@@ -169,6 +169,75 @@ button {
   box-shadow: var(--shadow-magenta);
 }
 
+.speed-class-panel {
+  display: grid;
+  gap: 9px;
+  border: 1px solid rgba(40, 246, 255, 0.32);
+  border-radius: 6px;
+  padding: 10px;
+  background: rgba(5, 8, 20, 0.7);
+}
+
+.speed-class-header {
+  display: flex;
+  gap: 8px;
+  justify-content: space-between;
+  color: var(--yellow);
+  font-size: 0.86rem;
+  text-transform: uppercase;
+}
+
+.speed-class-header strong {
+  color: var(--text);
+}
+
+.speed-class-grid {
+  display: grid;
+  gap: 7px;
+  grid-template-columns: repeat(auto-fit, minmax(112px, 1fr));
+}
+
+.speed-class-button {
+  min-height: 64px;
+  border: 1px solid rgba(40, 246, 255, 0.42);
+  border-radius: 6px;
+  padding: 8px;
+  background: rgba(9, 16, 42, 0.86);
+  cursor: pointer;
+  text-align: left;
+}
+
+.speed-class-button strong,
+.speed-class-button span {
+  display: block;
+}
+
+.speed-class-button strong {
+  color: var(--text);
+  font-size: 0.78rem;
+  text-transform: uppercase;
+}
+
+.speed-class-button span {
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 0.72rem;
+  line-height: 1.25;
+}
+
+.speed-class-button:hover,
+.speed-class-button:focus-visible {
+  outline: none;
+  border-color: var(--yellow);
+  box-shadow: 0 0 14px rgba(255, 228, 94, 0.22);
+}
+
+.speed-class-button.is-selected {
+  border-color: var(--magenta);
+  background: linear-gradient(180deg, rgba(255, 63, 209, 0.25), rgba(40, 246, 255, 0.1));
+  box-shadow: inset 0 0 18px rgba(255, 63, 209, 0.12);
+}
+
 .danger-button {
   border-color: rgba(255, 59, 88, 0.72);
   color: #fff;
@@ -329,6 +398,12 @@ button {
   font-size: 1.2rem;
 }
 
+.score-card .tally-score {
+  color: var(--green);
+  font-size: 1.45rem;
+  text-shadow: 0 0 12px rgba(68, 255, 153, 0.55);
+}
+
 .pause-card {
   width: min(460px, 100%);
   text-align: center;
@@ -368,7 +443,8 @@ button {
   .title-panel,
   .split,
   .score-grid,
-  .audio-grid {
+  .audio-grid,
+  .speed-class-grid {
     grid-template-columns: 1fr;
   }
 
