@@ -4718,28 +4718,88 @@ function drawCanvasPlayerCar(ctx, x, y, carConfig, state) {
 
 function drawTrafficCar(ctx, x, y, type, scale = 1) {
   const isFast = type === "fastCar";
-  const body = isFast ? "#ff8f3f" : "#2dd4ff";
-  const stripe = isFast ? "#ffe45e" : "#ff3fd1";
+  const body = isFast ? "#e84f45" : "#687c89";
+  const trim = isFast ? "#ffd25c" : "#a9c0c6";
+  const glass = isFast ? "#182033" : "#141e2c";
   const w = 62 * scale;
   const h = 104 * scale;
   ctx.save();
   ctx.translate(x, y);
-  drawShadow(ctx, w, h);
-  ctx.shadowBlur = 9;
-  ctx.shadowColor = body;
+  drawShadow(ctx, w * (isFast ? 0.9 : 0.96), h * 0.96);
+  ctx.fillStyle = "#070912";
+  ctx.fillRect(-w * 0.49, -h * 0.22, w * 0.1, h * 0.23);
+  ctx.fillRect(w * 0.39, -h * 0.22, w * 0.1, h * 0.23);
+  ctx.fillRect(-w * 0.49, h * 0.19, w * 0.1, h * 0.25);
+  ctx.fillRect(w * 0.39, h * 0.19, w * 0.1, h * 0.25);
+
   ctx.fillStyle = body;
-  pixelPath(ctx, [[-0.38, -0.48], [0.38, -0.48], [0.46, 0.4], [-0.46, 0.4]], w, h);
-  ctx.shadowBlur = 0;
-  ctx.fillStyle = "#0c1430";
-  ctx.fillRect(-w * 0.25, -h * 0.24, w * 0.5, h * 0.22);
-  ctx.fillStyle = stripe;
-  ctx.fillRect(-w * 0.3, h * 0.18, w * 0.6, h * 0.08);
-  ctx.fillStyle = isFast ? "#ff3b58" : "#ffe45e";
-  ctx.fillRect(-w * 0.32, -h * 0.43, w * 0.17, h * 0.06);
-  ctx.fillRect(w * 0.15, -h * 0.43, w * 0.17, h * 0.06);
-  ctx.fillStyle = "#05070f";
-  ctx.fillRect(-w * 0.54, -h * 0.18, w * 0.12, h * 0.52);
-  ctx.fillRect(w * 0.42, -h * 0.18, w * 0.12, h * 0.52);
+  if (isFast) {
+    pixelPath(ctx, [
+      [0, -0.5],
+      [0.34, -0.39],
+      [0.43, 0.28],
+      [0.32, 0.5],
+      [-0.32, 0.5],
+      [-0.43, 0.28],
+      [-0.34, -0.39]
+    ], w, h);
+  } else {
+    pixelPath(ctx, [
+      [-0.33, -0.49],
+      [0.33, -0.49],
+      [0.43, -0.36],
+      [0.43, 0.42],
+      [0.34, 0.5],
+      [-0.34, 0.5],
+      [-0.43, 0.42],
+      [-0.43, -0.36]
+    ], w, h);
+  }
+  ctx.strokeStyle = "rgba(5, 7, 15, 0.72)";
+  ctx.lineWidth = Math.max(2, 3 * scale);
+  ctx.stroke();
+
+  ctx.fillStyle = shade(body, isFast ? 26 : 18);
+  if (isFast) {
+    pixelPath(ctx, [
+      [0, -0.44],
+      [0.22, -0.34],
+      [0.28, -0.02],
+      [-0.28, -0.02],
+      [-0.22, -0.34]
+    ], w, h);
+  } else {
+    ctx.fillRect(-w * 0.27, -h * 0.4, w * 0.54, h * 0.2);
+  }
+  ctx.fillStyle = glass;
+  if (isFast) {
+    ctx.fillRect(-w * 0.2, -h * 0.19, w * 0.4, h * 0.21);
+    ctx.fillRect(-w * 0.17, h * 0.1, w * 0.34, h * 0.16);
+  } else {
+    ctx.fillRect(-w * 0.26, -h * 0.19, w * 0.52, h * 0.22);
+    ctx.fillRect(-w * 0.24, h * 0.18, w * 0.48, h * 0.16);
+  }
+  ctx.fillStyle = "rgba(255,255,255,0.34)";
+  ctx.fillRect(-w * 0.18, -h * 0.16, w * 0.08, h * 0.16);
+
+  ctx.fillStyle = "rgba(5, 7, 15, 0.5)";
+  ctx.fillRect(-w * 0.36, -h * 0.32, w * 0.72, Math.max(1, h * 0.025));
+  ctx.fillRect(-w * 0.34, h * 0.33, w * 0.68, Math.max(1, h * 0.025));
+
+  ctx.fillStyle = trim;
+  if (isFast) {
+    ctx.fillRect(-w * 0.045, -h * 0.35, w * 0.09, h * 0.68);
+    ctx.fillRect(-w * 0.28, h * 0.35, w * 0.56, h * 0.045);
+  } else {
+    ctx.fillRect(-w * 0.33, h * 0.07, w * 0.66, h * 0.045);
+  }
+
+  ctx.fillStyle = "#fff2b0";
+  ctx.fillRect(-w * 0.27, -h * 0.46, w * 0.15, h * 0.05);
+  ctx.fillRect(w * 0.12, -h * 0.46, w * 0.15, h * 0.05);
+  ctx.fillStyle = "#ff334c";
+  ctx.fillRect(-w * 0.29, h * 0.44, w * 0.16, h * 0.05);
+  ctx.fillRect(w * 0.13, h * 0.44, w * 0.16, h * 0.05);
   ctx.restore();
 }
 
@@ -4748,21 +4808,65 @@ function drawTruck(ctx, x, y, scale = 1) {
   const h = 142 * scale;
   ctx.save();
   ctx.translate(x, y);
-  drawShadow(ctx, w, h);
-  ctx.shadowBlur = 10;
-  ctx.shadowColor = "#ff3b58";
-  ctx.fillStyle = "#ff3b58";
-  ctx.fillRect(-w * 0.48, -h * 0.48, w * 0.96, h * 0.78);
-  ctx.fillStyle = "#cfd4e3";
-  ctx.fillRect(-w * 0.42, -h * 0.16, w * 0.84, h * 0.48);
-  ctx.fillStyle = "#0c1430";
-  ctx.fillRect(-w * 0.34, -h * 0.4, w * 0.68, h * 0.18);
+  drawShadow(ctx, w * 1.02, h);
+  ctx.fillStyle = "#070912";
+  ctx.fillRect(-w * 0.5, -h * 0.37, w * 0.11, h * 0.3);
+  ctx.fillRect(w * 0.39, -h * 0.37, w * 0.11, h * 0.3);
+  ctx.fillRect(-w * 0.5, h * 0.07, w * 0.11, h * 0.34);
+  ctx.fillRect(w * 0.39, h * 0.07, w * 0.11, h * 0.34);
+
+  ctx.fillStyle = "#7c2632";
+  pixelPath(ctx, [
+    [-0.39, -0.49],
+    [0.39, -0.49],
+    [0.48, -0.39],
+    [0.46, -0.09],
+    [-0.46, -0.09],
+    [-0.48, -0.39]
+  ], w, h);
+  ctx.strokeStyle = "rgba(5, 7, 15, 0.78)";
+  ctx.lineWidth = Math.max(2, 3 * scale);
+  ctx.stroke();
+
+  ctx.fillStyle = "#c3c8cc";
+  ctx.fillRect(-w * 0.46, -h * 0.08, w * 0.92, h * 0.51);
+  ctx.strokeStyle = "rgba(5, 7, 15, 0.72)";
+  ctx.strokeRect(-w * 0.46, -h * 0.08, w * 0.92, h * 0.51);
+
+  ctx.fillStyle = "#182033";
+  ctx.fillRect(-w * 0.31, -h * 0.41, w * 0.62, h * 0.18);
+  ctx.fillStyle = "rgba(255,255,255,0.32)";
+  ctx.fillRect(-w * 0.22, -h * 0.38, w * 0.1, h * 0.12);
+
+  ctx.fillStyle = "#8a949b";
+  ctx.fillRect(-w * 0.38, h * 0.05, w * 0.76, h * 0.24);
+  ctx.fillStyle = "rgba(5, 7, 15, 0.24)";
+  ctx.fillRect(-w * 0.38, h * 0.05, w * 0.76, Math.max(2, h * 0.035));
+  ctx.fillRect(-w * 0.38, h * 0.26, w * 0.76, Math.max(2, h * 0.035));
+
   ctx.fillStyle = "#ffe45e";
-  ctx.fillRect(-w * 0.44, -h * 0.47, w * 0.2, h * 0.06);
-  ctx.fillRect(w * 0.24, -h * 0.47, w * 0.2, h * 0.06);
-  ctx.fillStyle = "#111";
-  ctx.fillRect(-w * 0.58, -h * 0.28, w * 0.12, h * 0.72);
-  ctx.fillRect(w * 0.46, -h * 0.28, w * 0.12, h * 0.72);
+  ctx.fillRect(-w * 0.35, -h * 0.48, w * 0.18, h * 0.055);
+  ctx.fillRect(w * 0.17, -h * 0.48, w * 0.18, h * 0.055);
+  ctx.fillStyle = "#ff334c";
+  ctx.fillRect(-w * 0.35, h * 0.43, w * 0.18, h * 0.05);
+  ctx.fillRect(w * 0.17, h * 0.43, w * 0.18, h * 0.05);
+
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(-w * 0.42, h * 0.31, w * 0.84, h * 0.1);
+  ctx.clip();
+  for (let i = -3; i < 6; i += 1) {
+    const sx = -w * 0.55 + i * w * 0.2;
+    ctx.fillStyle = i % 2 ? "#101018" : "#ffd25c";
+    ctx.beginPath();
+    ctx.moveTo(sx, h * 0.42);
+    ctx.lineTo(sx + w * 0.18, h * 0.42);
+    ctx.lineTo(sx + w * 0.31, h * 0.31);
+    ctx.lineTo(sx + w * 0.13, h * 0.31);
+    ctx.closePath();
+    ctx.fill();
+  }
+  ctx.restore();
   ctx.restore();
 }
 
@@ -4881,22 +4985,40 @@ function drawBarrier(ctx, x, y, scale = 1) {
   const h = 70 * scale;
   ctx.save();
   ctx.translate(x, y);
-  drawShadow(ctx, w, h);
-  ctx.shadowBlur = 10;
-  ctx.shadowColor = "#ff3b58";
-  ctx.fillStyle = "#27212c";
-  ctx.fillRect(-w * 0.5, -h * 0.26, w, h * 0.48);
-  ctx.strokeStyle = "#ff3b58";
-  ctx.lineWidth = Math.max(3, 5 * scale);
+  drawShadow(ctx, w, h * 0.82);
+  ctx.fillStyle = "#12131a";
+  ctx.fillRect(-w * 0.42, h * 0.18, w * 0.12, h * 0.25);
+  ctx.fillRect(w * 0.3, h * 0.18, w * 0.12, h * 0.25);
+
+  ctx.fillStyle = "#2a2730";
+  ctx.fillRect(-w * 0.48, -h * 0.32, w * 0.96, h * 0.5);
+  ctx.strokeStyle = "#f3f0d8";
+  ctx.lineWidth = Math.max(2, 3 * scale);
+  ctx.strokeRect(-w * 0.48, -h * 0.32, w * 0.96, h * 0.5);
+
+  ctx.save();
   ctx.beginPath();
-  ctx.moveTo(-w * 0.42, h * 0.14);
-  ctx.lineTo(w * 0.42, -h * 0.2);
-  ctx.moveTo(-w * 0.12, h * 0.18);
-  ctx.lineTo(w * 0.48, -h * 0.06);
-  ctx.stroke();
-  ctx.fillStyle = "#ffe45e";
-  ctx.fillRect(-w * 0.42, -h * 0.2, w * 0.18, h * 0.12);
-  ctx.fillRect(w * 0.18, h * 0.02, w * 0.18, h * 0.12);
+  ctx.rect(-w * 0.44, -h * 0.26, w * 0.88, h * 0.38);
+  ctx.clip();
+  for (let i = -3; i < 8; i += 1) {
+    const sx = -w * 0.62 + i * w * 0.18;
+    ctx.fillStyle = i % 2 ? "#101018" : "#ffb340";
+    ctx.beginPath();
+    ctx.moveTo(sx, h * 0.15);
+    ctx.lineTo(sx + w * 0.16, h * 0.15);
+    ctx.lineTo(sx + w * 0.38, -h * 0.3);
+    ctx.lineTo(sx + w * 0.22, -h * 0.3);
+    ctx.closePath();
+    ctx.fill();
+  }
+  ctx.restore();
+
+  ctx.fillStyle = "#f3f0d8";
+  ctx.fillRect(-w * 0.5, -h * 0.38, w, h * 0.08);
+  ctx.fillRect(-w * 0.5, h * 0.13, w, h * 0.08);
+  ctx.fillStyle = "#ff334c";
+  ctx.fillRect(-w * 0.49, -h * 0.4, w * 0.14, h * 0.12);
+  ctx.fillRect(w * 0.35, -h * 0.4, w * 0.14, h * 0.12);
   ctx.restore();
 }
 
