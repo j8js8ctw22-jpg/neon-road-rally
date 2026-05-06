@@ -11,6 +11,10 @@
 // ---------------------------------------------------------------------------
 
 const STORAGE_KEY = "neonRoadRally.v1";
+const GAME_VERSION = "show-build-local";
+const PLAYTEST_REPORT_STORAGE_KEY = "neonRoadRally.playtestReports.v1";
+const PLAYTEST_REPORT_VERSION = 1;
+const PLAYTEST_REPORT_MAX_RUNS = 200;
 const LOCAL_PLAYER_NAME_MAX_LENGTH = 20;
 const LOCAL_CAR_NAME_MAX_LENGTH = 24;
 const ROAD_SEED_MAX_LENGTH = 32;
@@ -38,6 +42,14 @@ const CLASSIC_SEED_LABEL = "Classic";
 const PARTY_MIN_PLAYERS = 2;
 const PARTY_MAX_PLAYERS = 8;
 const PARTY_ROUND_TYPE_ONE_RUN = "oneRunEach";
+const PLAYTEST_REPORT_FILTERS = [
+  { id: "all", label: "All Runs" },
+  { id: "classic", label: "Classic Only" },
+  { id: "fuelRun", label: "Fuel Run Only" },
+  { id: "challenge", label: "Challenge Runs" },
+  { id: "party", label: "Party Runs" },
+  { id: "turbo", label: "Turbo Only" }
+];
 const TRACKS = [
   {
     id: "sunset-highway",
@@ -1076,6 +1088,80 @@ function normalizeLeaderboardList(value) {
     .slice(0, LEADERBOARD_MAX_ENTRIES);
 }
 
+function normalizePlaytestRunSummary(entry) {
+  if (!entry || typeof entry !== "object") return null;
+  const raceTypeId = normalizeRaceTypeId(entry.raceTypeId || entry.raceType, DEFAULT_RACE_TYPE_ID);
+  const raceModeId = normalizeSpeedClassId(entry.raceModeId || entry.raceMode || entry.speedClass, DEFAULT_SPEED_CLASS_ID);
+  const status = normalizeRunStatus(entry.status || entry.result);
+  const track = getTrackById(entry.trackId);
+  const challenge = getChallengeById(entry.challengeId);
+  const progressPercent = Number.isFinite(Number(entry.finishProgressPercent))
+    ? Number(entry.finishProgressPercent)
+    : Number(entry.progress || 0) * 100;
+  return {
+    runId: normalizeStorageId(entry.runId || entry.id, uid()),
+    timestamp: normalizeDateString(entry.timestamp, new Date().toISOString()),
+    gameVersion: sanitizeName(entry.gameVersion || GAME_VERSION, GAME_VERSION, 32),
+    playerDisplayName: sanitizePlayerName(entry.playerDisplayName || entry.playerName, "PLAYER"),
+    trackId: normalizeStorageId(track?.id || entry.trackId, TRACKS[0].id),
+    trackName: sanitizeName(entry.trackName || track?.name, TRACKS[0].name, DISPLAY_TEXT_MAX_LENGTH),
+    raceTypeId,
+    raceTypeLabel: sanitizeName(entry.raceTypeLabel || getRaceTypeLabel(raceTypeId), getRaceTypeLabel(raceTypeId), DISPLAY_TEXT_MAX_LENGTH),
+    raceModeId,
+    raceModeLabel: sanitizeName(entry.raceModeLabel || getSpeedClassLabel(raceModeId), getSpeedClassLabel(raceModeId), DISPLAY_TEXT_MAX_LENGTH),
+    challengeId: challenge ? challenge.id : "",
+    challengeName: challenge ? sanitizeName(entry.challengeName || challenge.name, challenge.name, DISPLAY_TEXT_MAX_LENGTH) : "",
+    challengeObjective: challenge ? sanitizeName(entry.challengeObjective || getChallengeObjectiveLabel(challenge), getChallengeObjectiveLabel(challenge), DISPLAY_TEXT_MAX_LENGTH) : "",
+    challengeCompleted: Boolean(entry.challengeCompleted),
+    challengePreviousBest: normalizeNonNegativeInteger(entry.challengePreviousBest || entry.previousBest),
+    challengeNewBest: Boolean(entry.challengeNewBest || entry.newBest),
+    partyMode: Boolean(entry.partyMode),
+    partySessionId: normalizeStorageId(entry.partySessionId, ""),
+    partyTurnIndex: normalizeNonNegativeInteger(entry.partyTurnIndex, 0, PARTY_MAX_PLAYERS),
+    partyPlayerCount: normalizeNonNegativeInteger(entry.partyPlayerCount, 0, PARTY_MAX_PLAYERS),
+    partySharedSeed: normalizeStoredRoadSeed(entry.partySharedSeed || entry.sharedSeed, ""),
+    partyRankAfterRun: normalizeNonNegativeInteger(entry.partyRankAfterRun || entry.partyRank, 0, PARTY_MAX_PLAYERS),
+    partyStandingGap: normalizeNonNegativeInteger(entry.partyStandingGap || entry.leaderMargin),
+    roadSeed: normalizeStoredRoadSeed(entry.roadSeed || entry.seed, CLASSIC_SEED_LABEL),
+    result: getRunStatusLabel(status),
+    status,
+    finalScore: normalizeNonNegativeInteger(entry.finalScore || entry.score),
+    elapsedTime: normalizeNonNegativeNumber(entry.elapsedTime || entry.time, 0, 24 * 60 * 60),
+    distanceCompleted: normalizeNonNegativeNumber(entry.distanceCompleted || entry.distance),
+    finishProgressPercent: clampNumber(progressPercent, 0, 100, 0),
+    endReason: sanitizeName(entry.endReason || entry.reason, "", DISPLAY_TEXT_MAX_LENGTH),
+    boostsUsed: normalizeNonNegativeInteger(entry.boostsUsed || entry.manualBoostsUsed, 0, 99),
+    boostPadsCollected: normalizeNonNegativeInteger(entry.boostPadsCollected, 0, 999),
+    rampsUsed: normalizeNonNegativeInteger(entry.rampsUsed, 0, 999),
+    nearMisses: normalizeNonNegativeInteger(entry.nearMisses, 0, 999),
+    slowdownHits: normalizeNonNegativeInteger(entry.slowdownHits, 0, 999),
+    collisionType: sanitizeName(entry.collisionType, "", DISPLAY_TEXT_MAX_LENGTH),
+    laneChanges: normalizeNonNegativeInteger(entry.laneChanges || entry.laneMoves, 0, 9999),
+    verticalMovementAmount: normalizeNonNegativeNumber(entry.verticalMovementAmount, 0, 9999),
+    centerLaneTime: normalizeNonNegativeNumber(entry.centerLaneTime, 0, 24 * 60 * 60),
+    longestCenterLaneStreak: normalizeNonNegativeNumber(entry.longestCenterLaneStreak, 0, 24 * 60 * 60),
+    averageSpeed: normalizeNonNegativeNumber(entry.averageSpeed, 0, 99999),
+    maxSpeed: normalizeNonNegativeNumber(entry.maxSpeed, 0, 99999),
+    finalSectionId: normalizeStorageId(entry.finalSectionId, ""),
+    finalSectionName: sanitizeName(entry.finalSectionName, "", DISPLAY_TEXT_MAX_LENGTH),
+    roadDirectorWaveCount: normalizeNonNegativeInteger(entry.roadDirectorWaveCount, 0, 99999),
+    hardestPressureObserved: normalizeNonNegativeNumber(entry.hardestPressureObserved, 0, 999),
+    gasCansSpawned: normalizeNonNegativeInteger(entry.gasCansSpawned, 0, 9999),
+    gasCansCollected: normalizeNonNegativeInteger(entry.gasCansCollected || entry.fuelCollected, 0, 9999),
+    fuelRemaining: normalizeNonNegativeNumber(entry.fuelRemaining, 0, FUEL_RUN_CONFIG.fuelMax),
+    lowestFuelReached: normalizeNonNegativeNumber(entry.lowestFuelReached, 0, FUEL_RUN_CONFIG.fuelMax),
+    longestNoFuelStretch: normalizeNonNegativeNumber(entry.longestNoFuelStretch, 0, 24 * 60 * 60),
+    lowFuelTime: normalizeNonNegativeNumber(entry.lowFuelTime, 0, 24 * 60 * 60),
+    criticalFuelTime: normalizeNonNegativeNumber(entry.criticalFuelTime, 0, 24 * 60 * 60),
+    outOfFuelOccurred: Boolean(entry.outOfFuelOccurred || status === "outOfFuel")
+  };
+}
+
+function normalizePlaytestReportFilter(value) {
+  const id = String(value || "all");
+  return PLAYTEST_REPORT_FILTERS.some((filter) => filter.id === id) ? id : "all";
+}
+
 function getChallengeRunStats(summary) {
   const breakdown = summary?.scoreBreakdown || {};
   return {
@@ -1589,6 +1675,70 @@ class PlayerProfileManager {
   }
 }
 
+class PlaytestReportStore {
+  constructor(storageKey) {
+    this.storageKey = storageKey;
+    this.status = "Not loaded";
+    this.runs = this.load();
+  }
+
+  load() {
+    const rawSave = safeStorageGetItem(this.storageKey);
+    const parsed = safeJsonParse(rawSave);
+    const source = Array.isArray(parsed)
+      ? parsed
+      : (Array.isArray(parsed?.runs) ? parsed.runs : []);
+    const runs = source
+      .slice(-PLAYTEST_REPORT_MAX_RUNS)
+      .map((entry) => normalizePlaytestRunSummary(entry))
+      .filter(Boolean);
+    this.status = rawSave && !parsed ? "Recovered from corrupted playtest report data" : "Playtest reports loaded";
+    return runs;
+  }
+
+  save() {
+    const payload = {
+      version: PLAYTEST_REPORT_VERSION,
+      maxRuns: PLAYTEST_REPORT_MAX_RUNS,
+      runs: this.runs.slice(-PLAYTEST_REPORT_MAX_RUNS)
+    };
+    if (safeStorageSetItem(this.storageKey, JSON.stringify(payload))) {
+      this.status = `Saved ${this.runs.length} playtest run${this.runs.length === 1 ? "" : "s"}`;
+      return true;
+    }
+    this.status = "Playtest report save failed";
+    return false;
+  }
+
+  addRun(entry) {
+    const cleanEntry = normalizePlaytestRunSummary({
+      timestamp: new Date().toISOString(),
+      runId: uid(),
+      ...entry
+    });
+    if (!cleanEntry) {
+      this.status = "Playtest run ignored";
+      return null;
+    }
+    this.runs.push(cleanEntry);
+    if (this.runs.length > PLAYTEST_REPORT_MAX_RUNS) {
+      this.runs.splice(0, this.runs.length - PLAYTEST_REPORT_MAX_RUNS);
+    }
+    this.save();
+    return cleanEntry;
+  }
+
+  clear() {
+    safeStorageRemoveItem(this.storageKey);
+    this.runs = [];
+    this.status = "Playtest reports cleared";
+  }
+
+  getRuns() {
+    return this.runs.slice();
+  }
+}
+
 function snapshotPartyPlayer(player) {
   return {
     id: normalizeStorageId(player.id, uid()),
@@ -1601,6 +1751,7 @@ function snapshotPartyPlayer(player) {
 class PartySession {
   constructor(options = {}) {
     const players = Array.isArray(options.players) ? options.players : [];
+    this.sessionId = normalizeStorageId(options.sessionId, uid());
     this.isPartyMode = true;
     this.roundType = options.roundType || PARTY_ROUND_TYPE_ONE_RUN;
     this.selectedPlayers = players.slice(0, PARTY_MAX_PLAYERS).map(snapshotPartyPlayer);
@@ -3046,6 +3197,13 @@ class RoadDirector {
     result.hard = result.type === "fourLaneSpike"
       || blockedCount >= 3
       || result.pressure >= context.pressureBudget + 0.45;
+    if (context.run) {
+      context.run.hardestPressureObserved = Math.max(
+        context.run.hardestPressureObserved || 0,
+        blockedCount,
+        result.maxDangerBlocked || 0
+      );
+    }
 
     const stats = this.stats;
     const sectionStats = this.getSectionStats(stats, context.section);
@@ -3251,6 +3409,8 @@ class RoadDirector {
       seed: formatRoadSeed(run.roadSeed),
       raceType: getRaceTypeLabel(run.raceTypeId),
       fuelRunObjectMixActive: Boolean(run.fuelRunObjectMixActive),
+      waveCount: this.stats.totalWaves || 0,
+      hardestPressureObserved: Math.max(0, run.hardestPressureObserved || 0),
       fuelAmount: Number.isFinite(run.fuel) ? run.fuel : 0,
       fuelDrainPerSecond: Number.isFinite(run.fuelDrainPerSecond) ? run.fuelDrainPerSecond : 0,
       timeSinceLastGasCan: Number.isFinite(run.timeSinceLastGasCan) ? run.timeSinceLastGasCan : 0,
@@ -4536,6 +4696,7 @@ class CollisionSystem {
     }
 
     if (obstacle.type === "ramp") {
+      run.rampsUsed += 1;
       this.game.launchJump();
       this.game.addScoreEvent("ramp", 80);
       this.game.audio.playSfx("ramp");
@@ -4543,6 +4704,7 @@ class CollisionSystem {
     }
 
     if (obstacle.type === "boostPad") {
+      run.boostPadsCollected += 1;
       run.padBoostTimer = Math.max(run.padBoostTimer, SPEED_TUNING.padBoostDuration);
       run.boostBurstTimer = Math.max(run.boostBurstTimer || 0, ARCADE_FEEL.boostBurstSeconds);
       run.screenShake = Math.max(run.screenShake || 0, 0.14);
@@ -5906,8 +6068,16 @@ class Renderer {
       missing: "none"
     };
     const nearbyTrafficSpriteDebug = this.getNearbyTrafficSpriteDebug(run);
+    const currentResultStatus = run.ended
+      ? getRunStatusLabel(run.finished ? "finished" : (run.endReason === "Out of Fuel" ? "outOfFuel" : "crashed"), run.endReason)
+      : (run.raceActive ? "Running" : "Countdown");
     const lines = [
       "DEBUG `",
+      `playtest result: ${currentResultStatus}`,
+      `playtest lanes: changes ${run.laneMoves || 0} center ${(run.centerLaneTime || 0).toFixed(1)}s streak ${(run.currentCenterLaneStreak || 0).toFixed(1)}s max ${(run.longestCenterLaneStreak || 0).toFixed(1)}s`,
+      `playtest fuel: gas ${run.gasCansCollected || 0}/${run.gasCansSpawned || 0} low ${(run.lowFuelSeconds || 0).toFixed(1)}s critical ${(run.criticalFuelSeconds || 0).toFixed(1)}s`,
+      `playtest boost: manual ${run.manualBoostsUsed || 0} pads ${run.boostPadsCollected || 0} ramps ${run.rampsUsed || 0}`,
+      `playtest director: waves ${directorDebug.waveCount || 0} hardest pressure ${directorDebug.hardestPressureObserved || 0}`,
       `race type: ${directorDebug.raceType}`,
       `mode: ${run.speedClass?.label || getSpeedClassLabel(run.speedClassId)} score x${(run.scoreMultiplier || 1).toFixed(2)}`,
       `seed: ${directorDebug.seed}`,
@@ -7078,6 +7248,7 @@ class NeonRoadRally {
       this.canvas.addEventListener("pointerdown", () => this.focusControls());
     }
     this.profiles = new PlayerProfileManager(STORAGE_KEY);
+    this.playtestReports = new PlaytestReportStore(PLAYTEST_REPORT_STORAGE_KEY);
     this.audio = new AudioManager(this.profiles.data.audio, (settings) => this.profiles.updateAudioSettings(settings));
     this.carSprites = new CarSpriteManager(CAR_BODY_STYLES, () => {
       if (this.screen === "customize") this.renderCarPreview();
@@ -7102,6 +7273,8 @@ class NeonRoadRally {
     this.pendingRaceTypeId = DEFAULT_RACE_TYPE_ID;
     this.partySetup = null;
     this.partySession = null;
+    this.playtestReportFilter = "all";
+    this.playtestReportCopyText = "";
     this.roadRng = null;
     this.randomFloat = () => this.nextRoadRandom();
     this.simulationStatus = null;
@@ -7125,6 +7298,8 @@ class NeonRoadRally {
     const speedClass = getSpeedClassConfig(this.profiles?.data?.speedClassId);
     const section = getTrackSection(track, 0);
     return {
+      runId: uid(),
+      gameVersion: GAME_VERSION,
       player,
       track,
       speedClassId: speedClass.id,
@@ -7150,6 +7325,9 @@ class NeonRoadRally {
       gasCansSpawned: 0,
       gasCansCollected: 0,
       fuelCollected: 0,
+      lowestFuelReached: 0,
+      lowFuelSeconds: 0,
+      criticalFuelSeconds: 0,
       fuelOpportunitiesBySection: {},
       simulatedFuelRestored: 0,
       roadSeed: DEFAULT_ROAD_SEED,
@@ -7186,6 +7364,7 @@ class NeonRoadRally {
       speedCapped: false,
       debugSpeedScale: 1,
       partyMode: false,
+      partySessionId: "",
       partySeedLocked: false,
       partyRoundNumber: 0,
       partyTurnNumber: 0,
@@ -7199,6 +7378,8 @@ class NeonRoadRally {
       boostMultiplier: 1,
       manualBoosts: 3,
       manualBoostsUsed: 0,
+      boostPadsCollected: 0,
+      rampsUsed: 0,
       boostTimer: 0,
       padBoostTimer: 0,
       oilTimer: 0,
@@ -7214,6 +7395,14 @@ class NeonRoadRally {
       penalties: 0,
       slowdownHits: 0,
       laneMoves: 0,
+      verticalMovementAmount: 0,
+      centerLaneTime: 0,
+      currentCenterLaneStreak: 0,
+      longestCenterLaneStreak: 0,
+      speedSampleSeconds: 0,
+      speedWeightedSum: 0,
+      maxSpeedObserved: getTrackCruiseSpeed(track, 0, speedClass.id),
+      hardestPressureObserved: 0,
       eventScore: 0,
       bonuses: {
         finish: 0,
@@ -7241,6 +7430,7 @@ class NeonRoadRally {
         fuelBonus: 0
       },
       lastCollision: "clear",
+      crashCollisionType: "",
       collisionState: "clear",
       crashFlash: 0,
       screenShake: 0,
@@ -7343,8 +7533,44 @@ class NeonRoadRally {
     run.gasCansSpawned = 0;
     run.gasCansCollected = 0;
     run.fuelCollected = 0;
+    run.lowestFuelReached = fuelRun ? tuning.fuelMax : 0;
+    run.lowFuelSeconds = 0;
+    run.criticalFuelSeconds = 0;
     run.fuelOpportunitiesBySection = {};
     run.simulatedFuelRestored = 0;
+  }
+
+  updateRunTelemetry(dt) {
+    const run = this.run;
+    if (!run || !run.raceActive || dt <= 0) return;
+    const speed = Number.isFinite(run.currentSpeed) ? run.currentSpeed : 0;
+    run.maxSpeedObserved = Math.max(run.maxSpeedObserved || 0, speed);
+    run.speedSampleSeconds = Math.max(0, (run.speedSampleSeconds || 0) + dt);
+    run.speedWeightedSum = Math.max(0, (run.speedWeightedSum || 0) + speed * dt);
+    const laneValue = Number.isFinite(run.renderLaneFloat) ? run.renderLaneFloat : run.targetLane;
+    const lane = Math.round(clamp(laneValue, 0, LANES - 1));
+    if (lane === TRACK_DIRECTOR.centerLane) {
+      run.centerLaneTime = Math.max(0, (run.centerLaneTime || 0) + dt);
+      run.currentCenterLaneStreak = Math.max(0, (run.currentCenterLaneStreak || 0) + dt);
+      run.longestCenterLaneStreak = Math.max(run.longestCenterLaneStreak || 0, run.currentCenterLaneStreak);
+    } else {
+      run.currentCenterLaneStreak = 0;
+    }
+  }
+
+  updateFuelRunTelemetry(dt) {
+    const run = this.run;
+    if (!run || !isFuelRunRaceType(run.raceTypeId) || dt <= 0) return;
+    run.lowestFuelReached = Math.min(
+      Number.isFinite(run.lowestFuelReached) ? run.lowestFuelReached : run.fuelMax,
+      Number.isFinite(run.fuel) ? run.fuel : run.fuelMax
+    );
+    if (run.lowFuelActive) {
+      run.lowFuelSeconds = Math.max(0, (run.lowFuelSeconds || 0) + dt);
+    }
+    if (run.criticalFuelActive) {
+      run.criticalFuelSeconds = Math.max(0, (run.criticalFuelSeconds || 0) + dt);
+    }
   }
 
   updateFuelRun(dt) {
@@ -7356,6 +7582,7 @@ class NeonRoadRally {
     run.fuel = clamp(run.fuel - run.fuelDrainPerSecond * dt, 0, run.fuelMax);
     run.lowFuelActive = run.fuel <= run.lowFuelThreshold;
     run.criticalFuelActive = run.fuel <= run.criticalFuelThreshold;
+    this.updateFuelRunTelemetry(dt);
     this.maybePlayFuelWarning();
     if (run.fuel <= 0 && !run.ended) {
       this.endRace("outOfFuel", "Out of Fuel");
@@ -7393,6 +7620,7 @@ class NeonRoadRally {
     if (!isFuelRunRaceType(run.raceTypeId)) return;
     const before = run.fuel;
     const restore = Number.isFinite(run.gasCanRestoreAmount) ? run.gasCanRestoreAmount : getFuelRunTuning(run.speedClassId).gasCanRestoreAmount;
+    run.lowestFuelReached = Math.min(Number.isFinite(run.lowestFuelReached) ? run.lowestFuelReached : before, before);
     run.fuel = clamp(run.fuel + restore, 0, run.fuelMax);
     run.gasCansCollected += 1;
     run.fuelCollected += 1;
@@ -7432,11 +7660,13 @@ class NeonRoadRally {
 
     if (run.verticalInput !== 0) {
       const verticalSpeed = INPUT_CONFIG.verticalMoveRatioPerSecond;
-      run.targetYRatio = clamp(
+      const nextYRatio = clamp(
         run.targetYRatio + run.verticalInput * verticalSpeed * dt,
         PLAYER_MIN_Y_RATIO,
         PLAYER_MAX_Y_RATIO
       );
+      run.verticalMovementAmount += Math.abs(nextYRatio - run.playerYRatio) * 100;
+      run.targetYRatio = nextYRatio;
       run.playerYRatio = run.targetYRatio;
     }
 
@@ -7470,6 +7700,7 @@ class NeonRoadRally {
     const distanceDelta = run.currentSpeed * dt;
     run.lastDistanceDelta = distanceDelta;
     run.distance += distanceDelta;
+    this.updateRunTelemetry(dt);
     this.updateRaceSection();
     const distanceScore = distanceDelta * (run.boostTimer > 0 ? 1.6 : 1);
     const paceScore = run.currentSpeed * dt * 0.04;
@@ -7707,6 +7938,7 @@ class NeonRoadRally {
     this.run.raceTypeId = raceType.id;
     this.run.raceType = raceType;
     this.run.partyMode = partyMode;
+    this.run.partySessionId = partyMode ? (this.partySession?.sessionId || "") : "";
     this.run.partySeedLocked = Boolean(options.partySeedLocked ?? partyMode);
     this.run.partyRoundNumber = partyMode ? (this.partySession?.roundNumber || 1) : 0;
     this.run.partyTurnNumber = partyMode ? (this.partySession?.currentTurnNumber || 1) : 0;
@@ -7971,6 +8203,93 @@ class NeonRoadRally {
     return this.profiles.recordChallengeResult(challenge, summary, evaluation);
   }
 
+  getPartyStandingForSummary(summary) {
+    if (!summary?.partyMode || !this.partySession?.isPartyMode) return null;
+    const result = summary.partyResult;
+    const standings = this.partySession.standings();
+    return standings.find((standing) => (
+      standing.playerId === result?.playerId
+      && standing.date === result?.date
+    )) || standings.find((standing) => standing.playerId === summary.playerId) || null;
+  }
+
+  buildPlaytestRunSummary(summary) {
+    const run = this.run || {};
+    const directorStats = this.obstacles?.director?.getSimulationStats
+      ? this.obstacles.director.getSimulationStats()
+      : {};
+    const partyStanding = this.getPartyStandingForSummary(summary);
+    const challengeResult = summary.challengeResult || {};
+    const averageSpeed = run.speedSampleSeconds > 0
+      ? run.speedWeightedSum / run.speedSampleSeconds
+      : (summary.time > 0 ? summary.distance / summary.time : 0);
+    return {
+      runId: run.runId,
+      timestamp: new Date().toISOString(),
+      gameVersion: run.gameVersion || GAME_VERSION,
+      playerDisplayName: summary.playerName,
+      trackId: run.track?.id || TRACKS[0].id,
+      trackName: summary.trackName,
+      raceTypeId: summary.raceTypeId,
+      raceTypeLabel: summary.raceTypeLabel,
+      raceModeId: summary.speedClass,
+      raceModeLabel: summary.speedClassLabel,
+      challengeId: summary.challengeMode ? summary.challengeId : "",
+      challengeName: summary.challengeMode ? summary.challengeName : "",
+      challengeObjective: summary.challengeMode ? summary.challengeObjective : "",
+      challengeCompleted: Boolean(challengeResult.completed),
+      challengePreviousBest: challengeResult.previousBestScore || 0,
+      challengeNewBest: Boolean(challengeResult.newBest || challengeResult.newlyCompleted),
+      partyMode: Boolean(summary.partyMode),
+      partySessionId: summary.partyMode ? (run.partySessionId || this.partySession?.sessionId || "") : "",
+      partyTurnIndex: summary.partyMode ? (run.partyTurnNumber || 0) : 0,
+      partyPlayerCount: summary.partyMode ? (run.partyTotalPlayers || 0) : 0,
+      partySharedSeed: summary.partyMode ? (this.partySession?.sharedSeed || run.roadSeed || "") : "",
+      partyRankAfterRun: partyStanding?.rank || 0,
+      partyStandingGap: partyStanding?.leaderMargin || 0,
+      roadSeed: summary.seed,
+      status: summary.status,
+      finalScore: summary.finalScore,
+      elapsedTime: summary.time,
+      distanceCompleted: summary.distance,
+      finishProgressPercent: summary.progress * 100,
+      endReason: summary.reason,
+      boostsUsed: summary.manualBoostsUsed,
+      boostPadsCollected: run.boostPadsCollected || 0,
+      rampsUsed: run.rampsUsed || 0,
+      nearMisses: summary.nearMisses,
+      slowdownHits: summary.slowdownHits,
+      collisionType: summary.status === "crashed" ? (run.crashCollisionType || summary.reason || "") : "",
+      laneChanges: summary.laneMoves,
+      verticalMovementAmount: run.verticalMovementAmount || 0,
+      centerLaneTime: run.centerLaneTime || 0,
+      longestCenterLaneStreak: run.longestCenterLaneStreak || 0,
+      averageSpeed,
+      maxSpeed: run.maxSpeedObserved || run.currentSpeed || 0,
+      finalSectionId: run.currentSectionId || "",
+      finalSectionName: run.currentSectionLabel || "",
+      roadDirectorWaveCount: directorStats.totalWaves || 0,
+      hardestPressureObserved: run.hardestPressureObserved || 0,
+      gasCansSpawned: summary.gasCansSpawned,
+      gasCansCollected: summary.gasCansCollected,
+      fuelRemaining: summary.fuelRemaining,
+      lowestFuelReached: isFuelRunRaceType(summary.raceTypeId) ? (run.lowestFuelReached || 0) : 0,
+      longestNoFuelStretch: isFuelRunRaceType(summary.raceTypeId) ? (run.longestNoFuelStretchSeconds || 0) : 0,
+      lowFuelTime: isFuelRunRaceType(summary.raceTypeId) ? (run.lowFuelSeconds || 0) : 0,
+      criticalFuelTime: isFuelRunRaceType(summary.raceTypeId) ? (run.criticalFuelSeconds || 0) : 0,
+      outOfFuelOccurred: summary.status === "outOfFuel"
+    };
+  }
+
+  recordPlaytestRunSummary(summary) {
+    if (!summary || !this.playtestReports) return null;
+    const playtestRun = this.playtestReports.addRun(this.buildPlaytestRunSummary(summary));
+    if (playtestRun) {
+      summary.playtestRunId = playtestRun.runId;
+    }
+    return playtestRun;
+  }
+
   endRace(status, reason) {
     const run = this.run;
     if (run.ended) return;
@@ -7978,6 +8297,9 @@ class NeonRoadRally {
     run.ended = true;
     run.finished = status === "finished";
     run.endReason = reason;
+    run.crashCollisionType = status === "crashed"
+      ? sanitizeName(reason || run.lastCollision, "Unknown", DISPLAY_TEXT_MAX_LENGTH)
+      : "";
     run.crashFlash = status === "crashed" ? 1 : 0;
     run.screenShake = status === "crashed" ? Math.max(run.screenShake || 0, ARCADE_FEEL.crashShake) : run.screenShake;
     run.crashBeatTimer = status === "crashed" ? 0.72 : 0;
@@ -8126,7 +8448,13 @@ class NeonRoadRally {
     this.lastSummary = summary;
     if (run.partyMode && this.partySession?.isPartyMode) {
       this.lastSummary.partyResult = this.partySession.addResult(this.lastSummary);
+      const partyStanding = this.getPartyStandingForSummary(this.lastSummary);
+      if (partyStanding && this.lastSummary.partyResult) {
+        this.lastSummary.partyResult.rank = partyStanding.rank;
+        this.lastSummary.partyResult.leaderMargin = partyStanding.leaderMargin;
+      }
     }
+    this.recordPlaytestRunSummary(this.lastSummary);
 
     setTimeout(() => {
       if (this.screen !== "game") return;
@@ -9398,6 +9726,7 @@ class NeonRoadRally {
               <button class="small-button" data-action="runSeedTest">Seed Determinism</button>
               <button class="small-button" data-action="runSimulation">Classic Simulation</button>
               <button class="small-button" data-action="runFuelSimulation">Fuel Run Simulation</button>
+              <button class="small-button" data-action="showPlaytestReport">Playtest Report</button>
               <button class="small-button" data-action="vehicleScaleDebug">Vehicle Scale Check</button>
             </div>
           ` : ""}
@@ -9453,6 +9782,7 @@ class NeonRoadRally {
             <button class="small-button" data-action="toggleMusic">Music: ${this.audio.musicMuted ? "Muted" : "On"}</button>
             <button class="small-button" data-action="toggleSfx">SFX: ${this.audio.sfxMuted ? "Muted" : "On"}</button>
             <button class="small-button" data-action="fullscreen">Fullscreen</button>
+            <button class="small-button" data-action="showPlaytestReport">Playtest Report</button>
             <button class="small-button primary" data-action="title">Back to Title</button>
           </div>
           <p class="keyboard-hints">F toggles fullscreen. In debug gameplay, F keeps the debug finish shortcut.</p>
@@ -9462,6 +9792,279 @@ class NeonRoadRally {
     `;
     this.bindLayerButtons();
     this.bindTitleAudioControls();
+  }
+
+  filterPlaytestRuns(runs, filterValue = "all") {
+    const filter = normalizePlaytestReportFilter(filterValue);
+    if (filter === "classic") return runs.filter((run) => run.raceTypeId === DEFAULT_RACE_TYPE_ID);
+    if (filter === "fuelRun") return runs.filter((run) => run.raceTypeId === FUEL_RUN_RACE_TYPE_ID);
+    if (filter === "challenge") return runs.filter((run) => Boolean(run.challengeId));
+    if (filter === "party") return runs.filter((run) => Boolean(run.partyMode));
+    if (filter === "turbo") return runs.filter((run) => run.raceModeId === "turbo");
+    return runs;
+  }
+
+  averagePlaytestField(runs, field) {
+    if (!runs.length) return 0;
+    return runs.reduce((sum, run) => sum + (Number(run[field]) || 0), 0) / runs.length;
+  }
+
+  completionRate(runs) {
+    if (!runs.length) return 0;
+    return runs.filter((run) => run.status === "finished").length / runs.length;
+  }
+
+  groupPlaytestRuns(runs, keyField, labelField) {
+    const groups = new Map();
+    runs.forEach((run) => {
+      const key = String(run[keyField] || "unknown");
+      if (!groups.has(key)) {
+        groups.set(key, {
+          id: key,
+          label: sanitizeName(run[labelField] || key, key, DISPLAY_TEXT_MAX_LENGTH),
+          runs: []
+        });
+      }
+      groups.get(key).runs.push(run);
+    });
+    return Array.from(groups.values())
+      .map((group) => ({
+        id: group.id,
+        label: group.label,
+        count: group.runs.length,
+        completionRate: this.completionRate(group.runs),
+        averageScore: this.averagePlaytestField(group.runs, "finalScore"),
+        averageDuration: this.averagePlaytestField(group.runs, "elapsedTime")
+      }))
+      .sort((a, b) => b.count - a.count || a.label.localeCompare(b.label));
+  }
+
+  countPlaytestRuns(runs, keyFn) {
+    const counts = new Map();
+    runs.forEach((run) => {
+      const key = sanitizeName(keyFn(run), "Unknown", DISPLAY_TEXT_MAX_LENGTH);
+      counts.set(key, (counts.get(key) || 0) + 1);
+    });
+    return Array.from(counts.entries())
+      .map(([label, count]) => ({ label, count }))
+      .sort((a, b) => b.count - a.count || a.label.localeCompare(b.label));
+  }
+
+  buildPlaytestReportAggregate(filterValue = "all") {
+    const filter = normalizePlaytestReportFilter(filterValue);
+    const allRuns = this.playtestReports.getRuns();
+    const runs = this.filterPlaytestRuns(allRuns, filter);
+    const fuelRuns = runs.filter((run) => run.raceTypeId === FUEL_RUN_RACE_TYPE_ID);
+    const fuelFinishes = fuelRuns.filter((run) => run.status === "finished");
+    const challengeRuns = runs.filter((run) => Boolean(run.challengeId));
+    const partyRuns = runs.filter((run) => Boolean(run.partyMode));
+    const partySessionIds = new Set(partyRuns.map((run) => run.partySessionId).filter(Boolean));
+    const challengeGroups = this.countPlaytestRuns(challengeRuns, (run) => run.challengeName || run.challengeId);
+    const challengeRows = challengeGroups.map((group) => {
+      const groupRuns = challengeRuns.filter((run) => (run.challengeName || run.challengeId) === group.label);
+      return {
+        ...group,
+        completed: groupRuns.filter((run) => run.challengeCompleted).length,
+        newBest: groupRuns.filter((run) => run.challengeNewBest).length
+      };
+    });
+    const crashRows = this.countPlaytestRuns(
+      runs.filter((run) => run.status === "crashed"),
+      (run) => run.collisionType || run.endReason || "Unknown"
+    );
+
+    return {
+      filter,
+      totalStored: allRuns.length,
+      filteredCount: runs.length,
+      runs,
+      completionRate: this.completionRate(runs),
+      averageScore: this.averagePlaytestField(runs, "finalScore"),
+      averageDuration: this.averagePlaytestField(runs, "elapsedTime"),
+      averageBoostsUsed: this.averagePlaytestField(runs, "boostsUsed"),
+      averageLaneChanges: this.averagePlaytestField(runs, "laneChanges"),
+      averageCenterLaneTime: this.averagePlaytestField(runs, "centerLaneTime"),
+      modeRows: this.groupPlaytestRuns(runs, "raceModeId", "raceModeLabel"),
+      typeRows: this.groupPlaytestRuns(runs, "raceTypeId", "raceTypeLabel"),
+      crashRows,
+      outOfFuelCount: runs.filter((run) => run.status === "outOfFuel").length,
+      fuelSummary: {
+        runs: fuelRuns.length,
+        averageGasCansCollected: this.averagePlaytestField(fuelRuns, "gasCansCollected"),
+        averageGasCansSpawned: this.averagePlaytestField(fuelRuns, "gasCansSpawned"),
+        averageFuelRemainingOnFinishes: this.averagePlaytestField(fuelFinishes, "fuelRemaining"),
+        averageLowestFuelReached: this.averagePlaytestField(fuelRuns, "lowestFuelReached"),
+        averageLowFuelTime: this.averagePlaytestField(fuelRuns, "lowFuelTime"),
+        averageCriticalFuelTime: this.averagePlaytestField(fuelRuns, "criticalFuelTime"),
+        outOfFuelCount: fuelRuns.filter((run) => run.outOfFuelOccurred).length
+      },
+      challengeSummary: {
+        runs: challengeRuns.length,
+        completed: challengeRuns.filter((run) => run.challengeCompleted).length,
+        newBest: challengeRuns.filter((run) => run.challengeNewBest).length,
+        rows: challengeRows
+      },
+      partySummary: {
+        runs: partyRuns.length,
+        sessions: partySessionIds.size,
+        averageRank: this.averagePlaytestField(partyRuns.filter((run) => run.partyRankAfterRun > 0), "partyRankAfterRun"),
+        averageLeaderGap: this.averagePlaytestField(partyRuns, "partyStandingGap"),
+        playerCountAverage: this.averagePlaytestField(partyRuns, "partyPlayerCount")
+      }
+    };
+  }
+
+  formatPlaytestPercent(value) {
+    return `${Math.round(clampNumber(value, 0, 1, 0) * 100)}%`;
+  }
+
+  formatPlaytestDecimal(value, digits = 1) {
+    const numeric = Number(value);
+    return Number.isFinite(numeric) ? numeric.toFixed(digits) : "0.0";
+  }
+
+  renderPlaytestSummaryList(rows, emptyText, renderRow) {
+    return `
+      <ol class="leaderboard-list playtest-report-list">
+        ${rows.length ? rows.map((row) => renderRow(row)).join("") : `<li class="leaderboard-item"><span class="meta">${escapeHtml(emptyText)}</span></li>`}
+      </ol>
+    `;
+  }
+
+  buildPlaytestReportExportText(filterValue = this.playtestReportFilter) {
+    const aggregate = this.buildPlaytestReportAggregate(filterValue);
+    const payload = {
+      generatedAt: new Date().toISOString(),
+      storageKey: PLAYTEST_REPORT_STORAGE_KEY,
+      localOnly: true,
+      maxRunsStored: PLAYTEST_REPORT_MAX_RUNS,
+      filter: aggregate.filter,
+      totals: {
+        totalRunsStored: aggregate.totalStored,
+        filteredRuns: aggregate.filteredCount,
+        completionRate: aggregate.completionRate,
+        averageScore: Math.round(aggregate.averageScore),
+        averageDurationSeconds: Number(aggregate.averageDuration.toFixed(2)),
+        outOfFuelCount: aggregate.outOfFuelCount,
+        averageBoostsUsed: Number(aggregate.averageBoostsUsed.toFixed(2)),
+        averageLaneChanges: Number(aggregate.averageLaneChanges.toFixed(2)),
+        averageCenterLaneTimeSeconds: Number(aggregate.averageCenterLaneTime.toFixed(2))
+      },
+      completionByRaceMode: aggregate.modeRows,
+      completionByRaceType: aggregate.typeRows,
+      crashCountByObstacleType: aggregate.crashRows,
+      fuelRun: aggregate.fuelSummary,
+      challengeCompletionSummary: aggregate.challengeSummary,
+      partyModeSummary: aggregate.partySummary,
+      runSummaries: aggregate.runs
+    };
+    return JSON.stringify(payload, null, 2);
+  }
+
+  showPlaytestReportScreen(message = "") {
+    this.setScreen("playtestReport");
+    this.audio.playMusic("title", false);
+    const filter = normalizePlaytestReportFilter(this.playtestReportFilter);
+    const aggregate = this.buildPlaytestReportAggregate(filter);
+    const filterButtons = PLAYTEST_REPORT_FILTERS.map((item) => `
+      <button class="small-button ${item.id === filter ? "primary" : ""}" data-action="showPlaytestReport" data-filter="${escapeAttr(item.id)}">${escapeHtml(item.label)}</button>
+    `).join("");
+    const modeList = this.renderPlaytestSummaryList(aggregate.modeRows, "No mode data yet.", (row) => `
+      <li class="leaderboard-item playtest-report-row">
+        <span class="leaderboard-rank">${escapeHtml(row.label)}</span>
+        <span class="meta">${row.count} runs · ${this.formatPlaytestPercent(row.completionRate)} finished · Avg ${formatScore(row.averageScore)} · ${formatTime(row.averageDuration)}</span>
+      </li>
+    `);
+    const typeList = this.renderPlaytestSummaryList(aggregate.typeRows, "No race type data yet.", (row) => `
+      <li class="leaderboard-item playtest-report-row">
+        <span class="leaderboard-rank">${escapeHtml(row.label)}</span>
+        <span class="meta">${row.count} runs · ${this.formatPlaytestPercent(row.completionRate)} finished · Avg ${formatScore(row.averageScore)} · ${formatTime(row.averageDuration)}</span>
+      </li>
+    `);
+    const crashList = this.renderPlaytestSummaryList(aggregate.crashRows, "No crashes recorded in this filter.", (row) => `
+      <li class="leaderboard-item playtest-report-row">
+        <span class="leaderboard-rank">${escapeHtml(row.label)}</span>
+        <span class="leaderboard-score">${row.count}</span>
+      </li>
+    `);
+    const challengeList = this.renderPlaytestSummaryList(aggregate.challengeSummary.rows, "No challenge runs recorded in this filter.", (row) => `
+      <li class="leaderboard-item playtest-report-row">
+        <span class="leaderboard-rank">${escapeHtml(row.label)}</span>
+        <span class="meta">${row.completed}/${row.count} complete · ${row.newBest} new best${row.newBest === 1 ? "" : "s"}</span>
+      </li>
+    `);
+    this.layer.classList.remove("is-empty");
+    this.layer.innerHTML = `
+      <section class="panel playtest-report-panel">
+        <div class="playtest-report-header">
+          <div>
+            <span class="eyebrow">Local Development Only</span>
+            <h2>Playtest Report</h2>
+            <p class="hint">Run summaries are stored only in this browser under ${escapeHtml(PLAYTEST_REPORT_STORAGE_KEY)}.</p>
+          </div>
+          <div class="playtest-report-status">
+            <strong>${aggregate.totalStored}</strong>
+            <span>total stored</span>
+          </div>
+        </div>
+        <div class="row playtest-filter-row">${filterButtons}</div>
+        <div class="score-grid playtest-summary-grid">
+          <div class="score-card"><strong>Filtered Runs</strong><span>${aggregate.filteredCount}</span></div>
+          <div class="score-card"><strong>Completion Rate</strong><span>${this.formatPlaytestPercent(aggregate.completionRate)}</span></div>
+          <div class="score-card"><strong>Average Score</strong><span>${formatScore(aggregate.averageScore)}</span></div>
+          <div class="score-card"><strong>Average Duration</strong><span>${formatTime(aggregate.averageDuration)}</span></div>
+          <div class="score-card"><strong>Out Of Fuel</strong><span>${aggregate.outOfFuelCount}</span></div>
+          <div class="score-card"><strong>Avg Boosts Used</strong><span>${this.formatPlaytestDecimal(aggregate.averageBoostsUsed)}</span></div>
+          <div class="score-card"><strong>Avg Lane Changes</strong><span>${this.formatPlaytestDecimal(aggregate.averageLaneChanges)}</span></div>
+          <div class="score-card"><strong>Avg Center-Lane Time</strong><span>${formatTime(aggregate.averageCenterLaneTime)}</span></div>
+          <div class="score-card"><strong>Fuel Gas Collected</strong><span>${this.formatPlaytestDecimal(aggregate.fuelSummary.averageGasCansCollected)}</span></div>
+          <div class="score-card"><strong>Fuel Left On Finishes</strong><span>${this.formatPlaytestDecimal(aggregate.fuelSummary.averageFuelRemainingOnFinishes)}</span></div>
+          <div class="score-card"><strong>Challenge Runs</strong><span>${aggregate.challengeSummary.completed}/${aggregate.challengeSummary.runs}</span></div>
+          <div class="score-card"><strong>Party Runs</strong><span>${aggregate.partySummary.runs}</span></div>
+        </div>
+        <div class="playtest-report-columns">
+          <section>
+            <h3>Race Modes</h3>
+            ${modeList}
+          </section>
+          <section>
+            <h3>Race Types</h3>
+            ${typeList}
+          </section>
+          <section>
+            <h3>Crash Types</h3>
+            ${crashList}
+          </section>
+          <section>
+            <h3>Challenges</h3>
+            ${challengeList}
+          </section>
+        </div>
+        <div class="score-grid playtest-detail-grid">
+          <div class="score-card"><strong>Fuel Runs</strong><span class="is-compact">${aggregate.fuelSummary.runs} runs · ${this.formatPlaytestDecimal(aggregate.fuelSummary.averageGasCansSpawned)} gas spawned · ${formatTime(aggregate.fuelSummary.averageLowFuelTime)} low fuel · ${formatTime(aggregate.fuelSummary.averageCriticalFuelTime)} critical</span></div>
+          <div class="score-card"><strong>Party Summary</strong><span class="is-compact">${aggregate.partySummary.sessions} sessions · avg rank ${this.formatPlaytestDecimal(aggregate.partySummary.averageRank)} · avg gap ${formatScore(aggregate.partySummary.averageLeaderGap)} · avg players ${this.formatPlaytestDecimal(aggregate.partySummary.playerCountAverage)}</span></div>
+        </div>
+        <div class="row playtest-action-row">
+          <button class="small-button primary" data-action="copyPlaytestReport">Copy Playtest Report</button>
+          <button class="danger-button" data-action="clearPlaytestReports">Clear Playtest Reports</button>
+          <button class="small-button" data-action="settings">Back to Settings</button>
+          <button class="small-button" data-action="title">Back to Title</button>
+        </div>
+        ${this.playtestReportCopyText ? `
+          <div class="field playtest-copy-field">
+            <label for="playtestReportCopyText">Manual Copy</label>
+            <textarea id="playtestReportCopyText" readonly>${escapeHtml(this.playtestReportCopyText)}</textarea>
+          </div>
+        ` : ""}
+        <p class="status-line">${escapeHtml(message || this.playtestReports.status)}</p>
+      </section>
+    `;
+    this.bindLayerButtons();
+    const copyText = document.getElementById("playtestReportCopyText");
+    if (copyText) {
+      copyText.focus();
+      copyText.select();
+    }
   }
 
   showPreRaceScreen(message = "") {
@@ -10718,6 +11321,11 @@ class NeonRoadRally {
         else if (action === "customize") this.showCustomizeScreen();
         else if (action === "leaderboard") this.showLeaderboard();
         else if (action === "settings") this.showSettingsScreen();
+        else if (action === "showPlaytestReport") {
+          this.playtestReportFilter = normalizePlaytestReportFilter(button.dataset.filter || this.playtestReportFilter);
+          this.playtestReportCopyText = "";
+          this.showPlaytestReportScreen();
+        }
         else if (action === "fullscreen") this.toggleFullscreen();
         else if (action === "setSpeedClass") this.handleSetSpeedClass(button.dataset.id);
         else if (action === "randomSeed") this.handleRandomSeed();
@@ -10745,6 +11353,8 @@ class NeonRoadRally {
         else if (action === "selectPlayer") this.handleSelectPlayer(button.dataset.id);
         else if (action === "saveCar") this.handleSaveCar();
         else if (action === "resetData") this.handleResetData();
+        else if (action === "copyPlaytestReport") this.handleCopyPlaytestReport();
+        else if (action === "clearPlaytestReports") this.handleClearPlaytestReports();
       });
     });
   }
@@ -10803,6 +11413,29 @@ class NeonRoadRally {
     this.audio.setMusicMuted(false);
     this.audio.setSfxMuted(false);
     this.showTitle();
+  }
+
+  async handleCopyPlaytestReport() {
+    const text = this.buildPlaytestReportExportText(this.playtestReportFilter);
+    try {
+      if (!navigator.clipboard || typeof navigator.clipboard.writeText !== "function") {
+        throw new Error("Clipboard API unavailable");
+      }
+      await navigator.clipboard.writeText(text);
+      this.playtestReportCopyText = "";
+      this.showPlaytestReportScreen("Playtest report copied to clipboard.");
+    } catch (error) {
+      this.playtestReportCopyText = text;
+      this.showPlaytestReportScreen("Clipboard copy failed. Use the manual copy box below.");
+    }
+  }
+
+  handleClearPlaytestReports() {
+    const confirmed = window.confirm("Clear only local Playtest Report run summaries? This does not delete players, leaderboard, settings, challenge progress, or car data.");
+    if (!confirmed) return;
+    this.playtestReports.clear();
+    this.playtestReportCopyText = "";
+    this.showPlaytestReportScreen("Playtest reports cleared.");
   }
 
   toggleMusic(refreshTitle = false) {

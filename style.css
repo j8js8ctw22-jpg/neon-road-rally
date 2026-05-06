@@ -670,8 +670,94 @@ button:disabled {
 }
 
 .score-results-panel,
-.party-results-panel {
+.party-results-panel,
+.playtest-report-panel {
   width: min(1040px, 100%);
+}
+
+.playtest-report-header {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: minmax(0, 1fr) minmax(150px, 0.24fr);
+  align-items: start;
+  margin-bottom: 14px;
+}
+
+.playtest-report-status {
+  display: grid;
+  gap: 3px;
+  border: 1px solid rgba(255, 228, 94, 0.46);
+  border-radius: 6px;
+  padding: 12px;
+  background: rgba(255, 228, 94, 0.08);
+  text-align: right;
+}
+
+.playtest-report-status strong {
+  color: var(--green);
+  font-size: 2rem;
+  line-height: 1;
+}
+
+.playtest-report-status span {
+  color: var(--yellow);
+  font-size: 0.78rem;
+  text-transform: uppercase;
+}
+
+.playtest-filter-row,
+.playtest-action-row {
+  margin: 14px 0;
+}
+
+.playtest-summary-grid {
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+}
+
+.playtest-report-columns {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin: 18px 0;
+}
+
+.playtest-report-columns h3 {
+  margin: 0 0 8px;
+  color: var(--yellow);
+  font-size: 0.94rem;
+  text-transform: uppercase;
+}
+
+.playtest-report-list {
+  max-height: 220px;
+  overflow: auto;
+  padding-right: 2px;
+}
+
+.playtest-report-row {
+  grid-template-columns: minmax(120px, 0.45fr) minmax(0, 1fr);
+}
+
+.playtest-detail-grid {
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+}
+
+.playtest-copy-field {
+  margin-top: 14px;
+}
+
+.playtest-copy-field textarea {
+  width: 100%;
+  min-height: 240px;
+  border: 1px solid rgba(40, 246, 255, 0.5);
+  border-radius: 6px;
+  padding: 11px;
+  color: var(--text);
+  background: rgba(5, 8, 20, 0.96);
+  font-family: ui-monospace, "SFMono-Regular", Consolas, monospace;
+  font-size: 0.78rem;
+  line-height: 1.4;
+  resize: vertical;
 }
 
 .score-hero,
@@ -1045,6 +1131,8 @@ button:disabled {
   .challenge-result-card,
   .party-summary-strip,
   .party-setup-grid,
+  .playtest-report-header,
+  .playtest-report-columns,
   .score-hero,
   .party-drama-header,
   .party-last-run-card,
@@ -1065,6 +1153,14 @@ button:disabled {
 
   .leaderboard-item {
     grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .playtest-report-status {
+    text-align: left;
+  }
+
+  .playtest-report-row {
+    grid-template-columns: 1fr;
   }
 
   .leaderboard-score {
