@@ -20,6 +20,26 @@ Then open:
 http://127.0.0.1:8081/
 ```
 
+## Demo Checklist
+
+For a local show build, use a current desktop browser and run from the local server above so audio loads consistently.
+
+Recommended first demo path:
+
+1. Choose or create a player.
+2. Customize or select a car.
+3. Run Solo / Seeded Run on Arcade with the generated seed.
+4. Run Solo / Seeded Run on Turbo with a manual seed.
+5. Open Challenge Mode and play First Run or Turbo Dare.
+6. Open Party Mode with 2 players, then try Rematch Same Seed and Rematch New Seed.
+7. Show Leaderboard, Settings/audio mute, and fullscreen.
+
+To clear local test data, open Leaderboard, choose `Reset Local Data`, and accept the browser confirmation. This clears local players, car settings, scores, challenge progress, and audio/default race settings for this browser only. It never runs automatically.
+
+Audio files live in `audio/`. Player car sprites live in `assets/cars/`, and traffic sprites live in `assets/traffic/`.
+
+Known demo limitations: Sunset Highway is the only track, Party Mode is pass-the-keyboard only, saves are browser-local, and there are no Fuel Run, online, account, or cloud-save features.
+
 ## Controls
 
 - Arrow keys or WASD: steer and move within the driving zone
