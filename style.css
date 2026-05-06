@@ -294,10 +294,39 @@ button {
   align-items: center;
 }
 
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.46;
+  box-shadow: none;
+}
+
 .split {
   display: grid;
   gap: 18px;
   grid-template-columns: minmax(0, 1fr) minmax(260px, 0.8fr);
+}
+
+.party-panel {
+  width: min(1040px, 100%);
+}
+
+.party-setup-grid {
+  display: grid;
+  gap: 18px;
+  grid-template-columns: minmax(240px, 0.85fr) minmax(320px, 1.15fr);
+  align-items: start;
+}
+
+.party-player-list,
+.party-order-list,
+.party-standings-list {
+  max-height: 48vh;
+  overflow: auto;
+  padding-right: 2px;
+}
+
+.party-last-run {
+  margin: 14px 0;
 }
 
 .field {
@@ -409,6 +438,12 @@ button {
   font-weight: 700;
 }
 
+.leaderboard-item.is-winner {
+  border-color: var(--yellow);
+  background: rgba(255, 228, 94, 0.1);
+  box-shadow: 0 0 16px rgba(255, 228, 94, 0.22);
+}
+
 .score-grid {
   display: grid;
   gap: 12px;
@@ -479,6 +514,7 @@ button {
 
   .title-panel,
   .split,
+  .party-setup-grid,
   .score-grid,
   .audio-grid,
   .speed-class-grid {

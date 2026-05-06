@@ -24,6 +24,9 @@ const DEFAULT_SPEED_CLASS_ID = "arcade";
 const ROAD_SEED_PREFIXES = ["SUNSET", "TURBO", "ROAD", "NEON", "RALLY", "LANE", "BOOST"];
 const DEFAULT_ROAD_SEED = "ROAD-52819";
 const CLASSIC_SEED_LABEL = "Classic";
+const PARTY_MIN_PLAYERS = 2;
+const PARTY_MAX_PLAYERS = 8;
+const PARTY_ROUND_TYPE_ONE_RUN = "oneRunEach";
 const TRACKS = [
   {
     id: "sunset-highway",
@@ -704,6 +707,7 @@ class PlayerProfileManager {
         const speedClass = normalizeSpeedClassId(entry.speedClass || entry.raceMode, DEFAULT_SPEED_CLASS_ID);
         return {
           playerName: sanitizeName(entry.playerName, "PLAYER"),
+          playerId: entry.playerId ? String(entry.playerId) : "",
           carName: sanitizeName(entry.carName, "CAR"),
           trackName: sanitizeName(entry.trackName, "TRACK"),
           speedClass,
@@ -712,7 +716,8 @@ class PlayerProfileManager {
           score: Math.max(0, Math.round(entry.score)),
           status: entry.status === "finished" ? "finished" : "crashed",
           time: Number.isFinite(entry.time) ? Math.max(0, entry.time) : 0,
-          date: String(entry.date || new Date().toISOString())
+          date: String(entry.date || new Date().toISOString()),
+          partyMode: Boolean(entry.partyMode)
         };
       })
       .sort((a, b) => b.score - a.score)
@@ -761,6 +766,10 @@ class PlayerProfileManager {
 
   getCurrentPlayer() {
     return this.data.players.find((player) => player.id === this.data.currentPlayerId) || null;
+  }
+
+  getPlayerById(id) {
+    return this.data.players.find((player) => player.id === id) || null;
   }
 
   ensureDefaultPlayer() {
@@ -829,6 +838,7 @@ class PlayerProfileManager {
     const speedClass = normalizeSpeedClassId(entry.speedClass || entry.raceMode, DEFAULT_SPEED_CLASS_ID);
     const cleanEntry = {
       playerName: sanitizeName(entry.playerName, "PLAYER"),
+      playerId: entry.playerId ? String(entry.playerId) : "",
       carName: sanitizeName(entry.carName, "CAR"),
       trackName: sanitizeName(entry.trackName, "TRACK"),
       speedClass,
@@ -837,18 +847,111 @@ class PlayerProfileManager {
       score: Math.max(0, Math.round(entry.score)),
       status: entry.status === "finished" ? "finished" : "crashed",
       time: Number.isFinite(entry.time) ? Math.max(0, entry.time) : 0,
-      date: new Date().toISOString()
+      date: new Date().toISOString(),
+      partyMode: Boolean(entry.partyMode)
     };
     this.data.leaderboard.push(cleanEntry);
     this.data.leaderboard.sort((a, b) => b.score - a.score);
     this.data.leaderboard = this.data.leaderboard.slice(0, 20);
 
-    const player = this.getCurrentPlayer();
+    const player = cleanEntry.playerId ? this.getPlayerById(cleanEntry.playerId) : this.getCurrentPlayer();
     if (player && cleanEntry.score > player.bestScore) {
       player.bestScore = cleanEntry.score;
     }
     this.save();
     return cleanEntry;
+  }
+}
+
+function snapshotPartyPlayer(player) {
+  return {
+    id: String(player.id || uid()),
+    name: sanitizeName(player.name, "PLAYER"),
+    car: {
+      ...DEFAULT_CAR,
+      ...(player.car && typeof player.car === "object" ? player.car : {})
+    },
+    bestScore: Number.isFinite(player.bestScore) ? Math.max(0, Math.round(player.bestScore)) : 0
+  };
+}
+
+class PartySession {
+  constructor(options = {}) {
+    const players = Array.isArray(options.players) ? options.players : [];
+    this.isPartyMode = true;
+    this.roundType = options.roundType || PARTY_ROUND_TYPE_ONE_RUN;
+    this.selectedPlayers = players.slice(0, PARTY_MAX_PLAYERS).map(snapshotPartyPlayer);
+    this.currentPlayerIndex = clampNumber(options.currentPlayerIndex, 0, Math.max(0, this.selectedPlayers.length - 1), 0);
+    this.sharedSeed = normalizeRoadSeed(options.sharedSeed, DEFAULT_ROAD_SEED);
+    this.track = options.track || TRACKS[0];
+    this.raceMode = normalizeSpeedClassId(options.raceMode, DEFAULT_SPEED_CLASS_ID);
+    this.results = Array.isArray(options.results) ? options.results.slice() : [];
+    this.roundNumber = Math.max(1, Math.round(options.roundNumber || 1));
+    this.completed = Boolean(options.completed) || this.results.length >= this.selectedPlayers.length;
+    this.finalSfxPlayed = false;
+  }
+
+  get currentPlayer() {
+    return this.selectedPlayers[this.currentPlayerIndex] || null;
+  }
+
+  get totalPlayers() {
+    return this.selectedPlayers.length;
+  }
+
+  get currentTurnNumber() {
+    return clamp(this.currentPlayerIndex + 1, 1, Math.max(1, this.totalPlayers));
+  }
+
+  addResult(summary) {
+    const player = this.currentPlayer || snapshotPartyPlayer(summary?.player || {});
+    const result = {
+      playerId: player.id,
+      playerName: sanitizeName(player.name, "PLAYER"),
+      carName: sanitizeName(player.car?.name, DEFAULT_CAR.name),
+      score: Math.max(0, Math.round(summary?.finalScore || 0)),
+      status: summary?.status === "finished" ? "finished" : "crashed",
+      reason: String(summary?.reason || ""),
+      time: Number.isFinite(summary?.time) ? Math.max(0, summary.time) : 0,
+      raceMode: normalizeSpeedClassId(summary?.speedClass || this.raceMode, this.raceMode),
+      seed: normalizeStoredRoadSeed(summary?.seed || this.sharedSeed, this.sharedSeed),
+      trackName: sanitizeName(summary?.trackName || this.track?.name, "TRACK"),
+      scoreSaved: summary?.scoreSaved !== false,
+      date: new Date().toISOString()
+    };
+    this.results.push(result);
+    this.currentPlayerIndex += 1;
+    if (this.currentPlayerIndex >= this.selectedPlayers.length) {
+      this.completed = true;
+    }
+    return result;
+  }
+
+  standings() {
+    return this.results
+      .slice()
+      .sort((a, b) => b.score - a.score || a.time - b.time || a.playerName.localeCompare(b.playerName))
+      .map((result, index) => ({
+        ...result,
+        rank: index + 1
+      }));
+  }
+
+  marginOfVictory() {
+    const standings = this.standings();
+    if (standings.length < 2) return null;
+    return Math.max(0, standings[0].score - standings[1].score);
+  }
+
+  createRematch(sharedSeed) {
+    return new PartySession({
+      players: this.selectedPlayers,
+      sharedSeed,
+      track: this.track,
+      raceMode: this.raceMode,
+      roundNumber: this.roundNumber + 1,
+      roundType: this.roundType
+    });
   }
 }
 
@@ -1287,7 +1390,7 @@ class InputManager {
         return;
       }
       if (lower === "r") {
-        this.game.startRace();
+        this.game.handleRestartRun();
         return;
       }
       if (lower === "f") {
@@ -1340,7 +1443,7 @@ class InputManager {
     if (this.game.screen === "score") {
       if (keyId === "enter") {
         this.game.audio.playSfx("menu");
-        this.game.startRace();
+        this.game.handleRestartRun();
       } else if (keyId === "escape") {
         this.game.audio.playSfx("menu");
         this.game.showTitle();
@@ -1354,6 +1457,15 @@ class InputManager {
     } else if (keyId === "enter" && this.game.screen === "preRace") {
       this.game.audio.playSfx("menu");
       this.game.handleStartSeededRace();
+    } else if (keyId === "enter" && this.game.screen === "partyTurn") {
+      this.game.audio.playSfx("menu");
+      this.game.startCurrentPartyRun();
+    } else if (keyId === "enter" && this.game.screen === "partyStandings") {
+      this.game.audio.playSfx("menu");
+      this.game.handlePartyNextPlayer();
+    } else if (keyId === "enter" && this.game.screen === "partyFinal") {
+      this.game.audio.playSfx("menu");
+      this.game.handlePartyRematch(true);
     } else if (keyId === "escape" && !["title", "game"].includes(this.game.screen)) {
       this.game.audio.playSfx("menu");
       this.game.showTitle();
@@ -1501,6 +1613,9 @@ class RoadDirector {
     this.forceRecoveryNext = false;
     this.lastFairnessPassed = true;
     this.stats = this.createStats();
+    this.seedLockLastCenterBlockDistance = 0;
+    this.seedLockLastMovementDistance = 0;
+    this.seedLockLastMeaningfulWaveDistance = 0;
   }
 
   createStats() {
@@ -1537,6 +1652,14 @@ class RoadDirector {
 
   random() {
     return this.manager.random();
+  }
+
+  isSeedLocked() {
+    return Boolean(this.manager.game.run?.partySeedLocked);
+  }
+
+  getSeedLockedSecondsSince(distance, lastDistance, cruiseSpeed) {
+    return Math.max(0, distance - Math.max(0, lastDistance || 0)) / Math.max(1, cruiseSpeed || 1);
   }
 
   update(dt) {
@@ -1584,11 +1707,24 @@ class RoadDirector {
     const speedClassId = this.manager.getSpeedClassId();
     const cadence = getTrackDirectorCadence(speedClassId);
     const modeIntensity = TRACK_DIRECTOR.modeIntensity[speedClassId] || 1;
-    const playerLane = Math.round(clamp(
+    const cruiseSpeed = getTrackCruiseSpeed(track, progress, speedClassId);
+    const seedLocked = this.isSeedLocked();
+    let playerLane = Math.round(clamp(
       Number.isFinite(run.targetLane) ? run.targetLane : TRACK_DIRECTOR.centerLane,
       0,
       LANES - 1
     ));
+    let centerSafeSeconds = this.centerSafeSeconds;
+    let centerHoldSeconds = this.centerLaneHoldSeconds;
+    let laneStillSeconds = this.laneStillSeconds;
+    let meaningfulGapSeconds = this.timeSinceMeaningfulWaveSeconds;
+    if (seedLocked) {
+      playerLane = TRACK_DIRECTOR.centerLane;
+      centerSafeSeconds = this.getSeedLockedSecondsSince(distance, this.seedLockLastCenterBlockDistance, cruiseSpeed);
+      centerHoldSeconds = distance / Math.max(1, cruiseSpeed);
+      laneStillSeconds = this.getSeedLockedSecondsSince(distance, this.seedLockLastMovementDistance, cruiseSpeed);
+      meaningfulGapSeconds = this.getSeedLockedSecondsSince(distance, this.seedLockLastMeaningfulWaveDistance, cruiseSpeed);
+    }
     const bandT = clamp((progress - band.min) / Math.max(0.001, band.max - band.min), 0, 1);
     const budget = lerp(band.budget[0], band.budget[1], bandT) * modeIntensity;
     const centerSafeLimit = cadence.centerSafe ?? TRACK_DIRECTOR.centerSafeSecondsLimit;
@@ -1598,14 +1734,15 @@ class RoadDirector {
     const pressureBudgetAllowance = TRACK_DIRECTOR.pressureBudgetAllowance[speedClassId] ?? 1.1;
     const laneStillLimit = cadence.laneStill ?? 3;
     const centerHoldLimit = cadence.centerHold ?? TRACK_DIRECTOR.centerHoldSeconds;
-    const centerHoldPressure = this.centerLaneHoldSeconds >= centerHoldLimit
-      && this.centerSafeSeconds >= centerChallengeMinSeconds;
+    const centerHoldPressure = centerHoldSeconds >= centerHoldLimit
+      && centerSafeSeconds >= centerChallengeMinSeconds;
     const centerNeedsChallenge = progress > 0.12
-      && (centerHoldPressure || this.centerSafeSeconds >= centerSafeLimit);
-    const needsMovementChallenge = progress > 0.16 && this.laneStillSeconds >= laneStillLimit;
+      && (centerHoldPressure || centerSafeSeconds >= centerSafeLimit);
+    const needsMovementChallenge = progress > 0.16 && laneStillSeconds >= laneStillLimit;
     const allowSoftCenterPressure = progress > 0.18
       && !centerNeedsChallenge
-      && this.centerSafeSeconds >= centerChallengeMinSeconds * 0.92;
+      && centerSafeSeconds >= centerChallengeMinSeconds * 0.92;
+    const forceMeaningful = meaningfulGapSeconds >= (cadence.forceMeaningful ?? 3);
 
     return {
       track,
@@ -1618,6 +1755,7 @@ class RoadDirector {
       cadence,
       modeIntensity,
       playerLane,
+      seedLocked,
       pressureBudget: budget,
       pressureBudgetAllowance,
       centerNeedsChallenge,
@@ -1626,7 +1764,8 @@ class RoadDirector {
       centerSoftPressure,
       centerRestChance,
       needsMovementChallenge,
-      cruiseSpeed: getTrackCruiseSpeed(track, progress, speedClassId)
+      forceMeaningful,
+      cruiseSpeed
     };
   }
 
@@ -1650,7 +1789,7 @@ class RoadDirector {
       this.forceRecoveryNext = false;
       return "recoveryGap";
     }
-    if (this.timeSinceMeaningfulWaveSeconds >= (context.cadence.forceMeaningful ?? 3)) {
+    if (context.forceMeaningful) {
       return this.chooseForcedMeaningfulWave(context);
     }
 
@@ -1894,7 +2033,10 @@ class RoadDirector {
 
   recordWave(result, context) {
     const blockedCount = clamp(result.blockedLanes.size, 0, 5);
-    const safety = this.manager.validateObstaclePattern(this.manager.obstacles, this.manager.game.run.distance);
+    const safety = this.manager.validateObstaclePattern(
+      this.manager.getSpawnValidationObstacles(context.distance),
+      this.manager.getSafetyRunDistance(context.distance)
+    );
     result.fairnessPassed = !safety.invalid;
     result.maxDangerBlocked = safety.maxBlocked;
     result.pressureBudgetPassed = result.pressure <= context.pressureBudget + context.pressureBudgetAllowance;
@@ -1936,12 +2078,19 @@ class RoadDirector {
       stats.movementGapSeconds.push(this.decisionSafeSeconds);
       this.decisionSafeSeconds = 0;
     }
-    const meaningfulWave = result.type !== "recoveryGap" && (blockedCount > 0 || this.hasActivePressureAhead());
+    const activePressureRunDistance = context.seedLocked ? this.manager.getSafetyRunDistance(context.distance) : undefined;
+    const activePressureObstacles = context.seedLocked ? this.manager.getSpawnValidationObstacles(context.distance) : undefined;
+    const meaningfulWave = result.type !== "recoveryGap" && (blockedCount > 0 || this.hasActivePressureAhead(activePressureRunDistance, activePressureObstacles));
     if (meaningfulWave) {
       stats.meaningfulWaveCount += 1;
       stats.meaningfulWaveGapSeconds.push(this.timeSinceMeaningfulWaveSeconds);
       stats.longestMeaningfulWaveGapSeconds = Math.max(stats.longestMeaningfulWaveGapSeconds, this.timeSinceMeaningfulWaveSeconds);
       this.timeSinceMeaningfulWaveSeconds = 0;
+    }
+    if (context.seedLocked) {
+      if (result.centerBlocked) this.seedLockLastCenterBlockDistance = context.distance;
+      if (requiresMovement) this.seedLockLastMovementDistance = context.distance;
+      if (meaningfulWave) this.seedLockLastMeaningfulWaveDistance = context.distance;
     }
     if (result.type === "rampEscape" && result.rampLanes.length && blockedCount >= 2) {
       stats.rampUsefulCount += 1;
@@ -2007,9 +2156,8 @@ class RoadDirector {
     }
   }
 
-  hasActivePressureAhead() {
-    const runDistance = this.manager.game.run?.distance || 0;
-    return this.manager.obstacles.some((obstacle) => {
+  hasActivePressureAhead(runDistance = this.manager.game.run?.distance || 0, obstacles = this.manager.obstacles) {
+    return obstacles.some((obstacle) => {
       if (!this.manager.isFairnessBlocker(obstacle)) return false;
       const ahead = obstacle.distance - runDistance;
       return ahead > 0 && ahead < VIEW_DISTANCE * 0.92;
@@ -2432,7 +2580,7 @@ class RoadDirector {
     const candidates = types.map((type, index) => this.manager.createObstacle(type, lanes[index], distance, {
       allowFourLanePressure: true
     }));
-    const scan = this.manager.scanPatternSafety(candidates, this.manager.obstacles);
+    const scan = this.manager.scanPatternSafety(candidates, this.manager.getSpawnValidationObstacles(distance));
     if (scan.invalid) {
       result.fairnessPassed = false;
       this.manager.preventedUnsafeSpawns += 1;
@@ -2466,6 +2614,7 @@ class ObstacleManager {
     this.preventedUnsafeSpawns = 0;
     this.lastSafetySummary = null;
     this.nextObstacleId = 1;
+    this.seedLockedSpawnObstacles = [];
     this.fallbackRng = createSeededRandomController("road-director-fallback");
     this.director = new RoadDirector(this);
   }
@@ -2480,6 +2629,7 @@ class ObstacleManager {
     this.preventedUnsafeSpawns = 0;
     this.lastSafetySummary = null;
     this.nextObstacleId = 1;
+    this.seedLockedSpawnObstacles = [];
     this.director.reset(track);
   }
 
@@ -2572,14 +2722,16 @@ class ObstacleManager {
     const spawnResult = this.canSpawnObstacle(candidate);
     if (spawnResult.canSpawn) {
       this.obstacles.push(candidate);
+      if (this.isPartySeedLocked()) this.seedLockedSpawnObstacles.push({ ...candidate });
       if (spawnResult.maxBlocked >= 4) {
         this.lastFourLanePressureDistance = distance;
       }
       this.lastSafetySummary = spawnResult;
-      const postSpawn = this.validateObstaclePattern(this.obstacles, this.game.run.distance);
+      const postSpawn = this.validateObstaclePattern(this.getSpawnValidationObstacles(candidate.distance), this.getSafetyRunDistance(candidate.distance));
       if (postSpawn.invalid) {
         candidate.remove = true;
         this.obstacles = this.obstacles.filter((obstacle) => obstacle !== candidate);
+        this.seedLockedSpawnObstacles = this.seedLockedSpawnObstacles.filter((obstacle) => obstacle.id !== candidate.id);
         this.preventedUnsafeSpawns += 1;
         this.lastSafetySummary = { ...postSpawn, reason: "post-spawn five-lane wall prevented" };
         return null;
@@ -2594,6 +2746,7 @@ class ObstacleManager {
         const adjustedResult = this.canSpawnObstacle(adjusted);
         if (adjustedResult.canSpawn) {
           this.obstacles.push(adjusted);
+          if (this.isPartySeedLocked()) this.seedLockedSpawnObstacles.push({ ...adjusted });
           if (adjustedResult.maxBlocked >= 4) {
             this.lastFourLanePressureDistance = distance;
           }
@@ -2697,7 +2850,7 @@ class ObstacleManager {
     return base + speedPadding;
   }
 
-  wouldOverlapExistingObject(candidate, existingObjects = this.obstacles) {
+  wouldOverlapExistingObject(candidate, existingObjects = this.getSpawnValidationObstacles(candidate.distance)) {
     return this.findSpawnOverlap(candidate, existingObjects);
   }
 
@@ -2733,6 +2886,24 @@ class ObstacleManager {
 
   canSpawnCandidate(candidate) {
     return this.canSpawnObstacle(candidate);
+  }
+
+  isPartySeedLocked() {
+    return Boolean(this.game.run?.partySeedLocked);
+  }
+
+  getSafetyRunDistance(distance) {
+    if (!this.isPartySeedLocked()) return this.game.run.distance;
+    return Math.max(0, distance - VIEW_DISTANCE);
+  }
+
+  getSpawnValidationObstacles(distance) {
+    if (!this.isPartySeedLocked()) return this.obstacles;
+    const safetyRunDistance = this.getSafetyRunDistance(distance);
+    return this.seedLockedSpawnObstacles.filter((obstacle) => {
+      const ahead = obstacle.distance - safetyRunDistance;
+      return ahead > -260 && !obstacle.remove;
+    });
   }
 
   reserveSpawnSpace(candidate) {
@@ -2875,12 +3046,12 @@ class ObstacleManager {
     return this.getDangerZoneLaneOccupancy(obstacles, runDistance);
   }
 
-  wouldCreateFiveLaneWall(candidateObstacle, existingObstacles = this.obstacles) {
+  wouldCreateFiveLaneWall(candidateObstacle, existingObstacles = this.getSpawnValidationObstacles(candidateObstacle.distance)) {
     return this.scanCandidateSafety(candidateObstacle, existingObstacles).invalid;
   }
 
-  canSpawnObstacle(candidateObstacle) {
-    const overlap = this.wouldOverlapExistingObject(candidateObstacle, this.obstacles);
+  canSpawnObstacle(candidateObstacle, existingObstacles = this.getSpawnValidationObstacles(candidateObstacle.distance)) {
+    const overlap = this.wouldOverlapExistingObject(candidateObstacle, existingObstacles);
     if (overlap) {
       return {
         canSpawn: false,
@@ -2893,7 +3064,7 @@ class ObstacleManager {
     if (!this.isFairnessBlocker(candidateObstacle)) {
       return { canSpawn: true, maxBlocked: 0, invalid: false, reason: "non-blocker" };
     }
-    const scan = this.scanCandidateSafety(candidateObstacle, this.obstacles);
+    const scan = this.scanCandidateSafety(candidateObstacle, existingObstacles);
     if (scan.invalid) {
       return { ...scan, canSpawn: false, reason: "five-lane wall prevented" };
     }
@@ -2907,7 +3078,7 @@ class ObstacleManager {
     return { ...scan, canSpawn: true, reason: "safe" };
   }
 
-  scanCandidateSafety(candidateObstacle, existingObstacles = this.obstacles) {
+  scanCandidateSafety(candidateObstacle, existingObstacles = this.getSpawnValidationObstacles(candidateObstacle.distance)) {
     return this.scanPatternSafety([candidateObstacle], existingObstacles);
   }
 
@@ -2919,7 +3090,7 @@ class ObstacleManager {
     const aheadBottom = renderer.aheadForY(bottom);
     const minDistance = Math.min(...candidateObstacles.map((obstacle) => obstacle.distance));
     const maxDistance = Math.max(...candidateObstacles.map((obstacle) => obstacle.distance));
-    const start = Math.max(this.game.run.distance, minDistance - aheadTop - 180);
+    const start = Math.max(this.getSafetyRunDistance(minDistance), minDistance - aheadTop - 180);
     const end = maxDistance - aheadBottom + 180;
     const sampleStep = Math.max(22, VIEW_DISTANCE * (8 / renderer.road.h));
     const pattern = existingObstacles.concat(candidateObstacles);
@@ -4161,6 +4332,14 @@ class Renderer {
     const roadMarkerDeltaPerFrame = run.currentSpeed * actualDt * SPEED_TUNING.roadStripeScrollScale;
     const eta = run.currentSpeed > 0 ? (run.track.distanceToFinish - run.distance) / run.currentSpeed : 0;
     const directorDebug = this.game.obstacles.director.getDebugInfo();
+    const partyDebug = this.game.getPartyDebugInfo();
+    const partyLines = partyDebug.active ? [
+      "party mode: active",
+      `party player: ${partyDebug.currentPlayer}`,
+      `party turn: ${partyDebug.currentTurn}/${partyDebug.totalPlayers}`,
+      `party seed: ${partyDebug.sharedSeed}`,
+      `party results: ${partyDebug.resultsCount}`
+    ] : [];
     const spriteDebug = getPlayerSpriteDebugInfo(run.player.car, {
       airborne: run.airborne,
       laneWidth: this.road.laneW
@@ -4169,6 +4348,7 @@ class Renderer {
       "DEBUG `",
       `mode: ${run.speedClass?.label || getSpeedClassLabel(run.speedClassId)} score x${(run.scoreMultiplier || 1).toFixed(2)}`,
       `seed: ${directorDebug.seed}`,
+      ...partyLines,
       `seed hash: ${directorDebug.seedHash >>> 0} rng ${directorDebug.rngState >>> 0}`,
       `configured: ${classStartSpeed.toFixed(0)} -> ${classEndSpeed.toFixed(0)}`,
       `base speed: ${(run.baseCruiseSpeed || classStartSpeed).toFixed(0)} raw ${(run.rawCruiseSpeed || classStartSpeed).toFixed(0)}`,
@@ -5241,6 +5421,8 @@ class NeonRoadRally {
     this.debugSpeedScale = 1;
     this.attractDistance = 0;
     this.pendingRoadSeed = generateReadableRoadSeed();
+    this.partySetup = null;
+    this.partySession = null;
     this.roadRng = null;
     this.randomFloat = () => this.nextRoadRandom();
     this.simulationStatus = null;
@@ -5295,6 +5477,11 @@ class NeonRoadRally {
       speedCap: track.maxSpeed * SPEED_TUNING.maxBoostOverrunMultiplier,
       speedCapped: false,
       debugSpeedScale: 1,
+      partyMode: false,
+      partySeedLocked: false,
+      partyRoundNumber: 0,
+      partyTurnNumber: 0,
+      partyTotalPlayers: 0,
       lastDistanceDelta: 0,
       boostMultiplier: 1,
       manualBoosts: 3,
@@ -5533,9 +5720,10 @@ class NeonRoadRally {
   }
 
   startRace(options = {}) {
-    const player = this.profiles.ensureDefaultPlayer();
-    const track = TRACKS[0];
-    const speedClass = getSpeedClassConfig(this.profiles.data.speedClassId);
+    const partyMode = Boolean(options.partyMode);
+    const player = options.player ? snapshotPartyPlayer(options.player) : this.profiles.ensureDefaultPlayer();
+    const track = options.track || TRACKS[0];
+    const speedClass = getSpeedClassConfig(options.speedClassId ?? this.profiles.data.speedClassId);
     if (this.scoreTallyFrame) {
       cancelAnimationFrame(this.scoreTallyFrame);
       this.scoreTallyFrame = null;
@@ -5550,6 +5738,11 @@ class NeonRoadRally {
     this.run.speedClassId = speedClass.id;
     this.run.speedClass = speedClass;
     this.run.scoreMultiplier = speedClass.scoreMultiplier;
+    this.run.partyMode = partyMode;
+    this.run.partySeedLocked = Boolean(options.partySeedLocked ?? partyMode);
+    this.run.partyRoundNumber = partyMode ? (this.partySession?.roundNumber || 1) : 0;
+    this.run.partyTurnNumber = partyMode ? (this.partySession?.currentTurnNumber || 1) : 0;
+    this.run.partyTotalPlayers = partyMode ? (this.partySession?.totalPlayers || 0) : 0;
     this.run.currentSpeed = getTrackCruiseSpeed(track, 0, speedClass.id);
     this.run.rawCruiseSpeed = getTrackRawCruiseSpeed(track, 0, speedClass.id);
     this.run.baseCruiseSpeed = this.run.currentSpeed;
@@ -5720,14 +5913,16 @@ class NeonRoadRally {
     run.score = Math.max(0, Math.round(run.score));
     this.audio.stopMusic(0.28);
 
-    const player = this.profiles.getCurrentPlayer() || this.profiles.ensureDefaultPlayer();
-    const previousBestScore = player.bestScore || 0;
+    const player = run.player || this.profiles.getCurrentPlayer() || this.profiles.ensureDefaultPlayer();
+    const profilePlayer = this.profiles.getPlayerById(player.id) || player;
+    const previousBestScore = profilePlayer.bestScore || 0;
     const leaderboard = this.profiles.data.leaderboard || [];
     const topTwentyCutoff = leaderboard.length < 20 ? -1 : Math.min(...leaderboard.slice(0, 20).map((item) => item.score || 0));
     const debugSpeedScaleActive = Math.abs((this.debugSpeedScale || 1) - 1) > 0.001;
     const isNewPersonalBest = !debugSpeedScaleActive && run.score > previousBestScore;
     const entersTopTwenty = !debugSpeedScaleActive && (leaderboard.length < 20 || run.score > topTwentyCutoff);
     const entry = debugSpeedScaleActive ? null : this.profiles.recordScore({
+      playerId: player.id,
       playerName: player.name,
       carName: player.car.name,
       trackName: run.track.name,
@@ -5736,11 +5931,19 @@ class NeonRoadRally {
       raceMode: run.speedClassId,
       score: run.score,
       status,
-      time: run.elapsed
+      time: run.elapsed,
+      partyMode: Boolean(run.partyMode)
     });
+    const updatedProfilePlayer = this.profiles.getPlayerById(player.id) || profilePlayer;
 
     this.lastSummary = {
       scoreEntry: entry,
+      player: snapshotPartyPlayer(player),
+      playerId: player.id,
+      playerName: player.name,
+      carName: player.car.name,
+      trackName: run.track.name,
+      partyMode: Boolean(run.partyMode),
       baseScore: Math.max(0, Math.round(run.baseScore || 0)),
       finalScore: run.score,
       seed: run.roadSeed,
@@ -5755,7 +5958,7 @@ class NeonRoadRally {
       time: run.elapsed,
       bonuses: { ...run.bonuses },
       penalties: run.penalties,
-      bestScore: debugSpeedScaleActive ? previousBestScore : (this.profiles.getCurrentPlayer()?.bestScore || run.score),
+      bestScore: debugSpeedScaleActive ? previousBestScore : (updatedProfilePlayer.bestScore || run.score),
       trackDistance: run.track.distanceToFinish,
       newPersonalBest: isNewPersonalBest,
       entersTopTwenty,
@@ -5764,10 +5967,42 @@ class NeonRoadRally {
       debugSpeedScaleActive,
       debugSpeedScale: this.debugSpeedScale || 1
     };
+    if (run.partyMode && this.partySession?.isPartyMode) {
+      this.lastSummary.partyResult = this.partySession.addResult(this.lastSummary);
+    }
 
     setTimeout(() => {
-      if (this.screen === "game") this.showScoreScreen();
+      if (this.screen !== "game") return;
+      if (this.lastSummary?.partyMode && this.partySession?.isPartyMode) {
+        this.showPartyStandingsScreen();
+      } else {
+        this.showScoreScreen();
+      }
     }, status === "crashed" ? ARCADE_FEEL.crashScoreDelayMs : ARCADE_FEEL.finishScoreDelayMs);
+  }
+
+  getPartyDebugInfo() {
+    const session = this.partySession;
+    const run = this.run;
+    const active = Boolean(session?.isPartyMode || run?.partyMode);
+    if (!active) {
+      return {
+        active: false,
+        currentPlayer: "none",
+        currentTurn: 0,
+        totalPlayers: 0,
+        sharedSeed: "none",
+        resultsCount: 0
+      };
+    }
+    return {
+      active: true,
+      currentPlayer: session?.currentPlayer?.name || run?.player?.name || "none",
+      currentTurn: run?.partyMode ? (run.partyTurnNumber || session?.currentTurnNumber || 1) : (session?.currentTurnNumber || 0),
+      totalPlayers: run?.partyMode ? (run.partyTotalPlayers || session?.totalPlayers || 0) : (session?.totalPlayers || 0),
+      sharedSeed: session?.sharedSeed || run?.roadSeed || "none",
+      resultsCount: session?.results?.length || 0
+    };
   }
 
   forceCrash() {
@@ -5814,6 +6049,7 @@ class NeonRoadRally {
       roadSeedHash: rng.seedHash,
       roadRngState: rng.getState(),
       roadDirectorSequence: [],
+      partySeedLocked: Boolean(options.partySeedLocked),
       distance: 0,
       elapsed: 0,
       currentSpeed: getTrackCruiseSpeed(track, 0, speedClassId),
@@ -6565,6 +6801,8 @@ class NeonRoadRally {
   }
 
   showTitle() {
+    this.partySession = null;
+    this.partySetup = null;
     this.setScreen("title");
     this.audio.stopMusic(0);
     this.audio.playMusic("title", false);
@@ -6596,6 +6834,7 @@ class NeonRoadRally {
             <p class="hint">Higher speed classes start faster and award higher scores. Arcade is the standard race.</p>
           </div>
           <button class="menu-button primary" data-action="start">Start Game</button>
+          <button class="menu-button" data-action="partyMode">Party Mode</button>
           <button class="menu-button" data-action="players">Choose/Create Player</button>
           <button class="menu-button" data-action="customize">Customize Car</button>
           <button class="menu-button" data-action="leaderboard">View Top 20 Scores</button>
@@ -6700,6 +6939,471 @@ class NeonRoadRally {
     this.pendingRoadSeed = seed;
     if (input) input.value = seed;
     this.startRace({ seed });
+  }
+
+  createDefaultPartySetup() {
+    const players = this.profiles.data.players;
+    const currentId = this.profiles.data.currentPlayerId;
+    const orderedPlayers = currentId
+      ? players.filter((player) => player.id === currentId).concat(players.filter((player) => player.id !== currentId))
+      : players.slice();
+    return {
+      selectedPlayerIds: orderedPlayers.slice(0, Math.min(PARTY_MIN_PLAYERS, orderedPlayers.length)).map((player) => player.id),
+      trackId: TRACKS[0].id,
+      raceMode: normalizeSpeedClassId(this.profiles.data.speedClassId, DEFAULT_SPEED_CLASS_ID),
+      sharedSeed: generateReadableRoadSeed(),
+      roundType: PARTY_ROUND_TYPE_ONE_RUN
+    };
+  }
+
+  getPartySetup() {
+    if (!this.partySetup) {
+      this.partySetup = this.createDefaultPartySetup();
+    }
+    const validIds = new Set(this.profiles.data.players.map((player) => player.id));
+    this.partySetup.selectedPlayerIds = (this.partySetup.selectedPlayerIds || [])
+      .filter((id, index, list) => validIds.has(id) && list.indexOf(id) === index)
+      .slice(0, PARTY_MAX_PLAYERS);
+    this.partySetup.raceMode = normalizeSpeedClassId(this.partySetup.raceMode, DEFAULT_SPEED_CLASS_ID);
+    this.partySetup.sharedSeed = normalizeRoadSeed(this.partySetup.sharedSeed, "");
+    this.partySetup.trackId = TRACKS[0].id;
+    this.partySetup.roundType = PARTY_ROUND_TYPE_ONE_RUN;
+    return this.partySetup;
+  }
+
+  getPartySetupSelectedPlayers() {
+    const setup = this.getPartySetup();
+    return setup.selectedPlayerIds
+      .map((id) => this.profiles.getPlayerById(id))
+      .filter(Boolean)
+      .map(snapshotPartyPlayer);
+  }
+
+  readPartySetupForm() {
+    const setup = this.getPartySetup();
+    const raceMode = document.getElementById("partyRaceMode");
+    const seedInput = document.getElementById("partySeedInput");
+    if (raceMode) setup.raceMode = normalizeSpeedClassId(raceMode.value, setup.raceMode);
+    if (seedInput) setup.sharedSeed = normalizeRoadSeed(seedInput.value, "");
+    return setup;
+  }
+
+  showPartySetupScreen(message = "") {
+    this.partySession = null;
+    this.setScreen("partySetup");
+    this.audio.playMusic("title", false);
+    const players = this.profiles.data.players;
+    if (players.length < PARTY_MIN_PLAYERS) {
+      this.layer.classList.remove("is-empty");
+      this.layer.innerHTML = `
+        <section class="panel compact">
+          <h2>Party Mode</h2>
+          <p class="hint">Create at least two local player profiles before starting pass-the-keyboard competition.</p>
+          <div class="row" style="margin-top:16px">
+            <button class="small-button primary" data-action="players">Create More Players</button>
+            <button class="small-button" data-action="title">Return to Title</button>
+          </div>
+          <p class="status-line">${escapeHtml(message || "Party Mode needs 2-8 local players.")}</p>
+        </section>
+      `;
+      this.bindLayerButtons();
+      return;
+    }
+
+    const setup = this.getPartySetup();
+    const selectedPlayers = this.getPartySetupSelectedPlayers();
+    const selectedIds = new Set(setup.selectedPlayerIds);
+    const seed = setup.sharedSeed || "Random seed on start";
+    const seedHash = setup.sharedSeed ? (hashSeed(getRunRandomSeedSource(setup.sharedSeed, TRACKS[0], setup.raceMode)) >>> 0) : "pending";
+    this.layer.classList.remove("is-empty");
+    this.layer.innerHTML = `
+      <section class="panel party-panel">
+        <h2>Party Mode</h2>
+        <p class="hint">One Run Each. Everyone drives ${escapeHtml(TRACKS[0].name)} with the same race mode and shared Road Seed.</p>
+        <div class="party-setup-grid">
+          <div>
+            <h2>Local Players</h2>
+            <ul class="profile-list party-player-list">
+              ${players.map((player) => {
+                const selected = selectedIds.has(player.id);
+                const disabled = !selected && selectedPlayers.length >= PARTY_MAX_PLAYERS;
+                return `
+                  <li class="profile-item ${selected ? "is-current" : ""}">
+                    <strong>${escapeHtml(player.name)}</strong>
+                    <span class="meta">${escapeHtml(player.car.name)} · Best ${formatScore(player.bestScore)}</span>
+                    <button class="small-button" data-action="partyTogglePlayer" data-id="${escapeAttr(player.id)}" ${disabled ? "disabled" : ""}>${selected ? "Remove" : "Add"}</button>
+                  </li>
+                `;
+              }).join("")}
+            </ul>
+          </div>
+          <div class="form-stack">
+            <div>
+              <h2>Selected Order</h2>
+              <ol class="profile-list party-order-list">
+                ${selectedPlayers.length ? selectedPlayers.map((player, index) => `
+                  <li class="profile-item">
+                    <strong>${index + 1}. ${escapeHtml(player.name)}</strong>
+                    <span class="meta">${escapeHtml(player.car.name)}</span>
+                    <div class="row">
+                      <button class="small-button" data-action="partyMovePlayer" data-id="${escapeAttr(player.id)}" data-dir="-1" ${index === 0 ? "disabled" : ""}>Up</button>
+                      <button class="small-button" data-action="partyMovePlayer" data-id="${escapeAttr(player.id)}" data-dir="1" ${index === selectedPlayers.length - 1 ? "disabled" : ""}>Down</button>
+                      <button class="small-button" data-action="partyRemovePlayer" data-id="${escapeAttr(player.id)}">Remove</button>
+                    </div>
+                  </li>
+                `).join("") : `<li class="profile-item"><span class="meta">Choose 2-8 players.</span></li>`}
+              </ol>
+            </div>
+            <div class="field">
+              <label for="partyTrack">Track</label>
+              <input id="partyTrack" type="text" value="${escapeAttr(TRACKS[0].name)}" readonly>
+            </div>
+            <div class="field">
+              <label for="partyRaceMode">Race Mode</label>
+              <select id="partyRaceMode">
+                ${SPEED_CLASSES.map((speedClass) => `<option value="${escapeAttr(speedClass.id)}" ${speedClass.id === setup.raceMode ? "selected" : ""}>${escapeHtml(speedClass.label)}</option>`).join("")}
+              </select>
+            </div>
+            <div class="seed-display" aria-live="polite">
+              <span>Shared Party Seed</span>
+              <strong id="partySeedDisplay">${escapeHtml(seed)}</strong>
+            </div>
+            <div class="field">
+              <label for="partySeedInput">Manual Seed</label>
+              <input id="partySeedInput" type="text" maxlength="32" value="${escapeAttr(setup.sharedSeed)}" autocomplete="off" spellcheck="false" inputmode="text">
+            </div>
+            <p id="partySeedHash" class="hint">Seed hash: ${escapeHtml(seedHash)}</p>
+            <div class="row">
+              <button class="small-button" data-action="partyRandomSeed">Random Seed</button>
+              <button class="small-button primary" data-action="partyStartRound" ${selectedPlayers.length < PARTY_MIN_PLAYERS ? "disabled" : ""}>Start Party Round</button>
+              <button class="small-button" data-action="title">Return to Title</button>
+            </div>
+            <p class="status-line">${escapeHtml(message || `${selectedPlayers.length}/${PARTY_MAX_PLAYERS} players selected.`)}</p>
+          </div>
+        </div>
+      </section>
+    `;
+    this.bindLayerButtons();
+    this.bindPartySetupControls();
+  }
+
+  bindPartySetupControls() {
+    const input = document.getElementById("partySeedInput");
+    const display = document.getElementById("partySeedDisplay");
+    const seedHash = document.getElementById("partySeedHash");
+    const raceMode = document.getElementById("partyRaceMode");
+    const updateSeedDisplay = () => {
+      if (!input || !display) return;
+      const normalized = normalizeRoadSeed(input.value, "");
+      const mode = normalizeSpeedClassId(raceMode?.value, DEFAULT_SPEED_CLASS_ID);
+      display.textContent = normalized || "Random seed on start";
+      if (seedHash) {
+        seedHash.textContent = normalized
+          ? `Seed hash: ${hashSeed(getRunRandomSeedSource(normalized, TRACKS[0], mode)) >>> 0}`
+          : "Seed hash: pending";
+      }
+    };
+    if (input) {
+      input.addEventListener("input", updateSeedDisplay);
+      input.addEventListener("blur", () => {
+        const normalized = normalizeRoadSeed(input.value, "");
+        input.value = normalized;
+        this.getPartySetup().sharedSeed = normalized;
+        updateSeedDisplay();
+      });
+      input.addEventListener("keydown", (event) => {
+        if (event.key === "Enter") {
+          event.preventDefault();
+          this.handlePartyStartRound();
+        }
+      });
+    }
+    if (raceMode) {
+      raceMode.addEventListener("change", () => {
+        this.readPartySetupForm();
+        updateSeedDisplay();
+      });
+    }
+  }
+
+  handlePartyTogglePlayer(id) {
+    this.readPartySetupForm();
+    const setup = this.getPartySetup();
+    const index = setup.selectedPlayerIds.indexOf(id);
+    if (index >= 0) {
+      setup.selectedPlayerIds.splice(index, 1);
+      this.showPartySetupScreen("Player removed from the order.");
+      return;
+    }
+    if (setup.selectedPlayerIds.length >= PARTY_MAX_PLAYERS) {
+      this.showPartySetupScreen(`Party Mode supports up to ${PARTY_MAX_PLAYERS} players.`);
+      return;
+    }
+    if (this.profiles.getPlayerById(id)) {
+      setup.selectedPlayerIds.push(id);
+    }
+    this.showPartySetupScreen("Player added to the order.");
+  }
+
+  handlePartyMovePlayer(id, direction) {
+    this.readPartySetupForm();
+    const setup = this.getPartySetup();
+    const index = setup.selectedPlayerIds.indexOf(id);
+    const nextIndex = index + direction;
+    if (index < 0 || nextIndex < 0 || nextIndex >= setup.selectedPlayerIds.length) {
+      this.showPartySetupScreen();
+      return;
+    }
+    [setup.selectedPlayerIds[index], setup.selectedPlayerIds[nextIndex]] = [setup.selectedPlayerIds[nextIndex], setup.selectedPlayerIds[index]];
+    this.showPartySetupScreen("Player order updated.");
+  }
+
+  handlePartyRandomSeed() {
+    this.readPartySetupForm();
+    this.getPartySetup().sharedSeed = generateReadableRoadSeed();
+    this.showPartySetupScreen("Random party seed ready.");
+  }
+
+  handlePartyStartRound() {
+    const setup = this.readPartySetupForm();
+    const selectedPlayers = this.getPartySetupSelectedPlayers();
+    if (selectedPlayers.length < PARTY_MIN_PLAYERS) {
+      this.showPartySetupScreen(`Choose at least ${PARTY_MIN_PLAYERS} local players to start Party Mode.`);
+      return;
+    }
+    const sharedSeed = this.resolveRoadSeed(setup.sharedSeed);
+    setup.sharedSeed = sharedSeed;
+    setup.selectedPlayerIds = selectedPlayers.map((player) => player.id);
+    this.partySession = new PartySession({
+      players: selectedPlayers,
+      sharedSeed,
+      track: TRACKS[0],
+      raceMode: setup.raceMode,
+      roundType: PARTY_ROUND_TYPE_ONE_RUN
+    });
+    this.pendingRoadSeed = sharedSeed;
+    this.showPartyTurnScreen("Party round ready.");
+  }
+
+  showPartyTurnScreen(message = "") {
+    const session = this.partySession;
+    if (!session?.isPartyMode) {
+      this.showPartySetupScreen("Set up Party Mode before starting a turn.");
+      return;
+    }
+    if (session.completed) {
+      this.showPartyStandingsScreen();
+      return;
+    }
+    const player = session.currentPlayer;
+    this.setScreen("partyTurn");
+    this.audio.playMusic("title", false);
+    const standings = session.standings();
+    this.layer.classList.remove("is-empty");
+    this.layer.innerHTML = `
+      <section class="panel split party-turn-panel">
+        <div class="form-stack">
+          <h2>Party Turn</h2>
+          <div class="score-grid">
+            <div class="score-card"><strong>Driver</strong><span>${escapeHtml(player.name)}</span></div>
+            <div class="score-card"><strong>Turn</strong><span>Player ${session.currentTurnNumber} of ${session.totalPlayers}</span></div>
+            <div class="score-card"><strong>Track</strong><span>${escapeHtml(session.track.name)}</span></div>
+            <div class="score-card"><strong>Race Mode</strong><span>${escapeHtml(getSpeedClassLabel(session.raceMode))}</span></div>
+            <div class="score-card"><strong>Shared Seed</strong><span>${escapeHtml(session.sharedSeed)}</span></div>
+            <div class="score-card"><strong>Round Type</strong><span>One Run Each</span></div>
+          </div>
+          <p class="hint">Press Enter or Start Run when this player is at the keyboard.</p>
+          <div class="row">
+            <button class="small-button primary" data-action="partyStartRun">Start Run</button>
+            <button class="small-button" data-action="partyChangeSetup">Change Players/Mode</button>
+            <button class="small-button" data-action="title">Return to Title</button>
+          </div>
+          <p class="status-line">${escapeHtml(message)}</p>
+          ${standings.length ? `
+            <h2>Current Standings</h2>
+            <ol class="leaderboard-list">
+              ${standings.map((result) => `
+                <li class="leaderboard-item">
+                  <span class="leaderboard-rank">#${result.rank}</span>
+                  <span>
+                    <strong>${escapeHtml(result.playerName)}</strong>
+                    <span class="meta">${escapeHtml(result.carName)} · ${result.status} · ${formatTime(result.time)}</span>
+                  </span>
+                  <span class="leaderboard-score">${formatScore(result.score)}</span>
+                </li>
+              `).join("")}
+            </ol>
+          ` : ""}
+        </div>
+        <canvas id="partyCarPreview" class="car-preview" width="360" height="280" aria-label="Party car preview"></canvas>
+      </section>
+    `;
+    this.bindLayerButtons();
+    this.renderPartyCarPreview(player);
+  }
+
+  renderPartyCarPreview(player) {
+    const canvas = document.getElementById("partyCarPreview");
+    if (!canvas || !player) return;
+    const ctx = canvas.getContext("2d");
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
+    gradient.addColorStop(0, "#20144a");
+    gradient.addColorStop(1, "#05050a");
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.strokeStyle = "rgba(255, 228, 94, 0.24)";
+    for (let x = -40; x < canvas.width; x += 58) {
+      ctx.beginPath();
+      ctx.moveTo(x, 0);
+      ctx.lineTo(x + 94, canvas.height);
+      ctx.stroke();
+    }
+    const laneWidth = this.renderer?.road?.laneW || canvas.width / LANES;
+    drawPlayerCar(ctx, canvas.width / 2, canvas.height / 2 + 18, player.car, {
+      preview: true,
+      boosting: false,
+      airborne: false,
+      laneWidth,
+      laneChanging: false,
+      laneDelta: 0,
+      verticalInput: 0,
+      crashFlash: 0
+    }, this.carSprites);
+  }
+
+  startCurrentPartyRun() {
+    const session = this.partySession;
+    if (!session?.isPartyMode) {
+      this.showPartySetupScreen("Set up Party Mode before starting a turn.");
+      return;
+    }
+    if (session.completed) {
+      this.showPartyStandingsScreen();
+      return;
+    }
+    const player = session.currentPlayer;
+    this.startRace({
+      player,
+      track: session.track,
+      speedClassId: session.raceMode,
+      seed: session.sharedSeed,
+      partyMode: true,
+      partySeedLocked: true
+    });
+  }
+
+  showPartyStandingsScreen(message = "") {
+    const session = this.partySession;
+    if (!session?.isPartyMode) {
+      this.showTitle();
+      return;
+    }
+    const final = session.completed;
+    const standings = session.standings();
+    const leader = standings[0] || null;
+    const margin = session.marginOfVictory();
+    const nextPlayer = session.currentPlayer;
+    this.setScreen(final ? "partyFinal" : "partyStandings");
+    this.audio.playMusic("title", false);
+    if (final && !session.finalSfxPlayed) {
+      this.audio.playSfx("newHighScore");
+      session.finalSfxPlayed = true;
+    }
+    const summary = this.lastSummary;
+    this.layer.classList.remove("is-empty");
+    this.layer.innerHTML = `
+      <section class="panel">
+        <h2>${final ? "Party Winner" : "Party Standings"}</h2>
+        <p class="hint">
+          ${final && leader
+            ? `${escapeHtml(leader.playerName)} wins by ${formatScore(margin || 0)} on ${escapeHtml(session.track.name)} · ${escapeHtml(getSpeedClassLabel(session.raceMode))} · Seed ${escapeHtml(session.sharedSeed)}.`
+            : `${escapeHtml(nextPlayer?.name || "Next player")} is up next on ${escapeHtml(session.track.name)} · ${escapeHtml(getSpeedClassLabel(session.raceMode))} · Seed ${escapeHtml(session.sharedSeed)}.`}
+        </p>
+        ${summary?.partyMode ? `
+          <div class="score-grid party-last-run">
+            <div class="score-card"><strong>Last Run</strong><span>${escapeHtml(summary.playerName)}</span></div>
+            <div class="score-card"><strong>Score</strong><span>${formatScore(summary.finalScore)}</span></div>
+            <div class="score-card"><strong>Status</strong><span>${summary.status === "finished" ? "Finished" : `Crashed: ${escapeHtml(summary.reason)}`}</span></div>
+            <div class="score-card"><strong>Time</strong><span>${formatTime(summary.time)}</span></div>
+          </div>
+        ` : ""}
+        <ol class="leaderboard-list party-standings-list">
+          ${standings.length ? standings.map((result, index) => `
+            <li class="leaderboard-item ${final && index === 0 ? "is-winner" : ""}">
+              <span class="leaderboard-rank">#${result.rank}</span>
+              <span>
+                <strong>${escapeHtml(result.playerName)}</strong>
+                <span class="meta">${escapeHtml(result.carName)} · ${escapeHtml(getSpeedClassLabel(result.raceMode))} · Seed ${escapeHtml(result.seed)} · ${result.status} · ${formatTime(result.time)}</span>
+              </span>
+              <span class="leaderboard-score">${formatScore(result.score)}</span>
+            </li>
+          `).join("") : `<li class="leaderboard-item"><span class="meta">No party runs recorded yet.</span></li>`}
+        </ol>
+        <div class="row" style="margin-top:18px">
+          ${final ? `
+            <button class="small-button primary" data-action="partyRematchSameSeed">Rematch Same Seed</button>
+            <button class="small-button" data-action="partyRematchNewSeed">Rematch New Seed</button>
+            <button class="small-button" data-action="partyChangeSetup">Change Players/Mode</button>
+            <button class="small-button" data-action="title">Return to Title</button>
+          ` : `
+            <button class="small-button primary" data-action="partyNextPlayer">Next Player</button>
+            <button class="small-button" data-action="partyChangeSetup">Change Players/Mode</button>
+            <button class="small-button" data-action="title">Return to Title</button>
+          `}
+        </div>
+        <p class="status-line">${escapeHtml(message)}</p>
+      </section>
+    `;
+    this.bindLayerButtons();
+  }
+
+  handlePartyNextPlayer() {
+    this.showPartyTurnScreen();
+  }
+
+  handlePartyRematch(useSameSeed) {
+    const session = this.partySession;
+    if (!session?.isPartyMode) {
+      this.showPartySetupScreen("Set up Party Mode before rematching.");
+      return;
+    }
+    const seed = useSameSeed ? session.sharedSeed : generateReadableRoadSeed();
+    this.partySession = session.createRematch(seed);
+    this.partySetup = {
+      selectedPlayerIds: this.partySession.selectedPlayers.map((player) => player.id),
+      trackId: this.partySession.track.id,
+      raceMode: this.partySession.raceMode,
+      sharedSeed: this.partySession.sharedSeed,
+      roundType: PARTY_ROUND_TYPE_ONE_RUN
+    };
+    this.pendingRoadSeed = this.partySession.sharedSeed;
+    this.showPartyTurnScreen(useSameSeed ? "Rematch with the same seed." : "Rematch with a new seed.");
+  }
+
+  handlePartyChangeSetup() {
+    const session = this.partySession;
+    if (session?.isPartyMode) {
+      this.partySetup = {
+        selectedPlayerIds: session.selectedPlayers.map((player) => player.id),
+        trackId: session.track.id,
+        raceMode: session.raceMode,
+        sharedSeed: session.sharedSeed,
+        roundType: PARTY_ROUND_TYPE_ONE_RUN
+      };
+    } else {
+      this.getPartySetup();
+    }
+    this.partySession = null;
+    this.showPartySetupScreen("Adjust the party round.");
+  }
+
+  handleRestartRun() {
+    if (this.run?.partyMode && this.partySession?.isPartyMode) {
+      this.startCurrentPartyRun();
+      return;
+    }
+    this.startRace();
   }
 
   showPlayerScreen(message = "") {
@@ -6883,7 +7587,7 @@ class NeonRoadRally {
               <span class="leaderboard-rank">#${index + 1}</span>
               <span>
                 <strong>${escapeHtml(entry.playerName)}</strong>
-                <span class="meta">${escapeHtml(entry.carName)} · ${escapeHtml(entry.trackName)} · ${escapeHtml(getSpeedClassLabel(entry.raceMode || entry.speedClass))} · Seed ${escapeHtml(formatRoadSeed(entry.seed))} · ${entry.status} · ${formatTime(entry.time)} · ${new Date(entry.date).toLocaleDateString()}</span>
+                <span class="meta">${entry.partyMode ? "Party · " : ""}${escapeHtml(entry.carName)} · ${escapeHtml(entry.trackName)} · ${escapeHtml(getSpeedClassLabel(entry.raceMode || entry.speedClass))} · Seed ${escapeHtml(formatRoadSeed(entry.seed))} · ${entry.status} · ${formatTime(entry.time)} · ${new Date(entry.date).toLocaleDateString()}</span>
               </span>
               <span class="leaderboard-score">${formatScore(entry.score)}</span>
             </li>
@@ -6937,7 +7641,7 @@ class NeonRoadRally {
               <span class="leaderboard-rank">#${index + 1}</span>
               <span>
                 <strong>${escapeHtml(entry.playerName)}</strong>
-                <span class="meta">${escapeHtml(entry.carName)} · ${escapeHtml(getSpeedClassLabel(entry.raceMode || entry.speedClass))} · Seed ${escapeHtml(formatRoadSeed(entry.seed))} · ${entry.status} · ${formatTime(entry.time)}</span>
+                <span class="meta">${entry.partyMode ? "Party · " : ""}${escapeHtml(entry.carName)} · ${escapeHtml(getSpeedClassLabel(entry.raceMode || entry.speedClass))} · Seed ${escapeHtml(formatRoadSeed(entry.seed))} · ${entry.status} · ${formatTime(entry.time)}</span>
               </span>
               <span class="leaderboard-score">${formatScore(entry.score)}</span>
             </li>
@@ -6990,18 +7694,29 @@ class NeonRoadRally {
         this.audio.playSfx("menu");
         const action = button.dataset.action;
         if (action === "start") this.startRaceFromTitle();
+        else if (action === "partyMode") this.showPartySetupScreen();
         else if (action === "players") this.showPlayerScreen();
         else if (action === "customize") this.showCustomizeScreen();
         else if (action === "leaderboard") this.showLeaderboard();
         else if (action === "setSpeedClass") this.handleSetSpeedClass(button.dataset.id);
         else if (action === "randomSeed") this.handleRandomSeed();
         else if (action === "startSeededRace") this.handleStartSeededRace();
+        else if (action === "partyTogglePlayer") this.handlePartyTogglePlayer(button.dataset.id);
+        else if (action === "partyRemovePlayer") this.handlePartyTogglePlayer(button.dataset.id);
+        else if (action === "partyMovePlayer") this.handlePartyMovePlayer(button.dataset.id, Number(button.dataset.dir || 0));
+        else if (action === "partyRandomSeed") this.handlePartyRandomSeed();
+        else if (action === "partyStartRound") this.handlePartyStartRound();
+        else if (action === "partyStartRun") this.startCurrentPartyRun();
+        else if (action === "partyNextPlayer") this.handlePartyNextPlayer();
+        else if (action === "partyRematchSameSeed") this.handlePartyRematch(true);
+        else if (action === "partyRematchNewSeed") this.handlePartyRematch(false);
+        else if (action === "partyChangeSetup") this.handlePartyChangeSetup();
         else if (action === "toggleMusic") this.toggleMusic(true);
         else if (action === "toggleSfx") this.toggleSfx(true);
         else if (action === "runSimulation") this.runSpawnSafetySimulation();
         else if (action === "runSeedTest") this.runSeedDeterminismTest();
         else if (action === "title") this.showTitle();
-        else if (action === "restart") this.startRace();
+        else if (action === "restart") this.handleRestartRun();
         else if (action === "resume") this.togglePause();
         else if (action === "createPlayer") this.handleCreatePlayer();
         else if (action === "selectPlayer") this.handleSelectPlayer(button.dataset.id);
