@@ -33,6 +33,133 @@ const TRACKS = [
     name: "Sunset Highway",
     music: "audio/sunset-highway.mp3",
     targetDurationSeconds: 115,
+    sections: [
+      {
+        id: "launch",
+        label: "Launch",
+        startProgress: 0,
+        endProgress: 0.15,
+        pressureMultiplier: 0.85,
+        visualIntensity: 0.8,
+        cadenceMultiplier: 1.08,
+        recoveryGapMultiplier: 1.05,
+        forceMeaningfulMultiplier: 1.18,
+        waveWeightMultipliers: {
+          singleBlocker: 1.35,
+          doubleGate: 0.82,
+          offsetPair: 0.62,
+          centerBlock: 0.46,
+          leftRightSweep: 0.45,
+          constructionSqueeze: 0.16,
+          deerCrossing: 0,
+          rampEscape: 0.9,
+          boostTemptation: 1.18,
+          nearMissCorridor: 0,
+          fourLaneSpike: 0,
+          recoveryGap: 0.95
+        }
+      },
+      {
+        id: "groove",
+        label: "Groove",
+        startProgress: 0.15,
+        endProgress: 0.4,
+        pressureMultiplier: 1,
+        visualIntensity: 1,
+        cadenceMultiplier: 1,
+        recoveryGapMultiplier: 1,
+        forceMeaningfulMultiplier: 1,
+        waveWeightMultipliers: {
+          singleBlocker: 0.95,
+          doubleGate: 1.12,
+          offsetPair: 1.05,
+          centerBlock: 0.92,
+          leftRightSweep: 0.95,
+          constructionSqueeze: 0.86,
+          deerCrossing: 0.78,
+          rampEscape: 1,
+          boostTemptation: 1.08,
+          nearMissCorridor: 0.72,
+          fourLaneSpike: 0,
+          recoveryGap: 1
+        }
+      },
+      {
+        id: "pressure",
+        label: "Pressure",
+        startProgress: 0.4,
+        endProgress: 0.65,
+        pressureMultiplier: 1.18,
+        visualIntensity: 1.15,
+        cadenceMultiplier: 0.94,
+        recoveryGapMultiplier: 0.9,
+        forceMeaningfulMultiplier: 0.86,
+        waveWeightMultipliers: {
+          singleBlocker: 0.7,
+          doubleGate: 0.96,
+          offsetPair: 1.22,
+          centerBlock: 1.26,
+          leftRightSweep: 1.16,
+          constructionSqueeze: 1.34,
+          deerCrossing: 1.22,
+          rampEscape: 0.92,
+          boostTemptation: 0.78,
+          nearMissCorridor: 1.36,
+          fourLaneSpike: 0.55,
+          recoveryGap: 0.72
+        }
+      },
+      {
+        id: "breather",
+        label: "Breather",
+        startProgress: 0.65,
+        endProgress: 0.75,
+        pressureMultiplier: 0.66,
+        visualIntensity: 0.9,
+        cadenceMultiplier: 1.14,
+        recoveryGapMultiplier: 0.95,
+        forceMeaningfulMultiplier: 1.14,
+        waveWeightMultipliers: {
+          singleBlocker: 1.12,
+          doubleGate: 0.62,
+          offsetPair: 0.52,
+          centerBlock: 0.32,
+          leftRightSweep: 0.48,
+          constructionSqueeze: 0.28,
+          deerCrossing: 0.42,
+          rampEscape: 1.8,
+          boostTemptation: 1.65,
+          nearMissCorridor: 0.18,
+          fourLaneSpike: 0,
+          recoveryGap: 1.55
+        }
+      },
+      {
+        id: "finalPush",
+        label: "Final Push",
+        startProgress: 0.75,
+        endProgress: 1,
+        pressureMultiplier: 1.35,
+        visualIntensity: 1.35,
+        cadenceMultiplier: 0.84,
+        recoveryGapMultiplier: 0.72,
+        forceMeaningfulMultiplier: 0.72,
+        waveWeightMultipliers: {
+          singleBlocker: 0.5,
+          doubleGate: 0.8,
+          offsetPair: 1.18,
+          centerBlock: 1.28,
+          leftRightSweep: 1.32,
+          constructionSqueeze: 1.42,
+          deerCrossing: 1.12,
+          rampEscape: 1.05,
+          boostTemptation: 0.72,
+          nearMissCorridor: 1.62,
+          fourLaneSpike: 1.9,
+          recoveryGap: 0.58
+        }
+      }
+    ],
     distanceToFinish: 155000,
     baseSpeed: 1000,
     maxSpeed: 3000,
@@ -589,6 +716,45 @@ function getTrackDirectorBand(progress) {
   const safeProgress = Number.isFinite(progress) ? clamp(progress, 0, 1) : 0;
   return TRACK_DIRECTOR_BANDS.find((band) => safeProgress >= band.min && safeProgress < band.max)
     || TRACK_DIRECTOR_BANDS[TRACK_DIRECTOR_BANDS.length - 1];
+}
+
+const FALLBACK_TRACK_SECTION = {
+  id: "fullRun",
+  label: "Full Run",
+  startProgress: 0,
+  endProgress: 1,
+  pressureMultiplier: 1,
+  visualIntensity: 1,
+  cadenceMultiplier: 1,
+  recoveryGapMultiplier: 1,
+  forceMeaningfulMultiplier: 1,
+  waveWeightMultipliers: {}
+};
+
+function getTrackSections(track) {
+  return Array.isArray(track?.sections) && track.sections.length
+    ? track.sections
+    : [FALLBACK_TRACK_SECTION];
+}
+
+function getTrackSection(track, progress) {
+  const safeProgress = Number.isFinite(progress) ? clamp(progress, 0, 1) : 0;
+  const sections = getTrackSections(track);
+  return sections.find((section) => {
+    const start = Number.isFinite(section.startProgress) ? section.startProgress : 0;
+    const end = Number.isFinite(section.endProgress) ? section.endProgress : 1;
+    return safeProgress >= start && (safeProgress < end || (safeProgress >= 1 && end >= 1));
+  }) || sections[sections.length - 1] || FALLBACK_TRACK_SECTION;
+}
+
+function getTrackSectionProgress(section, progress) {
+  const start = Number.isFinite(section?.startProgress) ? section.startProgress : 0;
+  const end = Number.isFinite(section?.endProgress) ? section.endProgress : 1;
+  return clamp((progress - start) / Math.max(0.0001, end - start), 0, 1);
+}
+
+function getSectionNumber(section, key, fallback = 1, min = 0.1, max = 3) {
+  return clampNumber(section?.[key], min, max, fallback);
 }
 
 function getTrackDirectorCadence(speedClassId = DEFAULT_SPEED_CLASS_ID) {
@@ -1658,8 +1824,42 @@ class RoadDirector {
       meaningfulWaveCount: 0,
       rampUsefulCount: 0,
       longestLaneSafeSeconds: Array(LANES).fill(0),
-      pressureBudgetSum: 0
+      pressureBudgetSum: 0,
+      pressureSum: 0,
+      sectionStats: {}
     };
+  }
+
+  createSectionStats(section = FALLBACK_TRACK_SECTION) {
+    return {
+      id: section.id || FALLBACK_TRACK_SECTION.id,
+      label: section.label || section.id || FALLBACK_TRACK_SECTION.label,
+      totalWaves: 0,
+      centerBlockedWaves: 0,
+      blockedLaneSum: 0,
+      hardWaveCount: 0,
+      recoveryWaveCount: 0,
+      meaningfulWaveCount: 0,
+      fairnessFailures: 0,
+      pressureBudgetFailures: 0,
+      pressureSum: 0,
+      pressureBudgetSum: 0,
+      waveGapCount: 0,
+      waveGapSum: 0,
+      meaningfulWaveGapCount: 0,
+      meaningfulWaveGapSum: 0,
+      longestActiveEmptySeconds: 0,
+      pressureCounts: { 0: 0, 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 },
+      waveCounts: {}
+    };
+  }
+
+  getSectionStats(stats, section) {
+    const id = section?.id || FALLBACK_TRACK_SECTION.id;
+    if (!stats.sectionStats[id]) {
+      stats.sectionStats[id] = this.createSectionStats(section);
+    }
+    return stats.sectionStats[id];
   }
 
   random() {
@@ -1704,6 +1904,12 @@ class RoadDirector {
     this.stats.longestWaveGapSeconds = Math.max(this.stats.longestWaveGapSeconds, this.timeSinceWaveSeconds);
     this.stats.longestMeaningfulWaveGapSeconds = Math.max(this.stats.longestMeaningfulWaveGapSeconds, this.timeSinceMeaningfulWaveSeconds);
     this.stats.longestActiveEmptySeconds = Math.max(this.stats.longestActiveEmptySeconds, this.activeEmptySeconds);
+    const track = this.track || this.manager.track;
+    if (track) {
+      const progress = clamp((run.distance || 0) / Math.max(1, track.distanceToFinish), 0, 1);
+      const sectionStats = this.getSectionStats(this.stats, getTrackSection(track, progress));
+      sectionStats.longestActiveEmptySeconds = Math.max(sectionStats.longestActiveEmptySeconds, this.activeEmptySeconds);
+    }
     for (let lane = 0; lane < LANES; lane += 1) {
       this.laneSafeSeconds[lane] += dt;
       this.stats.longestLaneSafeSeconds[lane] = Math.max(this.stats.longestLaneSafeSeconds[lane], this.laneSafeSeconds[lane]);
@@ -1715,6 +1921,9 @@ class RoadDirector {
     const run = this.manager.game.run || {};
     const progress = clamp(distance / Math.max(1, track.distanceToFinish), 0, 1);
     const band = getTrackDirectorBand(progress);
+    const section = getTrackSection(track, progress);
+    const sectionProgress = getTrackSectionProgress(section, progress);
+    const sectionPressureMultiplier = getSectionNumber(section, "pressureMultiplier", 1, 0.25, 2.4);
     const difficulty = track.difficultyCurve(progress);
     const speedClassId = this.manager.getSpeedClassId();
     const cadence = getTrackDirectorCadence(speedClassId);
@@ -1738,11 +1947,11 @@ class RoadDirector {
       meaningfulGapSeconds = this.getSeedLockedSecondsSince(distance, this.seedLockLastMeaningfulWaveDistance, cruiseSpeed);
     }
     const bandT = clamp((progress - band.min) / Math.max(0.001, band.max - band.min), 0, 1);
-    const budget = lerp(band.budget[0], band.budget[1], bandT) * modeIntensity;
+    const budget = lerp(band.budget[0], band.budget[1], bandT) * modeIntensity * sectionPressureMultiplier;
     const centerSafeLimit = cadence.centerSafe ?? TRACK_DIRECTOR.centerSafeSecondsLimit;
     const centerChallengeMinSeconds = TRACK_DIRECTOR.centerChallengeMinSeconds[speedClassId] ?? Math.max(2.5, centerSafeLimit * 0.65);
-    const centerSoftPressure = TRACK_DIRECTOR.centerSoftPressure[speedClassId] ?? 0.32;
-    const centerRestChance = TRACK_DIRECTOR.centerRestChance[speedClassId] ?? 0.5;
+    const centerSoftPressure = (TRACK_DIRECTOR.centerSoftPressure[speedClassId] ?? 0.32) * getSectionNumber(section, "centerSoftPressureMultiplier", sectionPressureMultiplier, 0.35, 2);
+    const centerRestChance = clamp((TRACK_DIRECTOR.centerRestChance[speedClassId] ?? 0.5) / getSectionNumber(section, "pressureMultiplier", 1, 0.55, 1.6), 0.02, 0.9);
     const pressureBudgetAllowance = TRACK_DIRECTOR.pressureBudgetAllowance[speedClassId] ?? 1.1;
     const laneStillLimit = cadence.laneStill ?? 3;
     const centerHoldLimit = cadence.centerHold ?? TRACK_DIRECTOR.centerHoldSeconds;
@@ -1754,7 +1963,7 @@ class RoadDirector {
     const allowSoftCenterPressure = progress > 0.18
       && !centerNeedsChallenge
       && centerSafeSeconds >= centerChallengeMinSeconds * 0.92;
-    const forceMeaningful = meaningfulGapSeconds >= (cadence.forceMeaningful ?? 3);
+    const forceMeaningful = meaningfulGapSeconds >= (cadence.forceMeaningful ?? 3) * getSectionNumber(section, "forceMeaningfulMultiplier", 1, 0.45, 1.8);
 
     return {
       track,
@@ -1762,6 +1971,9 @@ class RoadDirector {
       distance,
       progress,
       band,
+      section,
+      sectionProgress,
+      sectionPressureMultiplier,
       difficulty,
       speedClassId,
       cadence,
@@ -1796,6 +2008,11 @@ class RoadDirector {
     return result;
   }
 
+  getSectionWaveWeight(type, context) {
+    const multipliers = context.section?.waveWeightMultipliers || {};
+    return getSectionNumber({ value: multipliers[type] }, "value", 1, 0, 4);
+  }
+
   chooseWaveType(context) {
     if (this.forceRecoveryNext) {
       this.forceRecoveryNext = false;
@@ -1808,6 +2025,7 @@ class RoadDirector {
     const entries = Object.entries(context.band.weights).map(([type, baseWeight]) => {
       let weight = baseWeight;
       if (!this.isWaveAllowed(type, context)) return { value: type, weight: 0 };
+      weight *= this.getSectionWaveWeight(type, context);
       if (!context.centerNeedsChallenge && type === "centerBlock") {
         weight *= context.centerSoftPressure;
       }
@@ -1907,6 +2125,9 @@ class RoadDirector {
       weights.find((item) => item.value === "nearMissCorridor").weight = 0;
       weights.find((item) => item.value === "leftRightSweep").weight *= 0.4;
     }
+    weights.forEach((item) => {
+      item.weight *= this.getSectionWaveWeight(item.value, context);
+    });
     return weightedChoice(weights, () => this.random()) || "doubleGate";
   }
 
@@ -1955,6 +2176,8 @@ class RoadDirector {
       type,
       label: this.getWaveLabel(type),
       band: context.band,
+      section: context.section,
+      sectionProgress: context.sectionProgress,
       pressureBudget: context.pressureBudget,
       spawned: [],
       blockedLanes: new Set(),
@@ -2057,18 +2280,34 @@ class RoadDirector {
       || result.pressure >= context.pressureBudget + 0.45;
 
     const stats = this.stats;
+    const sectionStats = this.getSectionStats(stats, context.section);
+    const waveGapSeconds = this.timeSinceWaveSeconds;
+    const meaningfulGapSeconds = this.timeSinceMeaningfulWaveSeconds;
     stats.totalWaves += 1;
     if (context.band.id !== "opening") stats.nonOpeningWaves += 1;
     stats.blockedLaneSum += blockedCount;
     stats.pressureCounts[blockedCount] = (stats.pressureCounts[blockedCount] || 0) + 1;
     stats.waveCounts[result.type] = (stats.waveCounts[result.type] || 0) + 1;
     stats.pressureBudgetSum += context.pressureBudget;
+    stats.pressureSum += result.pressure;
+    sectionStats.totalWaves += 1;
+    sectionStats.blockedLaneSum += blockedCount;
+    sectionStats.pressureCounts[blockedCount] = (sectionStats.pressureCounts[blockedCount] || 0) + 1;
+    sectionStats.waveCounts[result.type] = (sectionStats.waveCounts[result.type] || 0) + 1;
+    sectionStats.pressureBudgetSum += context.pressureBudget;
+    sectionStats.pressureSum += result.pressure;
     if (result.hard) stats.hardWaveCount += 1;
     if (result.type === "recoveryGap") stats.recoveryWaveCount += 1;
     if (!result.fairnessPassed) stats.fairnessFailures += 1;
     if (!result.pressureBudgetPassed) stats.pressureBudgetFailures += 1;
-    stats.waveGapSeconds.push(this.timeSinceWaveSeconds);
-    stats.longestWaveGapSeconds = Math.max(stats.longestWaveGapSeconds, this.timeSinceWaveSeconds);
+    if (result.hard) sectionStats.hardWaveCount += 1;
+    if (result.type === "recoveryGap") sectionStats.recoveryWaveCount += 1;
+    if (!result.fairnessPassed) sectionStats.fairnessFailures += 1;
+    if (!result.pressureBudgetPassed) sectionStats.pressureBudgetFailures += 1;
+    stats.waveGapSeconds.push(waveGapSeconds);
+    stats.longestWaveGapSeconds = Math.max(stats.longestWaveGapSeconds, waveGapSeconds);
+    sectionStats.waveGapCount += 1;
+    sectionStats.waveGapSum += waveGapSeconds;
     this.timeSinceWaveSeconds = 0;
 
     if (this.lastWaveType === result.type) {
@@ -2082,6 +2321,7 @@ class RoadDirector {
       stats.centerBlockedWaves += 1;
       if (context.band.id !== "opening") stats.nonOpeningCenterBlockedWaves += 1;
       stats.centerChallengeGapSeconds.push(this.centerSafeSeconds);
+      sectionStats.centerBlockedWaves += 1;
       this.centerSafeSeconds = 0;
     }
 
@@ -2095,8 +2335,11 @@ class RoadDirector {
     const meaningfulWave = result.type !== "recoveryGap" && (blockedCount > 0 || this.hasActivePressureAhead(activePressureRunDistance, activePressureObstacles));
     if (meaningfulWave) {
       stats.meaningfulWaveCount += 1;
-      stats.meaningfulWaveGapSeconds.push(this.timeSinceMeaningfulWaveSeconds);
-      stats.longestMeaningfulWaveGapSeconds = Math.max(stats.longestMeaningfulWaveGapSeconds, this.timeSinceMeaningfulWaveSeconds);
+      stats.meaningfulWaveGapSeconds.push(meaningfulGapSeconds);
+      stats.longestMeaningfulWaveGapSeconds = Math.max(stats.longestMeaningfulWaveGapSeconds, meaningfulGapSeconds);
+      sectionStats.meaningfulWaveCount += 1;
+      sectionStats.meaningfulWaveGapCount += 1;
+      sectionStats.meaningfulWaveGapSum += meaningfulGapSeconds;
       this.timeSinceMeaningfulWaveSeconds = 0;
     }
     if (context.seedLocked) {
@@ -2125,6 +2368,11 @@ class RoadDirector {
       type: result.type,
       label: result.label,
       band: context.band.label,
+      sectionId: context.section?.id || FALLBACK_TRACK_SECTION.id,
+      sectionLabel: context.section?.label || FALLBACK_TRACK_SECTION.label,
+      sectionProgress: context.sectionProgress,
+      sectionPressureMultiplier: context.sectionPressureMultiplier,
+      sectionVisualIntensity: getSectionNumber(context.section, "visualIntensity", 1, 0.5, 1.8),
       distance: Math.round(context.distance),
       pressureBudget: context.pressureBudget,
       pressure: result.pressure,
@@ -2146,6 +2394,9 @@ class RoadDirector {
         index: stats.totalWaves,
         type: this.currentWave.type,
         label: this.currentWave.label,
+        sectionId: this.currentWave.sectionId,
+        sectionLabel: this.currentWave.sectionLabel,
+        sectionProgress: this.currentWave.sectionProgress,
         distance: this.currentWave.distance,
         blockedLanes: this.currentWave.blockedLanes.slice(),
         boostLanes: this.currentWave.boostLanes.slice(),
@@ -2179,6 +2430,10 @@ class RoadDirector {
   getSpacingMultiplier(result) {
     if (!result) return 1;
     const cadence = getTrackDirectorCadence(this.manager.getSpeedClassId());
+    const sectionCadence = getSectionNumber(result.section, "cadenceMultiplier", 1, 0.5, 1.5);
+    const sectionRecovery = result.type === "recoveryGap"
+      ? getSectionNumber(result.section, "recoveryGapMultiplier", 1, 0.45, 1.6)
+      : 1;
     const multipliers = {
       recoveryGap: 0.72,
       singleBlocker: 0.72,
@@ -2194,28 +2449,36 @@ class RoadDirector {
       fourLaneSpike: 1.16
     };
     const recoveryScale = result.type === "recoveryGap" ? (cadence.recoveryScale ?? 1) : 1;
-    return (multipliers[result.type] || 1) * (cadence.spacingScale ?? 1) * recoveryScale;
+    return (multipliers[result.type] || 1) * (cadence.spacingScale ?? 1) * recoveryScale * sectionCadence * sectionRecovery;
   }
 
   getRandomSecondsScale(result) {
     if (!result) return 1;
     const cadence = getTrackDirectorCadence(this.manager.getSpeedClassId());
     const speedClassId = this.manager.getSpeedClassId();
-    if (result.type === "recoveryGap") return 0.28 * (cadence.recoveryScale ?? 1);
-    if (speedClassId === "turbo") return result.hard ? 0.24 : 0.34;
-    if (speedClassId === "pro") return result.hard ? 0.32 : 0.44;
-    if (result.hard) return 0.38;
-    return 0.52;
+    const sectionRandom = getSectionNumber(result.section, "cadenceMultiplier", 1, 0.5, 1.5);
+    if (result.type === "recoveryGap") return 0.28 * (cadence.recoveryScale ?? 1) * sectionRandom;
+    if (speedClassId === "turbo") return (result.hard ? 0.24 : 0.34) * sectionRandom;
+    if (speedClassId === "pro") return (result.hard ? 0.32 : 0.44) * sectionRandom;
+    if (result.hard) return 0.38 * sectionRandom;
+    return 0.52 * sectionRandom;
   }
 
   getDebugInfo() {
     const current = this.currentWave || {};
     const run = this.manager.game.run || {};
+    const progress = clamp((run.distance || 0) / Math.max(1, this.manager.track?.distanceToFinish || 1), 0, 1);
+    const section = getTrackSection(this.manager.track, progress);
     return {
       seed: formatRoadSeed(run.roadSeed),
       seedHash: Number.isFinite(run.roadSeedHash) ? run.roadSeedHash : 0,
       rngState: Number.isFinite(run.roadRngState) ? run.roadRngState : 0,
       band: current.band || getTrackDirectorBand(this.manager.game.run?.distance / Math.max(1, this.manager.track?.distanceToFinish || 1)).label,
+      sectionId: current.sectionId || section.id,
+      sectionLabel: current.sectionLabel || section.label,
+      sectionProgress: Number.isFinite(current.sectionProgress) ? current.sectionProgress : getTrackSectionProgress(section, progress),
+      sectionPressureMultiplier: Number.isFinite(current.sectionPressureMultiplier) ? current.sectionPressureMultiplier : getSectionNumber(section, "pressureMultiplier", 1, 0.25, 2.4),
+      sectionVisualIntensity: Number.isFinite(current.sectionVisualIntensity) ? current.sectionVisualIntensity : getSectionNumber(section, "visualIntensity", 1, 0.5, 1.8),
       wave: current.label || "none",
       lastWave: this.lastWaveType ? this.getWaveLabel(this.lastWaveType) : "none",
       budget: Number.isFinite(current.pressureBudget) ? current.pressureBudget : 0,
@@ -2231,6 +2494,39 @@ class RoadDirector {
       fairnessPassed: this.lastFairnessPassed,
       pressureBudgetPassed: current.pressureBudgetPassed !== false
     };
+  }
+
+  formatSectionStats(stats) {
+    return Object.fromEntries(Object.entries(stats.sectionStats || {}).map(([id, section]) => [id, {
+      id: section.id || id,
+      label: section.label || id,
+      totalWaves: section.totalWaves,
+      centerBlockedWaves: section.centerBlockedWaves,
+      blockedLaneSum: section.blockedLaneSum,
+      hardWaveCount: section.hardWaveCount,
+      recoveryWaveCount: section.recoveryWaveCount,
+      meaningfulWaveCount: section.meaningfulWaveCount,
+      fairnessFailures: section.fairnessFailures,
+      pressureBudgetFailures: section.pressureBudgetFailures,
+      pressureSum: section.pressureSum,
+      pressureBudgetSum: section.pressureBudgetSum,
+      waveGapCount: section.waveGapCount,
+      waveGapSum: section.waveGapSum,
+      meaningfulWaveGapCount: section.meaningfulWaveGapCount,
+      meaningfulWaveGapSum: section.meaningfulWaveGapSum,
+      longestActiveEmptySeconds: section.longestActiveEmptySeconds,
+      pressureCounts: { ...section.pressureCounts },
+      waveCounts: { ...section.waveCounts },
+      averagePressure: section.totalWaves ? section.pressureSum / section.totalWaves : 0,
+      averagePressureBudget: section.totalWaves ? section.pressureBudgetSum / section.totalWaves : 0,
+      averageBlockedLanesPerWave: section.totalWaves ? section.blockedLaneSum / section.totalWaves : 0,
+      centerBlockedPercent: section.totalWaves ? section.centerBlockedWaves / section.totalWaves : 0,
+      hardWavePercent: section.totalWaves ? section.hardWaveCount / section.totalWaves : 0,
+      recoveryWavePercent: section.totalWaves ? section.recoveryWaveCount / section.totalWaves : 0,
+      meaningfulWavePercent: section.totalWaves ? section.meaningfulWaveCount / section.totalWaves : 0,
+      averageWaveGapSeconds: section.waveGapCount ? section.waveGapSum / section.waveGapCount : null,
+      averageMeaningfulWaveGapSeconds: section.meaningfulWaveGapCount ? section.meaningfulWaveGapSum / section.meaningfulWaveGapCount : null
+    }]));
   }
 
   getSimulationStats() {
@@ -2279,7 +2575,9 @@ class RoadDirector {
       rampLaneCounts: stats.rampLaneCounts.slice(),
       obstacleTypeCounts: { ...stats.obstacleTypeCounts },
       averagePressureBudget: stats.totalWaves ? stats.pressureBudgetSum / stats.totalWaves : 0,
-      longestLaneSafeSeconds: stats.longestLaneSafeSeconds.slice()
+      averagePressure: stats.totalWaves ? stats.pressureSum / stats.totalWaves : 0,
+      longestLaneSafeSeconds: stats.longestLaneSafeSeconds.slice(),
+      sectionStats: this.formatSectionStats(stats)
     };
   }
 
@@ -3477,6 +3775,8 @@ class Renderer {
     const ctx = this.ctx;
     const h = this.height;
     const w = this.width;
+    const visualIntensity = this.getRaceVisualIntensity();
+    const glowStrength = clamp(TRACK_VISUALS.horizonGlowStrength * clamp(visualIntensity, 0.78, 1.28), 0.45, 1);
     const sky = ctx.createLinearGradient(0, 0, 0, h);
     sky.addColorStop(0, "#100c2b");
     sky.addColorStop(0.26, "#2c0d46");
@@ -3490,8 +3790,8 @@ class Renderer {
     const sunY = Math.min(horizonY - 72, h * 0.27);
     const sunR = Math.min(132, w * 0.17);
     const sun = ctx.createRadialGradient(w * 0.5, sunY, 10, w * 0.5, sunY, sunR);
-    sun.addColorStop(0, `rgba(255, 228, 94, ${0.95 * TRACK_VISUALS.horizonGlowStrength})`);
-    sun.addColorStop(0.42, `rgba(255, 130, 75, ${0.66 * TRACK_VISUALS.horizonGlowStrength})`);
+    sun.addColorStop(0, `rgba(255, 228, 94, ${0.95 * glowStrength})`);
+    sun.addColorStop(0.42, `rgba(255, 130, 75, ${0.66 * glowStrength})`);
     sun.addColorStop(1, "rgba(255, 63, 209, 0)");
     ctx.fillStyle = sun;
     ctx.beginPath();
@@ -3499,8 +3799,8 @@ class Renderer {
     ctx.fill();
 
     const horizonGlow = ctx.createRadialGradient(w * 0.5, horizonY, 4, w * 0.5, horizonY, Math.max(w * 0.28, 320));
-    horizonGlow.addColorStop(0, `rgba(255, 148, 72, ${0.42 * TRACK_VISUALS.horizonGlowStrength})`);
-    horizonGlow.addColorStop(0.38, `rgba(255, 63, 209, ${0.17 * TRACK_VISUALS.horizonGlowStrength})`);
+    horizonGlow.addColorStop(0, `rgba(255, 148, 72, ${0.42 * glowStrength})`);
+    horizonGlow.addColorStop(0.38, `rgba(255, 63, 209, ${0.17 * glowStrength})`);
     horizonGlow.addColorStop(1, "rgba(40, 246, 255, 0)");
     ctx.fillStyle = horizonGlow;
     ctx.fillRect(0, horizonY - 180, w, 360);
@@ -3580,11 +3880,22 @@ class Renderer {
     return clamp((progress - TRACK_VISUALS.finalStretchStart) / Math.max(0.01, 1 - TRACK_VISUALS.finalStretchStart), 0, 1);
   }
 
+  getRaceVisualIntensity() {
+    const run = this.game.run;
+    if (!run || !run.track || (this.game.screen !== "game" && this.game.screen !== "score")) return 1;
+    const progress = clamp(run.distance / Math.max(1, run.track.distanceToFinish), 0, 1);
+    const section = getTrackSection(run.track, progress);
+    return getSectionNumber({
+      visualIntensity: Number.isFinite(run.sectionVisualIntensity) ? run.sectionVisualIntensity : section.visualIntensity
+    }, "visualIntensity", 1, 0.65, 1.55);
+  }
+
   drawRoadsideScenery(alpha = 1) {
     const ctx = this.ctx;
     const road = this.road;
     const scrollSource = this.getVisualDistance();
     const speedRatio = this.getVisualSpeedRatio();
+    const visualIntensity = this.getRaceVisualIntensity();
     const spacing = TRACK_VISUALS.scenerySpacing / Math.max(0.55, TRACK_VISUALS.sceneryDensity);
     const sceneryScrollScale = 0.22 + speedRatio * 0.12;
     const scroll = (scrollSource * sceneryScrollScale) % spacing;
@@ -3607,7 +3918,7 @@ class Renderer {
       const scale = lerp(0.56, 1.12, depth);
       const typeRoll = deterministicNoise(worldIndex, 23);
       const signRoll = deterministicNoise(worldIndex, 24);
-      const warmth = this.getFinalStretchIntensity();
+      const warmth = clamp(this.getFinalStretchIntensity() + Math.max(0, visualIntensity - 1) * 0.42, 0, 1);
 
       if (typeRoll < 0.42) {
         this.drawPalmSilhouette(x, y, scale, side);
@@ -3772,6 +4083,7 @@ class Renderer {
     this.drawFloatingTexts();
     this.drawCountdown();
     this.drawCrashBeat();
+    this.drawSectionNotice();
     this.drawHud();
     if (this.game.debugMode) this.drawDebug();
   }
@@ -3779,6 +4091,7 @@ class Renderer {
   drawRoadBase(alpha) {
     const ctx = this.ctx;
     const road = this.road;
+    const visualIntensity = this.getRaceVisualIntensity();
     ctx.save();
     ctx.globalAlpha = alpha;
     ctx.fillStyle = "#161722";
@@ -3796,10 +4109,10 @@ class Renderer {
     const scrollSource = this.getVisualDistance();
     this.drawRoadSurfaceDetails(scrollSource, alpha);
 
-    ctx.shadowBlur = 14;
+    ctx.shadowBlur = 14 * visualIntensity;
     ctx.shadowColor = "#28f6ff";
     ctx.strokeStyle = "#28f6ff";
-    ctx.lineWidth = 4;
+    ctx.lineWidth = 4 + Math.max(0, visualIntensity - 1) * 1.5;
     ctx.beginPath();
     ctx.moveTo(road.x, road.y);
     ctx.lineTo(road.x, this.height);
@@ -3811,6 +4124,8 @@ class Renderer {
     const dashHeight = 56;
     const gap = 46;
     const scroll = (scrollSource * SPEED_TUNING.roadStripeScrollScale) % (dashHeight + gap);
+    const lanePulse = 0.94 + Math.sin(scrollSource * 0.018) * 0.06 * clamp((visualIntensity - 0.8) / 0.55, 0, 1);
+    ctx.globalAlpha = alpha * clamp(visualIntensity * lanePulse, 0.78, 1.24);
     for (let lane = 1; lane < LANES; lane += 1) {
       const x = road.x + lane * road.laneW;
       ctx.shadowColor = lane % 2 ? "#ff3fd1" : "#ffe45e";
@@ -3823,6 +4138,7 @@ class Renderer {
         ctx.stroke();
       }
     }
+    ctx.globalAlpha = alpha;
 
     const glowLane = this.game.run.targetLane;
     const glowX = road.x + glowLane * road.laneW;
@@ -3838,7 +4154,8 @@ class Renderer {
   drawRoadSurfaceDetails(scrollSource, alpha) {
     const ctx = this.ctx;
     const road = this.road;
-    const intensity = TRACK_VISUALS.roadDetailIntensity * alpha;
+    const visualIntensity = this.getRaceVisualIntensity();
+    const intensity = TRACK_VISUALS.roadDetailIntensity * alpha * clamp(visualIntensity, 0.78, 1.18);
     const bandSpacing = TRACK_VISUALS.asphaltBandSpacing;
     const seamSpacing = TRACK_VISUALS.roadSeamSpacing;
     const bandScroll = (scrollSource * 0.28) % bandSpacing;
@@ -3882,18 +4199,19 @@ class Renderer {
     const ctx = this.ctx;
     const road = this.road;
     const speedRatio = this.getVisualSpeedRatio();
+    const visualIntensity = this.getRaceVisualIntensity();
     const lightSpacing = TRACK_VISUALS.edgeLightSpacing;
     const reflectorSpacing = TRACK_VISUALS.reflectorSpacing;
-    const lightScroll = (scrollSource * (0.72 + speedRatio * 0.42)) % lightSpacing;
+    const lightScroll = (scrollSource * (0.72 + speedRatio * 0.42) * clamp(visualIntensity, 0.92, 1.12)) % lightSpacing;
     const reflectorScroll = (scrollSource * 0.58) % reflectorSpacing;
 
     ctx.save();
-    ctx.globalAlpha = alpha * 0.85;
+    ctx.globalAlpha = alpha * 0.85 * clamp(visualIntensity, 0.78, 1.18);
     for (let y = road.y - lightSpacing + lightScroll; y < this.height + lightSpacing; y += lightSpacing) {
       const t = clamp((y - road.y) / Math.max(1, road.h), 0, 1);
       const size = lerp(3, 7, t);
       const color = Math.floor(y / lightSpacing) % 2 ? "#ff3fd1" : "#28f6ff";
-      ctx.shadowBlur = 12;
+      ctx.shadowBlur = 12 * visualIntensity;
       ctx.shadowColor = color;
       ctx.fillStyle = color;
       ctx.fillRect(road.x - 14, y, size, size * 2.3);
@@ -3912,11 +4230,14 @@ class Renderer {
 
   drawFinalStretchRoadGlow(alpha) {
     const finalStretch = this.getFinalStretchIntensity();
-    if (finalStretch <= 0) return;
+    const visualIntensity = this.getRaceVisualIntensity();
+    const sectionPush = clamp((visualIntensity - 1) / 0.35, 0, 1);
+    const glowIntensity = Math.max(finalStretch, sectionPush * 0.45);
+    if (glowIntensity <= 0) return;
     const ctx = this.ctx;
     const road = this.road;
     ctx.save();
-    ctx.globalAlpha = alpha * finalStretch * 0.22;
+    ctx.globalAlpha = alpha * glowIntensity * 0.22;
     const glow = ctx.createLinearGradient(0, road.y, 0, this.height);
     glow.addColorStop(0, "rgba(255, 228, 94, 0)");
     glow.addColorStop(0.6, "rgba(255, 95, 68, 0.24)");
@@ -4113,14 +4434,17 @@ class Renderer {
     if (!ARCADE_FEEL.enabled) return;
     const highSpeed = run.currentSpeed > run.track.maxSpeed * ARCADE_FEEL.highSpeedLineStartRatio;
     const boosting = run.boostTimer > 0 || run.padBoostTimer > 0;
-    if (!(boosting || highSpeed)) return;
+    const visualIntensity = this.getRaceVisualIntensity();
+    const sectionEnergy = visualIntensity > 1.22 && this.game.screen === "game";
+    if (!(boosting || highSpeed || sectionEnergy)) return;
     const ctx = this.ctx;
     const speedRatio = this.getVisualSpeedRatio();
     const finalStretch = this.getFinalStretchIntensity();
-    const intensity = (run.boostTimer > 0 ? 0.42 : (run.padBoostTimer > 0 ? 0.32 : 0.18))
+    const intensity = (run.boostTimer > 0 ? 0.42 : (run.padBoostTimer > 0 ? 0.32 : (sectionEnergy ? 0.14 : 0.18)))
       * TRACK_VISUALS.speedStreakIntensity
-      * (1 + finalStretch * 0.25);
-    const lineCount = Math.round((run.boostTimer > 0 ? 34 : (run.padBoostTimer > 0 ? 24 : 16)) * (0.85 + speedRatio * 0.35));
+      * (1 + finalStretch * 0.25)
+      * clamp(visualIntensity, 0.8, 1.35);
+    const lineCount = Math.round((run.boostTimer > 0 ? 34 : (run.padBoostTimer > 0 ? 24 : (sectionEnergy ? 18 : 16))) * (0.85 + speedRatio * 0.35) * clamp(visualIntensity, 0.92, 1.18));
     ctx.save();
     ctx.globalAlpha = intensity;
     ctx.strokeStyle = boosting ? "#28f6ff" : "#f6fbff";
@@ -4289,6 +4613,36 @@ class Renderer {
     ctx.restore();
   }
 
+  drawSectionNotice() {
+    const run = this.game.run;
+    if (!ARCADE_FEEL.enabled || !run || run.sectionNoticeTimer <= 0 || this.game.screen !== "game") return;
+    const label = String(run.currentSectionLabel || "").toUpperCase();
+    if (!label) return;
+    const t = clamp(run.sectionNoticeTimer / 1.25, 0, 1);
+    const alpha = Math.min(1, t * 1.8);
+    const ctx = this.ctx;
+    const y = 82;
+    ctx.save();
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.font = "900 15px Trebuchet MS, Verdana, sans-serif";
+    const textWidth = ctx.measureText(label).width;
+    const boxW = Math.min(this.width - 28, Math.max(122, textWidth + 42));
+    const x = this.width / 2;
+    ctx.globalAlpha = alpha;
+    ctx.fillStyle = "rgba(5, 7, 18, 0.82)";
+    ctx.fillRect(x - boxW / 2, y - 10, boxW, 20);
+    ctx.strokeStyle = run.sectionVisualIntensity >= 1.2 ? "#ffe45e" : "#28f6ff";
+    ctx.lineWidth = 2;
+    ctx.shadowBlur = 10;
+    ctx.shadowColor = ctx.strokeStyle;
+    ctx.strokeRect(x - boxW / 2, y - 10, boxW, 20);
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = "#f6fbff";
+    ctx.fillText(label, x, y + 1);
+    ctx.restore();
+  }
+
   drawHud() {
     const ctx = this.ctx;
     const run = this.game.run;
@@ -4327,7 +4681,12 @@ class Renderer {
     ctx.shadowBlur = 0;
     ctx.fillStyle = "#b8c6d9";
     ctx.font = "700 12px Trebuchet MS, Verdana, sans-serif";
-    ctx.fillText(`${Math.round(progress * 100)}%  MUSIC ${this.game.audio.musicMuted ? "OFF" : "ON"}  SFX ${this.game.audio.sfxMuted ? "OFF" : "ON"}`, barX + barW + 18, 47);
+    const sectionLabel = String(run.currentSectionLabel || getTrackSection(run.track, progress).label || "").toUpperCase();
+    const audioText = `MUSIC ${this.game.audio.musicMuted ? "OFF" : "ON"}  SFX ${this.game.audio.sfxMuted ? "OFF" : "ON"}`;
+    const statusText = w >= 930
+      ? `${Math.round(progress * 100)}%  ${sectionLabel}  ${audioText}`
+      : `${Math.round(progress * 100)}%  ${sectionLabel}`;
+    ctx.fillText(statusText, barX + barW + 18, 47);
     ctx.restore();
   }
 
@@ -4381,6 +4740,8 @@ class Renderer {
       `distance: ${run.distance.toFixed(0)}`,
       `obstacles: ${this.game.obstacles.obstacles.length}`,
       `progress: ${(progress * 100).toFixed(1)}%`,
+      `section: ${directorDebug.sectionId} ${directorDebug.sectionLabel} ${(directorDebug.sectionProgress * 100).toFixed(0)}%`,
+      `section mult: pressure ${directorDebug.sectionPressureMultiplier.toFixed(2)} visual ${directorDebug.sectionVisualIntensity.toFixed(2)}`,
       `airborne: ${run.airborne}`,
       `collision: ${run.collisionState}`,
       `last hit: ${run.lastCollision}`,
@@ -5456,6 +5817,7 @@ class NeonRoadRally {
     };
     const track = TRACKS[0];
     const speedClass = getSpeedClassConfig(this.profiles?.data?.speedClassId);
+    const section = getTrackSection(track, 0);
     return {
       player,
       track,
@@ -5467,6 +5829,12 @@ class NeonRoadRally {
       roadSeedHash: hashSeed(getRunRandomSeedSource(DEFAULT_ROAD_SEED, track, speedClass.id)),
       roadRngState: hashSeed(getRunRandomSeedSource(DEFAULT_ROAD_SEED, track, speedClass.id)),
       roadDirectorSequence: [],
+      currentSectionId: section.id,
+      currentSectionLabel: section.label,
+      sectionProgress: 0,
+      sectionPressureMultiplier: getSectionNumber(section, "pressureMultiplier", 1, 0.25, 2.4),
+      sectionVisualIntensity: getSectionNumber(section, "visualIntensity", 1, 0.5, 1.8),
+      sectionNoticeTimer: 0,
       distance: 0,
       baseScore: 0,
       score: 0,
@@ -5586,6 +5954,7 @@ class NeonRoadRally {
     run.finishFlashTimer = Math.max(0, (run.finishFlashTimer || 0) - dt);
     run.crashBeatTimer = Math.max(0, (run.crashBeatTimer || 0) - dt);
     run.inputFlashTimer = Math.max(0, (run.inputFlashTimer || 0) - dt);
+    run.sectionNoticeTimer = Math.max(0, (run.sectionNoticeTimer || 0) - dt);
     if (Array.isArray(run.floatingTexts)) {
       run.floatingTexts.forEach((text) => {
         text.life -= dt;
@@ -5596,6 +5965,22 @@ class NeonRoadRally {
     }
   }
 
+  updateRaceSection(showInitialNotice = false) {
+    const run = this.run;
+    if (!run?.track) return;
+    const progress = clamp(run.distance / Math.max(1, run.track.distanceToFinish), 0, 1);
+    const section = getTrackSection(run.track, progress);
+    const sectionChanged = section.id !== run.currentSectionId;
+    run.currentSectionId = section.id;
+    run.currentSectionLabel = section.label;
+    run.sectionProgress = getTrackSectionProgress(section, progress);
+    run.sectionPressureMultiplier = getSectionNumber(section, "pressureMultiplier", 1, 0.25, 2.4);
+    run.sectionVisualIntensity = getSectionNumber(section, "visualIntensity", 1, 0.5, 1.8);
+    if ((sectionChanged && run.raceActive) || showInitialNotice) {
+      run.sectionNoticeTimer = 1.25;
+    }
+  }
+
   updateRun(dt) {
     const run = this.run;
     if (run.countdownTimer > 0) {
@@ -5603,6 +5988,7 @@ class NeonRoadRally {
       run.countdownTimer = Math.max(0, run.countdownTimer - dt);
       if (run.countdownTimer <= 0) {
         run.raceActive = true;
+        this.updateRaceSection(true);
         if (this.input) this.input.clearCountdownInputLocks();
       }
       return;
@@ -5654,6 +6040,7 @@ class NeonRoadRally {
     const distanceDelta = run.currentSpeed * dt;
     run.lastDistanceDelta = distanceDelta;
     run.distance += distanceDelta;
+    this.updateRaceSection();
     const distanceScore = distanceDelta * (run.boostTimer > 0 ? 1.6 : 1);
     const paceScore = run.currentSpeed * dt * 0.04;
     this.addBaseScore(distanceScore);
@@ -5780,6 +6167,7 @@ class NeonRoadRally {
     this.run.speedCap = track.maxSpeed * SPEED_TUNING.maxBoostOverrunMultiplier * (this.debugSpeedScale || 1);
     this.run.speedCapped = false;
     this.run.debugSpeedScale = this.debugSpeedScale || 1;
+    this.updateRaceSection(false);
     this.configureRunSeed(options.seed ?? this.pendingRoadSeed, track, speedClass.id);
     if (this.input) this.input.clearGameplayInput();
     this.obstacles.reset(track);
@@ -6214,6 +6602,7 @@ class NeonRoadRally {
   getRoadDirectorSequenceFingerprint(sequence) {
     return JSON.stringify((sequence || []).map((wave) => ({
       type: wave.type,
+      sectionId: wave.sectionId,
       distance: Math.round(wave.distance / 10) * 10,
       blockedLanes: wave.blockedLanes,
       boostLanes: wave.boostLanes,
@@ -6320,12 +6709,14 @@ class NeonRoadRally {
         longestMeaningfulWaveGapSeconds: 0,
         longestActiveEmptySeconds: 0,
         pressureBudgetSum: 0,
+        pressureSum: 0,
         pressureCounts: { 0: 0, 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 },
         waveCounts: {},
         boostLaneCounts: Array(LANES).fill(0),
         rampLaneCounts: Array(LANES).fill(0),
         obstacleTypeCounts: {},
-        longestLaneSafeSeconds: Array(LANES).fill(0)
+        longestLaneSafeSeconds: Array(LANES).fill(0),
+        sectionStats: {}
       };
     }
 
@@ -6339,6 +6730,116 @@ class NeonRoadRally {
       for (let i = 0; i < LANES; i += 1) {
         target[i] += source?.[i] || 0;
       }
+    }
+
+    function createSectionAggregate(section = FALLBACK_TRACK_SECTION) {
+      return {
+        id: section.id || FALLBACK_TRACK_SECTION.id,
+        label: section.label || section.id || FALLBACK_TRACK_SECTION.label,
+        totalWaves: 0,
+        centerBlockedWaves: 0,
+        blockedLaneSum: 0,
+        hardWaveCount: 0,
+        recoveryWaveCount: 0,
+        meaningfulWaveCount: 0,
+        fairnessFailures: 0,
+        pressureBudgetFailures: 0,
+        pressureSum: 0,
+        pressureBudgetSum: 0,
+        waveGapCount: 0,
+        waveGapSum: 0,
+        meaningfulWaveGapCount: 0,
+        meaningfulWaveGapSum: 0,
+        longestActiveEmptySeconds: 0,
+        pressureCounts: { 0: 0, 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 },
+        waveCounts: {}
+      };
+    }
+
+    function ensureSectionAggregate(target, section = FALLBACK_TRACK_SECTION) {
+      const id = section.id || FALLBACK_TRACK_SECTION.id;
+      if (!target[id]) target[id] = createSectionAggregate(section);
+      return target[id];
+    }
+
+    function mergeSectionAggregate(target, source) {
+      target.totalWaves += source.totalWaves || 0;
+      target.centerBlockedWaves += source.centerBlockedWaves || 0;
+      target.blockedLaneSum += source.blockedLaneSum || 0;
+      target.hardWaveCount += source.hardWaveCount || 0;
+      target.recoveryWaveCount += source.recoveryWaveCount || 0;
+      target.meaningfulWaveCount += source.meaningfulWaveCount || 0;
+      target.fairnessFailures += source.fairnessFailures || 0;
+      target.pressureBudgetFailures += source.pressureBudgetFailures || 0;
+      target.pressureSum += source.pressureSum || 0;
+      target.pressureBudgetSum += source.pressureBudgetSum || 0;
+      target.waveGapCount += source.waveGapCount || 0;
+      target.waveGapSum += source.waveGapSum || 0;
+      target.meaningfulWaveGapCount += source.meaningfulWaveGapCount || 0;
+      target.meaningfulWaveGapSum += source.meaningfulWaveGapSum || 0;
+      target.longestActiveEmptySeconds = Math.max(target.longestActiveEmptySeconds, source.longestActiveEmptySeconds || 0);
+      mergeCountMap(target.pressureCounts, source.pressureCounts);
+      mergeCountMap(target.waveCounts, source.waveCounts);
+    }
+
+    function mergeSectionStats(target, source = {}) {
+      Object.entries(source || {}).forEach(([id, sourceStats]) => {
+        const targetStats = ensureSectionAggregate(target, {
+          id,
+          label: sourceStats.label || id
+        });
+        mergeSectionAggregate(targetStats, sourceStats);
+      });
+    }
+
+    function finalizeSectionStats(map = {}) {
+      const sections = getTrackSections(track);
+      return Object.fromEntries(sections.map((section) => {
+        const stats = map[section.id] || createSectionAggregate(section);
+        return [section.id, {
+          id: section.id,
+          label: section.label,
+          totalWaves: stats.totalWaves,
+          averagePressure: stats.totalWaves ? stats.pressureSum / stats.totalWaves : 0,
+          averagePressureBudget: stats.totalWaves ? stats.pressureBudgetSum / stats.totalWaves : 0,
+          averageBlockedLanesPerWave: stats.totalWaves ? stats.blockedLaneSum / stats.totalWaves : 0,
+          centerBlockedPercent: stats.totalWaves ? stats.centerBlockedWaves / stats.totalWaves : 0,
+          hardWavePercent: stats.totalWaves ? stats.hardWaveCount / stats.totalWaves : 0,
+          recoveryWavePercent: stats.totalWaves ? stats.recoveryWaveCount / stats.totalWaves : 0,
+          meaningfulWavePercent: stats.totalWaves ? stats.meaningfulWaveCount / stats.totalWaves : 0,
+          longestActiveEmptySeconds: stats.longestActiveEmptySeconds,
+          averageWaveGapSeconds: stats.waveGapCount ? stats.waveGapSum / stats.waveGapCount : null,
+          averageMeaningfulWaveGapSeconds: stats.meaningfulWaveGapCount ? stats.meaningfulWaveGapSum / stats.meaningfulWaveGapCount : null,
+          pressureCounts: { ...stats.pressureCounts },
+          waveCounts: { ...stats.waveCounts },
+          topWaveCounts: topCountList(stats.waveCounts, 5)
+        }];
+      }));
+    }
+
+    function createSectionSafetyStats(section = FALLBACK_TRACK_SECTION) {
+      return {
+        id: section.id || FALLBACK_TRACK_SECTION.id,
+        label: section.label || section.id || FALLBACK_TRACK_SECTION.label,
+        invalidWalls: 0,
+        sameLaneOverlaps: 0,
+        boostObjectOverlaps: 0,
+        rampObjectOverlaps: 0,
+        maxBlocked: 0
+      };
+    }
+
+    function ensureSectionSafety(target, section = FALLBACK_TRACK_SECTION) {
+      const id = section.id || FALLBACK_TRACK_SECTION.id;
+      if (!target[id]) target[id] = createSectionSafetyStats(section);
+      return target[id];
+    }
+
+    function finalizeSectionSafety(map = {}) {
+      return Object.fromEntries(getTrackSections(track).map((section) => {
+        const stats = map[section.id] || createSectionSafetyStats(section);
+        return [section.id, { ...stats, id: section.id, label: section.label }];
+      }));
     }
 
     function mergeDirectorStats(target, stats) {
@@ -6367,11 +6868,13 @@ class NeonRoadRally {
       target.longestMeaningfulWaveGapSeconds = Math.max(target.longestMeaningfulWaveGapSeconds, stats.longestMeaningfulWaveGapSeconds);
       target.longestActiveEmptySeconds = Math.max(target.longestActiveEmptySeconds, stats.longestActiveEmptySeconds);
       target.pressureBudgetSum += stats.pressureBudgetSum;
+      target.pressureSum += stats.pressureSum || 0;
       mergeCountMap(target.pressureCounts, stats.pressureCounts);
       mergeCountMap(target.waveCounts, stats.waveCounts);
       mergeCountMap(target.obstacleTypeCounts, stats.obstacleTypeCounts);
       mergeLaneCounts(target.boostLaneCounts, stats.boostLaneCounts);
       mergeLaneCounts(target.rampLaneCounts, stats.rampLaneCounts);
+      mergeSectionStats(target.sectionStats, stats.sectionStats);
       for (let i = 0; i < LANES; i += 1) {
         target.longestLaneSafeSeconds[i] = Math.max(target.longestLaneSafeSeconds[i], stats.longestLaneSafeSeconds?.[i] || 0);
       }
@@ -6420,7 +6923,9 @@ class NeonRoadRally {
         topObstacleTypes: topCountList(aggregate.obstacleTypeCounts, 8),
         obstacleTypeCounts: { ...aggregate.obstacleTypeCounts },
         averagePressureBudget: aggregate.totalWaves ? aggregate.pressureBudgetSum / aggregate.totalWaves : 0,
-        longestLaneSafeSeconds: aggregate.longestLaneSafeSeconds.slice()
+        averagePressure: aggregate.totalWaves ? aggregate.pressureSum / aggregate.totalWaves : 0,
+        longestLaneSafeSeconds: aggregate.longestLaneSafeSeconds.slice(),
+        sectionStats: finalizeSectionStats(aggregate.sectionStats)
       };
     }
 
@@ -6437,6 +6942,7 @@ class NeonRoadRally {
         spacingSum: 0,
         spacingSamples: 0,
         pressureCounts: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 },
+        sectionSafety: {},
         director: createDirectorAggregate()
       };
 
@@ -6461,6 +6967,8 @@ class NeonRoadRally {
 
         while (simRun.distance < track.distanceToFinish) {
           const progress = clamp(simRun.distance / track.distanceToFinish, 0, 1);
+          const section = getTrackSection(track, progress);
+          const sectionSafety = ensureSectionSafety(perSpeedClass[speedClassId].sectionSafety, section);
           simRun.currentSpeed = getTrackCruiseSpeed(track, progress, speedClassId);
           simRun.distance += simRun.currentSpeed * dt;
           simRun.elapsed += dt;
@@ -6481,9 +6989,11 @@ class NeonRoadRally {
           if (blocked > perSpeedClass[speedClassId].maxBlocked) {
             perSpeedClass[speedClassId].maxBlocked = blocked;
           }
+          sectionSafety.maxBlocked = Math.max(sectionSafety.maxBlocked, blocked);
           if (occupancy.invalid) {
             invalidWalls += 1;
             perSpeedClass[speedClassId].invalidWalls += 1;
+            sectionSafety.invalidWalls += 1;
             const example = this.capturePressureExample(runIndex, seed, simRun, occupancy);
             if (invalidExamples.length < 8) invalidExamples.push(example);
             if (invalidWalls <= 8) {
@@ -6502,6 +7012,9 @@ class NeonRoadRally {
             perSpeedClass[speedClassId].sameLaneOverlaps += sameLaneCount;
             perSpeedClass[speedClassId].boostObjectOverlaps += boostCount;
             perSpeedClass[speedClassId].rampObjectOverlaps += rampCount;
+            sectionSafety.sameLaneOverlaps += sameLaneCount;
+            sectionSafety.boostObjectOverlaps += boostCount;
+            sectionSafety.rampObjectOverlaps += rampCount;
             if (overlapExamples.length < 8) {
               overlapExamples.push(this.captureOverlapExample(runIndex, seed, simRun, overlaps));
             }
@@ -6552,6 +7065,7 @@ class NeonRoadRally {
       item.averageSpacing = item.spacingSamples ? item.spacingSum / item.spacingSamples : null;
       item.minSameLaneSpacing = Number.isFinite(item.minSameLaneSpacing) ? item.minSameLaneSpacing : null;
       item.director = finalizeDirectorStats(item.director);
+      item.sectionSafety = finalizeSectionSafety(item.sectionSafety);
       delete item.spacingSum;
       delete item.spacingSamples;
     });
@@ -6566,9 +7080,34 @@ class NeonRoadRally {
       fourLaneOnlyHighModes: true,
       centerNotSafeLong: true
     };
+    const sectionShapeChecks = {
+      finalPushMoreIntenseThanGroove: true,
+      breatherCalmerThanPressure: true,
+      breatherNotEmpty: true
+    };
     for (const id of speedClassIds) {
       const item = perSpeedClass[id];
       const stats = item.director;
+      const sections = stats.sectionStats || {};
+      const groove = sections.groove || {};
+      const pressure = sections.pressure || {};
+      const breather = sections.breather || {};
+      const finalPush = sections.finalPush || {};
+      if ((groove.totalWaves || 0) > 0 && (finalPush.totalWaves || 0) > 0) {
+        sectionShapeChecks.finalPushMoreIntenseThanGroove = sectionShapeChecks.finalPushMoreIntenseThanGroove
+          && finalPush.averagePressure > groove.averagePressure * 1.04;
+      } else {
+        sectionShapeChecks.finalPushMoreIntenseThanGroove = false;
+      }
+      if ((pressure.totalWaves || 0) > 0 && (breather.totalWaves || 0) > 0) {
+        sectionShapeChecks.breatherCalmerThanPressure = sectionShapeChecks.breatherCalmerThanPressure
+          && breather.averagePressure < pressure.averagePressure * 0.94;
+        sectionShapeChecks.breatherNotEmpty = sectionShapeChecks.breatherNotEmpty
+          && (breather.meaningfulWavePercent || 0) >= 0.45;
+      } else {
+        sectionShapeChecks.breatherCalmerThanPressure = false;
+        sectionShapeChecks.breatherNotEmpty = false;
+      }
       const wavePressureTotal = Math.max(1, (stats.pressureCounts[1] || 0) + (stats.pressureCounts[2] || 0) + (stats.pressureCounts[3] || 0) + (stats.pressureCounts[4] || 0));
       const highPressurePercent = ((stats.pressureCounts[3] || 0) + (stats.pressureCounts[4] || 0)) / wavePressureTotal;
       const twoThreePressurePercent = ((stats.pressureCounts[2] || 0) + (stats.pressureCounts[3] || 0)) / wavePressureTotal;
@@ -6608,6 +7147,12 @@ class NeonRoadRally {
     const repeatedPatternsControlled = director.repeatedPatternPercent <= 0.18;
     const directorFairnessPassed = director.fairnessFailures === 0;
     const directorPressureBudgetPassed = director.pressureBudgetFailures === 0;
+    const seedDeterminism = this.runSeedDeterminismTest({
+      seed: "SECTION-TEST",
+      speedClassId: DEFAULT_SPEED_CLASS_ID,
+      waveLimit: 18,
+      show: false
+    });
     const pass = invalidWalls === 0
       && maxBlocked <= 4
       && sameLaneOverlaps === 0
@@ -6628,7 +7173,11 @@ class NeonRoadRally {
       && modeIntensityChecks.arcadeNoDeadAir
       && modeIntensityChecks.proTurboThreeLaneFrequent
       && modeIntensityChecks.fourLaneOnlyHighModes
-      && modeIntensityChecks.centerNotSafeLong;
+      && modeIntensityChecks.centerNotSafeLong
+      && sectionShapeChecks.finalPushMoreIntenseThanGroove
+      && sectionShapeChecks.breatherCalmerThanPressure
+      && sectionShapeChecks.breatherNotEmpty
+      && seedDeterminism.pass;
 
     return {
       runs,
@@ -6652,6 +7201,7 @@ class NeonRoadRally {
       speedClassIds,
       perSpeedClass,
       director,
+      seedDeterminism,
       pass,
       passDetails: {
         zeroFiveLaneWalls: invalidWalls === 0,
@@ -6668,6 +7218,8 @@ class NeonRoadRally {
         repeatedPatternsControlled,
         directorFairnessPassed,
         directorPressureBudgetPassed,
+        seededDeterminismPassed: seedDeterminism.pass,
+        ...sectionShapeChecks,
         ...modeIntensityChecks
       }
     };
@@ -6717,7 +7269,7 @@ class NeonRoadRally {
       const obstacleText = (wave.obstacles || [])
         .map((obstacle) => `${obstacle.type} L${obstacle.lane + 1}@${obstacle.distance}`)
         .join(", ");
-      return `${wave.index}. ${wave.label} d${wave.distance}: ${obstacleText || "gap"}`;
+      return `${wave.index}. ${wave.sectionLabel || "Section"} ${wave.label} d${wave.distance}: ${obstacleText || "gap"}`;
     };
     this.layer.classList.remove("is-empty");
     this.layer.innerHTML = `
@@ -6799,6 +7351,23 @@ class NeonRoadRally {
       const count = director.pressureCounts?.[blocked] || 0;
       return `${blocked}-lane ${count.toLocaleString()}`;
     }).join(" · ");
+    const sectionList = getTrackSections(TRACKS[0]);
+    const sectionSummary = (summary.speedClassIds || []).map((id) => {
+      const item = summary.perSpeedClass[id];
+      const sectionText = sectionList.map((section) => {
+        const stats = item.director?.sectionStats?.[section.id] || {};
+        const safety = item.sectionSafety?.[section.id] || {};
+        const overlaps = (safety.sameLaneOverlaps || 0) + (safety.boostObjectOverlaps || 0) + (safety.rampObjectOverlaps || 0);
+        return `${section.label} ${stats.totalWaves || 0}w p${Number.isFinite(stats.averagePressure) ? stats.averagePressure.toFixed(2) : "0.00"} empty ${fmtSeconds(stats.longestActiveEmptySeconds)} center ${fmtPercent(stats.centerBlockedPercent)} walls ${safety.invalidWalls || 0} overlaps ${overlaps}`;
+      }).join(" / ");
+      return `${item.label}: ${sectionText}`;
+    }).join(" | ");
+    const sectionChecks = [
+      `Final Push > Groove ${summary.passDetails.finalPushMoreIntenseThanGroove ? "yes" : "no"}`,
+      `Breather < Pressure ${summary.passDetails.breatherCalmerThanPressure ? "yes" : "no"}`,
+      `Breather not empty ${summary.passDetails.breatherNotEmpty ? "yes" : "no"}`,
+      `seeded ${summary.passDetails.seededDeterminismPassed ? "yes" : "no"}`
+    ].join(" · ");
     const overlapSummary = (summary.overlapExamples || []).length
       ? (summary.overlapExamples || []).slice(0, 4).map((example) => {
         const pairs = example.overlaps.map((overlap) => {
@@ -6843,6 +7412,8 @@ class NeonRoadRally {
           <div class="score-card"><strong>Useful Ramps</strong><span>${fmtPercent(director.rampUsefulPercent)}</span></div>
           <div class="score-card"><strong>Repeat Patterns</strong><span>${fmtPercent(director.repeatedPatternPercent)}</span></div>
           <div class="score-card"><strong>Budget Misses</strong><span>${(director.pressureBudgetFailures || 0).toLocaleString()}</span></div>
+          <div class="score-card"><strong>Section Shape</strong><span>${summary.passDetails.finalPushMoreIntenseThanGroove && summary.passDetails.breatherCalmerThanPressure ? "PASS" : "CHECK"}</span></div>
+          <div class="score-card"><strong>Seed Determinism</strong><span>${summary.passDetails.seededDeterminismPassed ? "PASS" : "FAIL"}</span></div>
           <div class="score-card"><strong>Seed</strong><span>${escapeHtml(summary.seed)}</span></div>
         </div>
         <p class="hint">
@@ -6850,13 +7421,15 @@ class NeonRoadRally {
         </p>
         <p class="hint">${escapeHtml(speedClassSummary)}</p>
         <p class="hint">Director pressure: ${escapeHtml(directorPressure)}.</p>
+        <p class="hint">Section checks: ${escapeHtml(sectionChecks)}.</p>
+        <p class="hint">Section distribution: ${escapeHtml(sectionSummary)}</p>
         <p class="hint">Boost lanes: ${escapeHtml(laneDistribution(director.boostLaneCounts, director.boostLaneDistribution))}</p>
         <p class="hint">Ramp lanes: ${escapeHtml(laneDistribution(director.rampLaneCounts, director.rampLaneDistribution))}</p>
         <p class="hint">Top waves: ${escapeHtml(topList(director.topWaveCounts))}</p>
         <p class="hint">Obstacle mix: ${escapeHtml(topList(director.topObstacleTypes))}</p>
         <p class="hint">Overlap examples: ${escapeHtml(overlapSummary)}</p>
         <p class="hint">
-          Checks: zero 5-lane walls ${summary.passDetails.zeroFiveLaneWalls ? "yes" : "no"} · zero overlaps ${summary.passDetails.zeroSameLaneOverlaps ? "yes" : "no"} · zero boost overlaps ${summary.passDetails.zeroBoostOverlaps ? "yes" : "no"} · zero ramp overlaps ${summary.passDetails.zeroRampOverlaps ? "yes" : "no"} · 4-lane rare ${summary.passDetails.fourLaneRare ? "yes" : "no"} · 2/3 common ${summary.passDetails.directorTwoThreeCommon ? "yes" : "no"} · center challenged ${summary.passDetails.centerChallengedRegularly ? "yes" : "no"} · budget respected ${summary.passDetails.directorPressureBudgetPassed ? "yes" : "no"} · boosts distributed ${summary.passDetails.boostNotMostlyCenter ? "yes" : "no"} · no Arcade dead air ${summary.passDetails.arcadeNoDeadAir ? "yes" : "no"} · Pro/Turbo pressure ${summary.passDetails.proTurboThreeLaneFrequent ? "yes" : "no"} · pattern repeats controlled ${summary.passDetails.repeatedPatternsControlled ? "yes" : "no"}.
+          Checks: zero 5-lane walls ${summary.passDetails.zeroFiveLaneWalls ? "yes" : "no"} · zero overlaps ${summary.passDetails.zeroSameLaneOverlaps ? "yes" : "no"} · zero boost overlaps ${summary.passDetails.zeroBoostOverlaps ? "yes" : "no"} · zero ramp overlaps ${summary.passDetails.zeroRampOverlaps ? "yes" : "no"} · 4-lane rare ${summary.passDetails.fourLaneRare ? "yes" : "no"} · 2/3 common ${summary.passDetails.directorTwoThreeCommon ? "yes" : "no"} · center challenged ${summary.passDetails.centerChallengedRegularly ? "yes" : "no"} · budget respected ${summary.passDetails.directorPressureBudgetPassed ? "yes" : "no"} · boosts distributed ${summary.passDetails.boostNotMostlyCenter ? "yes" : "no"} · no Arcade dead air ${summary.passDetails.arcadeNoDeadAir ? "yes" : "no"} · Pro/Turbo pressure ${summary.passDetails.proTurboThreeLaneFrequent ? "yes" : "no"} · section shape ${summary.passDetails.finalPushMoreIntenseThanGroove && summary.passDetails.breatherCalmerThanPressure && summary.passDetails.breatherNotEmpty ? "yes" : "no"} · seeded deterministic ${summary.passDetails.seededDeterminismPassed ? "yes" : "no"} · pattern repeats controlled ${summary.passDetails.repeatedPatternsControlled ? "yes" : "no"}.
         </p>
         <div class="row" style="margin-top:16px">
           <button class="small-button" data-action="runSimulation">Run Again</button>

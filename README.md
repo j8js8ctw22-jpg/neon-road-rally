@@ -55,7 +55,9 @@ When debug mode is active on the title screen, a `Run Spawn Safety Simulation` b
 - Warning signs appear before deer crossings and construction zones.
 - The Road Director builds intentional obstacle waves from reusable templates instead of spawning isolated random objects.
 - The Road Director validates obstacle hitboxes in the lower danger zone so it cannot create a five-lane unavoidable wall.
-- Debug simulation checks 1,000 deterministic runs per speed class and reports center pressure, wave frequency, obstacle mix, boost/ramp lane distribution, empty stretches, pattern repeats, and overlap/fairness failures.
+- Sunset Highway is divided into progress-based race sections: Launch, Groove, Pressure, Breather, and Final Push.
+- Race sections shape Road Director pressure, wave cadence, recovery gaps, wave template weights, and subtle visual intensity. They do not analyze audio, require beat timing, or change music playback speed.
+- Debug simulation checks 1,000 deterministic runs per speed class and reports center pressure, wave frequency, obstacle mix, boost/ramp lane distribution, empty stretches, section distribution, pattern repeats, seeded determinism, and overlap/fairness failures.
 
 ## Scoring
 
@@ -154,6 +156,14 @@ Tune Road Director values near the top of `game.js`:
 - `ROAD_DIRECTOR.pressureValues`: simple pressure budget values for each obstacle/reward type
 - `ROAD_DIRECTOR.modeIntensity`: target pressure budget by speed class
 - `TRACK_DIRECTOR_BANDS`: opening, early-mid, late-mid, and final wave template weights
+
+Tune music-shaped race pacing in the Sunset Highway `sections` config:
+
+- `startProgress` / `endProgress`: progress range for the named section
+- `pressureMultiplier`: stacks with the selected race speed's Road Director intensity
+- `visualIntensity`: subtly scales road edge glow, lane pulse, horizon glow, and speed streak energy
+- `cadenceMultiplier` and `recoveryGapMultiplier`: shape wave spacing without changing car speed
+- `waveWeightMultipliers`: bias existing Road Director wave templates without adding new track data
 
 Tune these values in the Sunset Highway track config only when the whole race pace or length needs to change:
 
