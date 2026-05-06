@@ -163,10 +163,47 @@ button {
   box-shadow: var(--shadow-cyan);
 }
 
-.menu-button.primary {
+.menu-button.primary,
+.small-button.primary {
   border-color: var(--magenta);
   background: linear-gradient(90deg, rgba(255, 63, 209, 0.34), rgba(40, 246, 255, 0.16));
   box-shadow: var(--shadow-magenta);
+}
+
+.seed-display {
+  display: grid;
+  gap: 6px;
+  border: 1px solid rgba(255, 228, 94, 0.48);
+  border-radius: 6px;
+  padding: 14px;
+  background: rgba(5, 8, 20, 0.78);
+}
+
+.seed-display span {
+  color: var(--yellow);
+  font-size: 0.82rem;
+  text-transform: uppercase;
+}
+
+.seed-display strong,
+.seed-copy {
+  color: var(--text);
+  font-family: ui-monospace, "SFMono-Regular", Consolas, monospace;
+  letter-spacing: 0.04em;
+  overflow-wrap: anywhere;
+}
+
+.seed-display strong {
+  font-size: clamp(1.7rem, 6vw, 2.7rem);
+}
+
+.seed-copy {
+  width: 100%;
+  min-height: 42px;
+  border: 1px solid rgba(40, 246, 255, 0.5);
+  border-radius: 6px;
+  padding: 9px 11px;
+  background: rgba(5, 8, 20, 0.92);
 }
 
 .speed-class-panel {

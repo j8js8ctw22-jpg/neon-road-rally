@@ -21,6 +21,9 @@ const DANGER_ZONE_BOTTOM_RATIO = 0.95;
 const DANGER_ZONE_SLICE_PX = 32;
 const FOUR_LANE_PRESSURE_COOLDOWN = 9000;
 const DEFAULT_SPEED_CLASS_ID = "arcade";
+const ROAD_SEED_PREFIXES = ["SUNSET", "TURBO", "ROAD", "NEON", "RALLY", "LANE", "BOOST"];
+const DEFAULT_ROAD_SEED = "ROAD-52819";
+const CLASSIC_SEED_LABEL = "Classic";
 const TRACKS = [
   {
     id: "sunset-highway",
@@ -444,6 +447,42 @@ function sanitizeName(value, fallback) {
   return clean || fallback;
 }
 
+function normalizeRoadSeed(value, fallback = "") {
+  const clean = String(value ?? "")
+    .trim()
+    .toUpperCase()
+    .replace(/[^A-Z0-9]+/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "")
+    .slice(0, 32)
+    .replace(/-$/g, "");
+  return clean || fallback;
+}
+
+function normalizeStoredRoadSeed(value, fallback = CLASSIC_SEED_LABEL) {
+  const raw = String(value ?? "").trim();
+  if (/^classic$/i.test(raw)) return CLASSIC_SEED_LABEL;
+  if (/^unknown$/i.test(raw)) return "Unknown";
+  const clean = normalizeRoadSeed(value, "");
+  return clean || fallback;
+}
+
+function formatRoadSeed(value) {
+  return normalizeStoredRoadSeed(value, CLASSIC_SEED_LABEL);
+}
+
+function generateReadableRoadSeed(rng = Math.random) {
+  const prefix = randomChoice(ROAD_SEED_PREFIXES, rng) || "ROAD";
+  const number = Math.floor(rng() * 99000) + 1000;
+  return normalizeRoadSeed(`${prefix}-${number}`, DEFAULT_ROAD_SEED);
+}
+
+function getRunRandomSeedSource(seed, track, speedClassId) {
+  const trackId = track?.id || "track";
+  const modeId = normalizeSpeedClassId(speedClassId, DEFAULT_SPEED_CLASS_ID);
+  return `${normalizeRoadSeed(seed, DEFAULT_ROAD_SEED)}|${trackId}|${modeId}`;
+}
+
 function formatScore(value) {
   return Math.max(0, Math.round(value)).toLocaleString();
 }
@@ -500,15 +539,34 @@ function hashSeed(value) {
   return hash >>> 0;
 }
 
-function createSeededRandom(seed) {
-  let state = hashSeed(seed) || 1;
-  return function seededRandom() {
-    state += 0x6D2B79F5;
-    let t = state;
-    t = Math.imul(t ^ (t >>> 15), t | 1);
-    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+function createSeededRandomController(seed) {
+  const hash = hashSeed(seed) || 1;
+  let state = hash;
+  return {
+    seed: String(seed),
+    hash,
+    random() {
+      state = (state + 0x6D2B79F5) >>> 0;
+      let t = state;
+      t = Math.imul(t ^ (t >>> 15), t | 1);
+      t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    },
+    getState() {
+      return state >>> 0;
+    }
   };
+}
+
+function createSeededRandom(seed) {
+  const controller = createSeededRandomController(seed);
+  const seededRandom = function seededRandom() {
+    return controller.random();
+  };
+  seededRandom.seed = controller.seed;
+  seededRandom.seedHash = controller.hash;
+  seededRandom.getState = () => controller.getState();
+  return seededRandom;
 }
 
 function deterministicNoise(index, salt = 0) {
@@ -642,16 +700,21 @@ class PlayerProfileManager {
 
     const leaderboard = Array.isArray(parsed.leaderboard) ? parsed.leaderboard
       .filter((entry) => entry && Number.isFinite(entry.score))
-      .map((entry) => ({
-        playerName: sanitizeName(entry.playerName, "PLAYER"),
-        carName: sanitizeName(entry.carName, "CAR"),
-        trackName: sanitizeName(entry.trackName, "TRACK"),
-        speedClass: normalizeSpeedClassId(entry.speedClass, DEFAULT_SPEED_CLASS_ID),
-        score: Math.max(0, Math.round(entry.score)),
-        status: entry.status === "finished" ? "finished" : "crashed",
-        time: Number.isFinite(entry.time) ? Math.max(0, entry.time) : 0,
-        date: String(entry.date || new Date().toISOString())
-      }))
+      .map((entry) => {
+        const speedClass = normalizeSpeedClassId(entry.speedClass || entry.raceMode, DEFAULT_SPEED_CLASS_ID);
+        return {
+          playerName: sanitizeName(entry.playerName, "PLAYER"),
+          carName: sanitizeName(entry.carName, "CAR"),
+          trackName: sanitizeName(entry.trackName, "TRACK"),
+          speedClass,
+          raceMode: normalizeSpeedClassId(entry.raceMode || speedClass, speedClass),
+          seed: normalizeStoredRoadSeed(entry.seed, CLASSIC_SEED_LABEL),
+          score: Math.max(0, Math.round(entry.score)),
+          status: entry.status === "finished" ? "finished" : "crashed",
+          time: Number.isFinite(entry.time) ? Math.max(0, entry.time) : 0,
+          date: String(entry.date || new Date().toISOString())
+        };
+      })
       .sort((a, b) => b.score - a.score)
       .slice(0, 20) : [];
 
@@ -763,11 +826,14 @@ class PlayerProfileManager {
   }
 
   recordScore(entry) {
+    const speedClass = normalizeSpeedClassId(entry.speedClass || entry.raceMode, DEFAULT_SPEED_CLASS_ID);
     const cleanEntry = {
       playerName: sanitizeName(entry.playerName, "PLAYER"),
       carName: sanitizeName(entry.carName, "CAR"),
       trackName: sanitizeName(entry.trackName, "TRACK"),
-      speedClass: normalizeSpeedClassId(entry.speedClass, DEFAULT_SPEED_CLASS_ID),
+      speedClass,
+      raceMode: normalizeSpeedClassId(entry.raceMode || speedClass, speedClass),
+      seed: normalizeStoredRoadSeed(entry.seed, CLASSIC_SEED_LABEL),
       score: Math.max(0, Math.round(entry.score)),
       status: entry.status === "finished" ? "finished" : "crashed",
       time: Number.isFinite(entry.time) ? Math.max(0, entry.time) : 0,
@@ -1285,6 +1351,9 @@ class InputManager {
     if (keyId === "enter" && this.game.screen === "title") {
       this.game.audio.playSfx("menu");
       this.game.startRaceFromTitle();
+    } else if (keyId === "enter" && this.game.screen === "preRace") {
+      this.game.audio.playSfx("menu");
+      this.game.handleStartSeededRace();
     } else if (keyId === "escape" && !["title", "game"].includes(this.game.screen)) {
       this.game.audio.playSfx("menu");
       this.game.showTitle();
@@ -1895,14 +1964,37 @@ class RoadDirector {
       type: result.type,
       label: result.label,
       band: context.band.label,
+      distance: Math.round(context.distance),
       pressureBudget: context.pressureBudget,
       pressure: result.pressure,
       blockedLanes: Array.from(result.blockedLanes).sort((a, b) => a - b),
+      boostLanes: result.boostLanes.slice(),
+      rampLanes: result.rampLanes.slice(),
+      obstacles: result.spawned.map((obstacle) => ({
+        type: obstacle.type,
+        lane: Math.round(clamp(Number.isFinite(obstacle.laneFloat) ? obstacle.laneFloat : obstacle.lane, 0, LANES - 1)),
+        distance: Math.round(obstacle.distance)
+      })),
       lanePressureCount: blockedCount,
       centerBlocked: result.centerBlocked,
       fairnessPassed: result.fairnessPassed,
       pressureBudgetPassed: result.pressureBudgetPassed
     };
+    if (Array.isArray(context.run.roadDirectorSequence)) {
+      context.run.roadDirectorSequence.push({
+        index: stats.totalWaves,
+        type: this.currentWave.type,
+        label: this.currentWave.label,
+        distance: this.currentWave.distance,
+        blockedLanes: this.currentWave.blockedLanes.slice(),
+        boostLanes: this.currentWave.boostLanes.slice(),
+        rampLanes: this.currentWave.rampLanes.slice(),
+        obstacles: this.currentWave.obstacles.map((obstacle) => ({ ...obstacle }))
+      });
+      if (context.run.roadDirectorSequence.length > 40) {
+        context.run.roadDirectorSequence.splice(0, context.run.roadDirectorSequence.length - 40);
+      }
+    }
     this.lastFairnessPassed = result.fairnessPassed;
     this.lastWaveType = result.type;
     this.recentWaves.push(this.currentWave);
@@ -1958,7 +2050,11 @@ class RoadDirector {
 
   getDebugInfo() {
     const current = this.currentWave || {};
+    const run = this.manager.game.run || {};
     return {
+      seed: formatRoadSeed(run.roadSeed),
+      seedHash: Number.isFinite(run.roadSeedHash) ? run.roadSeedHash : 0,
+      rngState: Number.isFinite(run.roadRngState) ? run.roadRngState : 0,
       band: current.band || getTrackDirectorBand(this.manager.game.run?.distance / Math.max(1, this.manager.track?.distanceToFinish || 1)).label,
       wave: current.label || "none",
       lastWave: this.lastWaveType ? this.getWaveLabel(this.lastWaveType) : "none",
@@ -2369,6 +2465,8 @@ class ObstacleManager {
     this.lastFourLanePressureDistance = -Infinity;
     this.preventedUnsafeSpawns = 0;
     this.lastSafetySummary = null;
+    this.nextObstacleId = 1;
+    this.fallbackRng = createSeededRandomController("road-director-fallback");
     this.director = new RoadDirector(this);
   }
 
@@ -2381,11 +2479,12 @@ class ObstacleManager {
     this.lastFourLanePressureDistance = -Infinity;
     this.preventedUnsafeSpawns = 0;
     this.lastSafetySummary = null;
+    this.nextObstacleId = 1;
     this.director.reset(track);
   }
 
   random() {
-    return typeof this.game.randomFloat === "function" ? this.game.randomFloat() : Math.random();
+    return typeof this.game.randomFloat === "function" ? this.game.randomFloat() : this.fallbackRng.random();
   }
 
   update(dt) {
@@ -2511,7 +2610,7 @@ class ObstacleManager {
 
   createObstacle(type, lane, distance, options = {}) {
     return {
-      id: uid(),
+      id: `obstacle-${this.nextObstacleId++}`,
       type,
       lane,
       laneFloat: Number.isFinite(options.laneFloat) ? options.laneFloat : lane,
@@ -4069,6 +4168,8 @@ class Renderer {
     const lines = [
       "DEBUG `",
       `mode: ${run.speedClass?.label || getSpeedClassLabel(run.speedClassId)} score x${(run.scoreMultiplier || 1).toFixed(2)}`,
+      `seed: ${directorDebug.seed}`,
+      `seed hash: ${directorDebug.seedHash >>> 0} rng ${directorDebug.rngState >>> 0}`,
       `configured: ${classStartSpeed.toFixed(0)} -> ${classEndSpeed.toFixed(0)}`,
       `base speed: ${(run.baseCruiseSpeed || classStartSpeed).toFixed(0)} raw ${(run.rawCruiseSpeed || classStartSpeed).toFixed(0)}`,
       `curve mult: ${speedMultiplier.toFixed(2)}x`,
@@ -5139,7 +5240,9 @@ class NeonRoadRally {
     this.debugMode = false;
     this.debugSpeedScale = 1;
     this.attractDistance = 0;
-    this.randomFloat = Math.random;
+    this.pendingRoadSeed = generateReadableRoadSeed();
+    this.roadRng = null;
+    this.randomFloat = () => this.nextRoadRandom();
     this.simulationStatus = null;
     this.simulationRunning = false;
     this.lastFrame = performance.now();
@@ -5165,6 +5268,11 @@ class NeonRoadRally {
       speedClassId: speedClass.id,
       speedClass,
       scoreMultiplier: speedClass.scoreMultiplier,
+      roadSeed: DEFAULT_ROAD_SEED,
+      roadSeedSource: getRunRandomSeedSource(DEFAULT_ROAD_SEED, track, speedClass.id),
+      roadSeedHash: hashSeed(getRunRandomSeedSource(DEFAULT_ROAD_SEED, track, speedClass.id)),
+      roadRngState: hashSeed(getRunRandomSeedSource(DEFAULT_ROAD_SEED, track, speedClass.id)),
+      roadDirectorSequence: [],
       distance: 0,
       baseScore: 0,
       score: 0,
@@ -5385,15 +5493,46 @@ class NeonRoadRally {
     }
   }
 
+  nextRoadRandom() {
+    if (!this.roadRng) {
+      this.roadRng = createSeededRandomController("road-director-unconfigured");
+    }
+    const value = this.roadRng.random();
+    if (this.run) {
+      this.run.roadRngState = this.roadRng.getState();
+    }
+    return value;
+  }
+
+  resolveRoadSeed(value) {
+    const normalized = normalizeRoadSeed(value, "");
+    return normalized || generateReadableRoadSeed();
+  }
+
+  configureRunSeed(seed, track, speedClassId) {
+    const roadSeed = this.resolveRoadSeed(seed);
+    const source = getRunRandomSeedSource(roadSeed, track, speedClassId);
+    this.roadRng = createSeededRandomController(source);
+    if (this.run) {
+      this.run.roadSeed = roadSeed;
+      this.run.roadSeedSource = source;
+      this.run.roadSeedHash = this.roadRng.hash;
+      this.run.roadRngState = this.roadRng.getState();
+      this.run.roadDirectorSequence = [];
+    }
+    this.pendingRoadSeed = roadSeed;
+    return roadSeed;
+  }
+
   startRaceFromTitle() {
     if (!this.profiles.getCurrentPlayer()) {
       this.showPlayerScreen("Create or choose a player before the first run.");
       return;
     }
-    this.startRace();
+    this.showPreRaceScreen();
   }
 
-  startRace() {
+  startRace(options = {}) {
     const player = this.profiles.ensureDefaultPlayer();
     const track = TRACKS[0];
     const speedClass = getSpeedClassConfig(this.profiles.data.speedClassId);
@@ -5417,6 +5556,7 @@ class NeonRoadRally {
     this.run.speedCap = track.maxSpeed * SPEED_TUNING.maxBoostOverrunMultiplier * (this.debugSpeedScale || 1);
     this.run.speedCapped = false;
     this.run.debugSpeedScale = this.debugSpeedScale || 1;
+    this.configureRunSeed(options.seed ?? this.pendingRoadSeed, track, speedClass.id);
     if (this.input) this.input.clearGameplayInput();
     this.obstacles.reset(track);
     this.setScreen("game");
@@ -5591,7 +5731,9 @@ class NeonRoadRally {
       playerName: player.name,
       carName: player.car.name,
       trackName: run.track.name,
+      seed: run.roadSeed,
       speedClass: run.speedClassId,
+      raceMode: run.speedClassId,
       score: run.score,
       status,
       time: run.elapsed
@@ -5601,6 +5743,8 @@ class NeonRoadRally {
       scoreEntry: entry,
       baseScore: Math.max(0, Math.round(run.baseScore || 0)),
       finalScore: run.score,
+      seed: run.roadSeed,
+      seedHash: run.roadSeedHash,
       speedClass: run.speedClassId,
       speedClassLabel: run.speedClass?.label || getSpeedClassLabel(run.speedClassId),
       scoreMultiplier: run.scoreMultiplier || 1,
@@ -5641,13 +5785,125 @@ class NeonRoadRally {
     if (this.simulationRunning) return;
     this.simulationRunning = true;
     this.showSimulationRunning();
+    const seed = normalizeRoadSeed(options.seed ?? this.pendingRoadSeed, "sunset-highway-spawn-safety-v1");
     const summary = await this.runSpawnSafetySimulationCore({
       ...options,
+      seed,
       onProgress: (completed, total) => this.updateSimulationProgress(completed, total)
     });
     this.simulationRunning = false;
     this.simulationStatus = summary;
     this.showSimulationReport(summary);
+  }
+
+  captureRoadDirectorSequence(options = {}) {
+    const track = options.track || TRACKS[0];
+    const speedClassId = normalizeSpeedClassId(options.speedClassId, DEFAULT_SPEED_CLASS_ID);
+    const speedClass = getSpeedClassConfig(speedClassId);
+    const seed = normalizeRoadSeed(options.seed, DEFAULT_ROAD_SEED);
+    const waveLimit = Math.max(1, Math.round(options.waveLimit || 10));
+    const dt = Number.isFinite(options.dt) ? options.dt : 0.4;
+    const seedSource = getRunRandomSeedSource(seed, track, speedClassId);
+    const rng = createSeededRandom(seedSource);
+    const simRun = {
+      track,
+      speedClassId,
+      speedClass,
+      roadSeed: seed,
+      roadSeedSource: seedSource,
+      roadSeedHash: rng.seedHash,
+      roadRngState: rng.getState(),
+      roadDirectorSequence: [],
+      distance: 0,
+      elapsed: 0,
+      currentSpeed: getTrackCruiseSpeed(track, 0, speedClassId),
+      targetLane: TRACK_DIRECTOR.centerLane,
+      renderLaneFloat: TRACK_DIRECTOR.centerLane
+    };
+    const simGame = {
+      run: simRun,
+      renderer: this.renderer,
+      randomFloat: () => {
+        const value = rng();
+        simRun.roadRngState = rng.getState();
+        return value;
+      },
+      screen: "simulation",
+      audio: { playSfx() {} }
+    };
+    const manager = new ObstacleManager(simGame);
+    manager.reset(track);
+
+    while (simRun.distance < track.distanceToFinish && simRun.roadDirectorSequence.length < waveLimit) {
+      const progress = clamp(simRun.distance / track.distanceToFinish, 0, 1);
+      simRun.currentSpeed = getTrackCruiseSpeed(track, progress, speedClassId);
+      simRun.distance += simRun.currentSpeed * dt;
+      simRun.elapsed += dt;
+      manager.update(dt);
+    }
+
+    return {
+      seed,
+      speedClassId,
+      trackId: track.id,
+      seedHash: rng.seedHash,
+      rngState: rng.getState(),
+      sequence: simRun.roadDirectorSequence.slice(0, waveLimit)
+    };
+  }
+
+  getRoadDirectorSequenceFingerprint(sequence) {
+    return JSON.stringify((sequence || []).map((wave) => ({
+      type: wave.type,
+      distance: Math.round(wave.distance / 10) * 10,
+      blockedLanes: wave.blockedLanes,
+      boostLanes: wave.boostLanes,
+      rampLanes: wave.rampLanes,
+      obstacles: (wave.obstacles || []).map((obstacle) => ({
+        type: obstacle.type,
+        lane: obstacle.lane,
+        distance: Math.round(obstacle.distance / 10) * 10
+      }))
+    })));
+  }
+
+  runSeedDeterminismTest(options = {}) {
+    const seed = normalizeRoadSeed(options.seed, "TEST-123");
+    const speedClassId = normalizeSpeedClassId(options.speedClassId, DEFAULT_SPEED_CLASS_ID);
+    const alternateSeed = normalizeRoadSeed(options.alternateSeed, seed === "TEST-456" ? "TEST-789" : "TEST-456");
+    const alternateMode = speedClassId === "turbo" ? "arcade" : "turbo";
+    const waveLimit = options.waveLimit || 10;
+    const first = this.captureRoadDirectorSequence({ seed, speedClassId, waveLimit });
+    const repeat = this.captureRoadDirectorSequence({ seed, speedClassId, waveLimit });
+    const changedSeed = this.captureRoadDirectorSequence({ seed: alternateSeed, speedClassId, waveLimit });
+    const changedMode = this.captureRoadDirectorSequence({ seed, speedClassId: alternateMode, waveLimit });
+    const firstFingerprint = this.getRoadDirectorSequenceFingerprint(first.sequence);
+    const repeatFingerprint = this.getRoadDirectorSequenceFingerprint(repeat.sequence);
+    const changedSeedFingerprint = this.getRoadDirectorSequenceFingerprint(changedSeed.sequence);
+    const changedModeFingerprint = this.getRoadDirectorSequenceFingerprint(changedMode.sequence);
+    const summary = {
+      seed,
+      alternateSeed,
+      speedClassId,
+      alternateMode,
+      waveLimit,
+      seedHash: first.seedHash,
+      sameSeedMatches: firstFingerprint === repeatFingerprint,
+      differentSeedChanges: firstFingerprint !== changedSeedFingerprint,
+      differentModeChanges: firstFingerprint !== changedModeFingerprint,
+      first,
+      repeat,
+      changedSeed,
+      changedMode,
+      pass: firstFingerprint === repeatFingerprint
+        && firstFingerprint !== changedSeedFingerprint
+        && firstFingerprint !== changedModeFingerprint
+    };
+    this.seedDeterminismStatus = summary;
+    if (options.show !== false) {
+      this.showSeedDeterminismReport(summary);
+    }
+    return summary;
   }
 
   async runSpawnSafetySimulationCore(options = {}) {
@@ -6095,6 +6351,41 @@ class NeonRoadRally {
     };
   }
 
+  showSeedDeterminismReport(summary) {
+    this.setScreen("seedTest");
+    this.audio.playMusic("title", false);
+    const sequenceLine = (wave) => {
+      const obstacleText = (wave.obstacles || [])
+        .map((obstacle) => `${obstacle.type} L${obstacle.lane + 1}@${obstacle.distance}`)
+        .join(", ");
+      return `${wave.index}. ${wave.label} d${wave.distance}: ${obstacleText || "gap"}`;
+    };
+    this.layer.classList.remove("is-empty");
+    this.layer.innerHTML = `
+      <section class="panel">
+        <h2>Seed Determinism Test</h2>
+        <div class="score-grid">
+          <div class="score-card"><strong>Result</strong><span>${summary.pass ? "PASS" : "FAIL"}</span></div>
+          <div class="score-card"><strong>Seed</strong><span>${escapeHtml(summary.seed)}</span></div>
+          <div class="score-card"><strong>Race Mode</strong><span>${escapeHtml(getSpeedClassLabel(summary.speedClassId))}</span></div>
+          <div class="score-card"><strong>Seed Hash</strong><span>${summary.seedHash >>> 0}</span></div>
+          <div class="score-card"><strong>Same Seed</strong><span>${summary.sameSeedMatches ? "MATCH" : "DIFF"}</span></div>
+          <div class="score-card"><strong>Different Seed</strong><span>${summary.differentSeedChanges ? "CHANGED" : "SAME"}</span></div>
+          <div class="score-card"><strong>Different Mode</strong><span>${summary.differentModeChanges ? "CHANGED" : "SAME"}</span></div>
+          <div class="score-card"><strong>Waves Checked</strong><span>${summary.waveLimit}</span></div>
+        </div>
+        <p class="hint">First sequence: ${escapeHtml(summary.first.sequence.slice(0, 8).map(sequenceLine).join(" | "))}</p>
+        <p class="hint">Changed-seed sequence: ${escapeHtml(summary.changedSeed.sequence.slice(0, 8).map(sequenceLine).join(" | "))}</p>
+        <p class="hint">Changed-mode sequence: ${escapeHtml(summary.changedMode.sequence.slice(0, 8).map(sequenceLine).join(" | "))}</p>
+        <div class="row" style="margin-top:16px">
+          <button class="small-button" data-action="runSeedTest">Run Again</button>
+          <button class="small-button" data-action="title">Back to Title</button>
+        </div>
+      </section>
+    `;
+    this.bindLayerButtons();
+  }
+
   showSimulationRunning() {
     this.setScreen("simulation");
     this.layer.classList.remove("is-empty");
@@ -6310,6 +6601,7 @@ class NeonRoadRally {
           <button class="menu-button" data-action="leaderboard">View Top 20 Scores</button>
           <button class="menu-button" data-action="toggleMusic">Music: ${this.audio.musicMuted ? "Muted" : "On"}</button>
           <button class="menu-button" data-action="toggleSfx">SFX: ${this.audio.sfxMuted ? "Muted" : "On"}</button>
+          ${this.debugMode ? `<button class="menu-button" data-action="runSeedTest">Run Seed Determinism Test</button>` : ""}
           ${this.debugMode ? `<button class="menu-button" data-action="runSimulation">Run Spawn Safety Simulation</button>` : ""}
           <div class="audio-grid">
             <div class="field">
@@ -6326,6 +6618,88 @@ class NeonRoadRally {
     `;
     this.bindLayerButtons();
     this.bindTitleAudioControls();
+  }
+
+  showPreRaceScreen(message = "") {
+    if (!this.profiles.getCurrentPlayer()) {
+      this.showPlayerScreen("Create or choose a player before the first run.");
+      return;
+    }
+    this.setScreen("preRace");
+    this.audio.playMusic("title", false);
+    const player = this.profiles.getCurrentPlayer();
+    const speedClass = getSpeedClassConfig(this.profiles.data.speedClassId);
+    const track = TRACKS[0];
+    const seed = this.resolveRoadSeed(this.pendingRoadSeed);
+    this.pendingRoadSeed = seed;
+    const seedSource = getRunRandomSeedSource(seed, track, speedClass.id);
+    this.layer.classList.remove("is-empty");
+    this.layer.innerHTML = `
+      <section class="panel compact">
+        <div class="form-stack">
+          <h2>Seeded Challenge Run</h2>
+          <p class="hint">${escapeHtml(track.name)} · ${escapeHtml(speedClass.label)} · ${escapeHtml(player.name)}</p>
+          <div class="seed-display" aria-live="polite">
+            <span>Current Road Seed</span>
+            <strong id="roadSeedDisplay">${escapeHtml(seed)}</strong>
+          </div>
+          <div class="field">
+            <label for="roadSeedInput">Manual Seed</label>
+            <input id="roadSeedInput" type="text" maxlength="32" value="${escapeAttr(seed)}" autocomplete="off" spellcheck="false" inputmode="text">
+          </div>
+          <p class="hint">Same seed + same track + same race speed repeats the Road Director sequence.</p>
+          <p class="hint">Seed hash: ${hashSeed(seedSource) >>> 0}</p>
+          <div class="row">
+            <button class="small-button" data-action="randomSeed">Random Seed</button>
+            <button class="small-button primary" data-action="startSeededRace">Start Race</button>
+            <button class="small-button" data-action="title">Back</button>
+          </div>
+          <p class="status-line">${escapeHtml(message)}</p>
+        </div>
+      </section>
+    `;
+    this.bindLayerButtons();
+    this.bindPreRaceSeedControls();
+  }
+
+  bindPreRaceSeedControls() {
+    const input = document.getElementById("roadSeedInput");
+    const display = document.getElementById("roadSeedDisplay");
+    if (!input || !display) return;
+    const updateDisplay = () => {
+      const normalized = normalizeRoadSeed(input.value, "");
+      display.textContent = normalized || "Random seed on start";
+    };
+    input.addEventListener("input", updateDisplay);
+    input.addEventListener("blur", () => {
+      const normalized = normalizeRoadSeed(input.value, "");
+      if (normalized) {
+        input.value = normalized;
+        this.pendingRoadSeed = normalized;
+      }
+      updateDisplay();
+    });
+    input.addEventListener("keydown", (event) => {
+      if (event.key === "Enter") {
+        event.preventDefault();
+        this.handleStartSeededRace();
+      }
+    });
+    input.focus();
+    input.select();
+  }
+
+  handleRandomSeed() {
+    this.pendingRoadSeed = generateReadableRoadSeed();
+    this.showPreRaceScreen("Random seed ready.");
+  }
+
+  handleStartSeededRace() {
+    const input = document.getElementById("roadSeedInput");
+    const seed = this.resolveRoadSeed(input?.value ?? this.pendingRoadSeed);
+    this.pendingRoadSeed = seed;
+    if (input) input.value = seed;
+    this.startRace({ seed });
   }
 
   showPlayerScreen(message = "") {
@@ -6509,7 +6883,7 @@ class NeonRoadRally {
               <span class="leaderboard-rank">#${index + 1}</span>
               <span>
                 <strong>${escapeHtml(entry.playerName)}</strong>
-                <span class="meta">${escapeHtml(entry.carName)} · ${escapeHtml(entry.trackName)} · ${escapeHtml(getSpeedClassLabel(entry.speedClass))} · ${entry.status} · ${formatTime(entry.time)} · ${new Date(entry.date).toLocaleDateString()}</span>
+                <span class="meta">${escapeHtml(entry.carName)} · ${escapeHtml(entry.trackName)} · ${escapeHtml(getSpeedClassLabel(entry.raceMode || entry.speedClass))} · Seed ${escapeHtml(formatRoadSeed(entry.seed))} · ${entry.status} · ${formatTime(entry.time)} · ${new Date(entry.date).toLocaleDateString()}</span>
               </span>
               <span class="leaderboard-score">${formatScore(entry.score)}</span>
             </li>
@@ -6541,6 +6915,7 @@ class NeonRoadRally {
           <div class="score-card"><strong>Final Score</strong><span id="finalScoreValue" class="tally-score" data-final-score="${summary.finalScore}">0</span></div>
           <div class="score-card"><strong>Status</strong><span>${summary.status === "finished" ? "Finished" : `Crashed: ${escapeHtml(summary.reason)}`}</span></div>
           <div class="score-card"><strong>Speed Class</strong><span>${escapeHtml(summary.speedClassLabel)}</span></div>
+          <div class="score-card"><strong>Road Seed</strong><input class="seed-copy" type="text" value="${escapeAttr(summary.seed)}" readonly aria-label="Road seed used"></div>
           <div class="score-card"><strong>Score Multiplier</strong><span>${formatScore(summary.baseScore)} x ${summary.scoreMultiplier.toFixed(2)}</span></div>
           <div class="score-card"><strong>Distance</strong><span>${Math.round(summary.distance).toLocaleString()} / ${summary.trackDistance.toLocaleString()}</span></div>
           <div class="score-card"><strong>Time</strong><span>${formatTime(summary.time)}</span></div>
@@ -6562,7 +6937,7 @@ class NeonRoadRally {
               <span class="leaderboard-rank">#${index + 1}</span>
               <span>
                 <strong>${escapeHtml(entry.playerName)}</strong>
-                <span class="meta">${escapeHtml(entry.carName)} · ${escapeHtml(getSpeedClassLabel(entry.speedClass))} · ${entry.status} · ${formatTime(entry.time)}</span>
+                <span class="meta">${escapeHtml(entry.carName)} · ${escapeHtml(getSpeedClassLabel(entry.raceMode || entry.speedClass))} · Seed ${escapeHtml(formatRoadSeed(entry.seed))} · ${entry.status} · ${formatTime(entry.time)}</span>
               </span>
               <span class="leaderboard-score">${formatScore(entry.score)}</span>
             </li>
@@ -6619,9 +6994,12 @@ class NeonRoadRally {
         else if (action === "customize") this.showCustomizeScreen();
         else if (action === "leaderboard") this.showLeaderboard();
         else if (action === "setSpeedClass") this.handleSetSpeedClass(button.dataset.id);
+        else if (action === "randomSeed") this.handleRandomSeed();
+        else if (action === "startSeededRace") this.handleStartSeededRace();
         else if (action === "toggleMusic") this.toggleMusic(true);
         else if (action === "toggleSfx") this.toggleSfx(true);
         else if (action === "runSimulation") this.runSpawnSafetySimulation();
+        else if (action === "runSeedTest") this.runSeedDeterminismTest();
         else if (action === "title") this.showTitle();
         else if (action === "restart") this.startRace();
         else if (action === "resume") this.togglePause();
