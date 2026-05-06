@@ -91,9 +91,7 @@ const ARCADE_FEEL = {
 };
 
 const INPUT_CONFIG = {
-  laneChangeDurationSeconds: 0.11,
-  heldLaneRepeatDelaySeconds: 0.16,
-  heldLaneRepeatIntervalSeconds: 0.11,
+  laneChangeDurationSeconds: 0.1,
   verticalMoveRatioPerSecond: 0.58,
   inputFlashSeconds: 0.12
 };
@@ -118,35 +116,35 @@ const ROAD_DIRECTOR = {
   centerHoldSeconds: 4.2,
   centerSafeSecondsLimit: 5.5,
   laneSafeSecondsLimit: 12,
-  fourLaneMinProgress: 0.78,
+  fourLaneMinProgress: 0.8,
   hardWaveRecoveryChance: 0.18,
   modeCadence: {
     sunday: { early: 3.35, mid: 2.9, late: 2.42, randomEarly: 0.48, randomLate: 0.2, spacingScale: 1.14, recoveryScale: 1.35, centerSafe: 10, laneStill: 5.6, forceMeaningful: 4.6 },
     rookie: { early: 2.75, mid: 2.2, late: 1.75, randomEarly: 0.36, randomLate: 0.15, spacingScale: 1.02, recoveryScale: 1.05, centerSafe: 8, laneStill: 4.4, forceMeaningful: 3.55 },
-    arcade: { early: 2.02, mid: 1.58, late: 1.16, randomEarly: 0.23, randomLate: 0.1, spacingScale: 0.84, recoveryScale: 0.7, centerSafe: 7.4, laneStill: 3.25, forceMeaningful: 2.6 },
-    pro: { early: 1.58, mid: 1.2, late: 0.92, randomEarly: 0.16, randomLate: 0.07, spacingScale: 0.68, recoveryScale: 0.48, centerSafe: 5.5, laneStill: 2.35, forceMeaningful: 1.9 },
-    turbo: { early: 1.22, mid: 0.92, late: 0.72, randomEarly: 0.1, randomLate: 0.045, spacingScale: 0.56, recoveryScale: 0.32, centerSafe: 4.4, laneStill: 1.7, forceMeaningful: 1.35 }
+    arcade: { early: 1.96, mid: 1.5, late: 1.1, randomEarly: 0.2, randomLate: 0.085, spacingScale: 0.82, recoveryScale: 0.66, centerSafe: 5.5, centerHold: 3.5, laneStill: 2.9, forceMeaningful: 2.35 },
+    pro: { early: 1.52, mid: 1.14, late: 0.88, randomEarly: 0.13, randomLate: 0.055, spacingScale: 0.66, recoveryScale: 0.45, centerSafe: 3.35, centerHold: 2.45, laneStill: 1.95, forceMeaningful: 1.55 },
+    turbo: { early: 1.12, mid: 0.86, late: 0.66, randomEarly: 0.09, randomLate: 0.04, spacingScale: 0.62, recoveryScale: 0.42, centerSafe: 2.25, centerHold: 1.9, laneStill: 1.4, forceMeaningful: 1.15 }
   },
   centerChallengeMinSeconds: {
     sunday: 8,
     rookie: 6.8,
-    arcade: 6.6,
-    pro: 4.8,
-    turbo: 4
+    arcade: 4.2,
+    pro: 2.35,
+    turbo: 1.65
   },
   centerSoftPressure: {
     sunday: 0.1,
     rookie: 0.14,
-    arcade: 0.18,
-    pro: 0.26,
-    turbo: 0.34
+    arcade: 0.42,
+    pro: 0.75,
+    turbo: 1
   },
   centerRestChance: {
     sunday: 0.72,
     rookie: 0.64,
-    arcade: 0.52,
-    pro: 0.42,
-    turbo: 0.34
+    arcade: 0.32,
+    pro: 0.1,
+    turbo: 0.02
   },
   pressureBudgetAllowance: {
     sunday: 2.6,
@@ -170,9 +168,9 @@ const ROAD_DIRECTOR = {
   modeIntensity: {
     sunday: 0.95,
     rookie: 1.05,
-    arcade: 1.2,
-    pro: 1.38,
-    turbo: 1.66
+    arcade: 1.32,
+    pro: 1.85,
+    turbo: 2.45
   }
 };
 
@@ -1137,11 +1135,13 @@ class InputManager {
     this.heldVerticalKeys = new Set();
     this.activeKeys = new Set();
     this.suppressedUntilKeyup = new Set();
-    this.heldLaneKeys = new Map();
-    this.laneHoldDirection = 0;
-    this.laneRepeatTimer = 0;
     this.lastKeyPressed = "none";
     this.lastKeyTime = 0;
+    this.lastLaneInput = "none";
+    this.lastLaneInputTime = 0;
+    this.lastBoostEdgeTime = 0;
+    this.leftRightRepeatIgnoredCount = 0;
+    this.boostRepeatIgnoredCount = 0;
     this.boundKeyDown = this.onKeyDown.bind(this);
     this.boundKeyUp = this.onKeyUp.bind(this);
     this.boundWindowBlur = this.clearGameplayInput.bind(this);
@@ -1187,7 +1187,11 @@ class InputManager {
       return;
     }
 
-    if (!isEdge && isControlKey) return;
+    if (!isEdge && isControlKey) {
+      if (keyId === "left" || keyId === "right") this.leftRightRepeatIgnoredCount += 1;
+      if (keyId === "boost") this.boostRepeatIgnoredCount += 1;
+      return;
+    }
 
     if (key.toLowerCase() === "m") {
       this.game.toggleMusic();
@@ -1257,10 +1261,11 @@ class InputManager {
         this.heldVerticalKeys.add("down");
         this.updateVerticalInput();
       } else if (keyId === "left") {
-        this.startLaneHold("left", -1);
+        this.requestLaneStep("left", -1);
       } else if (keyId === "right") {
-        this.startLaneHold("right", 1);
+        this.requestLaneStep("right", 1);
       } else if (keyId === "boost") {
+        this.lastBoostEdgeTime = performance.now();
         this.game.useManualBoost();
       }
       return;
@@ -1298,20 +1303,11 @@ class InputManager {
     } else if (keyId === "down") {
       this.heldVerticalKeys.delete("down");
       this.updateVerticalInput();
-    } else if (keyId === "left" || keyId === "right") {
-      this.releaseLaneHold(keyId);
     }
   }
 
   update(dt) {
-    if (!this.canProcessGameplayInput()) return;
-    if (!this.laneHoldDirection) return;
-    this.laneRepeatTimer -= dt;
-    while (this.laneRepeatTimer <= 0) {
-      this.game.requestLaneMove(this.laneHoldDirection, "hold");
-      this.laneRepeatTimer += INPUT_CONFIG.heldLaneRepeatIntervalSeconds;
-      if (!this.laneHoldDirection) break;
-    }
+    void dt;
   }
 
   getKeyId(event) {
@@ -1352,27 +1348,17 @@ class InputManager {
     return this.game.screen === "game" && run && !run.paused && !run.ended && !run.debugFrozen && run.countdownTimer <= 0;
   }
 
-  startLaneHold(keyId, direction) {
+  requestLaneStep(keyId, direction) {
     if (this.suppressedUntilKeyup.has(keyId)) return;
-    this.heldLaneKeys.set(keyId, direction);
-    this.laneHoldDirection = direction;
-    this.laneRepeatTimer = INPUT_CONFIG.heldLaneRepeatDelaySeconds;
+    this.lastLaneInput = keyId;
+    this.lastLaneInputTime = performance.now();
     this.game.requestLaneMove(direction, "press");
-  }
-
-  releaseLaneHold(keyId) {
-    this.heldLaneKeys.delete(keyId);
-    const entries = Array.from(this.heldLaneKeys.values());
-    this.laneHoldDirection = entries.length ? entries[entries.length - 1] : 0;
-    this.laneRepeatTimer = this.laneHoldDirection ? INPUT_CONFIG.heldLaneRepeatDelaySeconds : 0;
   }
 
   releaseGameplayKey(keyId) {
     if (keyId === "up" || keyId === "down") {
       this.heldVerticalKeys.delete(keyId);
       this.updateVerticalInput();
-    } else if (keyId === "left" || keyId === "right") {
-      this.releaseLaneHold(keyId);
     }
   }
 
@@ -1380,9 +1366,6 @@ class InputManager {
     this.activeKeys.clear();
     this.suppressedUntilKeyup.clear();
     this.heldVerticalKeys.clear();
-    this.heldLaneKeys.clear();
-    this.laneHoldDirection = 0;
-    this.laneRepeatTimer = 0;
     this.game.setVerticalInput(0);
   }
 
@@ -1391,9 +1374,6 @@ class InputManager {
       if (this.activeKeys.has(keyId)) this.suppressedUntilKeyup.add(keyId);
     });
     this.heldVerticalKeys.clear();
-    this.heldLaneKeys.clear();
-    this.laneHoldDirection = 0;
-    this.laneRepeatTimer = 0;
     this.game.setVerticalInput(0);
   }
 
@@ -1410,8 +1390,15 @@ class InputManager {
       suppressedKeys: Array.from(this.suppressedUntilKeyup).join(", ") || "none",
       lastKey: this.lastKeyPressed,
       lastKeyAgeMs: this.lastKeyTime ? Math.max(0, now - this.lastKeyTime) : null,
-      laneHoldDirection: this.laneHoldDirection,
-      laneRepeatTimer: this.laneRepeatTimer,
+      leftKeyDown: this.activeKeys.has("left"),
+      rightKeyDown: this.activeKeys.has("right"),
+      boostKeyDown: this.activeKeys.has("boost"),
+      leftRightRepeatIgnoredCount: this.leftRightRepeatIgnoredCount,
+      boostRepeatIgnoredCount: this.boostRepeatIgnoredCount,
+      lastLaneInput: this.lastLaneInput,
+      lastLaneInputAgeMs: this.lastLaneInputTime ? Math.max(0, now - this.lastLaneInputTime) : null,
+      boostEdgeTriggered: this.lastBoostEdgeTime ? now - this.lastBoostEdgeTime <= 180 : false,
+      boostEdgeAgeMs: this.lastBoostEdgeTime ? Math.max(0, now - this.lastBoostEdgeTime) : null,
       verticalHeld: Array.from(this.heldVerticalKeys).join(", ") || "none"
     };
   }
@@ -1631,10 +1618,26 @@ class RoadDirector {
       } else if (context.speedClassId === "rookie") {
         if (["nearMissCorridor", "deerCrossing"].includes(type)) weight *= 0.72;
         if (type === "fourLaneSpike") weight = 0;
-      } else if (context.speedClassId === "pro" || context.speedClassId === "turbo") {
-        if (["offsetPair", "leftRightSweep", "constructionSqueeze", "nearMissCorridor", "rampEscape"].includes(type)) weight *= context.speedClassId === "turbo" ? 1.45 : 1.28;
-        if (type === "doubleGate") weight *= 0.82;
-        if (type === "recoveryGap") weight *= context.speedClassId === "turbo" ? 0.32 : 0.5;
+      } else if (context.speedClassId === "arcade") {
+        if (["offsetPair", "leftRightSweep", "constructionSqueeze", "nearMissCorridor"].includes(type)) weight *= 1.08;
+        if (type === "centerBlock") weight *= 1.16;
+        if (type === "singleBlocker") weight *= 0.86;
+      } else if (context.speedClassId === "pro") {
+        if (["offsetPair", "leftRightSweep", "constructionSqueeze", "nearMissCorridor", "rampEscape"].includes(type)) weight *= 1.36;
+        if (["centerBlock", "boostTemptation"].includes(type)) weight *= 1.3;
+        if (type === "singleBlocker") weight *= 0.64;
+        if (type === "doubleGate") weight *= 0.78;
+        if (type === "recoveryGap") weight *= 0.42;
+      } else if (context.speedClassId === "turbo") {
+        if (type === "centerBlock") weight *= 2.35;
+        if (["offsetPair", "leftRightSweep", "constructionSqueeze"].includes(type)) weight *= 2.85;
+        if (type === "nearMissCorridor") weight *= 3.1;
+        if (type === "rampEscape") weight *= 2.15;
+        if (type === "boostTemptation") weight *= 2.25;
+        if (type === "fourLaneSpike") weight *= 5.2;
+        if (type === "singleBlocker") weight *= 0.08;
+        if (type === "doubleGate") weight *= 0.2;
+        if (type === "recoveryGap") weight *= 0.1;
       }
 
       const expectedPressure = this.getExpectedWavePressure(type, context);
@@ -1662,9 +1665,18 @@ class RoadDirector {
       { value: "leftRightSweep", weight: context.band.id === "opening" ? 0 : 1.5 },
       { value: "constructionSqueeze", weight: this.isWaveAllowed("constructionSqueeze", context) ? 1.5 : 0 },
       { value: "nearMissCorridor", weight: this.isWaveAllowed("nearMissCorridor", context) ? 1.35 : 0 },
-      { value: "rampEscape", weight: this.isWaveAllowed("rampEscape", context) ? 0.95 : 0 }
+      { value: "rampEscape", weight: this.isWaveAllowed("rampEscape", context) ? 0.95 : 0 },
+      { value: "boostTemptation", weight: context.band.id === "opening" ? 0 : 0.9 }
     ];
-    if (context.speedClassId === "pro" || context.speedClassId === "turbo") {
+    if (context.speedClassId === "turbo") {
+      weights.find((item) => item.value === "centerBlock").weight *= 1.9;
+      weights.find((item) => item.value === "nearMissCorridor").weight *= 1.75;
+      weights.find((item) => item.value === "leftRightSweep").weight *= 1.55;
+      weights.find((item) => item.value === "constructionSqueeze").weight *= 1.45;
+      weights.find((item) => item.value === "rampEscape").weight *= 1.35;
+      weights.find((item) => item.value === "boostTemptation").weight *= 1.45;
+      weights.find((item) => item.value === "doubleGate").weight *= 0.58;
+    } else if (context.speedClassId === "pro") {
       weights.find((item) => item.value === "nearMissCorridor").weight *= 1.35;
       weights.find((item) => item.value === "leftRightSweep").weight *= 1.25;
       weights.find((item) => item.value === "doubleGate").weight *= 0.8;
@@ -1936,7 +1948,10 @@ class RoadDirector {
   getRandomSecondsScale(result) {
     if (!result) return 1;
     const cadence = getTrackDirectorCadence(this.manager.getSpeedClassId());
+    const speedClassId = this.manager.getSpeedClassId();
     if (result.type === "recoveryGap") return 0.28 * (cadence.recoveryScale ?? 1);
+    if (speedClassId === "turbo") return result.hard ? 0.24 : 0.34;
+    if (speedClassId === "pro") return result.hard ? 0.32 : 0.44;
     if (result.hard) return 0.38;
     return 0.52;
   }
@@ -2031,19 +2046,24 @@ class RoadDirector {
   pickPressureLane(context, centerChance = 0.25, excluded = []) {
     const blocked = Array.isArray(excluded) ? excluded : [excluded];
     const playerLaneIsCenter = context.playerLane === TRACK_DIRECTOR.centerLane;
+    const isTurbo = context.speedClassId === "turbo";
+    const isPro = context.speedClassId === "pro";
     if (context.needsMovementChallenge && !blocked.includes(context.playerLane)) {
       const playerLaneChance = playerLaneIsCenter
-        ? (context.centerNeedsChallenge ? 0.74 : 0.28)
-        : 0.74;
+        ? (context.centerNeedsChallenge ? (isTurbo ? 0.9 : 0.74) : (isTurbo ? 0.48 : 0.28))
+        : (isTurbo ? 0.84 : (isPro ? 0.78 : 0.74));
       if ((!playerLaneIsCenter || context.centerNeedsChallenge || context.allowSoftCenterPressure) && this.random() < playerLaneChance) {
         return context.playerLane;
       }
     }
     if (!blocked.includes(TRACK_DIRECTOR.centerLane)) {
-      if (context.centerNeedsChallenge && this.random() < 0.84) return TRACK_DIRECTOR.centerLane;
-      if (context.allowSoftCenterPressure && this.random() < centerChance * context.centerSoftPressure) return TRACK_DIRECTOR.centerLane;
+      const centerNeedChance = isTurbo ? 0.94 : (isPro ? 0.88 : 0.84);
+      const softMultiplier = isTurbo ? 1.45 : (isPro ? 1.18 : 1);
+      if (context.centerNeedsChallenge && this.random() < centerNeedChance) return TRACK_DIRECTOR.centerLane;
+      if (context.allowSoftCenterPressure && this.random() < centerChance * context.centerSoftPressure * softMultiplier) return TRACK_DIRECTOR.centerLane;
     }
-    if (!blocked.includes(context.playerLane) && context.progress > 0.24 && this.random() < 0.3) {
+    const playerLanePressureChance = isTurbo ? 0.46 : (isPro ? 0.36 : 0.3);
+    if (!blocked.includes(context.playerLane) && context.progress > 0.24 && this.random() < playerLanePressureChance) {
       return context.playerLane;
     }
     let fallbackLanes = this.lanesExcept(blocked);
@@ -2064,7 +2084,9 @@ class RoadDirector {
       const movementPenalty = context.needsMovementChallenge && context.allowSoftCenterPressure ? 0.68 : 1;
       if (this.random() < centerSafeChance * movementPenalty) return centerLane;
     }
-    return this.pickSafeLane(context, Boolean(options.preferSide) || context.centerNeedsChallenge, excluded);
+    const highModeCenterPressure = ["pro", "turbo"].includes(context.speedClassId)
+      && (context.allowSoftCenterPressure || context.progress > 0.22);
+    return this.pickSafeLane(context, Boolean(options.preferSide) || context.centerNeedsChallenge || highModeCenterPressure, excluded);
   }
 
   orderPressureLanes(context, lanes) {
@@ -2072,6 +2094,20 @@ class RoadDirector {
     const ordered = lanes.slice();
     if (context.centerNeedsChallenge && ordered.includes(centerLane)) {
       return [centerLane].concat(ordered.filter((lane) => lane !== centerLane));
+    }
+    if (context.allowSoftCenterPressure && ordered.includes(centerLane)) {
+      const softCenterChance = context.speedClassId === "turbo" ? 0.84 : (context.speedClassId === "pro" ? 0.68 : (context.speedClassId === "arcade" ? 0.44 : 0));
+      if (this.random() < softCenterChance) {
+        return [centerLane].concat(ordered.filter((lane) => lane !== centerLane));
+      }
+    }
+    if (ordered.includes(centerLane)) {
+      const highModeCenterChance = context.speedClassId === "turbo" && context.progress > 0.16
+        ? 0.48
+        : (context.speedClassId === "pro" && context.progress > 0.22 ? 0.36 : 0);
+      if (highModeCenterChance > 0 && this.random() < highModeCenterChance) {
+        return [centerLane].concat(ordered.filter((lane) => lane !== centerLane));
+      }
     }
     if (!context.allowSoftCenterPressure && ordered.includes(centerLane)) {
       return ordered.filter((lane) => lane !== centerLane).concat(centerLane);
@@ -2122,6 +2158,18 @@ class RoadDirector {
       ? "cone"
       : this.chooseBlockerType(context, 0.12);
     this.spawn(type, lane, distance, result);
+    const extraChance = context.speedClassId === "turbo" ? 0.96 : (context.speedClassId === "pro" ? 0.72 : (context.speedClassId === "arcade" ? 0.38 : 0));
+    const extraMinProgress = context.speedClassId === "turbo" ? 0.05 : (context.speedClassId === "pro" ? 0.14 : 0.22);
+    if (context.progress > extraMinProgress && extraChance > 0 && this.canAddPressure(result, "cone", context) && this.random() < extraChance) {
+      const sideLane = this.pickPressureLane(context, 0.32, [lane]);
+      this.spawn(this.random() < 0.62 ? "cone" : "oil", sideLane, distance + (context.speedClassId === "turbo" ? 70 : 110), result);
+      const thirdChance = context.speedClassId === "turbo" ? 0.8 : (context.speedClassId === "pro" ? 0.38 : 0);
+      const thirdMinProgress = context.speedClassId === "turbo" ? 0.18 : 0.42;
+      if (context.progress > thirdMinProgress && thirdChance > 0 && this.canAddPressure(result, "slowCar", context, 0.2) && this.random() < thirdChance) {
+        const thirdLane = this.pickPressureLane(context, 0.38, [lane, sideLane]);
+        this.spawn(this.random() < 0.55 ? "cone" : "slowCar", thirdLane, distance + (context.speedClassId === "turbo" ? 125 : 160), result);
+      }
+    }
   }
 
   waveDoubleGate(distance, context, result) {
@@ -2129,10 +2177,12 @@ class RoadDirector {
     const lanes = this.orderPressureLanes(context, shuffle(this.lanesExcept(safeLane), () => this.random()));
     this.spawn(this.chooseBlockerType(context, 0.12), lanes[0], distance, result);
     this.spawn(this.random() < 0.55 ? "slowCar" : (context.difficulty > 0.4 ? "oil" : "cone"), lanes[1], distance, result);
-    const addThird = context.progress > 0.42
+    const thirdChance = context.speedClassId === "arcade" ? 0.5 : (context.speedClassId === "pro" ? 0.86 : 0.98);
+    const thirdMinProgress = context.speedClassId === "turbo" ? 0.04 : (context.speedClassId === "pro" ? 0.16 : 0.3);
+    const addThird = context.progress > thirdMinProgress
       && (context.speedClassId === "arcade" || context.speedClassId === "pro" || context.speedClassId === "turbo")
       && this.canAddPressure(result, "cone", context)
-      && this.random() < (context.speedClassId === "arcade" ? 0.34 : (context.speedClassId === "pro" ? 0.58 : 0.72));
+      && this.random() < thirdChance;
     if (addThird) {
       this.spawn(this.random() < 0.55 ? "cone" : "oil", lanes[2], distance + 90, result);
     }
@@ -2144,7 +2194,9 @@ class RoadDirector {
     const stagger = lerp(170, 285, this.random());
     this.spawn(this.chooseBlockerType(context, 0.18), firstLane, distance, result);
     this.spawn(this.random() < 0.5 ? "cone" : this.chooseBlockerType(context, 0.12), secondLane, distance + stagger, result);
-    if (context.progress > 0.36 && context.speedClassId !== "sunday" && this.canAddPressure(result, "cone", context) && this.random() < (context.speedClassId === "rookie" ? 0.18 : 0.56)) {
+    const thirdChance = context.speedClassId === "rookie" ? 0.18 : (context.speedClassId === "arcade" ? 0.66 : (context.speedClassId === "pro" ? 0.88 : 0.99));
+    const thirdMinProgress = context.speedClassId === "turbo" ? 0.06 : (context.speedClassId === "pro" ? 0.16 : 0.28);
+    if (context.progress > thirdMinProgress && context.speedClassId !== "sunday" && this.canAddPressure(result, "cone", context) && this.random() < thirdChance) {
       const thirdLane = randomChoice(shuffle(this.lanesExcept([firstLane, secondLane]), () => this.random()), () => this.random());
       this.spawn(this.random() < 0.55 ? "cone" : "slowCar", thirdLane, distance + stagger * 0.55, result);
     }
@@ -2154,10 +2206,13 @@ class RoadDirector {
     const type = context.progress < 0.3 ? (this.random() < 0.45 ? "cone" : "slowCar") : this.chooseBlockerType(context, 0.2);
     this.spawn(type, TRACK_DIRECTOR.centerLane, distance, result);
     const sidePressureChance = context.speedClassId === "sunday" ? 0.44 : (context.speedClassId === "rookie" ? 0.72 : 1);
-    if (context.progress > 0.2 && this.random() < sidePressureChance && this.canAddPressure(result, "cone", context)) {
+    const sideMinProgress = context.speedClassId === "turbo" ? 0 : (context.speedClassId === "pro" ? 0.05 : 0.12);
+    if (context.progress > sideMinProgress && this.random() < sidePressureChance && this.canAddPressure(result, "cone", context)) {
       const sideLane = this.pickPressureLane(context, 0, [TRACK_DIRECTOR.centerLane]);
       this.spawn(this.random() < 0.55 ? "cone" : "oil", sideLane, distance, result);
-      if (context.progress > 0.48 && ["arcade", "pro", "turbo"].includes(context.speedClassId) && this.canAddPressure(result, "slowCar", context) && this.random() < (context.speedClassId === "arcade" ? 0.36 : 0.64)) {
+      const thirdChance = context.speedClassId === "arcade" ? 0.58 : (context.speedClassId === "pro" ? 0.94 : 0.99);
+      const thirdMinProgress = context.speedClassId === "arcade" ? 0.3 : (context.speedClassId === "pro" ? 0.12 : 0.04);
+      if (context.progress > thirdMinProgress && ["arcade", "pro", "turbo"].includes(context.speedClassId) && this.canAddPressure(result, "slowCar", context) && this.random() < thirdChance) {
         const thirdLane = this.pickPressureLane(context, 0, [TRACK_DIRECTOR.centerLane, sideLane]);
         this.spawn(this.random() < 0.5 ? "cone" : "slowCar", thirdLane, distance + 110, result);
       }
@@ -2174,7 +2229,7 @@ class RoadDirector {
     let count = context.speedClassId === "sunday"
       ? (context.band.id === "final" ? 3 : 2)
       : (context.band.id === "final" && (context.speedClassId === "pro" || context.speedClassId === "turbo") ? 4 : 3);
-    if (!context.centerNeedsChallenge && !context.allowSoftCenterPressure) {
+    if (!context.centerNeedsChallenge && !context.allowSoftCenterPressure && context.speedClassId !== "turbo") {
       count = Math.min(count, 2);
     }
     const step = clamp(context.cruiseSpeed * 0.17, 150, 285);
@@ -2206,12 +2261,19 @@ class RoadDirector {
     const direction = this.random() < 0.5 ? 1 : -1;
     const signLane = direction > 0 ? 0 : 4;
     this.manager.addWarning(distance, signLane, "deer");
-    if (context.progress > 0.35 && context.speedClassId !== "sunday") {
+    const hazardMinProgress = context.speedClassId === "turbo" ? 0.23 : (context.speedClassId === "pro" ? 0.25 : 0.35);
+    if (context.progress > hazardMinProgress && context.speedClassId !== "sunday") {
       const laneA = this.pickPressureLane(context, 0.24);
       const laneB = this.pickPressureLane(context, 0.18, [laneA]);
       this.spawn(this.random() < 0.6 ? "cone" : "oil", laneA, distance - 180, result);
-      if (["arcade", "pro", "turbo"].includes(context.speedClassId) && this.canAddPressure(result, "cone", context) && this.random() < 0.65) {
+      const secondChance = context.speedClassId === "turbo" ? 0.92 : (context.speedClassId === "pro" ? 0.8 : 0.68);
+      if (["arcade", "pro", "turbo"].includes(context.speedClassId) && this.canAddPressure(result, "cone", context) && this.random() < secondChance) {
         this.spawn("cone", laneB, distance + 170, result);
+      }
+      const thirdChance = context.speedClassId === "turbo" ? 0.56 : (context.speedClassId === "pro" ? 0.28 : 0);
+      if (context.progress > 0.52 && thirdChance > 0 && this.canAddPressure(result, "oil", context, 0.2) && this.random() < thirdChance) {
+        const laneC = this.pickPressureLane(context, 0.3, [laneA, laneB]);
+        this.spawn(this.random() < 0.55 ? "cone" : "oil", laneC, distance + 70, result);
       }
     }
     this.spawn("deer", TRACK_DIRECTOR.centerLane, distance, result, {
@@ -2242,6 +2304,12 @@ class RoadDirector {
     if (context.progress > 0.25 && this.canAddPressure(result, "cone", context)) {
       const secondLane = this.pickPressureLane(context, 0.18, [blockerLane, rewardLane]);
       this.spawn(this.random() < 0.62 ? "cone" : "oil", secondLane, distance + (context.speedClassId === "turbo" ? 0 : 40), result);
+      const thirdChance = context.speedClassId === "turbo" ? 0.98 : (context.speedClassId === "pro" ? 0.66 : 0);
+      const thirdMinProgress = context.speedClassId === "turbo" ? 0.12 : 0.32;
+      if (thirdChance > 0 && context.progress > thirdMinProgress && this.canAddPressure(result, "slowCar", context, 0.2) && this.random() < thirdChance) {
+        const thirdLane = this.pickPressureLane(context, 0.34, [blockerLane, rewardLane, secondLane]);
+        this.spawn(this.random() < 0.52 ? "cone" : "slowCar", thirdLane, distance + 95, result);
+      }
     }
     this.spawn("boostPad", rewardLane, distance + clamp(context.cruiseSpeed * 0.27, 260, 430), result);
   }
@@ -4110,17 +4178,22 @@ class Renderer {
     const currentX = this.laneCenter(run.renderLaneFloat);
     const targetX = this.laneCenter(run.targetLane);
     const age = input.lastKeyAgeMs === null ? "n/a" : `${Math.round(input.lastKeyAgeMs)}ms`;
+    const laneAge = input.lastLaneInputAgeMs === null ? "n/a" : `${Math.round(input.lastLaneInputAgeMs)}ms`;
+    const boostAge = input.boostEdgeAgeMs === null ? "n/a" : `${Math.round(input.boostEdgeAgeMs)}ms`;
     const lines = [
       "INPUT",
       `held: ${input.heldKeys}`,
+      `left down: ${input.leftKeyDown ? "yes" : "no"}  right down: ${input.rightKeyDown ? "yes" : "no"}`,
+      `boost down: ${input.boostKeyDown ? "yes" : "no"}  edge: ${input.boostEdgeTriggered ? "yes" : "no"} ${boostAge}`,
       `suppressed: ${input.suppressedKeys}`,
       `last: ${input.lastKey} ${age}`,
+      `last lane: ${input.lastLaneInput} ${laneAge}`,
       `lane: ${run.renderLaneFloat.toFixed(2)} -> ${run.targetLane}`,
       `progress: ${(run.laneChangeProgress * 100).toFixed(0)}%  dur ${(INPUT_CONFIG.laneChangeDurationSeconds * 1000).toFixed(0)}ms`,
       `x: ${currentX.toFixed(0)} -> ${targetX.toFixed(0)}  y: ${this.getPlayerScreenY().toFixed(0)}`,
       `lock: ${this.getInputLockState()}`,
       `boosts: ${run.manualBoosts}  active: ${run.boostTimer > 0 || run.padBoostTimer > 0 ? "yes" : "no"}`,
-      `repeat: ${input.laneHoldDirection || 0} in ${Math.max(0, input.laneRepeatTimer).toFixed(2)}s`,
+      `repeat ignored: LR ${input.leftRightRepeatIgnoredCount}  boost ${input.boostRepeatIgnoredCount}`,
       `vertical: ${input.verticalHeld} input ${run.verticalInput}`
     ];
     const panelWidth = 304;
