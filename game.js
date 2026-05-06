@@ -453,14 +453,32 @@ const CAR_BODY_STYLES = [
   { id: "formula", name: "Tiny Formula", sprite: "assets/cars/tiny-formula.png" }
 ];
 
+const TRAFFIC_SPRITE_ASSETS = {
+  slowCar: [
+    { id: "slow-car-1", path: "assets/traffic/slow-car-1.png" },
+    { id: "slow-car-2", path: "assets/traffic/slow-car-2.png" }
+  ],
+  fastCar: [
+    { id: "fast-car-1", path: "assets/traffic/fast-car-1.png" },
+    { id: "fast-car-2", path: "assets/traffic/fast-car-2.png" }
+  ],
+  truck: [
+    { id: "truck-1", path: "assets/traffic/truck-1.png" },
+    { id: "truck-2", path: "assets/traffic/truck-2.png" }
+  ],
+  barrier: [
+    { id: "barrier-1", path: "assets/traffic/barrier-1.png" }
+  ]
+};
+
 const PLAYER_CANVAS_WIDTH = 76;
 const PLAYER_CANVAS_HEIGHT = 118;
 const VEHICLE_SCALE_CONFIG = {
   playerSprite: {
-    widthRatio: 0.52,
+    widthRatio: 0.5,
     minWidth: 95,
-    maxWidth: 135,
-    laneMaxRatio: 0.7,
+    maxWidth: 130,
+    laneMaxRatio: 0.74,
     previewScale: 1.35,
     styleWidthScale: {
       wedge: 1,
@@ -469,28 +487,29 @@ const VEHICLE_SCALE_CONFIG = {
     }
   },
   playerCanvas: {
-    widthRatio: 0.52,
+    widthRatio: 0.5,
     minWidth: 90,
-    maxWidth: 130,
-    laneMaxRatio: 0.7,
+    maxWidth: 125,
+    laneMaxRatio: 0.72,
     previewScale: 1.35
   },
-  slowCar: { widthRatio: 0.46 },
-  fastCar: { widthRatio: 0.44 },
-  truck: { widthRatio: 0.54 },
-  barrier: { widthRatio: 0.55 }
+  slowCar: { widthRatio: 0.56, minWidth: 95, maxWidth: 140, laneMaxRatio: 0.74 },
+  fastCar: { widthRatio: 0.54, minWidth: 92, maxWidth: 135, laneMaxRatio: 0.72 },
+  truck: { widthRatio: 0.68, minWidth: 110, maxWidth: 165, laneMaxRatio: 0.88 },
+  barrier: { widthRatio: 0.62, minWidth: 100, maxWidth: 155, laneMaxRatio: 0.82 }
 };
 const SPRITE_OPAQUE_ALPHA_THRESHOLD = 16;
 const PLAYER_AIRBORNE_SCALE = 1.06;
 const MIN_COLLISION_OVERLAP_PX = 4;
+const HARD_VEHICLE_COLLISION_OVERLAP_PX = 2;
 const NEAR_MISS_ZONE_EXPANSION_PX = 26;
 
 const HITBOX_CONFIG = {
-  player: { width: 0.62, height: 0.68, offsetX: 0, offsetY: 0.03 },
-  slowCar: { width: 0.68, height: 0.74, offsetX: 0, offsetY: 0 },
-  fastCar: { width: 0.66, height: 0.72, offsetX: 0, offsetY: 0 },
-  truck: { width: 0.76, height: 0.82, offsetX: 0, offsetY: 0 },
-  barrier: { width: 0.78, height: 0.78, offsetX: 0, offsetY: 0 },
+  player: { width: 0.66, height: 0.74, offsetX: 0, offsetY: 0.02 },
+  slowCar: { width: 0.8, height: 0.84, offsetX: 0, offsetY: 0 },
+  fastCar: { width: 0.78, height: 0.82, offsetX: 0, offsetY: 0 },
+  truck: { width: 0.86, height: 0.88, offsetX: 0, offsetY: 0 },
+  barrier: { width: 0.86, height: 0.84, offsetX: 0, offsetY: 0 },
   cone: { width: 0.55, height: 0.6, offsetX: 0, offsetY: 0 },
   oil: { width: 0.7, height: 0.45, offsetX: 0, offsetY: 0 },
   deer: { width: 0.6, height: 0.65, offsetX: 0, offsetY: 0 },
@@ -498,6 +517,8 @@ const HITBOX_CONFIG = {
   boostPad: { width: 0.75, height: 0.55, offsetX: 0, offsetY: 0 },
   branch: { width: 0.66, height: 0.5, offsetX: 0, offsetY: 0 }
 };
+
+const HARD_VEHICLE_TYPES = new Set(["slowCar", "fastCar", "truck", "barrier"]);
 
 const OBSTACLE_INFO = {
   slowCar: { label: "Slow Car", tall: true, crash: true, w: 62, h: 104 },
@@ -988,6 +1009,16 @@ function rectFromCenter(x, y, w, h) {
   };
 }
 
+function rectFromRenderedVisual(visual) {
+  if (!visual) return null;
+  return {
+    x: visual.renderedX,
+    y: visual.renderedY,
+    w: visual.renderedWidth,
+    h: visual.renderedHeight
+  };
+}
+
 function rectsOverlap(a, b) {
   return a.x < b.x + b.w
     && a.x + a.w > b.x
@@ -1026,6 +1057,10 @@ function getHitboxConfig(type) {
 function hasGameplayHitbox(type) {
   const config = getHitboxConfig(type);
   return Boolean(config && config.width > 0 && config.height > 0);
+}
+
+function getCollisionMinOverlapPx(type) {
+  return HARD_VEHICLE_TYPES.has(type) ? HARD_VEHICLE_COLLISION_OVERLAP_PX : MIN_COLLISION_OVERLAP_PX;
 }
 
 function rectHorizontalGap(a, b) {
@@ -1729,6 +1764,102 @@ class CarSpriteManager {
   }
 
   load(entry) {
+    if (typeof Image !== "function") {
+      entry.status = "missing";
+      return;
+    }
+    entry.status = "loading";
+    const image = new Image();
+    image.onload = () => {
+      entry.status = image.naturalWidth > 0 && image.naturalHeight > 0 ? "loaded" : "missing";
+      image.neonOpaqueBounds = getOpaqueBounds(image);
+      if (this.onStatusChange) this.onStatusChange(entry);
+    };
+    image.onerror = () => {
+      entry.status = "missing";
+      if (this.onStatusChange) this.onStatusChange(entry);
+    };
+    image.src = entry.path;
+    entry.image = image;
+  }
+}
+
+class TrafficSpriteManager {
+  constructor(assetMap, onStatusChange) {
+    this.onStatusChange = onStatusChange;
+    this.byType = new Map();
+    this.entries = new Map();
+    Object.entries(assetMap).forEach(([type, variants]) => {
+      const entries = variants.map((variant) => {
+        const entry = {
+          type,
+          id: variant.id,
+          path: variant.path,
+          status: "idle",
+          image: null
+        };
+        this.entries.set(entry.id, entry);
+        return entry;
+      });
+      this.byType.set(type, entries);
+    });
+    this.preload();
+  }
+
+  preload() {
+    this.entries.forEach((entry) => this.load(entry));
+  }
+
+  getVariants(type) {
+    return this.byType.get(type) || [];
+  }
+
+  getVariantIds(type) {
+    return this.getVariants(type).map((entry) => entry.id);
+  }
+
+  getEntry(type, variantId) {
+    const variants = this.getVariants(type);
+    if (!variants.length) return null;
+    if (variantId) {
+      return variants.find((entry) => entry.id === variantId) || null;
+    }
+    return variants[0];
+  }
+
+  getSprite(type, variantId) {
+    const entry = this.getEntry(type, variantId);
+    if (!entry) return null;
+    if (entry.status === "idle") this.load(entry);
+    return entry.status === "loaded" ? entry.image : null;
+  }
+
+  getStatus(type, variantId) {
+    const entry = this.getEntry(type, variantId);
+    return entry ? entry.status : "missing";
+  }
+
+  getPath(type, variantId) {
+    const entry = this.getEntry(type, variantId);
+    return entry ? entry.path : "";
+  }
+
+  getDebugInfo() {
+    const entries = Array.from(this.entries.values());
+    const loaded = entries.filter((entry) => entry.status === "loaded").length;
+    const missing = entries
+      .filter((entry) => entry.status === "missing")
+      .map((entry) => entry.id);
+    return {
+      total: entries.length,
+      loaded,
+      active: loaded > 0,
+      missing: missing.length ? missing.join(",") : "none"
+    };
+  }
+
+  load(entry) {
+    if (!entry || entry.status === "loading" || entry.status === "loaded" || entry.status === "missing") return;
     if (typeof Image !== "function") {
       entry.status = "missing";
       return;
@@ -2658,6 +2789,7 @@ class RoadDirector {
       rampLanes: result.rampLanes.slice(),
       obstacles: result.spawned.map((obstacle) => ({
         type: obstacle.type,
+        variant: obstacle.variant || "",
         lane: Math.round(clamp(Number.isFinite(obstacle.laneFloat) ? obstacle.laneFloat : obstacle.lane, 0, LANES - 1)),
         distance: Math.round(obstacle.distance)
       })),
@@ -3349,8 +3481,9 @@ class ObstacleManager {
   }
 
   createObstacle(type, lane, distance, options = {}) {
+    const id = `obstacle-${this.nextObstacleId++}`;
     return {
-      id: `obstacle-${this.nextObstacleId++}`,
+      id,
       type,
       lane,
       laneFloat: Number.isFinite(options.laneFloat) ? options.laneFloat : lane,
@@ -3359,11 +3492,22 @@ class ObstacleManager {
       nearMissAwarded: false,
       warningType: options.warningType || null,
       direction: options.direction || 1,
-      variant: options.variant || "",
+      variant: options.variant || this.selectTrafficSpriteVariant(type, lane, distance, id),
       remove: false,
       sfxPlayed: false,
       allowFourLanePressure: Boolean(options.allowFourLanePressure)
     };
+  }
+
+  selectTrafficSpriteVariant(type, lane, distance, id) {
+    const variants = this.game.trafficSprites?.getVariantIds(type)
+      || (TRAFFIC_SPRITE_ASSETS[type] || []).map((entry) => entry.id);
+    if (!variants.length) return "";
+    const run = this.game.run || {};
+    const seedSource = run.roadSeedSource || run.roadSeed || this.track?.id || DEFAULT_ROAD_SEED;
+    const distanceKey = Math.round(distance);
+    const variantRng = createSeededRandomController(`traffic-sprite|${seedSource}|${type}|${lane}|${distanceKey}|${id}`);
+    return randomChoice(variants, () => variantRng.random()) || "";
   }
 
   isGameplaySpawnObject(obstacle) {
@@ -3380,21 +3524,21 @@ class ObstacleManager {
 
   getSpawnBounds(obstacle) {
     if (!this.isGameplaySpawnObject(obstacle)) return null;
-    const info = OBSTACLE_INFO[obstacle.type];
+    const visualSize = this.getObjectVisualSize(obstacle.type, obstacle);
     const laneW = this.game.renderer?.road?.laneW || 152;
     if (obstacle.type === "deer") {
       return {
         laneMin: -0.5,
         laneMax: LANES - 0.5,
-        distanceMin: obstacle.distance - this.getObjectDistanceHalfSize(obstacle.type),
-        distanceMax: obstacle.distance + this.getObjectDistanceHalfSize(obstacle.type),
+        distanceMin: obstacle.distance - this.getObjectDistanceHalfSize(obstacle.type, obstacle),
+        distanceMax: obstacle.distance + this.getObjectDistanceHalfSize(obstacle.type, obstacle),
         centerDistance: obstacle.distance
       };
     }
     const laneCenterValue = Number.isFinite(obstacle.laneFloat) ? obstacle.laneFloat : obstacle.lane;
     const config = getHitboxConfig(obstacle.type);
-    const laneHalfSpan = clamp((info.w * config.width) / Math.max(1, laneW * 2), 0.18, 0.48);
-    const halfDistance = this.getObjectDistanceHalfSize(obstacle.type);
+    const laneHalfSpan = clamp((visualSize.w * config.width) / Math.max(1, laneW * 2), 0.18, 0.48);
+    const halfDistance = this.getObjectDistanceHalfSize(obstacle.type, obstacle);
     return {
       laneMin: laneCenterValue - laneHalfSpan,
       laneMax: laneCenterValue + laneHalfSpan,
@@ -3404,12 +3548,22 @@ class ObstacleManager {
     };
   }
 
-  getObjectDistanceHalfSize(type) {
+  getObjectVisualSize(type, obstacle = null) {
+    const info = OBSTACLE_INFO[type];
+    if (!info) return { w: 70, h: 84 };
+    if (this.game.renderer?.getObstacleVisualSize) {
+      return this.game.renderer.getObstacleVisualSize(type, 1, obstacle);
+    }
+    return { w: info.w, h: info.h };
+  }
+
+  getObjectDistanceHalfSize(type, obstacle = null) {
     const info = OBSTACLE_INFO[type];
     const config = getHitboxConfig(type);
     if (!info || !config) return 42;
+    const visualSize = this.getObjectVisualSize(type, obstacle);
     const roadH = this.game.renderer?.road?.h || 720;
-    return Math.max(42, (info.h * config.height * 1.18 * VIEW_DISTANCE / Math.max(1, roadH)) / 2);
+    return Math.max(42, (visualSize.h * config.height * 1.18 * VIEW_DISTANCE / Math.max(1, roadH)) / 2);
   }
 
   getSpawnSpacingClass(obstacle) {
@@ -3741,11 +3895,12 @@ class CollisionSystem {
       if (!info || obstacle.hit || obstacle.type === "warning") continue;
       const obstacleBox = this.game.renderer.getObstacleHitbox(obstacle);
       if (!obstacleBox) continue;
-      const collision = rectsOverlapByThreshold(playerBox, obstacleBox, MIN_COLLISION_OVERLAP_PX);
+      const minOverlapPx = getCollisionMinOverlapPx(obstacle.type);
+      const collision = rectsOverlapByThreshold(playerBox, obstacleBox, minOverlapPx);
 
       if (collision.hit) {
         const result = this.getCollisionResult(obstacle, info);
-        this.logCollision(obstacle, info, playerBox, obstacleBox, collision.overlap, result);
+        this.logCollision(obstacle, info, playerBox, obstacleBox, collision.overlap, result, minOverlapPx);
         if (run.airborne && !info.tall && obstacle.type !== "ramp" && obstacle.type !== "boostPad") {
           obstacle.hit = true;
           obstacle.remove = true;
@@ -3785,7 +3940,7 @@ class CollisionSystem {
     return "slowdown";
   }
 
-  logCollision(obstacle, info, playerBox, obstacleBox, overlap, result) {
+  logCollision(obstacle, info, playerBox, obstacleBox, overlap, result, minOverlapPx) {
     if (!this.game.debugMode || typeof console === "undefined") return;
     const run = this.game.run;
     console.info("[collision]", {
@@ -3795,7 +3950,7 @@ class CollisionSystem {
       obstacleHitbox: this.formatRect(obstacleBox),
       overlapWidth: Number(overlap.width.toFixed(2)),
       overlapHeight: Number(overlap.height.toFixed(2)),
-      minOverlapPx: MIN_COLLISION_OVERLAP_PX,
+      minOverlapPx,
       playerLane: run.targetLane,
       obstacleLane: obstacle.lane,
       playerAirborne: run.airborne,
@@ -3950,7 +4105,7 @@ class Renderer {
     };
   }
 
-  getPlayerRenderBounds() {
+  getPlayerVisualRect() {
     const run = this.game.run;
     const x = this.laneCenter(run.renderLaneFloat);
     const y = this.getPlayerScreenY();
@@ -3958,24 +4113,33 @@ class Renderer {
       airborne: run.airborne,
       laneWidth: this.road.laneW
     }, this.game.carSprites);
-    return rectFromCenter(x, y, size.w, size.h);
+    return {
+      objectType: "player",
+      centerX: x,
+      centerY: y,
+      renderedX: x - size.w / 2,
+      renderedY: y - size.h / 2,
+      renderedWidth: size.w,
+      renderedHeight: size.h
+    };
+  }
+
+  getPlayerRenderBounds() {
+    return rectFromRenderedVisual(this.getPlayerVisualRect());
+  }
+
+  getPlayerHitboxFromVisualRect(visual) {
+    const config = getHitboxConfig("player");
+    return rectFromCenter(
+      visual.centerX + visual.renderedWidth * config.offsetX,
+      visual.centerY + visual.renderedHeight * config.offsetY,
+      visual.renderedWidth * config.width,
+      visual.renderedHeight * config.height
+    );
   }
 
   getPlayerHitbox() {
-    const run = this.game.run;
-    const x = this.laneCenter(run.renderLaneFloat);
-    const y = this.getPlayerScreenY();
-    const size = getPlayerCarDrawSize(run.player.car, {
-      airborne: run.airborne,
-      laneWidth: this.road.laneW
-    }, this.game.carSprites);
-    const config = getHitboxConfig("player");
-    return rectFromCenter(
-      x + size.w * config.offsetX,
-      y + size.h * config.offsetY,
-      size.w * config.width,
-      size.h * config.height
-    );
+    return this.getPlayerHitboxFromVisualRect(this.getPlayerVisualRect());
   }
 
   getObstacleScreenPosition(obstacle) {
@@ -4009,10 +4173,27 @@ class Renderer {
     return this.getObstacleRenderBoundsAt(obstacle, this.game.run.distance);
   }
 
-  getObstacleVisualSize(type, scale = 1) {
+  getTrafficSpriteForObstacle(obstacle) {
+    if (!obstacle || !this.game.trafficSprites) return null;
+    return this.game.trafficSprites.getSprite(obstacle.type, obstacle.variant);
+  }
+
+  getObstacleVisualSize(type, scale = 1, obstacle = null) {
     const info = OBSTACLE_INFO[type];
     if (!info) return { w: 0, h: 0, drawScale: scale };
     const config = VEHICLE_SCALE_CONFIG[type];
+    const baseWidth = config ? getConfiguredVehicleWidth(config, this.road.laneW) : info.w;
+    const sprite = obstacle ? this.getTrafficSpriteForObstacle(obstacle) : null;
+    if (sprite) {
+      const box = getScaledSpriteBox(sprite, baseWidth * scale);
+      return {
+        w: box.w,
+        h: box.h,
+        drawScale: scale,
+        sprite,
+        source: box.source
+      };
+    }
     if (!config) {
       return {
         w: info.w * scale,
@@ -4020,8 +4201,7 @@ class Renderer {
         drawScale: scale
       };
     }
-    const width = getConfiguredVehicleWidth(config, this.road.laneW);
-    const drawScale = (width / info.w) * scale;
+    const drawScale = (baseWidth / info.w) * scale;
     return {
       w: info.w * drawScale,
       h: info.h * drawScale,
@@ -4029,29 +4209,41 @@ class Renderer {
     };
   }
 
-  getObstacleRenderBoundsAt(obstacle, runDistance) {
+  getObstacleVisualRectAt(obstacle, runDistance) {
     const info = OBSTACLE_INFO[obstacle.type];
     if (!info || obstacle.type === "warning") return null;
     const ahead = obstacle.distance - runDistance;
     if (ahead < -70 || ahead > VIEW_DISTANCE + 160) return null;
     const { x, y, scale } = this.getObstacleScreenPositionAt(obstacle, runDistance);
-    const size = this.getObstacleVisualSize(obstacle.type, scale);
-    return rectFromCenter(x, y, size.w, size.h);
+    const size = this.getObstacleVisualSize(obstacle.type, scale, obstacle);
+    return {
+      objectType: obstacle.type,
+      spriteVariant: obstacle.variant || "",
+      centerX: x,
+      centerY: y,
+      renderedX: x - size.w / 2,
+      renderedY: y - size.h / 2,
+      renderedWidth: size.w,
+      renderedHeight: size.h,
+      drawScale: size.drawScale,
+      sprite: Boolean(size.sprite)
+    };
+  }
+
+  getObstacleRenderBoundsAt(obstacle, runDistance) {
+    return rectFromRenderedVisual(this.getObstacleVisualRectAt(obstacle, runDistance));
   }
 
   getObstacleHitboxAt(obstacle, runDistance) {
-    const info = OBSTACLE_INFO[obstacle.type];
     const config = getHitboxConfig(obstacle.type);
-    if (!info || obstacle.type === "warning" || !config) return null;
-    const ahead = obstacle.distance - runDistance;
-    if (ahead < -70 || ahead > VIEW_DISTANCE + 160) return null;
-    const { x, y, scale } = this.getObstacleScreenPositionAt(obstacle, runDistance);
-    const size = this.getObstacleVisualSize(obstacle.type, scale);
+    if (!config) return null;
+    const visual = this.getObstacleVisualRectAt(obstacle, runDistance);
+    if (!visual) return null;
     return rectFromCenter(
-      x + config.offsetX * size.w,
-      y + config.offsetY * size.h,
-      size.w * config.width,
-      size.h * config.height
+      visual.centerX + config.offsetX * visual.renderedWidth,
+      visual.centerY + config.offsetY * visual.renderedHeight,
+      visual.renderedWidth * config.width,
+      visual.renderedHeight * config.height
     );
   }
 
@@ -4347,7 +4539,15 @@ class Renderer {
     for (let i = 0; i < 11; i += 1) {
       const y = this.road.y + i * this.road.h / 10;
       const lane = i % LANES;
-      drawTrafficCar(ctx, this.laneCenter(lane), y, i % 2 ? "fastCar" : "slowCar", 0.72);
+      const type = i % 2 ? "fastCar" : "slowCar";
+      const variants = this.game.trafficSprites?.getVariantIds(type) || [];
+      const obstacle = { type, variant: variants.length ? variants[i % variants.length] : "" };
+      const visual = this.getObstacleVisualSize(type, 0.72, obstacle);
+      if (visual.sprite) {
+        drawTrafficSprite(ctx, this.laneCenter(lane), y, visual);
+      } else {
+        drawTrafficCar(ctx, this.laneCenter(lane), y, type, visual.drawScale);
+      }
     }
     ctx.restore();
   }
@@ -4617,7 +4817,11 @@ class Renderer {
   }
 
   drawObstacle(ctx, obstacle, x, y, scale) {
-    const visual = this.getObstacleVisualSize(obstacle.type, scale);
+    const visual = this.getObstacleVisualSize(obstacle.type, scale, obstacle);
+    if (visual.sprite) {
+      drawTrafficSprite(ctx, x, y, visual);
+      return;
+    }
     const drawScale = visual.drawScale;
     if (obstacle.type === "slowCar" || obstacle.type === "fastCar") {
       drawTrafficCar(ctx, x, y, obstacle.type, drawScale);
@@ -4664,20 +4868,24 @@ class Renderer {
     this.drawDangerZoneOverlay();
     const playerRenderBox = this.getPlayerRenderBounds();
     const playerBox = this.getPlayerHitbox();
-    drawHitboxRect(ctx, playerRenderBox, "rgba(246, 251, 255, 0.88)", "PLAYER render", "render");
-    drawHitboxRect(ctx, playerBox, "#28f6ff", "PLAYER hitbox", "hitbox");
+    drawHitboxRect(ctx, playerRenderBox, "rgba(246, 251, 255, 0.88)", `PLAYER render ${playerRenderBox.w.toFixed(0)}x${playerRenderBox.h.toFixed(0)}`, "render");
+    drawHitboxRect(ctx, playerBox, "#28f6ff", `PLAYER hit ${playerBox.w.toFixed(0)}x${playerBox.h.toFixed(0)}`, "hitbox");
     for (const obstacle of this.game.obstacles.obstacles) {
       const renderBox = this.getObstacleRenderBounds(obstacle);
       const box = this.getObstacleHitbox(obstacle);
       if (!box) continue;
       if (box.y > this.height + 140 || box.y + box.h < this.road.y - 140) continue;
       const info = OBSTACLE_INFO[obstacle.type];
-      const active = rectsOverlapByThreshold(playerBox, box, MIN_COLLISION_OVERLAP_PX).hit;
+      const overlap = rectOverlapSize(playerBox, box);
+      const minOverlapPx = getCollisionMinOverlapPx(obstacle.type);
+      const active = overlap.width > minOverlapPx && overlap.height > minOverlapPx;
       const color = active ? "#f6fbff" : (info.crash ? "#ff3b58" : (obstacle.type === "ramp" || obstacle.type === "boostPad" ? "#44ff99" : "#ffe45e"));
+      const variant = obstacle.variant ? ` ${obstacle.variant}` : "";
       if (renderBox) {
-        drawHitboxRect(ctx, renderBox, "rgba(246, 251, 255, 0.6)", "", "render");
+        drawHitboxRect(ctx, renderBox, "rgba(246, 251, 255, 0.6)", `${obstacle.type}${variant} render ${renderBox.w.toFixed(0)}x${renderBox.h.toFixed(0)}`, "render");
       }
-      drawHitboxRect(ctx, box, color, `${info.label} hitbox`, active ? "active" : "hitbox");
+      const overlapText = active ? ` ov ${overlap.width.toFixed(0)}x${overlap.height.toFixed(0)}` : "";
+      drawHitboxRect(ctx, box, color, `${obstacle.type} hit ${box.w.toFixed(0)}x${box.h.toFixed(0)}${overlapText}`, active ? "active" : "hitbox");
     }
     ctx.restore();
   }
@@ -5009,6 +5217,29 @@ class Renderer {
     ctx.restore();
   }
 
+  getNearbyTrafficSpriteDebug(run) {
+    const trafficTypes = Object.keys(TRAFFIC_SPRITE_ASSETS);
+    const candidates = this.game.obstacles.obstacles
+      .filter((obstacle) => trafficTypes.includes(obstacle.type) && !obstacle.hit && !obstacle.remove)
+      .map((obstacle) => ({
+        obstacle,
+        ahead: obstacle.distance - run.distance
+      }))
+      .filter((item) => item.ahead > -120 && item.ahead < VIEW_DISTANCE + 80)
+      .sort((a, b) => Math.abs(a.ahead) - Math.abs(b.ahead))
+      .slice(0, 2);
+    if (!candidates.length) return "none";
+    return candidates.map(({ obstacle }) => {
+      const status = this.game.trafficSprites?.getStatus(obstacle.type, obstacle.variant) || "canvas";
+      const { scale } = this.getObstacleScreenPositionAt(obstacle, run.distance);
+      const size = this.getObstacleVisualSize(obstacle.type, scale, obstacle);
+      const hitbox = this.getObstacleHitboxAt(obstacle, run.distance);
+      const hitboxText = hitbox ? ` hit ${hitbox.w.toFixed(0)}x${hitbox.h.toFixed(0)}` : "";
+      const variant = obstacle.variant || "canvas";
+      return `${obstacle.type}:${variant} ${status} ${size.w.toFixed(0)}x${size.h.toFixed(0)}${hitboxText}`;
+    }).join(" | ");
+  }
+
   drawDebug() {
     const ctx = this.ctx;
     const run = this.game.run;
@@ -5043,6 +5274,13 @@ class Renderer {
       airborne: run.airborne,
       laneWidth: this.road.laneW
     }, this.game.carSprites);
+    const trafficSpriteDebug = this.game.trafficSprites?.getDebugInfo() || {
+      total: 0,
+      loaded: 0,
+      active: false,
+      missing: "none"
+    };
+    const nearbyTrafficSpriteDebug = this.getNearbyTrafficSpriteDebug(run);
     const lines = [
       "DEBUG `",
       `mode: ${run.speedClass?.label || getSpeedClassLabel(run.speedClassId)} score x${(run.scoreMultiplier || 1).toFixed(2)}`,
@@ -5090,7 +5328,10 @@ class Renderer {
       `src img: ${spriteDebug.natural}`,
       `opaque: ${spriteDebug.opaque}`,
       `render: ${spriteDebug.render}`,
-      `hitbox: ${playerBox.w.toFixed(0)}x${playerBox.h.toFixed(0)} min ${MIN_COLLISION_OVERLAP_PX}px`,
+      `traffic sprites: ${trafficSpriteDebug.active ? "active" : "fallback"} ${trafficSpriteDebug.loaded}/${trafficSpriteDebug.total}`,
+      `missing traffic: ${trafficSpriteDebug.missing}`,
+      `near traffic: ${nearbyTrafficSpriteDebug}`,
+      `hitbox: ${playerBox.w.toFixed(0)}x${playerBox.h.toFixed(0)} min hard ${HARD_VEHICLE_COLLISION_OVERLAP_PX}px else ${MIN_COLLISION_OVERLAP_PX}px`,
       `save: ${this.game.profiles.saveStatus}`,
       `music track: ${this.game.audio.musicTrackStatus()}`,
       `title music: ${this.game.audio.tracks.title.loaded}`,
@@ -5131,7 +5372,7 @@ class Renderer {
     };
     const lines = [
       "HITBOX CONFIG",
-      `min overlap ${MIN_COLLISION_OVERLAP_PX}px`,
+      `min overlap hard ${HARD_VEHICLE_COLLISION_OVERLAP_PX}px / other ${MIN_COLLISION_OVERLAP_PX}px`,
       format("player"),
       `${format("slowCar", "slow")}  ${format("fastCar", "fast")}`,
       `${format("truck")}  ${format("barrier")}`,
@@ -6119,6 +6360,33 @@ function drawShadow(ctx, w, h) {
   ctx.restore();
 }
 
+function drawTrafficSprite(ctx, x, y, visual) {
+  const image = visual.sprite;
+  if (!image || !visual.source) return;
+  ctx.save();
+  const parentAlpha = ctx.globalAlpha;
+  ctx.globalAlpha = parentAlpha * 0.28;
+  ctx.fillStyle = "#000";
+  ctx.beginPath();
+  ctx.ellipse(x, y + visual.h * 0.34, visual.w * 0.46, visual.h * 0.11, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.globalAlpha = parentAlpha;
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = "high";
+  ctx.drawImage(
+    image,
+    visual.source.x,
+    visual.source.y,
+    visual.source.width,
+    visual.source.height,
+    x - visual.w / 2,
+    y - visual.h / 2,
+    visual.w,
+    visual.h
+  );
+  ctx.restore();
+}
+
 function shade(hex, amount) {
   const color = String(hex || "#ffffff").replace("#", "");
   if (color.length !== 6) return hex;
@@ -6144,6 +6412,10 @@ class NeonRoadRally {
     this.audio = new AudioManager(this.profiles.data.audio, (settings) => this.profiles.updateAudioSettings(settings));
     this.carSprites = new CarSpriteManager(CAR_BODY_STYLES, () => {
       if (this.screen === "customize") this.renderCarPreview();
+      if (this.screen === "vehicleScaleDebug") this.renderVehicleScaleDebugCanvas();
+    });
+    this.trafficSprites = new TrafficSpriteManager(TRAFFIC_SPRITE_ASSETS, () => {
+      if (this.screen === "vehicleScaleDebug") this.renderVehicleScaleDebugCanvas();
     });
     this.renderer = new Renderer(this.canvas, this);
     this.obstacles = new ObstacleManager(this);
@@ -7146,6 +7418,7 @@ class NeonRoadRally {
       rampLanes: wave.rampLanes,
       obstacles: (wave.obstacles || []).map((obstacle) => ({
         type: obstacle.type,
+        variant: obstacle.variant || "",
         lane: obstacle.lane,
         distance: Math.round(obstacle.distance / 10) * 10
       }))
@@ -7804,7 +8077,10 @@ class NeonRoadRally {
     this.audio.playMusic("title", false);
     const sequenceLine = (wave) => {
       const obstacleText = (wave.obstacles || [])
-        .map((obstacle) => `${obstacle.type} L${obstacle.lane + 1}@${obstacle.distance}`)
+        .map((obstacle) => {
+          const variant = obstacle.variant ? `:${obstacle.variant}` : "";
+          return `${obstacle.type}${variant} L${obstacle.lane + 1}@${obstacle.distance}`;
+        })
         .join(", ");
       return `${wave.index}. ${wave.sectionLabel || "Section"} ${wave.label} d${wave.distance}: ${obstacleText || "gap"}`;
     };
@@ -8076,6 +8352,7 @@ class NeonRoadRally {
           <button class="menu-button" data-action="toggleSfx">SFX: ${this.audio.sfxMuted ? "Muted" : "On"}</button>
           ${this.debugMode ? `<button class="menu-button" data-action="runSeedTest">Run Seed Determinism Test</button>` : ""}
           ${this.debugMode ? `<button class="menu-button" data-action="runSimulation">Run Spawn Safety Simulation</button>` : ""}
+          ${this.debugMode ? `<button class="menu-button" data-action="vehicleScaleDebug">Vehicle Scale Check</button>` : ""}
           <div class="audio-grid">
             <div class="field">
               <label for="musicVolume">Music volume</label>
@@ -8974,6 +9251,109 @@ class NeonRoadRally {
     }
   }
 
+  showVehicleScaleDebugScreen() {
+    this.setScreen("vehicleScaleDebug");
+    const trafficDebug = this.trafficSprites.getDebugInfo();
+    this.layer.classList.remove("is-empty");
+    this.layer.innerHTML = `
+      <section class="panel compact">
+        <h2>Vehicle Scale Check</h2>
+        <p class="hint">Debug-only visual bounds and collision hitboxes at gameplay lane scale.</p>
+        <div class="score-grid">
+          <div class="score-card"><strong>Traffic Sprites</strong><span>${trafficDebug.loaded}/${trafficDebug.total} loaded</span></div>
+          <div class="score-card"><strong>Missing</strong><span>${escapeHtml(trafficDebug.missing)}</span></div>
+        </div>
+        <canvas id="vehicleScaleDebugCanvas" class="car-preview" width="420" height="520" aria-label="Vehicle scale debug"></canvas>
+        <div class="row" style="margin-top:16px">
+          <button class="small-button" data-action="vehicleScaleDebug">Refresh</button>
+          <button class="small-button" data-action="title">Back to Title</button>
+        </div>
+      </section>
+    `;
+    this.bindLayerButtons();
+    this.renderVehicleScaleDebugCanvas();
+  }
+
+  renderVehicleScaleDebugCanvas() {
+    const canvas = document.getElementById("vehicleScaleDebugCanvas");
+    if (!canvas || !this.renderer) return;
+    const ctx = canvas.getContext("2d");
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    const laneWidth = this.renderer.road?.laneW || canvas.width / LANES;
+    ctx.fillStyle = "#070914";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.strokeStyle = "rgba(40, 246, 255, 0.24)";
+    ctx.lineWidth = 1;
+    const laneX = canvas.width * 0.5 - laneWidth * 0.5;
+    ctx.strokeRect(laneX, 18, laneWidth, canvas.height - 36);
+    ctx.fillStyle = "#f6fbff";
+    ctx.font = "12px monospace";
+    ctx.fillText(`lane ${laneWidth.toFixed(0)}px`, laneX, 14);
+
+    const player = this.profiles.getCurrentPlayer();
+    const car = player?.car || DEFAULT_CAR;
+    const rows = [
+      { type: "player", label: "player", y: 82 },
+      { type: "slowCar", label: "slow", y: 170 },
+      { type: "fastCar", label: "fast", y: 258 },
+      { type: "truck", label: "truck", y: 362 },
+      { type: "barrier", label: "barrier", y: 462 }
+    ];
+
+    rows.forEach((row) => {
+      const centerX = canvas.width / 2;
+      if (row.type === "player") {
+        const size = getPlayerCarDrawSize(car, { laneWidth }, this.carSprites);
+        drawPlayerCar(ctx, centerX, row.y, car, {
+          boosting: false,
+          airborne: false,
+          laneWidth,
+          laneChanging: false,
+          laneDelta: 0,
+          verticalInput: 0,
+          crashFlash: 0
+        }, this.carSprites);
+        const renderBox = rectFromCenter(centerX, row.y, size.w, size.h);
+        const config = getHitboxConfig("player");
+        const hitbox = rectFromCenter(
+          centerX + size.w * config.offsetX,
+          row.y + size.h * config.offsetY,
+          size.w * config.width,
+          size.h * config.height
+        );
+        this.drawVehicleScaleDebugBoxes(ctx, row.label, renderBox, hitbox);
+        return;
+      }
+
+      const variant = this.trafficSprites.getVariantIds(row.type)[0] || "";
+      const obstacle = { type: row.type, variant };
+      const visual = this.renderer.getObstacleVisualSize(row.type, 1, obstacle);
+      if (visual.sprite) {
+        drawTrafficSprite(ctx, centerX, row.y, visual);
+      } else if (row.type === "slowCar" || row.type === "fastCar") {
+        drawTrafficCar(ctx, centerX, row.y, row.type, visual.drawScale);
+      } else if (row.type === "truck") {
+        drawTruck(ctx, centerX, row.y, visual.drawScale);
+      } else if (row.type === "barrier") {
+        drawBarrier(ctx, centerX, row.y, visual.drawScale);
+      }
+      const renderBox = rectFromCenter(centerX, row.y, visual.w, visual.h);
+      const config = getHitboxConfig(row.type);
+      const hitbox = rectFromCenter(
+        centerX + visual.w * config.offsetX,
+        row.y + visual.h * config.offsetY,
+        visual.w * config.width,
+        visual.h * config.height
+      );
+      this.drawVehicleScaleDebugBoxes(ctx, `${row.label}${variant ? ` ${variant}` : " canvas"}`, renderBox, hitbox);
+    });
+  }
+
+  drawVehicleScaleDebugBoxes(ctx, label, renderBox, hitbox) {
+    drawHitboxRect(ctx, renderBox, "rgba(246, 251, 255, 0.72)", `${label} render ${renderBox.w.toFixed(0)}x${renderBox.h.toFixed(0)}`, "render");
+    drawHitboxRect(ctx, hitbox, "#28f6ff", `hit ${hitbox.w.toFixed(0)}x${hitbox.h.toFixed(0)}`, "hitbox");
+  }
+
   readCarForm() {
     return {
       name: sanitizeName(document.getElementById("carName")?.value, DEFAULT_CAR.name),
@@ -9171,6 +9551,7 @@ class NeonRoadRally {
         else if (action === "toggleSfx") this.toggleSfx(true);
         else if (action === "runSimulation") this.runSpawnSafetySimulation();
         else if (action === "runSeedTest") this.runSeedDeterminismTest();
+        else if (action === "vehicleScaleDebug") this.showVehicleScaleDebugScreen();
         else if (action === "title") this.showTitle();
         else if (action === "restart") this.handleRestartRun();
         else if (action === "resume") this.togglePause();
