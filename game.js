@@ -455,17 +455,32 @@ const CAR_BODY_STYLES = [
 
 const PLAYER_CANVAS_WIDTH = 76;
 const PLAYER_CANVAS_HEIGHT = 118;
-const PLAYER_SPRITE_WIDTH_RATIO = 1.05;
-const PLAYER_SPRITE_MIN_WIDTH = 145;
-const PLAYER_SPRITE_MAX_WIDTH = 205;
-const PLAYER_SPRITE_LANE_MAX_RATIO = 1.35;
-const PREVIEW_SPRITE_SCALE = 1.5;
-const SPRITE_OPAQUE_ALPHA_THRESHOLD = 16;
-const PLAYER_SPRITE_STYLE_WIDTH_RATIOS = {
-  wedge: PLAYER_SPRITE_WIDTH_RATIO,
-  muscle: 1.1,
-  formula: 0.9
+const VEHICLE_SCALE_CONFIG = {
+  playerSprite: {
+    widthRatio: 0.52,
+    minWidth: 95,
+    maxWidth: 135,
+    laneMaxRatio: 0.7,
+    previewScale: 1.35,
+    styleWidthScale: {
+      wedge: 1,
+      muscle: 1.06,
+      formula: 0.9
+    }
+  },
+  playerCanvas: {
+    widthRatio: 0.52,
+    minWidth: 90,
+    maxWidth: 130,
+    laneMaxRatio: 0.7,
+    previewScale: 1.35
+  },
+  slowCar: { widthRatio: 0.46 },
+  fastCar: { widthRatio: 0.44 },
+  truck: { widthRatio: 0.54 },
+  barrier: { widthRatio: 0.55 }
 };
+const SPRITE_OPAQUE_ALPHA_THRESHOLD = 16;
 const PLAYER_AIRBORNE_SCALE = 1.06;
 const MIN_COLLISION_OVERLAP_PX = 4;
 const NEAR_MISS_ZONE_EXPANSION_PX = 26;
@@ -3994,13 +4009,34 @@ class Renderer {
     return this.getObstacleRenderBoundsAt(obstacle, this.game.run.distance);
   }
 
+  getObstacleVisualSize(type, scale = 1) {
+    const info = OBSTACLE_INFO[type];
+    if (!info) return { w: 0, h: 0, drawScale: scale };
+    const config = VEHICLE_SCALE_CONFIG[type];
+    if (!config) {
+      return {
+        w: info.w * scale,
+        h: info.h * scale,
+        drawScale: scale
+      };
+    }
+    const width = getConfiguredVehicleWidth(config, this.road.laneW);
+    const drawScale = (width / info.w) * scale;
+    return {
+      w: info.w * drawScale,
+      h: info.h * drawScale,
+      drawScale
+    };
+  }
+
   getObstacleRenderBoundsAt(obstacle, runDistance) {
     const info = OBSTACLE_INFO[obstacle.type];
     if (!info || obstacle.type === "warning") return null;
     const ahead = obstacle.distance - runDistance;
     if (ahead < -70 || ahead > VIEW_DISTANCE + 160) return null;
     const { x, y, scale } = this.getObstacleScreenPositionAt(obstacle, runDistance);
-    return rectFromCenter(x, y, info.w * scale, info.h * scale);
+    const size = this.getObstacleVisualSize(obstacle.type, scale);
+    return rectFromCenter(x, y, size.w, size.h);
   }
 
   getObstacleHitboxAt(obstacle, runDistance) {
@@ -4010,11 +4046,12 @@ class Renderer {
     const ahead = obstacle.distance - runDistance;
     if (ahead < -70 || ahead > VIEW_DISTANCE + 160) return null;
     const { x, y, scale } = this.getObstacleScreenPositionAt(obstacle, runDistance);
+    const size = this.getObstacleVisualSize(obstacle.type, scale);
     return rectFromCenter(
-      x + config.offsetX * info.w * scale,
-      y + config.offsetY * info.h * scale,
-      info.w * scale * config.width,
-      info.h * scale * config.height
+      x + config.offsetX * size.w,
+      y + config.offsetY * size.h,
+      size.w * config.width,
+      size.h * config.height
     );
   }
 
@@ -4580,10 +4617,12 @@ class Renderer {
   }
 
   drawObstacle(ctx, obstacle, x, y, scale) {
+    const visual = this.getObstacleVisualSize(obstacle.type, scale);
+    const drawScale = visual.drawScale;
     if (obstacle.type === "slowCar" || obstacle.type === "fastCar") {
-      drawTrafficCar(ctx, x, y, obstacle.type, scale);
+      drawTrafficCar(ctx, x, y, obstacle.type, drawScale);
     } else if (obstacle.type === "truck") {
-      drawTruck(ctx, x, y, scale);
+      drawTruck(ctx, x, y, drawScale);
     } else if (obstacle.type === "deer") {
       drawDeer(ctx, x, y, obstacle.direction, scale);
     } else if (obstacle.type === "cone") {
@@ -4595,7 +4634,7 @@ class Renderer {
     } else if (obstacle.type === "boostPad") {
       drawBoostPad(ctx, x, y, scale);
     } else if (obstacle.type === "barrier") {
-      drawBarrier(ctx, x, y, scale);
+      drawBarrier(ctx, x, y, drawScale);
     } else if (obstacle.type === "branch") {
       drawBranch(ctx, x, y, scale);
     } else if (obstacle.type === "warning") {
@@ -5288,11 +5327,33 @@ function getOpaqueBounds(image) {
   }
 }
 
+function getVehicleLaneWidth(state = {}) {
+  return Number.isFinite(state.laneWidth) && state.laneWidth > 0
+    ? state.laneWidth
+    : 760 / LANES;
+}
+
+function getConfiguredVehicleWidth(config, laneWidth, widthScale = 1) {
+  const ratio = Number.isFinite(config.widthRatio) ? config.widthRatio : 1;
+  const scale = Number.isFinite(widthScale) && widthScale > 0 ? widthScale : 1;
+  const laneMaxRatio = Number.isFinite(config.laneMaxRatio) ? config.laneMaxRatio : 1;
+  const laneMax = Math.max(1, laneWidth * laneMaxRatio);
+  const rawMin = Number.isFinite(config.minWidth) ? config.minWidth * scale : 1;
+  const rawMax = Number.isFinite(config.maxWidth) ? config.maxWidth * scale : laneMax;
+  const maxWidth = Math.max(1, Math.min(rawMax, laneMax));
+  const minWidth = Math.min(maxWidth, Math.max(1, rawMin));
+  return clamp(laneWidth * ratio * scale, minWidth, maxWidth);
+}
+
 function getCanvasPlayerCarRenderSize(state = {}) {
-  const scale = state.airborne ? PLAYER_AIRBORNE_SCALE : 1;
+  const config = VEHICLE_SCALE_CONFIG.playerCanvas;
+  let width = getConfiguredVehicleWidth(config, getVehicleLaneWidth(state));
+  if (state.preview) width *= config.previewScale || 1;
+  if (state.airborne) width *= PLAYER_AIRBORNE_SCALE;
+  const scale = width / PLAYER_CANVAS_WIDTH;
   return {
     scale,
-    w: PLAYER_CANVAS_WIDTH * scale,
+    w: width,
     h: PLAYER_CANVAS_HEIGHT * scale
   };
 }
@@ -5303,15 +5364,10 @@ function getCarStyleId(carConfig) {
 
 function getPlayerSpriteTargetWidth(carConfig, state = {}) {
   const style = getCarStyleId(carConfig);
-  const laneWidth = Number.isFinite(state.laneWidth) && state.laneWidth > 0
-    ? state.laneWidth
-    : 760 / LANES;
-  const ratio = PLAYER_SPRITE_STYLE_WIDTH_RATIOS[style] || PLAYER_SPRITE_WIDTH_RATIO;
-  const laneFitMax = Math.max(1, laneWidth * PLAYER_SPRITE_LANE_MAX_RATIO);
-  const minWidth = Math.min(PLAYER_SPRITE_MIN_WIDTH, laneFitMax);
-  const maxWidth = Math.min(PLAYER_SPRITE_MAX_WIDTH, laneFitMax);
-  let width = clamp(laneWidth * ratio, minWidth, maxWidth);
-  if (state.preview) width *= PREVIEW_SPRITE_SCALE;
+  const config = VEHICLE_SCALE_CONFIG.playerSprite;
+  const styleScale = config.styleWidthScale?.[style] || 1;
+  let width = getConfiguredVehicleWidth(config, getVehicleLaneWidth(state), styleScale);
+  if (state.preview) width *= config.previewScale || 1;
   if (state.airborne) width *= PLAYER_AIRBORNE_SCALE;
   return width;
 }
