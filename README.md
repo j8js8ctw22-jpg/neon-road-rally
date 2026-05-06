@@ -28,8 +28,12 @@ Debug mode also enables:
 - C: force a crash
 - L: view leaderboard
 - P: run the spawn safety simulation
+- H: freeze/unfreeze gameplay for hitbox inspection
 - Canvas hitbox outlines for the player and active obstacles
+- Separate rendered bounds and collision hitbox outlines
+- Input state panel with held keys, lane target, lane progress, boost state, and lock state
 - Danger-zone lane occupancy overlay for spawn fairness debugging
+- Debug-only collision logs in the browser console
 
 When debug mode is active on the title screen, a `Run Spawn Safety Simulation` button is also shown.
 
@@ -44,7 +48,7 @@ When debug mode is active on the title screen, a `Run Spawn Safety Simulation` b
 - Boosts temporarily increase speed, increase score gain, and add a neon trail.
 - Cars, trucks, and roadwork barriers crash the player and end the run.
 - Deer, cones, branches, debris-style hazards, and oil do not end the run, but they slow the car and apply score penalties.
-- Oil also delays lane-change response for about two seconds.
+- Oil slows the car without buffering or delaying steering input.
 - Ramps make the car jump briefly.
 - While airborne, the player can pass over small ground hazards.
 - Tall vehicles, trucks, and barriers are still dangerous.

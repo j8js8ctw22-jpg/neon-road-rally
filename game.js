@@ -90,6 +90,14 @@ const ARCADE_FEEL = {
   highSpeedLineStartRatio: 0.45
 };
 
+const INPUT_CONFIG = {
+  laneChangeDurationSeconds: 0.11,
+  heldLaneRepeatDelaySeconds: 0.16,
+  heldLaneRepeatIntervalSeconds: 0.11,
+  verticalMoveRatioPerSecond: 0.58,
+  inputFlashSeconds: 0.12
+};
+
 const TRACK_VISUALS = {
   roadDetailIntensity: 0.48,
   sceneryDensity: 1,
@@ -244,24 +252,35 @@ const PLAYER_SPRITE_STYLE_WIDTH_RATIOS = {
   formula: 0.9
 };
 const PLAYER_AIRBORNE_SCALE = 1.06;
-const PLAYER_CANVAS_HITBOX_WIDTH_RATIO = 0.8;
-const PLAYER_CANVAS_HITBOX_HEIGHT_RATIO = 0.82;
-const PLAYER_SPRITE_HITBOX_WIDTH_RATIO = 0.62;
-const PLAYER_SPRITE_HITBOX_HEIGHT_RATIO = 0.56;
-const PLAYER_SPRITE_HITBOX_Y_OFFSET_RATIO = -0.06;
+const MIN_COLLISION_OVERLAP_PX = 4;
+const NEAR_MISS_ZONE_EXPANSION_PX = 26;
+
+const HITBOX_CONFIG = {
+  player: { width: 0.62, height: 0.68, offsetX: 0, offsetY: 0.03 },
+  slowCar: { width: 0.68, height: 0.74, offsetX: 0, offsetY: 0 },
+  fastCar: { width: 0.66, height: 0.72, offsetX: 0, offsetY: 0 },
+  truck: { width: 0.76, height: 0.82, offsetX: 0, offsetY: 0 },
+  barrier: { width: 0.78, height: 0.78, offsetX: 0, offsetY: 0 },
+  cone: { width: 0.55, height: 0.6, offsetX: 0, offsetY: 0 },
+  oil: { width: 0.7, height: 0.45, offsetX: 0, offsetY: 0 },
+  deer: { width: 0.6, height: 0.65, offsetX: 0, offsetY: 0 },
+  ramp: { width: 0.75, height: 0.65, offsetX: 0, offsetY: 0 },
+  boostPad: { width: 0.75, height: 0.55, offsetX: 0, offsetY: 0 },
+  branch: { width: 0.66, height: 0.5, offsetX: 0, offsetY: 0 }
+};
 
 const OBSTACLE_INFO = {
-  slowCar: { label: "Slow Car", tall: true, crash: true, w: 62, h: 104, hitW: 0.88, hitH: 0.84, hitOffsetY: -0.02 },
-  fastCar: { label: "Fast Car", tall: true, crash: true, w: 62, h: 104, hitW: 0.88, hitH: 0.84, hitOffsetY: -0.02 },
-  truck: { label: "Truck", tall: true, crash: true, w: 78, h: 142, hitW: 0.9, hitH: 0.82, hitOffsetY: -0.04 },
-  deer: { label: "Deer", tall: false, crash: false, w: 72, h: 58, hitW: 0.68, hitH: 0.72, hitOffsetY: 0.02 },
-  cone: { label: "Cone", tall: false, crash: false, w: 42, h: 54, hitW: 0.7, hitH: 0.72, hitOffsetY: 0.1 },
-  oil: { label: "Oil", tall: false, crash: false, w: 70, h: 42, hitW: 0.82, hitH: 0.58, hitOffsetY: 0 },
-  ramp: { label: "Ramp", tall: false, crash: false, w: 80, h: 58, hitW: 0.9, hitH: 0.7, hitOffsetY: 0.06 },
-  barrier: { label: "Barrier", tall: true, crash: true, w: 84, h: 70, hitW: 0.9, hitH: 0.7, hitOffsetY: -0.02 },
-  boostPad: { label: "Boost Pad", tall: false, crash: false, w: 82, h: 48, hitW: 0.9, hitH: 0.74, hitOffsetY: 0 },
-  branch: { label: "Branch", tall: false, crash: false, w: 68, h: 34, hitW: 0.84, hitH: 0.64, hitOffsetY: 0 },
-  warning: { label: "Warning", tall: false, crash: false, w: 70, h: 78, hitW: 0, hitH: 0, hitOffsetY: 0 }
+  slowCar: { label: "Slow Car", tall: true, crash: true, w: 62, h: 104 },
+  fastCar: { label: "Fast Car", tall: true, crash: true, w: 62, h: 104 },
+  truck: { label: "Truck", tall: true, crash: true, w: 78, h: 142 },
+  deer: { label: "Deer", tall: false, crash: false, w: 72, h: 58 },
+  cone: { label: "Cone", tall: false, crash: false, w: 42, h: 54 },
+  oil: { label: "Oil", tall: false, crash: false, w: 70, h: 42 },
+  ramp: { label: "Ramp", tall: false, crash: false, w: 80, h: 58 },
+  barrier: { label: "Barrier", tall: true, crash: true, w: 84, h: 70 },
+  boostPad: { label: "Boost Pad", tall: false, crash: false, w: 82, h: 48 },
+  branch: { label: "Branch", tall: false, crash: false, w: 68, h: 34 },
+  warning: { label: "Warning", tall: false, crash: false, w: 70, h: 78 }
 };
 
 function clamp(value, min, max) {
@@ -503,6 +522,39 @@ function rectsOverlap(a, b) {
     && a.x + a.w > b.x
     && a.y < b.y + b.h
     && a.y + a.h > b.y;
+}
+
+function rectOverlapSize(a, b) {
+  return {
+    width: segmentOverlap(a.x, a.x + a.w, b.x, b.x + b.w),
+    height: segmentOverlap(a.y, a.y + a.h, b.y, b.y + b.h)
+  };
+}
+
+function rectsOverlapByThreshold(a, b, minOverlapPx = 0) {
+  const overlap = rectOverlapSize(a, b);
+  return {
+    hit: overlap.width > minOverlapPx && overlap.height > minOverlapPx,
+    overlap
+  };
+}
+
+function expandRect(rect, xPadding, yPadding) {
+  return {
+    x: rect.x - xPadding,
+    y: rect.y - yPadding,
+    w: rect.w + xPadding * 2,
+    h: rect.h + yPadding * 2
+  };
+}
+
+function getHitboxConfig(type) {
+  return HITBOX_CONFIG[type] || null;
+}
+
+function hasGameplayHitbox(type) {
+  const config = getHitboxConfig(type);
+  return Boolean(config && config.width > 0 && config.height > 0);
 }
 
 function rectHorizontalGap(a, b) {
@@ -1053,12 +1105,22 @@ class InputManager {
   constructor(game) {
     this.game = game;
     this.heldVerticalKeys = new Set();
+    this.activeKeys = new Set();
+    this.suppressedUntilKeyup = new Set();
+    this.heldLaneKeys = new Map();
+    this.laneHoldDirection = 0;
+    this.laneRepeatTimer = 0;
+    this.lastKeyPressed = "none";
+    this.lastKeyTime = 0;
     this.boundKeyDown = this.onKeyDown.bind(this);
     this.boundKeyUp = this.onKeyUp.bind(this);
+    this.boundWindowBlur = this.clearGameplayInput.bind(this);
     window.addEventListener("keydown", this.boundKeyDown);
     window.addEventListener("keyup", this.boundKeyUp);
+    window.addEventListener("blur", this.boundWindowBlur);
     window.addEventListener("pointerdown", () => {
       this.game.audio.activate();
+      this.game.focusControls();
       if (this.game.screen === "title") {
         this.game.audio.playMusic("title");
       }
@@ -1067,8 +1129,19 @@ class InputManager {
 
   onKeyDown(event) {
     const key = event.key;
-    if (["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", " ", "Spacebar", "Enter", "Escape"].includes(key)) {
+    if (this.isEditableTarget(event.target) && key !== "Escape") return;
+    const keyId = this.getKeyId(event);
+    const isControlKey = this.isControlKey(keyId);
+    const wasHeld = keyId ? this.activeKeys.has(keyId) : false;
+    const isEdge = !event.repeat && !wasHeld;
+    if (this.shouldPreventDefault(keyId, key)) {
       event.preventDefault();
+    }
+    if (keyId && isEdge) {
+      this.activeKeys.add(keyId);
+      this.lastKeyPressed = keyId;
+      this.lastKeyTime = performance.now();
+      this.game.recordInputEvent(keyId);
     }
     this.game.audio.activate();
     if (this.game.screen === "title") {
@@ -1077,9 +1150,14 @@ class InputManager {
 
     if (key === "`") {
       this.game.debugMode = !this.game.debugMode;
+      if (!this.game.debugMode && this.game.run) {
+        this.game.run.debugFrozen = false;
+      }
       if (this.game.screen === "title") this.game.showTitle();
       return;
     }
+
+    if (!isEdge && isControlKey) return;
 
     if (key.toLowerCase() === "m") {
       this.game.toggleMusic();
@@ -1128,61 +1206,164 @@ class InputManager {
         this.game.runSpawnSafetySimulation();
         return;
       }
+      if (lower === "h") {
+        this.game.toggleDebugFreeze();
+        return;
+      }
     }
 
     if (this.game.screen === "game") {
-      if (key === "Escape") {
+      if (this.shouldSuppressGameplayInput(keyId)) {
+        this.suppressedUntilKeyup.add(keyId);
+        this.releaseGameplayKey(keyId);
+        return;
+      }
+      if (keyId === "escape") {
         this.game.togglePause();
-      } else if (key === "ArrowUp" || key.toLowerCase() === "w") {
+      } else if (keyId === "up") {
         this.heldVerticalKeys.add("up");
         this.updateVerticalInput();
-      } else if (key === "ArrowDown" || key.toLowerCase() === "s") {
+      } else if (keyId === "down") {
         this.heldVerticalKeys.add("down");
         this.updateVerticalInput();
-      } else if (key === "ArrowLeft" || key.toLowerCase() === "a") {
-        this.game.requestLaneMove(-1);
-      } else if (key === "ArrowRight" || key.toLowerCase() === "d") {
-        this.game.requestLaneMove(1);
-      } else if (key === " " || key === "Spacebar") {
+      } else if (keyId === "left") {
+        this.startLaneHold("left", -1);
+      } else if (keyId === "right") {
+        this.startLaneHold("right", 1);
+      } else if (keyId === "boost") {
         this.game.useManualBoost();
       }
       return;
     }
 
     if (this.game.screen === "score") {
-      if (key === "Enter") {
+      if (keyId === "enter") {
         this.game.audio.playSfx("menu");
         this.game.startRace();
-      } else if (key === "Escape") {
+      } else if (keyId === "escape") {
         this.game.audio.playSfx("menu");
         this.game.showTitle();
       }
       return;
     }
 
-    if (key === "Enter" && this.game.screen === "title") {
+    if (keyId === "enter" && this.game.screen === "title") {
       this.game.audio.playSfx("menu");
       this.game.startRaceFromTitle();
-    } else if (key === "Escape" && !["title", "game"].includes(this.game.screen)) {
+    } else if (keyId === "escape" && !["title", "game"].includes(this.game.screen)) {
       this.game.audio.playSfx("menu");
       this.game.showTitle();
     }
   }
 
   onKeyUp(event) {
-    const key = event.key;
-    if (this.game.screen !== "game") return;
-    if (key === "ArrowUp" || key.toLowerCase() === "w") {
+    const keyId = this.getKeyId(event);
+    if (keyId) {
+      this.activeKeys.delete(keyId);
+      this.suppressedUntilKeyup.delete(keyId);
+    }
+    if (keyId === "up") {
       this.heldVerticalKeys.delete("up");
       this.updateVerticalInput();
-    } else if (key === "ArrowDown" || key.toLowerCase() === "s") {
+    } else if (keyId === "down") {
       this.heldVerticalKeys.delete("down");
       this.updateVerticalInput();
+    } else if (keyId === "left" || keyId === "right") {
+      this.releaseLaneHold(keyId);
     }
   }
 
-  clearVerticalInput() {
+  update(dt) {
+    if (!this.canProcessGameplayInput()) return;
+    if (!this.laneHoldDirection) return;
+    this.laneRepeatTimer -= dt;
+    while (this.laneRepeatTimer <= 0) {
+      this.game.requestLaneMove(this.laneHoldDirection, "hold");
+      this.laneRepeatTimer += INPUT_CONFIG.heldLaneRepeatIntervalSeconds;
+      if (!this.laneHoldDirection) break;
+    }
+  }
+
+  getKeyId(event) {
+    const key = event.key;
+    const lower = String(key || "").toLowerCase();
+    if (key === "ArrowLeft" || lower === "a") return "left";
+    if (key === "ArrowRight" || lower === "d") return "right";
+    if (key === "ArrowUp" || lower === "w") return "up";
+    if (key === "ArrowDown" || lower === "s") return "down";
+    if (key === " " || key === "Spacebar" || event.code === "Space") return "boost";
+    if (key === "Escape") return "escape";
+    if (key === "Enter") return "enter";
+    return "";
+  }
+
+  shouldPreventDefault(keyId, key) {
+    if (["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", " ", "Spacebar", "Enter", "Escape"].includes(key)) return true;
+    return this.game.screen === "game" && ["left", "right", "up", "down", "boost"].includes(keyId);
+  }
+
+  isEditableTarget(target) {
+    const tagName = String(target?.tagName || "").toLowerCase();
+    return tagName === "input" || tagName === "textarea" || tagName === "select" || target?.isContentEditable;
+  }
+
+  isControlKey(keyId) {
+    return ["left", "right", "up", "down", "boost", "escape", "enter"].includes(keyId);
+  }
+
+  shouldSuppressGameplayInput(keyId) {
+    if (!["left", "right", "up", "down", "boost"].includes(keyId)) return false;
+    const run = this.game.run;
+    return !run || run.ended || run.paused || run.countdownTimer > 0 || this.suppressedUntilKeyup.has(keyId);
+  }
+
+  canProcessGameplayInput() {
+    const run = this.game.run;
+    return this.game.screen === "game" && run && !run.paused && !run.ended && !run.debugFrozen && run.countdownTimer <= 0;
+  }
+
+  startLaneHold(keyId, direction) {
+    if (this.suppressedUntilKeyup.has(keyId)) return;
+    this.heldLaneKeys.set(keyId, direction);
+    this.laneHoldDirection = direction;
+    this.laneRepeatTimer = INPUT_CONFIG.heldLaneRepeatDelaySeconds;
+    this.game.requestLaneMove(direction, "press");
+  }
+
+  releaseLaneHold(keyId) {
+    this.heldLaneKeys.delete(keyId);
+    const entries = Array.from(this.heldLaneKeys.values());
+    this.laneHoldDirection = entries.length ? entries[entries.length - 1] : 0;
+    this.laneRepeatTimer = this.laneHoldDirection ? INPUT_CONFIG.heldLaneRepeatDelaySeconds : 0;
+  }
+
+  releaseGameplayKey(keyId) {
+    if (keyId === "up" || keyId === "down") {
+      this.heldVerticalKeys.delete(keyId);
+      this.updateVerticalInput();
+    } else if (keyId === "left" || keyId === "right") {
+      this.releaseLaneHold(keyId);
+    }
+  }
+
+  clearGameplayInput() {
+    this.activeKeys.clear();
+    this.suppressedUntilKeyup.clear();
     this.heldVerticalKeys.clear();
+    this.heldLaneKeys.clear();
+    this.laneHoldDirection = 0;
+    this.laneRepeatTimer = 0;
+    this.game.setVerticalInput(0);
+  }
+
+  clearCountdownInputLocks() {
+    ["left", "right", "up", "down", "boost"].forEach((keyId) => {
+      if (this.activeKeys.has(keyId)) this.suppressedUntilKeyup.add(keyId);
+    });
+    this.heldVerticalKeys.clear();
+    this.heldLaneKeys.clear();
+    this.laneHoldDirection = 0;
+    this.laneRepeatTimer = 0;
     this.game.setVerticalInput(0);
   }
 
@@ -1190,6 +1371,19 @@ class InputManager {
     const up = this.heldVerticalKeys.has("up");
     const down = this.heldVerticalKeys.has("down");
     this.game.setVerticalInput(up === down ? 0 : (up ? -1 : 1));
+  }
+
+  getDebugInfo() {
+    const now = performance.now();
+    return {
+      heldKeys: Array.from(this.activeKeys).filter((key) => this.isControlKey(key)).join(", ") || "none",
+      suppressedKeys: Array.from(this.suppressedUntilKeyup).join(", ") || "none",
+      lastKey: this.lastKeyPressed,
+      lastKeyAgeMs: this.lastKeyTime ? Math.max(0, now - this.lastKeyTime) : null,
+      laneHoldDirection: this.laneHoldDirection,
+      laneRepeatTimer: this.laneRepeatTimer,
+      verticalHeld: Array.from(this.heldVerticalKeys).join(", ") || "none"
+    };
   }
 }
 
@@ -2116,7 +2310,7 @@ class ObstacleManager {
 
   isGameplaySpawnObject(obstacle) {
     const info = OBSTACLE_INFO[obstacle.type];
-    return Boolean(info && obstacle.type !== "warning" && info.hitW > 0 && info.hitH > 0 && !obstacle.hit && !obstacle.remove);
+    return Boolean(info && obstacle.type !== "warning" && hasGameplayHitbox(obstacle.type) && !obstacle.hit && !obstacle.remove);
   }
 
   isFairnessBlocker(obstacle) {
@@ -2134,14 +2328,15 @@ class ObstacleManager {
       return {
         laneMin: -0.5,
         laneMax: LANES - 0.5,
-        distanceMin: obstacle.distance - this.getObjectDistanceHalfSize(info),
-        distanceMax: obstacle.distance + this.getObjectDistanceHalfSize(info),
+        distanceMin: obstacle.distance - this.getObjectDistanceHalfSize(obstacle.type),
+        distanceMax: obstacle.distance + this.getObjectDistanceHalfSize(obstacle.type),
         centerDistance: obstacle.distance
       };
     }
     const laneCenterValue = Number.isFinite(obstacle.laneFloat) ? obstacle.laneFloat : obstacle.lane;
-    const laneHalfSpan = clamp((info.w * info.hitW) / Math.max(1, laneW * 2), 0.18, 0.48);
-    const halfDistance = this.getObjectDistanceHalfSize(info);
+    const config = getHitboxConfig(obstacle.type);
+    const laneHalfSpan = clamp((info.w * config.width) / Math.max(1, laneW * 2), 0.18, 0.48);
+    const halfDistance = this.getObjectDistanceHalfSize(obstacle.type);
     return {
       laneMin: laneCenterValue - laneHalfSpan,
       laneMax: laneCenterValue + laneHalfSpan,
@@ -2151,9 +2346,12 @@ class ObstacleManager {
     };
   }
 
-  getObjectDistanceHalfSize(info) {
+  getObjectDistanceHalfSize(type) {
+    const info = OBSTACLE_INFO[type];
+    const config = getHitboxConfig(type);
+    if (!info || !config) return 42;
     const roadH = this.game.renderer?.road?.h || 720;
-    return Math.max(42, (info.h * info.hitH * 1.18 * VIEW_DISTANCE / Math.max(1, roadH)) / 2);
+    return Math.max(42, (info.h * config.height * 1.18 * VIEW_DISTANCE / Math.max(1, roadH)) / 2);
   }
 
   getSpawnSpacingClass(obstacle) {
@@ -2580,9 +2778,11 @@ class CollisionSystem {
       if (!info || obstacle.hit || obstacle.type === "warning") continue;
       const obstacleBox = this.game.renderer.getObstacleHitbox(obstacle);
       if (!obstacleBox) continue;
-      const overlaps = rectsOverlap(playerBox, obstacleBox);
+      const collision = rectsOverlapByThreshold(playerBox, obstacleBox, MIN_COLLISION_OVERLAP_PX);
 
-      if (overlaps) {
+      if (collision.hit) {
+        const result = this.getCollisionResult(obstacle, info);
+        this.logCollision(obstacle, info, playerBox, obstacleBox, collision.overlap, result);
         if (run.airborne && !info.tall && obstacle.type !== "ramp" && obstacle.type !== "boostPad") {
           obstacle.hit = true;
           obstacle.remove = true;
@@ -2604,10 +2804,49 @@ class CollisionSystem {
 
   isNearMiss(playerBox, obstacleBox, obstacle, info) {
     if (!info.tall || obstacle.nearMissAwarded) return false;
+    const nearMissZone = expandRect(playerBox, NEAR_MISS_ZONE_EXPANSION_PX, 0);
     const passedPlayer = obstacleBox.y > playerBox.y + playerBox.h;
     const stillCloseVertically = obstacleBox.y < playerBox.y + playerBox.h + 150;
-    const closeHorizontally = rectHorizontalGap(playerBox, obstacleBox) <= 26;
+    const closeHorizontally = rectsOverlap(nearMissZone, obstacleBox)
+      || rectHorizontalGap(playerBox, obstacleBox) <= NEAR_MISS_ZONE_EXPANSION_PX;
     return passedPlayer && stillCloseVertically && closeHorizontally;
+  }
+
+  getCollisionResult(obstacle, info) {
+    const run = this.game.run;
+    if (run.airborne && !info.tall && obstacle.type !== "ramp" && obstacle.type !== "boostPad") return "airborne-pass";
+    if (info.crash) return "crash";
+    if (obstacle.type === "oil") return "oil";
+    if (obstacle.type === "ramp") return "ramp";
+    if (obstacle.type === "boostPad") return "boost";
+    return "slowdown";
+  }
+
+  logCollision(obstacle, info, playerBox, obstacleBox, overlap, result) {
+    if (!this.game.debugMode || typeof console === "undefined") return;
+    const run = this.game.run;
+    console.info("[collision]", {
+      objectType: obstacle.type,
+      label: info.label,
+      playerHitbox: this.formatRect(playerBox),
+      obstacleHitbox: this.formatRect(obstacleBox),
+      overlapWidth: Number(overlap.width.toFixed(2)),
+      overlapHeight: Number(overlap.height.toFixed(2)),
+      minOverlapPx: MIN_COLLISION_OVERLAP_PX,
+      playerLane: run.targetLane,
+      obstacleLane: obstacle.lane,
+      playerAirborne: run.airborne,
+      result
+    });
+  }
+
+  formatRect(rect) {
+    return {
+      x: Number(rect.x.toFixed(2)),
+      y: Number(rect.y.toFixed(2)),
+      w: Number(rect.w.toFixed(2)),
+      h: Number(rect.h.toFixed(2))
+    };
   }
 
   resolveHit(obstacle, info) {
@@ -2748,20 +2987,32 @@ class Renderer {
     };
   }
 
-  getPlayerHitbox() {
+  getPlayerRenderBounds() {
     const run = this.game.run;
-    const scale = run.airborne ? PLAYER_AIRBORNE_SCALE : 1;
     const x = this.laneCenter(run.renderLaneFloat);
-    const y = this.getPlayerScreenY() - 2 * scale;
-    const usesSprite = playerUsesLoadedSprite(run.player.car, this.game.carSprites);
+    const y = this.getPlayerScreenY();
     const size = getPlayerCarDrawSize(run.player.car, {
       airborne: run.airborne,
       laneWidth: this.road.laneW
     }, this.game.carSprites);
-    const hitboxWidthRatio = usesSprite ? PLAYER_SPRITE_HITBOX_WIDTH_RATIO : PLAYER_CANVAS_HITBOX_WIDTH_RATIO;
-    const hitboxHeightRatio = usesSprite ? PLAYER_SPRITE_HITBOX_HEIGHT_RATIO : PLAYER_CANVAS_HITBOX_HEIGHT_RATIO;
-    const hitboxYOffset = usesSprite ? size.h * PLAYER_SPRITE_HITBOX_Y_OFFSET_RATIO : 0;
-    return rectFromCenter(x, y + hitboxYOffset, size.w * hitboxWidthRatio, size.h * hitboxHeightRatio);
+    return rectFromCenter(x, y, size.w, size.h);
+  }
+
+  getPlayerHitbox() {
+    const run = this.game.run;
+    const x = this.laneCenter(run.renderLaneFloat);
+    const y = this.getPlayerScreenY();
+    const size = getPlayerCarDrawSize(run.player.car, {
+      airborne: run.airborne,
+      laneWidth: this.road.laneW
+    }, this.game.carSprites);
+    const config = getHitboxConfig("player");
+    return rectFromCenter(
+      x + size.w * config.offsetX,
+      y + size.h * config.offsetY,
+      size.w * config.width,
+      size.h * config.height
+    );
   }
 
   getObstacleScreenPosition(obstacle) {
@@ -2791,17 +3042,31 @@ class Renderer {
     return this.getObstacleHitboxAt(obstacle, this.game.run.distance);
   }
 
+  getObstacleRenderBounds(obstacle) {
+    return this.getObstacleRenderBoundsAt(obstacle, this.game.run.distance);
+  }
+
+  getObstacleRenderBoundsAt(obstacle, runDistance) {
+    const info = OBSTACLE_INFO[obstacle.type];
+    if (!info || obstacle.type === "warning") return null;
+    const ahead = obstacle.distance - runDistance;
+    if (ahead < -70 || ahead > VIEW_DISTANCE + 160) return null;
+    const { x, y, scale } = this.getObstacleScreenPositionAt(obstacle, runDistance);
+    return rectFromCenter(x, y, info.w * scale, info.h * scale);
+  }
+
   getObstacleHitboxAt(obstacle, runDistance) {
     const info = OBSTACLE_INFO[obstacle.type];
-    if (!info || obstacle.type === "warning" || info.hitW <= 0 || info.hitH <= 0) return null;
+    const config = getHitboxConfig(obstacle.type);
+    if (!info || obstacle.type === "warning" || !config) return null;
     const ahead = obstacle.distance - runDistance;
     if (ahead < -70 || ahead > VIEW_DISTANCE + 160) return null;
     const { x, y, scale } = this.getObstacleScreenPositionAt(obstacle, runDistance);
     return rectFromCenter(
-      x,
-      y + (info.hitOffsetY || 0) * info.h * scale,
-      info.w * scale * info.hitW,
-      info.h * scale * info.hitH
+      x + config.offsetX * info.w * scale,
+      y + config.offsetY * info.h * scale,
+      info.w * scale * config.width,
+      info.h * scale * config.height
     );
   }
 
@@ -3386,17 +3651,23 @@ class Renderer {
     const ctx = this.ctx;
     ctx.save();
     ctx.shadowBlur = 0;
-    ctx.lineWidth = 2;
     this.drawDangerZoneOverlay();
+    const playerRenderBox = this.getPlayerRenderBounds();
     const playerBox = this.getPlayerHitbox();
-    drawHitboxRect(ctx, playerBox, "#28f6ff", "PLAYER");
+    drawHitboxRect(ctx, playerRenderBox, "rgba(246, 251, 255, 0.88)", "PLAYER render", "render");
+    drawHitboxRect(ctx, playerBox, "#28f6ff", "PLAYER hitbox", "hitbox");
     for (const obstacle of this.game.obstacles.obstacles) {
+      const renderBox = this.getObstacleRenderBounds(obstacle);
       const box = this.getObstacleHitbox(obstacle);
       if (!box) continue;
       if (box.y > this.height + 140 || box.y + box.h < this.road.y - 140) continue;
       const info = OBSTACLE_INFO[obstacle.type];
-      const color = info.crash ? "#ff3b58" : (obstacle.type === "ramp" || obstacle.type === "boostPad" ? "#44ff99" : "#ffe45e");
-      drawHitboxRect(ctx, box, color, info.label);
+      const active = rectsOverlapByThreshold(playerBox, box, MIN_COLLISION_OVERLAP_PX).hit;
+      const color = active ? "#f6fbff" : (info.crash ? "#ff3b58" : (obstacle.type === "ramp" || obstacle.type === "boostPad" ? "#44ff99" : "#ffe45e"));
+      if (renderBox) {
+        drawHitboxRect(ctx, renderBox, "rgba(246, 251, 255, 0.6)", "", "render");
+      }
+      drawHitboxRect(ctx, box, color, `${info.label} hitbox`, active ? "active" : "hitbox");
     }
     ctx.restore();
   }
@@ -3703,6 +3974,7 @@ class Renderer {
       `max speed: ${run.track.maxSpeed} cap ${(run.speedCap || run.track.maxSpeed).toFixed(0)} capped ${run.speedCapped ? "yes" : "no"}`,
       `mph display: ${Math.round(run.currentSpeed)} MPH`,
       `debug scale: ${(this.game.debugSpeedScale || 1).toFixed(2)}x`,
+      `debug freeze: ${run.debugFrozen ? "on" : "off"} (H)`,
       `finish dist: ${run.track.distanceToFinish}`,
       `eta now: ${formatTime(eta)}`,
       `lane: ${run.targetLane} render ${run.renderLaneFloat.toFixed(2)}`,
@@ -3727,7 +3999,7 @@ class Renderer {
       `src img: ${spriteDebug.natural}`,
       `opaque: ${spriteDebug.opaque}`,
       `render: ${spriteDebug.render}`,
-      `hitbox: ${playerBox.w.toFixed(0)}x${playerBox.h.toFixed(0)}`,
+      `hitbox: ${playerBox.w.toFixed(0)}x${playerBox.h.toFixed(0)} min ${MIN_COLLISION_OVERLAP_PX}px`,
       `save: ${this.game.profiles.saveStatus}`,
       `music track: ${this.game.audio.musicTrackStatus()}`,
       `title music: ${this.game.audio.tracks.title.loaded}`,
@@ -3738,7 +4010,7 @@ class Renderer {
       `missing sfx: ${this.game.audio.missingSfxList()}`,
       `last sfx: ${this.game.audio.lastPlayedSfx}`,
       `sfx: ${this.game.audio.sfxLoadedStatus()}`,
-      "R restart  F finish  C crash  L scores  P sim",
+      "R restart  F finish  C crash  L scores  P sim  H freeze",
       "Shift+Plus/Minus speed scale  Shift+0 reset"
     ];
     const panelWidth = 356;
@@ -3753,6 +4025,109 @@ class Renderer {
     ctx.fillStyle = "#f6fbff";
     lines.forEach((line, index) => ctx.fillText(line, x + 10, y + 12 + index * 19));
     ctx.restore();
+    this.drawHitboxConfigPanel();
+    this.drawInputDebugPanel();
+    this.drawInputFlashMarker();
+  }
+
+  drawHitboxConfigPanel() {
+    const ctx = this.ctx;
+    const format = (type, label = type) => {
+      const config = getHitboxConfig(type);
+      if (!config) return `${label} n/a`;
+      const yOffset = config.offsetY ? ` y${config.offsetY > 0 ? "+" : ""}${config.offsetY.toFixed(2)}` : "";
+      return `${label} ${config.width.toFixed(2)}x${config.height.toFixed(2)}${yOffset}`;
+    };
+    const lines = [
+      "HITBOX CONFIG",
+      `min overlap ${MIN_COLLISION_OVERLAP_PX}px`,
+      format("player"),
+      `${format("slowCar", "slow")}  ${format("fastCar", "fast")}`,
+      `${format("truck")}  ${format("barrier")}`,
+      `${format("cone")}  ${format("oil")}`,
+      `${format("deer")}  ${format("ramp")}`,
+      `${format("boostPad", "boost")}  ${format("branch")}`
+    ];
+    const panelWidth = 304;
+    const lineHeight = 15;
+    const x = 12;
+    const y = 88;
+    ctx.save();
+    ctx.fillStyle = "rgba(0, 0, 0, 0.72)";
+    ctx.fillRect(x, y, panelWidth, lines.length * lineHeight + 14);
+    ctx.strokeStyle = "#28f6ff";
+    ctx.strokeRect(x, y, panelWidth, lines.length * lineHeight + 14);
+    ctx.font = "11px monospace";
+    ctx.fillStyle = "#f6fbff";
+    lines.forEach((line, index) => ctx.fillText(line, x + 9, y + 12 + index * lineHeight));
+    ctx.restore();
+  }
+
+  drawInputDebugPanel() {
+    const ctx = this.ctx;
+    const run = this.game.run;
+    const input = this.game.input.getDebugInfo();
+    const currentX = this.laneCenter(run.renderLaneFloat);
+    const targetX = this.laneCenter(run.targetLane);
+    const age = input.lastKeyAgeMs === null ? "n/a" : `${Math.round(input.lastKeyAgeMs)}ms`;
+    const lines = [
+      "INPUT",
+      `held: ${input.heldKeys}`,
+      `suppressed: ${input.suppressedKeys}`,
+      `last: ${input.lastKey} ${age}`,
+      `lane: ${run.renderLaneFloat.toFixed(2)} -> ${run.targetLane}`,
+      `progress: ${(run.laneChangeProgress * 100).toFixed(0)}%  dur ${(INPUT_CONFIG.laneChangeDurationSeconds * 1000).toFixed(0)}ms`,
+      `x: ${currentX.toFixed(0)} -> ${targetX.toFixed(0)}  y: ${this.getPlayerScreenY().toFixed(0)}`,
+      `lock: ${this.getInputLockState()}`,
+      `boosts: ${run.manualBoosts}  active: ${run.boostTimer > 0 || run.padBoostTimer > 0 ? "yes" : "no"}`,
+      `repeat: ${input.laneHoldDirection || 0} in ${Math.max(0, input.laneRepeatTimer).toFixed(2)}s`,
+      `vertical: ${input.verticalHeld} input ${run.verticalInput}`
+    ];
+    const panelWidth = 304;
+    const lineHeight = 15;
+    const x = 12;
+    const y = 226;
+    ctx.save();
+    ctx.fillStyle = "rgba(0, 0, 0, 0.72)";
+    ctx.fillRect(x, y, panelWidth, lines.length * lineHeight + 14);
+    ctx.strokeStyle = "#44ff99";
+    ctx.strokeRect(x, y, panelWidth, lines.length * lineHeight + 14);
+    ctx.font = "11px monospace";
+    ctx.fillStyle = "#f6fbff";
+    lines.forEach((line, index) => ctx.fillText(line, x + 9, y + 12 + index * lineHeight));
+    ctx.restore();
+  }
+
+  getInputLockState() {
+    const run = this.game.run;
+    if (this.game.screen !== "game") return this.game.screen;
+    if (run.debugFrozen) return "debug freeze";
+    if (run.paused) return "paused";
+    if (run.ended) return "ended";
+    if (run.countdownTimer > 0) return `countdown ${run.countdownTimer.toFixed(1)}s`;
+    return "none";
+  }
+
+  drawInputFlashMarker() {
+    const run = this.game.run;
+    if (!run || run.inputFlashTimer <= 0) return;
+    const progress = clamp(run.inputFlashTimer / INPUT_CONFIG.inputFlashSeconds, 0, 1);
+    const ctx = this.ctx;
+    const x = this.road.x + this.road.w / 2;
+    const y = 84;
+    ctx.save();
+    ctx.globalAlpha = progress;
+    ctx.fillStyle = "#44ff99";
+    ctx.strokeStyle = "#f6fbff";
+    ctx.lineWidth = 2;
+    ctx.fillRect(x - 46, y, 92, 16);
+    ctx.strokeRect(x - 46, y, 92, 16);
+    ctx.fillStyle = "#07101b";
+    ctx.font = "900 10px monospace";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(`INPUT ${run.inputFlashKey}`, x, y + 8);
+    ctx.restore();
   }
 }
 
@@ -3765,18 +4140,27 @@ function drawHudLabel(ctx, label, value, x, y) {
   ctx.fillText(String(value).slice(0, 18), x, y + 16);
 }
 
-function drawHitboxRect(ctx, box, color, label) {
+function drawHitboxRect(ctx, box, color, label, style = "hitbox") {
+  if (!box) return;
+  const isRenderBounds = style === "render";
+  const isActive = style === "active";
   ctx.save();
+  ctx.lineWidth = isActive ? 3 : (isRenderBounds ? 1.5 : 2);
+  if (isRenderBounds) ctx.setLineDash([6, 5]);
   ctx.strokeStyle = color;
   ctx.fillStyle = color;
-  ctx.globalAlpha = 0.92;
+  ctx.globalAlpha = isRenderBounds ? 0.78 : 0.92;
   ctx.strokeRect(box.x, box.y, box.w, box.h);
-  ctx.globalAlpha = 0.12;
-  ctx.fillRect(box.x, box.y, box.w, box.h);
+  if (!isRenderBounds) {
+    ctx.globalAlpha = isActive ? 0.22 : 0.12;
+    ctx.fillRect(box.x, box.y, box.w, box.h);
+  }
   ctx.globalAlpha = 1;
-  ctx.font = "10px monospace";
-  ctx.textBaseline = "bottom";
-  ctx.fillText(label, box.x, box.y - 3);
+  if (label && box.w >= 18 && box.h >= 14) {
+    ctx.font = "10px monospace";
+    ctx.textBaseline = "bottom";
+    ctx.fillText(label, box.x, box.y - 3);
+  }
   ctx.restore();
 }
 
@@ -3844,10 +4228,6 @@ function getCanvasPlayerCarRenderSize(state = {}) {
 
 function getCarStyleId(carConfig) {
   return CAR_BODY_STYLES.some((item) => item.id === carConfig.bodyStyle) ? carConfig.bodyStyle : DEFAULT_CAR.bodyStyle;
-}
-
-function playerUsesLoadedSprite(carConfig, spriteManager = null) {
-  return carConfig.useSprite !== false && Boolean(spriteManager?.getSprite(getCarStyleId(carConfig)));
 }
 
 function getPlayerSpriteTargetWidth(carConfig, state = {}) {
@@ -4507,6 +4887,10 @@ class NeonRoadRally {
   constructor() {
     this.canvas = document.getElementById("gameCanvas");
     this.layer = document.getElementById("screenLayer");
+    if (this.canvas) {
+      this.canvas.tabIndex = 0;
+      this.canvas.addEventListener("pointerdown", () => this.focusControls());
+    }
     this.profiles = new PlayerProfileManager(STORAGE_KEY);
     this.audio = new AudioManager(this.profiles.data.audio, (settings) => this.profiles.updateAudioSettings(settings));
     this.carSprites = new CarSpriteManager(CAR_BODY_STYLES, () => {
@@ -4553,12 +4937,15 @@ class NeonRoadRally {
       targetLane: 2,
       renderLaneFloat: 2,
       playerLaneFloat: 2,
+      laneChangeStartLane: 2,
+      laneChangeTargetLane: 2,
+      laneChangeDistance: 0,
+      laneChangeElapsed: 0,
+      laneChangeProgress: 1,
+      laneChangeDuration: INPUT_CONFIG.laneChangeDurationSeconds,
       playerYRatio: PLAYER_START_Y_RATIO,
       targetYRatio: PLAYER_START_Y_RATIO,
       verticalInput: 0,
-      laneCooldown: 0,
-      queuedLaneMove: 0,
-      queuedMoveTimer: 0,
       currentSpeed: getTrackCruiseSpeed(track, 0, speedClass.id),
       rawCruiseSpeed: getTrackRawCruiseSpeed(track, 0, speedClass.id),
       baseCruiseSpeed: getTrackCruiseSpeed(track, 0, speedClass.id),
@@ -4599,6 +4986,9 @@ class NeonRoadRally {
       boostBurstTimer: 0,
       finishFlashTimer: 0,
       crashBeatTimer: 0,
+      inputFlashTimer: 0,
+      inputFlashKey: "none",
+      lastInputKey: "none",
       countdownTimer: ARCADE_FEEL.enabled ? ARCADE_FEEL.countdownSeconds : 0,
       lastCountdownSfxLabel: "",
       raceActive: !ARCADE_FEEL.enabled,
@@ -4606,20 +4996,23 @@ class NeonRoadRally {
       finished: false,
       ended: false,
       endReason: "",
-      paused: false
+      paused: false,
+      debugFrozen: false
     };
   }
 
   loop(time) {
     const dt = Math.min(0.05, (time - this.lastFrame) / 1000 || 0);
     this.lastFrame = time;
-    this.lastDt = dt;
-    if (this.screen === "game" && !this.run.paused && !this.run.ended) {
+    const debugFrozen = this.screen === "game" && this.run?.debugFrozen;
+    this.lastDt = debugFrozen ? 0 : dt;
+    if (this.screen === "game" && !this.run.paused && !this.run.ended && !debugFrozen) {
+      this.input.update(dt);
       this.updateRun(dt);
     } else if (this.screen !== "game") {
       this.attractDistance = (this.attractDistance + dt * 210) % 100000;
     }
-    if (!(this.screen === "game" && this.run.paused)) {
+    if (!(this.screen === "game" && (this.run.paused || this.run.debugFrozen))) {
       this.updateArcadeEffects(dt);
     }
     this.renderer.render();
@@ -4635,6 +5028,7 @@ class NeonRoadRally {
     run.boostBurstTimer = Math.max(0, (run.boostBurstTimer || 0) - dt);
     run.finishFlashTimer = Math.max(0, (run.finishFlashTimer || 0) - dt);
     run.crashBeatTimer = Math.max(0, (run.crashBeatTimer || 0) - dt);
+    run.inputFlashTimer = Math.max(0, (run.inputFlashTimer || 0) - dt);
     if (Array.isArray(run.floatingTexts)) {
       run.floatingTexts.forEach((text) => {
         text.life -= dt;
@@ -4652,33 +5046,26 @@ class NeonRoadRally {
       run.countdownTimer = Math.max(0, run.countdownTimer - dt);
       if (run.countdownTimer <= 0) {
         run.raceActive = true;
+        if (this.input) this.input.clearCountdownInputLocks();
       }
       return;
     }
     run.raceActive = true;
     run.elapsed += dt;
-    run.laneCooldown = Math.max(0, run.laneCooldown - dt);
     run.boostTimer = Math.max(0, run.boostTimer - dt);
     run.padBoostTimer = Math.max(0, run.padBoostTimer - dt);
     run.oilTimer = Math.max(0, run.oilTimer - dt);
     run.slowdownTimer = Math.max(0, run.slowdownTimer - dt);
 
-    if (run.queuedMoveTimer > 0) {
-      run.queuedMoveTimer -= dt;
-      if (run.queuedMoveTimer <= 0 && run.queuedLaneMove !== 0) {
-        const direction = run.queuedLaneMove;
-        run.queuedLaneMove = 0;
-        this.performLaneMove(direction);
-      }
+    if (run.verticalInput !== 0) {
+      const verticalSpeed = INPUT_CONFIG.verticalMoveRatioPerSecond;
+      run.targetYRatio = clamp(
+        run.targetYRatio + run.verticalInput * verticalSpeed * dt,
+        PLAYER_MIN_Y_RATIO,
+        PLAYER_MAX_Y_RATIO
+      );
+      run.playerYRatio = run.targetYRatio;
     }
-
-    const verticalSpeed = 0.42;
-    run.targetYRatio = clamp(
-      run.targetYRatio + run.verticalInput * verticalSpeed * dt,
-      PLAYER_MIN_Y_RATIO,
-      PLAYER_MAX_Y_RATIO
-    );
-    run.playerYRatio = lerp(run.playerYRatio, run.targetYRatio, clamp(dt * 11, 0, 1));
 
     if (run.jumpTimer > 0) {
       run.jumpTimer = Math.max(0, run.jumpTimer - dt);
@@ -4713,8 +5100,7 @@ class NeonRoadRally {
     this.addBaseScore(distanceDelta * (run.boostTimer > 0 ? 1.6 : 1));
     this.addBaseScore(run.currentSpeed * dt * 0.04);
 
-    run.renderLaneFloat = lerp(run.renderLaneFloat, run.targetLane, clamp(dt * 12, 0, 1));
-    run.playerLaneFloat = run.renderLaneFloat;
+    this.updateLaneVisual(dt);
 
     run.cleanTimer += dt;
     if (run.cleanTimer >= 10) {
@@ -4729,6 +5115,26 @@ class NeonRoadRally {
     if (run.distance >= run.track.distanceToFinish && !run.ended) {
       this.endRace("finished", "Finish Line");
     }
+  }
+
+  updateLaneVisual(dt) {
+    const run = this.run;
+    const target = clamp(run.targetLane, 0, LANES - 1);
+    const diff = target - run.renderLaneFloat;
+    run.laneChangeDuration = INPUT_CONFIG.laneChangeDurationSeconds;
+    if (Math.abs(diff) <= 0.001) {
+      run.renderLaneFloat = target;
+      run.playerLaneFloat = target;
+      run.laneChangeProgress = 1;
+      return;
+    }
+
+    const maxStep = dt / Math.max(0.001, INPUT_CONFIG.laneChangeDurationSeconds);
+    run.renderLaneFloat += Math.sign(diff) * Math.min(Math.abs(diff), maxStep);
+    run.playerLaneFloat = run.renderLaneFloat;
+    run.laneChangeElapsed += dt;
+    const distance = Math.max(0.001, run.laneChangeDistance || Math.abs(target - run.laneChangeStartLane) || Math.abs(diff));
+    run.laneChangeProgress = clamp(1 - Math.abs(target - run.renderLaneFloat) / distance, 0, 1);
   }
 
   playCountdownSfx() {
@@ -4776,23 +5182,19 @@ class NeonRoadRally {
     this.run.speedCap = track.maxSpeed * SPEED_TUNING.maxBoostOverrunMultiplier * (this.debugSpeedScale || 1);
     this.run.speedCapped = false;
     this.run.debugSpeedScale = this.debugSpeedScale || 1;
-    if (this.input) this.input.clearVerticalInput();
+    if (this.input) this.input.clearGameplayInput();
     this.obstacles.reset(track);
     this.setScreen("game");
     this.clearLayer();
+    this.focusControls();
     this.audio.stopMusic(0);
     this.audio.playMusic("race", true);
   }
 
   requestLaneMove(direction) {
     const run = this.run;
-    if (run.paused || run.ended || run.countdownTimer > 0) return;
-    if (run.oilTimer > 0) {
-      run.queuedLaneMove = direction;
-      run.queuedMoveTimer = Math.max(run.queuedMoveTimer, 0.16);
-      return;
-    }
-    this.performLaneMove(direction);
+    if (run.paused || run.ended || run.countdownTimer > 0) return false;
+    return this.performLaneMove(direction);
   }
 
   setVerticalInput(direction) {
@@ -4802,11 +5204,15 @@ class NeonRoadRally {
 
   performLaneMove(direction) {
     const run = this.run;
-    if (run.laneCooldown > 0) return;
     const nextLane = clamp(run.targetLane + direction, 0, LANES - 1);
-    if (nextLane === run.targetLane) return;
+    if (nextLane === run.targetLane) return false;
     run.targetLane = nextLane;
-    run.laneCooldown = run.oilTimer > 0 ? 0.26 : 0.08;
+    run.laneChangeStartLane = run.renderLaneFloat;
+    run.laneChangeTargetLane = nextLane;
+    run.laneChangeDistance = Math.max(0.001, Math.abs(nextLane - run.renderLaneFloat));
+    run.laneChangeElapsed = 0;
+    run.laneChangeProgress = 0;
+    return true;
   }
 
   useManualBoost() {
@@ -4824,6 +5230,22 @@ class NeonRoadRally {
     run.jumpDuration = 0.95;
     run.jumpTimer = run.jumpDuration;
     run.airborne = true;
+  }
+
+  focusControls() {
+    const active = document.activeElement;
+    const tagName = String(active?.tagName || "").toLowerCase();
+    if (tagName === "input" || tagName === "textarea" || tagName === "select" || active?.isContentEditable) return;
+    if (this.canvas && typeof this.canvas.focus === "function") {
+      this.canvas.focus({ preventScroll: true });
+    }
+  }
+
+  recordInputEvent(keyId) {
+    if (!this.run || this.screen !== "game") return;
+    this.run.lastInputKey = keyId;
+    this.run.inputFlashKey = keyId;
+    this.run.inputFlashTimer = INPUT_CONFIG.inputFlashSeconds;
   }
 
   applySlowdown(factor, penalty, reason, sfxKey = "slowdown") {
@@ -5529,6 +5951,7 @@ class NeonRoadRally {
     if (this.screen !== "game" || this.run.ended) return;
     this.run.paused = !this.run.paused;
     if (this.run.paused) {
+      if (this.input) this.input.clearGameplayInput();
       this.audio.stopMusic(0.15);
       this.layer.innerHTML = `
         <section class="panel pause-card">
@@ -5545,8 +5968,14 @@ class NeonRoadRally {
       this.bindLayerButtons();
     } else {
       this.clearLayer();
+      this.focusControls();
       this.audio.playMusic("race", false);
     }
+  }
+
+  toggleDebugFreeze() {
+    if (!this.debugMode || this.screen !== "game" || !this.run || this.run.ended || this.run.paused) return;
+    this.run.debugFrozen = !this.run.debugFrozen;
   }
 
   adjustDebugSpeedScale(delta) {
