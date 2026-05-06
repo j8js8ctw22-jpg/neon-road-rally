@@ -21,6 +21,8 @@ const DANGER_ZONE_BOTTOM_RATIO = 0.95;
 const DANGER_ZONE_SLICE_PX = 32;
 const FOUR_LANE_PRESSURE_COOLDOWN = 9000;
 const DEFAULT_SPEED_CLASS_ID = "arcade";
+const DEFAULT_RACE_TYPE_ID = "classic";
+const FUEL_RUN_RACE_TYPE_ID = "fuelRun";
 const ROAD_SEED_PREFIXES = ["SUNSET", "TURBO", "ROAD", "NEON", "RALLY", "LANE", "BOOST"];
 const DEFAULT_ROAD_SEED = "ROAD-52819";
 const CLASSIC_SEED_LABEL = "Classic";
@@ -196,6 +198,67 @@ const SPEED_CLASSES = [
   { id: "turbo", label: "Turbo", startSpeed: 1500, endSpeed: 2600, scoreMultiplier: 1.4 }
 ];
 
+const RACE_TYPES = [
+  {
+    id: DEFAULT_RACE_TYPE_ID,
+    label: "Classic",
+    shortLabel: "Classic",
+    description: "Full Sunset Highway Road Director mix."
+  },
+  {
+    id: FUEL_RUN_RACE_TYPE_ID,
+    label: "Fuel Run",
+    shortLabel: "Fuel",
+    description: "Traffic gates, gas can routing, and fuel survival."
+  }
+];
+
+const FUEL_RUN_CONFIG = {
+  fuelMax: 100,
+  fuelDrainPerSecond: {
+    sunday: 0.7,
+    rookie: 0.85,
+    arcade: 1,
+    pro: 1.18,
+    turbo: 1.35
+  },
+  gasCanRestoreAmount: {
+    sunday: 24,
+    rookie: 24,
+    arcade: 24,
+    pro: 22,
+    turbo: 20
+  },
+  lowFuelThreshold: 30,
+  criticalFuelThreshold: 12,
+  gasCanScore: 500,
+  fuelPointFinishBonus: 40,
+  warningCooldownSeconds: 4,
+  criticalWarningCooldownSeconds: 2.6,
+  initialGasGraceSeconds: 10,
+  minGasGapSeconds: {
+    sunday: 11,
+    rookie: 10,
+    arcade: 9,
+    pro: 8,
+    turbo: 7
+  },
+  targetGasGapSeconds: {
+    sunday: 22,
+    rookie: 20,
+    arcade: 17,
+    pro: 15,
+    turbo: 13
+  },
+  maxGasGapSeconds: {
+    sunday: 32,
+    rookie: 29,
+    arcade: 25,
+    pro: 22,
+    turbo: 19
+  }
+};
+
 const CHALLENGE_SAVE_VERSION = 1;
 const CHALLENGES = [
   {
@@ -203,6 +266,7 @@ const CHALLENGES = [
     name: "First Run",
     description: "An approachable Sunset Highway finish.",
     trackId: "sunset-highway",
+    raceType: "classic",
     raceMode: "rookie",
     seed: "FIRST-RUN",
     objective: { type: "finish", label: "Finish the race" },
@@ -213,6 +277,7 @@ const CHALLENGES = [
     name: "Turbo Dare",
     description: "Survive Sunset Highway at party-speed intensity.",
     trackId: "sunset-highway",
+    raceType: "classic",
     raceMode: "turbo",
     seed: "TURBO-DARE",
     objective: { type: "finish", label: "Finish the race" },
@@ -223,6 +288,7 @@ const CHALLENGES = [
     name: "Clean Line",
     description: "Hold a precise Arcade line without slowdown hits.",
     trackId: "sunset-highway",
+    raceType: "classic",
     raceMode: "arcade",
     seed: "CLEAN-LINE",
     objective: { type: "noSlowdownHits", label: "Finish with no slowdown hits" },
@@ -233,6 +299,7 @@ const CHALLENGES = [
     name: "Boost Hunter",
     description: "Spend every manual boost and still reach the finish.",
     trackId: "sunset-highway",
+    raceType: "classic",
     raceMode: "pro",
     seed: "BOOST-HUNTER",
     objective: { type: "useAllManualBoosts", label: "Finish and use all manual boosts", target: 3 },
@@ -243,6 +310,7 @@ const CHALLENGES = [
     name: "Near-Miss Run",
     description: "Push the scoring lane and bank five close calls.",
     trackId: "sunset-highway",
+    raceType: "classic",
     raceMode: "pro",
     seed: "NEAR-MISS",
     objective: { type: "nearMisses", label: "Earn at least 5 near-miss bonuses", target: 5 },
@@ -350,7 +418,8 @@ const ROAD_DIRECTOR = {
     truck: 1.8,
     barrier: 1.7,
     ramp: -0.8,
-    boostPad: -0.45
+    boostPad: -0.45,
+    gasCan: 0
   },
   modeIntensity: {
     sunday: 0.95,
@@ -513,6 +582,7 @@ const HITBOX_CONFIG = {
   deer: { width: 0.6, height: 0.65, offsetX: 0, offsetY: 0 },
   ramp: { width: 0.75, height: 0.65, offsetX: 0, offsetY: 0 },
   boostPad: { width: 0.75, height: 0.55, offsetX: 0, offsetY: 0 },
+  gasCan: { width: 0.58, height: 0.62, offsetX: 0, offsetY: 0, minOverlapPx: 4 },
   branch: { width: 0.66, height: 0.5, offsetX: 0, offsetY: 0 }
 };
 
@@ -528,6 +598,7 @@ const OBSTACLE_INFO = {
   ramp: { label: "Ramp", tall: false, crash: false, w: 80, h: 58 },
   barrier: { label: "Barrier", tall: true, crash: true, w: 84, h: 70 },
   boostPad: { label: "Boost Pad", tall: false, crash: false, w: 82, h: 48 },
+  gasCan: { label: "Gas Can", tall: false, crash: false, w: 54, h: 64 },
   branch: { label: "Branch", tall: false, crash: false, w: 68, h: 34 },
   warning: { label: "Warning", tall: false, crash: false, w: 70, h: 78 }
 };
@@ -590,6 +661,30 @@ function getSpeedClassConfig(value) {
 
 function getSpeedClassLabel(value) {
   return getSpeedClassConfig(value).label;
+}
+
+function normalizeRaceTypeId(value, fallback = DEFAULT_RACE_TYPE_ID) {
+  const raw = String(value || "").trim();
+  const compact = raw.toLowerCase().replace(/[^a-z0-9]+/g, "");
+  const match = RACE_TYPES.find((raceType) => (
+    raceType.id.toLowerCase() === raw.toLowerCase()
+    || raceType.id.toLowerCase() === compact
+    || raceType.label.toLowerCase().replace(/[^a-z0-9]+/g, "") === compact
+  ));
+  return match ? match.id : fallback;
+}
+
+function getRaceTypeConfig(value) {
+  const id = normalizeRaceTypeId(value);
+  return RACE_TYPES.find((raceType) => raceType.id === id) || RACE_TYPES[0];
+}
+
+function getRaceTypeLabel(value) {
+  return getRaceTypeConfig(value).label;
+}
+
+function isFuelRunRaceType(value) {
+  return normalizeRaceTypeId(value) === FUEL_RUN_RACE_TYPE_ID;
 }
 
 function getTrackById(value) {
@@ -657,6 +752,7 @@ function getScoreEventLabel(type, points) {
     clean: "CLEAN",
     boostPad: "BOOST PAD",
     ramp: "RAMP",
+    gasCan: "FUEL",
     finish: "FINISH"
   };
   return `${labels[type] || "BONUS"} ${amount}`;
@@ -666,6 +762,7 @@ function getScoreEventColor(type) {
   if (type === "nearMiss") return "#28f6ff";
   if (type === "boostPad") return "#44ff99";
   if (type === "ramp") return "#ffe45e";
+  if (type === "gasCan") return "#ff4d3d";
   if (type === "finish") return "#f6fbff";
   return "#ffe45e";
 }
@@ -709,14 +806,44 @@ function generateReadableRoadSeed(rng = Math.random) {
   return normalizeRoadSeed(`${prefix}-${number}`, DEFAULT_ROAD_SEED);
 }
 
-function getRunRandomSeedSource(seed, track, speedClassId) {
+function getRunRandomSeedSource(seed, track, speedClassId, raceTypeId = DEFAULT_RACE_TYPE_ID) {
   const trackId = track?.id || "track";
   const modeId = normalizeSpeedClassId(speedClassId, DEFAULT_SPEED_CLASS_ID);
-  return `${normalizeRoadSeed(seed, DEFAULT_ROAD_SEED)}|${trackId}|${modeId}`;
+  const base = `${normalizeRoadSeed(seed, DEFAULT_ROAD_SEED)}|${trackId}|${modeId}`;
+  const raceType = normalizeRaceTypeId(raceTypeId, DEFAULT_RACE_TYPE_ID);
+  return raceType === DEFAULT_RACE_TYPE_ID ? base : `${base}|${raceType}`;
 }
 
 function formatScore(value) {
   return Math.max(0, Math.round(value)).toLocaleString();
+}
+
+function normalizeRunStatus(value) {
+  const status = String(value || "").trim();
+  if (status === "finished") return "finished";
+  if (status === "outOfFuel" || status === "out-of-fuel" || /^out of fuel$/i.test(status)) return "outOfFuel";
+  return "crashed";
+}
+
+function getRunStatusLabel(status, reason = "") {
+  const normalized = normalizeRunStatus(status);
+  if (normalized === "finished") return "Finished";
+  if (normalized === "outOfFuel") return "Out of Fuel";
+  return reason ? `Crashed: ${reason}` : "Crashed";
+}
+
+function getFuelRunTuning(speedClassId) {
+  const id = normalizeSpeedClassId(speedClassId, DEFAULT_SPEED_CLASS_ID);
+  return {
+    fuelMax: FUEL_RUN_CONFIG.fuelMax,
+    fuelDrainPerSecond: FUEL_RUN_CONFIG.fuelDrainPerSecond[id] ?? FUEL_RUN_CONFIG.fuelDrainPerSecond[DEFAULT_SPEED_CLASS_ID],
+    gasCanRestoreAmount: FUEL_RUN_CONFIG.gasCanRestoreAmount[id] ?? FUEL_RUN_CONFIG.gasCanRestoreAmount[DEFAULT_SPEED_CLASS_ID],
+    lowFuelThreshold: FUEL_RUN_CONFIG.lowFuelThreshold,
+    criticalFuelThreshold: FUEL_RUN_CONFIG.criticalFuelThreshold,
+    minGasGapSeconds: FUEL_RUN_CONFIG.minGasGapSeconds[id] ?? FUEL_RUN_CONFIG.minGasGapSeconds[DEFAULT_SPEED_CLASS_ID],
+    targetGasGapSeconds: FUEL_RUN_CONFIG.targetGasGapSeconds[id] ?? FUEL_RUN_CONFIG.targetGasGapSeconds[DEFAULT_SPEED_CLASS_ID],
+    maxGasGapSeconds: FUEL_RUN_CONFIG.maxGasGapSeconds[id] ?? FUEL_RUN_CONFIG.maxGasGapSeconds[DEFAULT_SPEED_CLASS_ID]
+  };
 }
 
 function formatSignedScore(value) {
@@ -760,6 +887,7 @@ function normalizeChallengeRunSummary(summary) {
   return {
     status: summary.status === "finished" ? "finished" : "crashed",
     score: Math.max(0, Math.round(Number.isFinite(summary.score) ? summary.score : summary.finalScore || 0)),
+    raceType: normalizeRaceTypeId(summary.raceType || summary.raceTypeId, DEFAULT_RACE_TYPE_ID),
     raceMode: normalizeSpeedClassId(summary.raceMode || summary.speedClass, DEFAULT_SPEED_CLASS_ID),
     seed: normalizeStoredRoadSeed(summary.seed, ""),
     time: Number.isFinite(summary.time) ? Math.max(0, summary.time) : 0,
@@ -810,6 +938,7 @@ function getChallengeRunStats(summary) {
   return {
     finished: summary?.status === "finished",
     finalScore: Math.max(0, Math.round(summary?.finalScore || 0)),
+    raceType: normalizeRaceTypeId(summary?.raceType || summary?.raceTypeId, DEFAULT_RACE_TYPE_ID),
     raceMode: normalizeSpeedClassId(summary?.speedClass, DEFAULT_SPEED_CLASS_ID),
     seed: normalizeStoredRoadSeed(summary?.seed, ""),
     slowdownHits: Math.max(0, Math.round(summary?.slowdownHits || 0)),
@@ -1058,6 +1187,8 @@ function hasGameplayHitbox(type) {
 }
 
 function getCollisionMinOverlapPx(type) {
+  const config = getHitboxConfig(type);
+  if (Number.isFinite(config?.minOverlapPx)) return config.minOverlapPx;
   return HARD_VEHICLE_TYPES.has(type) ? HARD_VEHICLE_COLLISION_OVERLAP_PX : MIN_COLLISION_OVERLAP_PX;
 }
 
@@ -1121,6 +1252,7 @@ class PlayerProfileManager {
       .filter((entry) => entry && Number.isFinite(entry.score))
       .map((entry) => {
         const speedClass = normalizeSpeedClassId(entry.speedClass || entry.raceMode, DEFAULT_SPEED_CLASS_ID);
+        const raceType = normalizeRaceTypeId(entry.raceType || entry.raceTypeId, DEFAULT_RACE_TYPE_ID);
         const challenge = getChallengeById(entry.challengeId);
         const challengeId = challenge ? challenge.id : (entry.challengeId ? String(entry.challengeId) : "");
         return {
@@ -1130,10 +1262,14 @@ class PlayerProfileManager {
           trackName: sanitizeName(entry.trackName, "TRACK"),
           speedClass,
           raceMode: normalizeSpeedClassId(entry.raceMode || speedClass, speedClass),
+          raceType,
           seed: normalizeStoredRoadSeed(entry.seed, CLASSIC_SEED_LABEL),
           score: Math.max(0, Math.round(entry.score)),
-          status: entry.status === "finished" ? "finished" : "crashed",
+          status: normalizeRunStatus(entry.status),
           time: Number.isFinite(entry.time) ? Math.max(0, entry.time) : 0,
+          fuelCollected: Math.max(0, Math.round(Number.isFinite(entry.fuelCollected) ? entry.fuelCollected : entry.gasCansCollected || 0)),
+          fuelRemaining: Math.max(0, Math.round(Number.isFinite(entry.fuelRemaining) ? entry.fuelRemaining : 0)),
+          fuelBonus: Math.max(0, Math.round(Number.isFinite(entry.fuelBonus) ? entry.fuelBonus : 0)),
           date: String(entry.date || new Date().toISOString()),
           partyMode: Boolean(entry.partyMode),
           challengeId,
@@ -1257,6 +1393,7 @@ class PlayerProfileManager {
 
   recordScore(entry) {
     const speedClass = normalizeSpeedClassId(entry.speedClass || entry.raceMode, DEFAULT_SPEED_CLASS_ID);
+    const raceType = normalizeRaceTypeId(entry.raceType || entry.raceTypeId, DEFAULT_RACE_TYPE_ID);
     const challenge = getChallengeById(entry.challengeId);
     const challengeId = challenge ? challenge.id : (entry.challengeId ? String(entry.challengeId) : "");
     const cleanEntry = {
@@ -1266,10 +1403,14 @@ class PlayerProfileManager {
       trackName: sanitizeName(entry.trackName, "TRACK"),
       speedClass,
       raceMode: normalizeSpeedClassId(entry.raceMode || speedClass, speedClass),
+      raceType,
       seed: normalizeStoredRoadSeed(entry.seed, CLASSIC_SEED_LABEL),
       score: Math.max(0, Math.round(entry.score)),
-      status: entry.status === "finished" ? "finished" : "crashed",
+      status: normalizeRunStatus(entry.status),
       time: Number.isFinite(entry.time) ? Math.max(0, entry.time) : 0,
+      fuelCollected: Math.max(0, Math.round(Number.isFinite(entry.fuelCollected) ? entry.fuelCollected : entry.gasCansCollected || 0)),
+      fuelRemaining: Math.max(0, Math.round(Number.isFinite(entry.fuelRemaining) ? entry.fuelRemaining : 0)),
+      fuelBonus: Math.max(0, Math.round(Number.isFinite(entry.fuelBonus) ? entry.fuelBonus : 0)),
       date: new Date().toISOString(),
       partyMode: Boolean(entry.partyMode),
       challengeId,
@@ -1312,6 +1453,7 @@ class PlayerProfileManager {
       ? normalizeChallengeRunSummary({
         status: summary?.status,
         score,
+        raceType: summary?.raceTypeId,
         raceMode: summary?.speedClass,
         seed: summary?.seed,
         time: summary?.time,
@@ -1369,6 +1511,7 @@ class PartySession {
     this.sharedSeed = normalizeRoadSeed(options.sharedSeed, DEFAULT_ROAD_SEED);
     this.track = options.track || TRACKS[0];
     this.raceMode = normalizeSpeedClassId(options.raceMode, DEFAULT_SPEED_CLASS_ID);
+    this.raceType = normalizeRaceTypeId(options.raceType || options.raceTypeId, DEFAULT_RACE_TYPE_ID);
     this.results = Array.isArray(options.results) ? options.results.slice() : [];
     this.roundNumber = Math.max(1, Math.round(options.roundNumber || 1));
     this.completed = Boolean(options.completed) || this.results.length >= this.selectedPlayers.length;
@@ -1394,12 +1537,16 @@ class PartySession {
       playerName: sanitizeName(player.name, "PLAYER"),
       carName: sanitizeName(player.car?.name, DEFAULT_CAR.name),
       score: Math.max(0, Math.round(summary?.finalScore || 0)),
-      status: summary?.status === "finished" ? "finished" : "crashed",
+      status: normalizeRunStatus(summary?.status),
       reason: String(summary?.reason || ""),
       time: Number.isFinite(summary?.time) ? Math.max(0, summary.time) : 0,
       raceMode: normalizeSpeedClassId(summary?.speedClass || this.raceMode, this.raceMode),
+      raceType: normalizeRaceTypeId(summary?.raceTypeId || summary?.raceType || this.raceType, this.raceType),
       seed: normalizeStoredRoadSeed(summary?.seed || this.sharedSeed, this.sharedSeed),
       trackName: sanitizeName(summary?.trackName || this.track?.name, "TRACK"),
+      fuelCollected: Math.max(0, Math.round(summary?.fuelCollected || 0)),
+      fuelRemaining: Math.max(0, Math.round(summary?.fuelRemaining || 0)),
+      fuelBonus: Math.max(0, Math.round(summary?.fuelBonus || 0)),
       scoreSaved: summary?.scoreSaved !== false,
       leaderboardRank: Number.isFinite(summary?.topTwentyRank) ? summary.topTwentyRank : null,
       medals: Array.isArray(summary?.medals) ? summary.medals.slice(0, 3) : [],
@@ -1437,6 +1584,7 @@ class PartySession {
       sharedSeed,
       track: this.track,
       raceMode: this.raceMode,
+      raceType: this.raceType,
       roundNumber: this.roundNumber + 1,
       roundType: this.roundType
     });
@@ -2225,7 +2373,11 @@ class RoadDirector {
       waveCounts: {},
       boostLaneCounts: Array(LANES).fill(0),
       rampLaneCounts: Array(LANES).fill(0),
+      gasCanLaneCounts: Array(LANES).fill(0),
       obstacleTypeCounts: {},
+      gasCanGapSeconds: [],
+      longestGasCanGapSeconds: 0,
+      fuelPatternCounts: {},
       movementGapSeconds: [],
       centerChallengeGapSeconds: [],
       waveGapSeconds: [],
@@ -2262,6 +2414,8 @@ class RoadDirector {
       meaningfulWaveGapCount: 0,
       meaningfulWaveGapSum: 0,
       longestActiveEmptySeconds: 0,
+      gasCanCount: 0,
+      fuelPatternCounts: {},
       pressureCounts: { 0: 0, 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 },
       waveCounts: {}
     };
@@ -2339,6 +2493,7 @@ class RoadDirector {
     const sectionPressureMultiplier = getSectionNumber(section, "pressureMultiplier", 1, 0.25, 2.4);
     const difficulty = track.difficultyCurve(progress);
     const speedClassId = this.manager.getSpeedClassId();
+    const raceTypeId = this.manager.getRaceTypeId();
     const cadence = getTrackDirectorCadence(speedClassId);
     const modeIntensity = TRACK_DIRECTOR.modeIntensity[speedClassId] || 1;
     const cruiseSpeed = getTrackCruiseSpeed(track, progress, speedClassId);
@@ -2389,6 +2544,9 @@ class RoadDirector {
       sectionPressureMultiplier,
       difficulty,
       speedClassId,
+      raceTypeId,
+      fuelRun: isFuelRunRaceType(raceTypeId),
+      fuel: this.manager.getFuelRunContext(distance),
       cadence,
       modeIntensity,
       playerLane,
@@ -2427,6 +2585,9 @@ class RoadDirector {
   }
 
   chooseWaveType(context) {
+    if (context.fuelRun) {
+      return this.chooseFuelRunWaveType(context);
+    }
     if (this.forceRecoveryNext) {
       this.forceRecoveryNext = false;
       return "recoveryGap";
@@ -2544,6 +2705,56 @@ class RoadDirector {
     return weightedChoice(weights, () => this.random()) || "doubleGate";
   }
 
+  chooseFuelRunWaveType(context) {
+    if (this.forceRecoveryNext) {
+      this.forceRecoveryNext = false;
+      return context.fuel?.timeSinceLastGasCan >= (context.fuel?.minGasGapSeconds || 8)
+        ? "fuelAfterPressure"
+        : "fuelTrafficPressure";
+    }
+    const fuel = context.fuel || {};
+    const timeSinceGas = Number.isFinite(fuel.timeSinceLastGasCan) ? fuel.timeSinceLastGasCan : 0;
+    const minGap = fuel.minGasGapSeconds || 8;
+    const targetGap = fuel.targetGasGapSeconds || 16;
+    const maxGap = fuel.maxGasGapSeconds || 24;
+    const pastOpeningGrace = context.progress > 0.06 || (context.run.elapsed || 0) >= FUEL_RUN_CONFIG.initialGasGraceSeconds;
+    const low = Boolean(fuel.low);
+    const critical = Boolean(fuel.critical);
+    const overdue = pastOpeningGrace && timeSinceGas >= maxGap;
+    const due = pastOpeningGrace && timeSinceGas >= targetGap;
+    const canSpawnFuel = pastOpeningGrace && timeSinceGas >= minGap && context.progress < 0.97;
+
+    if (critical && canSpawnFuel && (overdue || this.random() < 0.82)) {
+      return "fuelLowRescue";
+    }
+    if ((low || overdue) && canSpawnFuel) {
+      return weightedChoice([
+        { value: "fuelTrafficGate", weight: 2.4 },
+        { value: "fuelAfterPressure", weight: 1.8 },
+        { value: "fuelSideTemptation", weight: low ? 1.25 : 1.55 },
+        { value: "fuelSplit", weight: context.progress > 0.28 ? 0.55 : 0.12 },
+        { value: "fuelLowRescue", weight: critical ? 1.6 : 0.28 }
+      ], () => this.random()) || "fuelTrafficGate";
+    }
+    if (due && canSpawnFuel && this.random() < 0.72) {
+      return weightedChoice([
+        { value: "fuelSideTemptation", weight: 1.7 },
+        { value: "fuelTrafficGate", weight: 1.55 },
+        { value: "fuelAfterPressure", weight: 1.1 },
+        { value: "fuelSplit", weight: context.progress > 0.24 ? 0.48 : 0.08 }
+      ], () => this.random()) || "fuelSideTemptation";
+    }
+
+    const supportWeight = context.progress > 0.18 && context.progress < 0.88 ? 1.7 : 0.72;
+    return weightedChoice([
+      { value: "fuelTrafficPressure", weight: context.forceMeaningful ? 3.2 : 2.55 },
+      { value: "fuelTrafficGate", weight: canSpawnFuel ? (context.centerNeedsChallenge || context.needsMovementChallenge ? 1.8 : 1.05) : 0 },
+      { value: "fuelSideTemptation", weight: canSpawnFuel ? 0.55 : 0 },
+      { value: "fuelSupport", weight: supportWeight },
+      { value: "fuelAfterPressure", weight: canSpawnFuel ? 0.36 : 0 }
+    ], () => this.random()) || "fuelTrafficPressure";
+  }
+
   isWaveAllowed(type, context) {
     if (type === "fourLaneSpike") {
       if (context.progress < TRACK_DIRECTOR.fourLaneMinProgress) return false;
@@ -2596,6 +2807,7 @@ class RoadDirector {
       blockedLanes: new Set(),
       boostLanes: [],
       rampLanes: [],
+      gasCanLanes: [],
       obstacleTypes: {},
       pressure: 0,
       centerBlocked: false,
@@ -2618,6 +2830,13 @@ class RoadDirector {
       boostTemptation: "Boost Temptation",
       nearMissCorridor: "Near-Miss Corridor",
       fourLaneSpike: "Four-Lane Spike",
+      fuelTrafficPressure: "Fuel Traffic Pressure",
+      fuelSideTemptation: "Gas Can Side Temptation",
+      fuelTrafficGate: "Traffic Gate + Fuel",
+      fuelAfterPressure: "Fuel After Pressure",
+      fuelSplit: "Fuel Split",
+      fuelLowRescue: "Low Fuel Rescue",
+      fuelSupport: "Fuel Support",
       recoveryGap: "Recovery Gap"
     };
     return labels[type] || type;
@@ -2636,6 +2855,13 @@ class RoadDirector {
       boostTemptation: () => this.waveBoostTemptation(distance, context, result),
       nearMissCorridor: () => this.waveNearMissCorridor(distance, context, result),
       fourLaneSpike: () => this.waveFourLaneSpike(distance, context, result),
+      fuelTrafficPressure: () => this.waveFuelTrafficPressure(distance, context, result),
+      fuelSideTemptation: () => this.waveFuelSideTemptation(distance, context, result),
+      fuelTrafficGate: () => this.waveFuelTrafficGate(distance, context, result),
+      fuelAfterPressure: () => this.waveFuelAfterPressure(distance, context, result),
+      fuelSplit: () => this.waveFuelSplit(distance, context, result),
+      fuelLowRescue: () => this.waveFuelLowRescue(distance, context, result),
+      fuelSupport: () => this.waveFuelSupport(distance, context, result),
       recoveryGap: () => this.waveRecoveryGap(distance, context, result)
     };
     (handlers[type] || handlers.singleBlocker)();
@@ -2670,12 +2896,44 @@ class RoadDirector {
       result.boostLanes.push(lane);
     } else if (obstacle.type === "ramp") {
       result.rampLanes.push(lane);
+    } else if (obstacle.type === "gasCan") {
+      result.gasCanLanes.push(lane);
     }
 
     if (this.manager.isFairnessBlocker(obstacle)) {
       const blockedLane = obstacle.type === "deer" ? TRACK_DIRECTOR.centerLane : lane;
       result.blockedLanes.add(blockedLane);
       if (blockedLane === TRACK_DIRECTOR.centerLane) result.centerBlocked = true;
+    }
+  }
+
+  recordFuelPlacement(obstacle, context, result, pattern = result?.type || "fuel") {
+    if (!obstacle) return;
+    const run = context.run || this.manager.game.run || {};
+    const lane = Math.round(clamp(Number.isFinite(obstacle.laneFloat) ? obstacle.laneFloat : obstacle.lane, 0, LANES - 1));
+    const gap = Math.max(0, Number.isFinite(run.timeSinceLastGasCan) ? run.timeSinceLastGasCan : 0);
+    const stats = this.stats;
+    const sectionStats = this.getSectionStats(stats, context.section);
+    stats.gasCanGapSeconds.push(gap);
+    stats.longestGasCanGapSeconds = Math.max(stats.longestGasCanGapSeconds || 0, gap);
+    stats.gasCanLaneCounts[lane] += 1;
+    stats.fuelPatternCounts[pattern] = (stats.fuelPatternCounts[pattern] || 0) + 1;
+    sectionStats.gasCanCount = (sectionStats.gasCanCount || 0) + 1;
+    sectionStats.fuelPatternCounts[pattern] = (sectionStats.fuelPatternCounts[pattern] || 0) + 1;
+
+    run.gasCansSpawned = Math.max(0, (run.gasCansSpawned || 0) + 1);
+    run.lastGasCanDistance = obstacle.distance;
+    run.maxTimeBetweenGasCans = Math.max(run.maxTimeBetweenGasCans || 0, gap);
+    if (Array.isArray(run.gasCanGapSamples)) run.gasCanGapSamples.push(gap);
+    if (run.fuelOpportunitiesBySection && context.section?.id) {
+      run.fuelOpportunitiesBySection[context.section.id] = (run.fuelOpportunitiesBySection[context.section.id] || 0) + 1;
+    }
+    run.timeSinceLastGasCan = 0;
+
+    if (run.simulateFuelPickups && isFuelRunRaceType(run.raceTypeId)) {
+      const restore = Number.isFinite(run.gasCanRestoreAmount) ? run.gasCanRestoreAmount : getFuelRunTuning(run.speedClassId).gasCanRestoreAmount;
+      run.fuel = clamp((run.fuel || 0) + restore * 0.85, 0, run.fuelMax || FUEL_RUN_CONFIG.fuelMax);
+      run.simulatedFuelRestored = (run.simulatedFuelRestored || 0) + restore;
     }
   }
 
@@ -2792,6 +3050,7 @@ class RoadDirector {
       blockedLanes: Array.from(result.blockedLanes).sort((a, b) => a - b),
       boostLanes: result.boostLanes.slice(),
       rampLanes: result.rampLanes.slice(),
+      gasCanLanes: result.gasCanLanes.slice(),
       obstacles: result.spawned.map((obstacle) => ({
         type: obstacle.type,
         variant: obstacle.variant || "",
@@ -2815,6 +3074,7 @@ class RoadDirector {
         blockedLanes: this.currentWave.blockedLanes.slice(),
         boostLanes: this.currentWave.boostLanes.slice(),
         rampLanes: this.currentWave.rampLanes.slice(),
+        gasCanLanes: this.currentWave.gasCanLanes.slice(),
         obstacles: this.currentWave.obstacles.map((obstacle) => ({ ...obstacle }))
       });
       if (context.run.roadDirectorSequence.length > 40) {
@@ -2860,7 +3120,14 @@ class RoadDirector {
       rampEscape: 0.94,
       boostTemptation: 0.78,
       nearMissCorridor: 1,
-      fourLaneSpike: 1.16
+      fourLaneSpike: 1.16,
+      fuelTrafficPressure: 0.88,
+      fuelSideTemptation: 0.9,
+      fuelTrafficGate: 0.94,
+      fuelAfterPressure: 1.02,
+      fuelSplit: 1.06,
+      fuelLowRescue: 0.72,
+      fuelSupport: 0.96
     };
     const recoveryScale = result.type === "recoveryGap" ? (cadence.recoveryScale ?? 1) : 1;
     return (multipliers[result.type] || 1) * (cadence.spacingScale ?? 1) * recoveryScale * sectionCadence * sectionRecovery;
@@ -2885,6 +3152,14 @@ class RoadDirector {
     const section = getTrackSection(this.manager.track, progress);
     return {
       seed: formatRoadSeed(run.roadSeed),
+      raceType: getRaceTypeLabel(run.raceTypeId),
+      fuelRunObjectMixActive: Boolean(run.fuelRunObjectMixActive),
+      fuelAmount: Number.isFinite(run.fuel) ? run.fuel : 0,
+      fuelDrainPerSecond: Number.isFinite(run.fuelDrainPerSecond) ? run.fuelDrainPerSecond : 0,
+      timeSinceLastGasCan: Number.isFinite(run.timeSinceLastGasCan) ? run.timeSinceLastGasCan : 0,
+      gasCansCollected: Math.max(0, Math.round(run.gasCansCollected || 0)),
+      lowFuelActive: Boolean(run.lowFuelActive),
+      criticalFuelActive: Boolean(run.criticalFuelActive),
       seedHash: Number.isFinite(run.roadSeedHash) ? run.roadSeedHash : 0,
       rngState: Number.isFinite(run.roadRngState) ? run.roadRngState : 0,
       band: current.band || getTrackDirectorBand(this.manager.game.run?.distance / Math.max(1, this.manager.track?.distanceToFinish || 1)).label,
@@ -2929,6 +3204,8 @@ class RoadDirector {
       meaningfulWaveGapCount: section.meaningfulWaveGapCount,
       meaningfulWaveGapSum: section.meaningfulWaveGapSum,
       longestActiveEmptySeconds: section.longestActiveEmptySeconds,
+      gasCanCount: section.gasCanCount || 0,
+      fuelPatternCounts: { ...(section.fuelPatternCounts || {}) },
       pressureCounts: { ...section.pressureCounts },
       waveCounts: { ...section.waveCounts },
       averagePressure: section.totalWaves ? section.pressureSum / section.totalWaves : 0,
@@ -2987,6 +3264,12 @@ class RoadDirector {
       waveCounts: { ...stats.waveCounts },
       boostLaneCounts: stats.boostLaneCounts.slice(),
       rampLaneCounts: stats.rampLaneCounts.slice(),
+      gasCanLaneCounts: stats.gasCanLaneCounts.slice(),
+      gasCanGapCount: stats.gasCanGapSeconds.length,
+      gasCanGapSum: gapSum(stats.gasCanGapSeconds),
+      averageGasCanGapSeconds: averageGap(stats.gasCanGapSeconds),
+      longestGasCanGapSeconds: Math.max(stats.longestGasCanGapSeconds || 0, this.manager.game.run?.timeSinceLastGasCan || 0),
+      fuelPatternCounts: { ...stats.fuelPatternCounts },
       obstacleTypeCounts: { ...stats.obstacleTypeCounts },
       averagePressureBudget: stats.totalWaves ? stats.pressureBudgetSum / stats.totalWaves : 0,
       averagePressure: stats.totalWaves ? stats.pressureSum / stats.totalWaves : 0,
@@ -3319,7 +3602,145 @@ class RoadDirector {
     }
   }
 
+  chooseFuelBlockerType(context, heavyChance = 0.22) {
+    const difficulty = context.difficulty;
+    const options = [
+      { value: "slowCar", weight: 1.65 },
+      { value: "fastCar", weight: 0.65 + difficulty * 1.25 },
+      { value: "truck", weight: heavyChance + difficulty * 0.48 },
+      { value: "barrier", weight: heavyChance * 0.85 + difficulty * 0.42 }
+    ];
+    if (context.speedClassId === "sunday") {
+      options.find((item) => item.value === "truck").weight *= 0.42;
+      options.find((item) => item.value === "barrier").weight *= 0.58;
+    }
+    if (context.speedClassId === "turbo") {
+      options.find((item) => item.value === "fastCar").weight *= 1.28;
+      options.find((item) => item.value === "truck").weight *= 1.18;
+    }
+    return weightedChoice(options, () => this.random()) || "slowCar";
+  }
+
+  pickFuelCanLane(context, excluded = [], options = {}) {
+    let lanes = this.lanesExcept(excluded);
+    if (!lanes.length) lanes = this.allLanes();
+    if (options.preferPlayer && lanes.includes(context.playerLane) && this.random() < 0.58) return context.playerLane;
+    const sideLanes = lanes.filter((lane) => lane !== TRACK_DIRECTOR.centerLane);
+    if (sideLanes.length && (options.preferSide || this.random() < 0.72)) {
+      lanes = sideLanes;
+    }
+    if (!options.allowFreeCenter && lanes.length > 1) {
+      const withoutCenter = lanes.filter((lane) => lane !== TRACK_DIRECTOR.centerLane);
+      if (withoutCenter.length) lanes = withoutCenter;
+    }
+    return randomChoice(shuffle(lanes, () => this.random()), () => this.random());
+  }
+
+  trySpawnFuelCan(preferredLanes, distance, context, result, pattern = result.type) {
+    const lanes = Array.isArray(preferredLanes) ? preferredLanes : [preferredLanes];
+    const fallback = shuffle(this.allLanes(), () => this.random());
+    const ordered = lanes.concat(fallback).filter((lane, index, list) => Number.isFinite(lane) && lane >= 0 && lane < LANES && list.indexOf(lane) === index);
+    for (const lane of ordered) {
+      const spawned = this.spawn("gasCan", lane, distance, result, { allowLaneAdjust: false });
+      if (spawned) {
+        this.recordFuelPlacement(spawned, context, result, pattern);
+        return spawned;
+      }
+    }
+    return null;
+  }
+
+  waveFuelTrafficPressure(distance, context, result) {
+    const safeLane = this.pickWaveSafeLane(context, { centerSafeChance: context.centerRestChance * 0.7 });
+    const lanes = this.orderPressureLanes(context, shuffle(this.lanesExcept(safeLane), () => this.random()));
+    const count = context.speedClassId === "sunday" ? 1 : (context.progress > 0.55 || ["pro", "turbo"].includes(context.speedClassId) ? 3 : 2);
+    for (let i = 0; i < count; i += 1) {
+      const lane = lanes[i];
+      if (!Number.isFinite(lane)) continue;
+      const gap = i === 2 ? clamp(context.cruiseSpeed * 0.16, 130, 240) : 0;
+      this.spawn(this.chooseFuelBlockerType(context, i === 0 ? 0.16 : 0.28), lane, distance + gap, result);
+    }
+  }
+
+  waveFuelSideTemptation(distance, context, result) {
+    const gasLane = this.pickFuelCanLane(context, [], { preferSide: true });
+    const lanes = this.orderPressureLanes(context, shuffle(this.lanesExcept(gasLane), () => this.random()));
+    this.spawn(this.chooseFuelBlockerType(context, 0.16), lanes[0], distance, result);
+    if (lanes.includes(TRACK_DIRECTOR.centerLane) && this.random() < 0.72) {
+      this.spawn(this.chooseFuelBlockerType(context, 0.18), TRACK_DIRECTOR.centerLane, distance + 55, result);
+    } else if (Number.isFinite(lanes[1])) {
+      this.spawn(this.chooseFuelBlockerType(context, 0.2), lanes[1], distance + 80, result);
+    }
+    this.trySpawnFuelCan([gasLane], distance + clamp(context.cruiseSpeed * 0.3, 310, 470), context, result, "sideTemptation");
+  }
+
+  waveFuelTrafficGate(distance, context, result) {
+    const safeLane = this.pickWaveSafeLane(context, {
+      preferSide: context.centerNeedsChallenge,
+      centerSafeChance: context.centerRestChance * 0.62
+    });
+    const lanes = this.orderPressureLanes(context, shuffle(this.lanesExcept(safeLane), () => this.random()));
+    this.spawn(this.chooseFuelBlockerType(context, 0.18), lanes[0], distance, result);
+    this.spawn(this.chooseFuelBlockerType(context, 0.22), lanes[1], distance, result);
+    if (context.progress > 0.32 && ["arcade", "pro", "turbo"].includes(context.speedClassId) && Number.isFinite(lanes[2]) && this.canAddPressure(result, "slowCar", context, 0.35) && this.random() < (context.speedClassId === "turbo" ? 0.78 : 0.42)) {
+      this.spawn(this.chooseFuelBlockerType(context, 0.18), lanes[2], distance + clamp(context.cruiseSpeed * 0.18, 150, 260), result);
+    }
+    this.trySpawnFuelCan([safeLane], distance + clamp(context.cruiseSpeed * 0.34, 340, 520), context, result, "trafficGate");
+  }
+
+  waveFuelAfterPressure(distance, context, result) {
+    const safeLane = this.pickWaveSafeLane(context, { preferSide: true, centerSafeChance: context.centerRestChance * 0.48 });
+    const lanes = this.orderPressureLanes(context, shuffle(this.lanesExcept(safeLane), () => this.random()));
+    const count = context.speedClassId === "sunday" ? 2 : 3;
+    for (let i = 0; i < count; i += 1) {
+      this.spawn(this.chooseFuelBlockerType(context, i === 0 ? 0.2 : 0.32), lanes[i], distance + (i === 2 ? 110 : 0), result);
+    }
+    this.trySpawnFuelCan([safeLane], distance + clamp(context.cruiseSpeed * 0.48, 480, 700), context, result, "afterPressure");
+  }
+
+  waveFuelSplit(distance, context, result) {
+    const candidates = shuffle(this.lanesExcept(TRACK_DIRECTOR.centerLane), () => this.random());
+    const gasA = candidates[0] ?? 0;
+    const gasB = candidates.find((lane) => Math.abs(lane - gasA) >= 2) ?? candidates[1] ?? 4;
+    const blockerLane = this.pickPressureLane(context, 0.42, [gasA, gasB]);
+    this.spawn(this.chooseFuelBlockerType(context, 0.22), blockerLane, distance, result);
+    const extraLane = this.pickPressureLane(context, 0.35, [gasA, gasB, blockerLane]);
+    if (Number.isFinite(extraLane) && this.random() < 0.72) {
+      this.spawn(this.chooseFuelBlockerType(context, 0.16), extraLane, distance + 95, result);
+    }
+    const fuelDistance = distance + clamp(context.cruiseSpeed * 0.32, 330, 520);
+    this.trySpawnFuelCan([gasA], fuelDistance, context, result, "fuelSplit");
+    this.trySpawnFuelCan([gasB], fuelDistance + clamp(context.cruiseSpeed * 0.08, 85, 150), context, result, "fuelSplit");
+  }
+
+  waveFuelLowRescue(distance, context, result) {
+    const fuelLane = this.pickFuelCanLane(context, [], {
+      preferPlayer: true,
+      preferSide: context.playerLane === TRACK_DIRECTOR.centerLane && this.random() < 0.42,
+      allowFreeCenter: this.random() < 0.34
+    });
+    const lanes = this.orderPressureLanes(context, shuffle(this.lanesExcept(fuelLane), () => this.random()));
+    const blockerCount = context.speedClassId === "sunday" ? 1 : 2;
+    for (let i = 0; i < blockerCount; i += 1) {
+      this.spawn(this.chooseFuelBlockerType(context, 0.16), lanes[i], distance + (i === 1 ? 60 : 0), result);
+    }
+    this.trySpawnFuelCan([fuelLane], distance + clamp(context.cruiseSpeed * 0.24, 240, 390), context, result, "lowFuelRescue");
+  }
+
+  waveFuelSupport(distance, context, result) {
+    const supportType = this.random() < 0.54 ? "boostPad" : "ramp";
+    const rewardLane = this.pickRewardLane(context);
+    this.spawn(supportType, rewardLane, distance + clamp(context.cruiseSpeed * 0.2, 210, 340), result);
+    const blockerLane = this.pickPressureLane(context, 0.3, [rewardLane]);
+    this.spawn(this.chooseFuelBlockerType(context, 0.12), blockerLane, distance, result);
+  }
+
   waveRecoveryGap(distance, context, result) {
+    if (context.fuelRun && context.fuel?.timeSinceLastGasCan >= (context.fuel?.targetGasGapSeconds || 16)) {
+      const lane = this.pickFuelCanLane(context, [], { preferSide: true, allowFreeCenter: false });
+      this.trySpawnFuelCan([lane], distance + clamp(context.cruiseSpeed * 0.24, 240, 390), context, result, "recoveryFuel");
+      return;
+    }
     if (context.progress > 0.18 && this.random() < (context.speedClassId === "sunday" ? 0.38 : 0.24)) {
       const lane = this.pickRewardLane(context);
       this.spawn("boostPad", lane, distance + clamp(context.cruiseSpeed * 0.24, 230, 390), result);
@@ -3412,6 +3833,32 @@ class ObstacleManager {
 
   getSpeedClassId() {
     return this.game.run?.speedClassId || DEFAULT_SPEED_CLASS_ID;
+  }
+
+  getRaceTypeId() {
+    return normalizeRaceTypeId(this.game.run?.raceTypeId, DEFAULT_RACE_TYPE_ID);
+  }
+
+  getFuelRunContext() {
+    const run = this.game.run || {};
+    if (!isFuelRunRaceType(run.raceTypeId)) return null;
+    const tuning = getFuelRunTuning(run.speedClassId);
+    const fuel = Number.isFinite(run.fuel) ? run.fuel : tuning.fuelMax;
+    return {
+      amount: fuel,
+      max: Number.isFinite(run.fuelMax) ? run.fuelMax : tuning.fuelMax,
+      percent: clamp(fuel / Math.max(1, Number.isFinite(run.fuelMax) ? run.fuelMax : tuning.fuelMax), 0, 1),
+      drainPerSecond: Number.isFinite(run.fuelDrainPerSecond) ? run.fuelDrainPerSecond : tuning.fuelDrainPerSecond,
+      restoreAmount: Number.isFinite(run.gasCanRestoreAmount) ? run.gasCanRestoreAmount : tuning.gasCanRestoreAmount,
+      timeSinceLastGasCan: Number.isFinite(run.timeSinceLastGasCan) ? run.timeSinceLastGasCan : 0,
+      gasCansCollected: Math.max(0, Math.round(run.gasCansCollected || 0)),
+      gasCansSpawned: Math.max(0, Math.round(run.gasCansSpawned || 0)),
+      low: fuel <= tuning.lowFuelThreshold,
+      critical: fuel <= tuning.criticalFuelThreshold,
+      minGasGapSeconds: tuning.minGasGapSeconds,
+      targetGasGapSeconds: tuning.targetGasGapSeconds,
+      maxGasGapSeconds: tuning.maxGasGapSeconds
+    };
   }
 
   getPatternSpacing(progress, difficulty, cruiseSpeed) {
@@ -3574,6 +4021,7 @@ class ObstacleManager {
   getSpawnSpacingClass(obstacle) {
     if (["slowCar", "fastCar", "truck", "barrier"].includes(obstacle.type)) return "heavy";
     if (["ramp", "boostPad"].includes(obstacle.type)) return "assist";
+    if (obstacle.type === "gasCan") return "collectible";
     if (obstacle.type === "deer") return "animal";
     return "small";
   }
@@ -3582,6 +4030,7 @@ class ObstacleManager {
     const baseByClass = {
       heavy: 360,
       assist: 340,
+      collectible: 300,
       animal: 320,
       small: 250
     };
@@ -3681,6 +4130,7 @@ class ObstacleManager {
           sameLane,
           boostOverlap: a.obstacle.type === "boostPad" || b.obstacle.type === "boostPad",
           rampOverlap: a.obstacle.type === "ramp" || b.obstacle.type === "ramp",
+          gasCanOverlap: a.obstacle.type === "gasCan" || b.obstacle.type === "gasCan",
           gap: Math.abs(a.obstacle.distance - b.obstacle.distance)
         });
       }
@@ -3906,6 +4356,10 @@ class CollisionSystem {
       if (collision.hit) {
         const result = this.getCollisionResult(obstacle, info);
         this.logCollision(obstacle, info, playerBox, obstacleBox, collision.overlap, result, minOverlapPx);
+        if (obstacle.type === "gasCan") {
+          this.game.collectGasCan(obstacle);
+          continue;
+        }
         if (run.airborne && !info.tall && obstacle.type !== "ramp" && obstacle.type !== "boostPad") {
           obstacle.hit = true;
           obstacle.remove = true;
@@ -3939,6 +4393,7 @@ class CollisionSystem {
     const run = this.game.run;
     if (run.airborne && !info.tall && obstacle.type !== "ramp" && obstacle.type !== "boostPad") return "airborne-pass";
     if (info.crash) return "crash";
+    if (obstacle.type === "gasCan") return "collect";
     if (obstacle.type === "oil") return "oil";
     if (obstacle.type === "ramp") return "ramp";
     if (obstacle.type === "boostPad") return "boost";
@@ -4587,6 +5042,7 @@ class Renderer {
     this.drawFloatingTexts();
     this.drawCountdown();
     this.drawCrashBeat();
+    this.drawFuelOutBeat();
     this.drawSectionNotice();
     this.drawHud();
     if (this.game.debugMode) this.drawDebug();
@@ -4842,6 +5298,8 @@ class Renderer {
       drawRamp(ctx, x, y, scale);
     } else if (obstacle.type === "boostPad") {
       drawBoostPad(ctx, x, y, scale);
+    } else if (obstacle.type === "gasCan") {
+      drawGasCan(ctx, x, y, scale);
     } else if (obstacle.type === "barrier") {
       drawBarrier(ctx, x, y, drawScale);
     } else if (obstacle.type === "branch") {
@@ -4884,7 +5342,7 @@ class Renderer {
       const overlap = rectOverlapSize(playerBox, box);
       const minOverlapPx = getCollisionMinOverlapPx(obstacle.type);
       const active = overlap.width > minOverlapPx && overlap.height > minOverlapPx;
-      const color = active ? "#f6fbff" : (info.crash ? "#ff3b58" : (obstacle.type === "ramp" || obstacle.type === "boostPad" ? "#44ff99" : "#ffe45e"));
+      const color = active ? "#f6fbff" : (info.crash ? "#ff3b58" : (obstacle.type === "ramp" || obstacle.type === "boostPad" || obstacle.type === "gasCan" ? "#44ff99" : "#ffe45e"));
       const variant = obstacle.variant ? ` ${obstacle.variant}` : "";
       if (renderBox) {
         drawHitboxRect(ctx, renderBox, "rgba(246, 251, 255, 0.6)", `${obstacle.type}${variant} render ${renderBox.w.toFixed(0)}x${renderBox.h.toFixed(0)}`, "render");
@@ -5127,6 +5585,29 @@ class Renderer {
     ctx.restore();
   }
 
+  drawFuelOutBeat() {
+    const run = this.game.run;
+    if (!ARCADE_FEEL.enabled || run.fuelOutBeatTimer <= 0) return;
+    const alpha = clamp(run.fuelOutBeatTimer / 0.78, 0, 1);
+    const ctx = this.ctx;
+    ctx.save();
+    ctx.globalAlpha = alpha * 0.18;
+    ctx.fillStyle = "#ffe45e";
+    ctx.fillRect(0, 0, this.width, this.height);
+    ctx.globalAlpha = Math.min(1, alpha * 1.15);
+    ctx.font = `900 ${Math.max(32, Math.min(68, this.width * 0.058))}px Trebuchet MS, Verdana, sans-serif`;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.lineWidth = 7;
+    ctx.strokeStyle = "rgba(0, 0, 0, 0.82)";
+    ctx.strokeText("OUT OF FUEL", this.width / 2, this.height * 0.38);
+    ctx.shadowBlur = 22;
+    ctx.shadowColor = "#ffe45e";
+    ctx.fillStyle = "#f6fbff";
+    ctx.fillText("OUT OF FUEL", this.width / 2, this.height * 0.38);
+    ctx.restore();
+  }
+
   drawSectionNotice() {
     const run = this.game.run;
     if (!ARCADE_FEEL.enabled || !run || run.sectionNoticeTimer <= 0 || this.game.screen !== "game") return;
@@ -5163,18 +5644,22 @@ class Renderer {
     const w = this.width;
     const progress = clamp(run.distance / run.track.distanceToFinish, 0, 1);
     const modeLabel = run.speedClass?.label || getSpeedClassLabel(run.speedClassId);
+    const raceTypeLabel = getRaceTypeLabel(run.raceTypeId);
+    const fuelRun = isFuelRunRaceType(run.raceTypeId);
     const hudItems = w >= 760
       ? [
         ["PLAYER", run.player.name],
         ["SCORE", formatScore(run.score)],
         ["SPEED", `${Math.round(run.currentSpeed)} MPH`],
         ["BOOST", `${run.manualBoosts}/3`],
+        ["TYPE", raceTypeLabel],
         ["MODE", modeLabel]
       ]
       : [
         ["SCORE", formatScore(run.score)],
         ["SPEED", `${Math.round(run.currentSpeed)}`],
         ["BOOST", `${run.manualBoosts}/3`],
+        ["TYPE", getRaceTypeConfig(run.raceTypeId).shortLabel || raceTypeLabel],
         ["MODE", modeLabel]
       ];
     ctx.save();
@@ -5198,7 +5683,8 @@ class Renderer {
 
     const barX = 16;
     const barY = 50;
-    const barW = Math.min(w - 32, w >= 760 ? 520 : 360);
+    const fuelGaugeW = fuelRun ? (w >= 760 ? 180 : 132) : 0;
+    const barW = Math.min(w - 32 - (fuelRun && w >= 620 ? fuelGaugeW + 22 : 0), w >= 760 ? 460 : 320);
     ctx.fillStyle = "rgba(255, 255, 255, 0.14)";
     ctx.fillRect(barX, barY, barW, 10);
     ctx.fillStyle = "#44ff99";
@@ -5210,13 +5696,52 @@ class Renderer {
     ctx.font = "700 12px Trebuchet MS, Verdana, sans-serif";
     const sectionLabel = String(run.currentSectionLabel || getTrackSection(run.track, progress).label || "").toUpperCase();
     const contextParts = [`${Math.round(progress * 100)}%`, sectionLabel];
+    contextParts.push(raceTypeLabel.toUpperCase());
     if (run.challengeMode) contextParts.push(`CHALLENGE ${run.challengeName}`);
     if (run.partyMode) contextParts.push(`PARTY ${run.partyTurnNumber}/${run.partyTotalPlayers}`);
     if (w >= 840) contextParts.push(`SEED ${formatRoadSeed(run.roadSeed)}`);
+    const drawFuelInline = fuelRun && w >= 620;
+    if (drawFuelInline) {
+      this.drawFuelGauge(ctx, w - fuelGaugeW - 16, 47, fuelGaugeW, 15);
+    }
     const statusX = w >= 760 ? barX + barW + 18 : barX;
     const statusY = w >= 760 ? 47 : 62;
-    const statusMaxWidth = w >= 760 ? Math.max(80, w - statusX - 12) : w - 32;
+    const statusMaxWidth = w >= 760
+      ? Math.max(80, w - statusX - (drawFuelInline ? fuelGaugeW + 30 : 12))
+      : (fuelRun && !drawFuelInline ? Math.max(80, w - fuelGaugeW - 54) : w - 32);
     drawFittedText(ctx, contextParts.join("  "), statusX, statusY, statusMaxWidth);
+    if (fuelRun && !drawFuelInline) {
+      this.drawFuelGauge(ctx, Math.max(16, w - fuelGaugeW - 16), 58, fuelGaugeW, 12);
+    }
+    ctx.restore();
+  }
+
+  drawFuelGauge(ctx, x, y, width, height) {
+    const run = this.game.run;
+    if (!run || !isFuelRunRaceType(run.raceTypeId)) return;
+    const percent = clamp((run.fuel || 0) / Math.max(1, run.fuelMax || FUEL_RUN_CONFIG.fuelMax), 0, 1);
+    const critical = run.criticalFuelActive;
+    const low = run.lowFuelActive;
+    const color = critical ? "#ff334c" : (low ? "#ffe45e" : (percent <= 0.55 ? "#44ff99" : "#28f6ff"));
+    const pulse = critical ? 0.55 + Math.sin((run.elapsed || 0) * 12) * 0.28 : (low ? 0.42 + Math.sin((run.elapsed || 0) * 7) * 0.16 : 0.18);
+    ctx.save();
+    ctx.fillStyle = "rgba(5, 7, 18, 0.92)";
+    ctx.fillRect(x, y, width, height);
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 2;
+    ctx.shadowBlur = critical || low ? 14 : 8;
+    ctx.shadowColor = color;
+    ctx.strokeRect(x, y, width, height);
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = color;
+    ctx.globalAlpha = critical || low ? clamp(pulse + 0.45, 0.45, 1) : 0.9;
+    ctx.fillRect(x + 3, y + 3, Math.max(0, (width - 6) * percent), Math.max(1, height - 6));
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = critical ? "#f6fbff" : "#07101b";
+    ctx.font = `900 ${Math.max(9, Math.min(12, height - 2))}px Trebuchet MS, Verdana, sans-serif`;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(`FUEL ${Math.ceil(run.fuel || 0)}`, x + width / 2, y + height / 2 + 0.5);
     ctx.restore();
   }
 
@@ -5286,6 +5811,7 @@ class Renderer {
     const nearbyTrafficSpriteDebug = this.getNearbyTrafficSpriteDebug(run);
     const lines = [
       "DEBUG `",
+      `race type: ${directorDebug.raceType}`,
       `mode: ${run.speedClass?.label || getSpeedClassLabel(run.speedClassId)} score x${(run.scoreMultiplier || 1).toFixed(2)}`,
       `seed: ${directorDebug.seed}`,
       ...partyLines,
@@ -5308,6 +5834,9 @@ class Renderer {
       `lane: ${run.targetLane} render ${run.renderLaneFloat.toFixed(2)}`,
       `vertical: ${(run.playerYRatio * 100).toFixed(1)}% input ${run.verticalInput}`,
       `distance: ${run.distance.toFixed(0)}`,
+      `fuel: ${isFuelRunRaceType(run.raceTypeId) ? `${directorDebug.fuelAmount.toFixed(1)}/${(run.fuelMax || 0).toFixed(0)} drain ${directorDebug.fuelDrainPerSecond.toFixed(2)}/s` : "hidden"}`,
+      `gas cans: ${directorDebug.gasCansCollected}/${run.gasCansSpawned || 0} last ${directorDebug.timeSinceLastGasCan.toFixed(1)}s`,
+      `fuel status: low ${directorDebug.lowFuelActive ? "yes" : "no"} critical ${directorDebug.criticalFuelActive ? "yes" : "no"} mix ${directorDebug.fuelRunObjectMixActive ? "fuel" : "classic"}`,
       `obstacles: ${this.game.obstacles.obstacles.length}`,
       `progress: ${(progress * 100).toFixed(1)}%`,
       `section: ${directorDebug.sectionId} ${directorDebug.sectionLabel} ${(directorDebug.sectionProgress * 100).toFixed(0)}%`,
@@ -5381,7 +5910,7 @@ class Renderer {
       `${format("truck")}  ${format("barrier")}`,
       `${format("cone")}  ${format("oil")}`,
       `${format("deer")}  ${format("ramp")}`,
-      `${format("boostPad", "boost")}  ${format("branch")}`
+      `${format("boostPad", "boost")}  ${format("gasCan", "gas")}  ${format("branch")}`
     ];
     const panelWidth = 304;
     const lineHeight = 15;
@@ -6238,6 +6767,46 @@ function drawBoostPad(ctx, x, y, scale = 1) {
   ctx.restore();
 }
 
+function drawGasCan(ctx, x, y, scale = 1) {
+  const w = 54 * scale;
+  const h = 64 * scale;
+  ctx.save();
+  ctx.translate(x, y);
+  drawShadow(ctx, w * 0.86, h * 0.72);
+  ctx.shadowBlur = 10;
+  ctx.shadowColor = "#ff334c";
+  ctx.fillStyle = "#c91f32";
+  pixelPath(ctx, [
+    [-0.34, -0.42],
+    [0.18, -0.42],
+    [0.36, -0.24],
+    [0.36, 0.42],
+    [-0.34, 0.42],
+    [-0.42, 0.28],
+    [-0.42, -0.32]
+  ], w, h);
+  ctx.strokeStyle = "#f6fbff";
+  ctx.lineWidth = Math.max(2, 3 * scale);
+  ctx.stroke();
+  ctx.shadowBlur = 0;
+
+  ctx.fillStyle = "#07101b";
+  ctx.fillRect(-w * 0.22, -h * 0.52, w * 0.38, h * 0.16);
+  ctx.fillStyle = "#ff334c";
+  ctx.fillRect(-w * 0.1, -h * 0.48, w * 0.18, h * 0.08);
+  ctx.fillStyle = "#f6fbff";
+  ctx.fillRect(-w * 0.22, -h * 0.12, w * 0.44, h * 0.09);
+  ctx.fillStyle = "#ffe45e";
+  ctx.beginPath();
+  ctx.moveTo(0, -h * 0.02);
+  ctx.bezierCurveTo(w * 0.18, h * 0.12, w * 0.12, h * 0.3, 0, h * 0.3);
+  ctx.bezierCurveTo(-w * 0.12, h * 0.3, -w * 0.18, h * 0.12, 0, -h * 0.02);
+  ctx.fill();
+  ctx.fillStyle = "#07101b";
+  ctx.fillRect(w * 0.24, -h * 0.34, w * 0.24, h * 0.1);
+  ctx.restore();
+}
+
 function drawBarrier(ctx, x, y, scale = 1) {
   const w = 84 * scale;
   const h = 70 * scale;
@@ -6433,6 +7002,7 @@ class NeonRoadRally {
     this.debugSpeedScale = 1;
     this.attractDistance = 0;
     this.pendingRoadSeed = generateReadableRoadSeed();
+    this.pendingRaceTypeId = DEFAULT_RACE_TYPE_ID;
     this.partySetup = null;
     this.partySession = null;
     this.roadRng = null;
@@ -6463,10 +7033,32 @@ class NeonRoadRally {
       speedClassId: speedClass.id,
       speedClass,
       scoreMultiplier: speedClass.scoreMultiplier,
+      raceTypeId: DEFAULT_RACE_TYPE_ID,
+      raceType: getRaceTypeConfig(DEFAULT_RACE_TYPE_ID),
+      fuelMax: 0,
+      fuel: 0,
+      fuelDrainPerSecond: 0,
+      gasCanRestoreAmount: 0,
+      lowFuelThreshold: 0,
+      criticalFuelThreshold: 0,
+      lowFuelActive: false,
+      criticalFuelActive: false,
+      fuelWarningCooldown: 0,
+      fuelWarningState: "none",
+      fuelRunObjectMixActive: false,
+      timeSinceLastGasCan: 0,
+      longestNoFuelStretchSeconds: 0,
+      maxTimeBetweenGasCans: 0,
+      gasCanGapSamples: [],
+      gasCansSpawned: 0,
+      gasCansCollected: 0,
+      fuelCollected: 0,
+      fuelOpportunitiesBySection: {},
+      simulatedFuelRestored: 0,
       roadSeed: DEFAULT_ROAD_SEED,
-      roadSeedSource: getRunRandomSeedSource(DEFAULT_ROAD_SEED, track, speedClass.id),
-      roadSeedHash: hashSeed(getRunRandomSeedSource(DEFAULT_ROAD_SEED, track, speedClass.id)),
-      roadRngState: hashSeed(getRunRandomSeedSource(DEFAULT_ROAD_SEED, track, speedClass.id)),
+      roadSeedSource: getRunRandomSeedSource(DEFAULT_ROAD_SEED, track, speedClass.id, DEFAULT_RACE_TYPE_ID),
+      roadSeedHash: hashSeed(getRunRandomSeedSource(DEFAULT_ROAD_SEED, track, speedClass.id, DEFAULT_RACE_TYPE_ID)),
+      roadRngState: hashSeed(getRunRandomSeedSource(DEFAULT_ROAD_SEED, track, speedClass.id, DEFAULT_RACE_TYPE_ID)),
       roadDirectorSequence: [],
       currentSectionId: section.id,
       currentSectionLabel: section.label,
@@ -6533,7 +7125,9 @@ class NeonRoadRally {
         clean: 0,
         nearMiss: 0,
         boostPad: 0,
-        ramp: 0
+        ramp: 0,
+        gasCan: 0,
+        fuelBonus: 0
       },
       scoreBreakdown: {
         distance: 0,
@@ -6545,7 +7139,9 @@ class NeonRoadRally {
         unusedBoosts: 0,
         slowdownPenalties: 0,
         boostPad: 0,
-        ramp: 0
+        ramp: 0,
+        gasCan: 0,
+        fuelBonus: 0
       },
       lastCollision: "clear",
       collisionState: "clear",
@@ -6555,6 +7151,7 @@ class NeonRoadRally {
       boostBurstTimer: 0,
       finishFlashTimer: 0,
       crashBeatTimer: 0,
+      fuelOutBeatTimer: 0,
       inputFlashTimer: 0,
       inputFlashKey: "none",
       lastInputKey: "none",
@@ -6598,6 +7195,7 @@ class NeonRoadRally {
     run.boostBurstTimer = Math.max(0, (run.boostBurstTimer || 0) - dt);
     run.finishFlashTimer = Math.max(0, (run.finishFlashTimer || 0) - dt);
     run.crashBeatTimer = Math.max(0, (run.crashBeatTimer || 0) - dt);
+    run.fuelOutBeatTimer = Math.max(0, (run.fuelOutBeatTimer || 0) - dt);
     run.inputFlashTimer = Math.max(0, (run.inputFlashTimer || 0) - dt);
     run.sectionNoticeTimer = Math.max(0, (run.sectionNoticeTimer || 0) - dt);
     if (Array.isArray(run.floatingTexts)) {
@@ -6624,6 +7222,98 @@ class NeonRoadRally {
     if ((sectionChanged && run.raceActive) || showInitialNotice) {
       run.sectionNoticeTimer = 1.25;
     }
+  }
+
+  configureFuelForRun(run) {
+    if (!run) return;
+    const fuelRun = isFuelRunRaceType(run.raceTypeId);
+    const tuning = getFuelRunTuning(run.speedClassId);
+    run.fuelRunObjectMixActive = fuelRun;
+    run.fuelMax = fuelRun ? tuning.fuelMax : 0;
+    run.fuel = fuelRun ? tuning.fuelMax : 0;
+    run.fuelDrainPerSecond = fuelRun ? tuning.fuelDrainPerSecond : 0;
+    run.gasCanRestoreAmount = fuelRun ? tuning.gasCanRestoreAmount : 0;
+    run.lowFuelThreshold = fuelRun ? tuning.lowFuelThreshold : 0;
+    run.criticalFuelThreshold = fuelRun ? tuning.criticalFuelThreshold : 0;
+    run.lowFuelActive = false;
+    run.criticalFuelActive = false;
+    run.fuelWarningCooldown = 0;
+    run.fuelWarningState = "none";
+    run.timeSinceLastGasCan = 0;
+    run.longestNoFuelStretchSeconds = 0;
+    run.maxTimeBetweenGasCans = 0;
+    run.gasCanGapSamples = [];
+    run.gasCansSpawned = 0;
+    run.gasCansCollected = 0;
+    run.fuelCollected = 0;
+    run.fuelOpportunitiesBySection = {};
+    run.simulatedFuelRestored = 0;
+  }
+
+  updateFuelRun(dt) {
+    const run = this.run;
+    if (!run || !isFuelRunRaceType(run.raceTypeId) || run.ended || !run.raceActive) return;
+    run.timeSinceLastGasCan = Math.max(0, (run.timeSinceLastGasCan || 0) + dt);
+    run.longestNoFuelStretchSeconds = Math.max(run.longestNoFuelStretchSeconds || 0, run.timeSinceLastGasCan);
+    run.fuelWarningCooldown = Math.max(0, (run.fuelWarningCooldown || 0) - dt);
+    run.fuel = clamp(run.fuel - run.fuelDrainPerSecond * dt, 0, run.fuelMax);
+    run.lowFuelActive = run.fuel <= run.lowFuelThreshold;
+    run.criticalFuelActive = run.fuel <= run.criticalFuelThreshold;
+    this.maybePlayFuelWarning();
+    if (run.fuel <= 0 && !run.ended) {
+      this.endRace("outOfFuel", "Out of Fuel");
+    }
+  }
+
+  maybePlayFuelWarning() {
+    const run = this.run;
+    if (!run || !isFuelRunRaceType(run.raceTypeId) || run.fuelWarningCooldown > 0) return;
+    const nextState = run.criticalFuelActive ? "critical" : (run.lowFuelActive ? "low" : "none");
+    if (nextState === "none") {
+      run.fuelWarningState = "none";
+      return;
+    }
+    if (nextState !== run.fuelWarningState || nextState === "critical") {
+      run.fuelWarningState = nextState;
+      run.fuelWarningCooldown = nextState === "critical"
+        ? FUEL_RUN_CONFIG.criticalWarningCooldownSeconds
+        : FUEL_RUN_CONFIG.warningCooldownSeconds;
+      this.audio.playSfx("warning", {
+        cooldownMs: nextState === "critical" ? 2400 : 3800,
+        maxInstances: 1,
+        volume: this.audio.sfxVolume * (nextState === "critical" ? 0.72 : 0.58)
+      });
+    }
+  }
+
+  collectGasCan(obstacle) {
+    const run = this.run;
+    if (!run || obstacle.hit || obstacle.remove) return;
+    obstacle.hit = true;
+    obstacle.remove = true;
+    run.lastCollision = "Gas Can";
+    run.collisionState = "collected Gas Can";
+    if (!isFuelRunRaceType(run.raceTypeId)) return;
+    const before = run.fuel;
+    const restore = Number.isFinite(run.gasCanRestoreAmount) ? run.gasCanRestoreAmount : getFuelRunTuning(run.speedClassId).gasCanRestoreAmount;
+    run.fuel = clamp(run.fuel + restore, 0, run.fuelMax);
+    run.gasCansCollected += 1;
+    run.fuelCollected += 1;
+    run.lowFuelActive = run.fuel <= run.lowFuelThreshold;
+    run.criticalFuelActive = run.fuel <= run.criticalFuelThreshold;
+    if (!run.lowFuelActive) run.fuelWarningState = "none";
+    this.addScoreEvent("gasCan", FUEL_RUN_CONFIG.gasCanScore);
+    this.addFloatingScoreText(`FUEL +${Math.round(run.fuel - before)}`, {
+      color: "#ff4d3d",
+      size: 20,
+      life: 1,
+      yOffset: -88
+    });
+    this.audio.playSfx("menu", {
+      cooldownMs: 120,
+      maxInstances: 1,
+      volume: this.audio.sfxVolume * 0.42
+    });
   }
 
   updateRun(dt) {
@@ -6690,6 +7380,8 @@ class NeonRoadRally {
     run.scoreBreakdown.distance += distanceScore;
     this.addBaseScore(paceScore);
     run.scoreBreakdown.pace += paceScore;
+    this.updateFuelRun(dt);
+    if (run.ended) return;
 
     this.updateLaneVisual(dt);
 
@@ -6774,9 +7466,9 @@ class NeonRoadRally {
     return normalized || generateReadableRoadSeed();
   }
 
-  configureRunSeed(seed, track, speedClassId) {
+  configureRunSeed(seed, track, speedClassId, raceTypeId = DEFAULT_RACE_TYPE_ID) {
     const roadSeed = this.resolveRoadSeed(seed);
-    const source = getRunRandomSeedSource(roadSeed, track, speedClassId);
+    const source = getRunRandomSeedSource(roadSeed, track, speedClassId, raceTypeId);
     this.roadRng = createSeededRandomController(source);
     if (this.run) {
       this.run.roadSeed = roadSeed;
@@ -6849,6 +7541,7 @@ class NeonRoadRally {
         </div>
         <div class="challenge-meta-grid">
           <span><strong>Track</strong>${escapeHtml(track.name)}</span>
+          <span><strong>Race Type</strong>${escapeHtml(getRaceTypeLabel(challenge.raceType || DEFAULT_RACE_TYPE_ID))}</span>
           <span><strong>Race Mode</strong>${escapeHtml(getSpeedClassLabel(challenge.raceMode))}</span>
           <span><strong>Fixed Seed</strong>${escapeHtml(normalizeRoadSeed(challenge.seed, DEFAULT_ROAD_SEED))}</span>
           <span><strong>Best Score</strong>${escapeHtml(bestScore)}</span>
@@ -6886,6 +7579,7 @@ class NeonRoadRally {
       challenge,
       track: getTrackById(challenge.trackId),
       speedClassId: challenge.raceMode,
+      raceTypeId: challenge.raceType || DEFAULT_RACE_TYPE_ID,
       seed: challenge.seed
     });
   }
@@ -6896,6 +7590,9 @@ class NeonRoadRally {
     const player = options.player ? snapshotPartyPlayer(options.player) : this.profiles.ensureDefaultPlayer();
     const track = challenge ? getTrackById(challenge.trackId) : (options.track || TRACKS[0]);
     const speedClass = getSpeedClassConfig(challenge ? challenge.raceMode : (options.speedClassId ?? this.profiles.data.speedClassId));
+    const raceType = getRaceTypeConfig(challenge
+      ? (challenge.raceType || DEFAULT_RACE_TYPE_ID)
+      : (partyMode ? DEFAULT_RACE_TYPE_ID : (options.raceTypeId || options.raceType || this.pendingRaceTypeId || DEFAULT_RACE_TYPE_ID)));
     if (this.scoreTallyFrame) {
       cancelAnimationFrame(this.scoreTallyFrame);
       this.scoreTallyFrame = null;
@@ -6910,6 +7607,8 @@ class NeonRoadRally {
     this.run.speedClassId = speedClass.id;
     this.run.speedClass = speedClass;
     this.run.scoreMultiplier = speedClass.scoreMultiplier;
+    this.run.raceTypeId = raceType.id;
+    this.run.raceType = raceType;
     this.run.partyMode = partyMode;
     this.run.partySeedLocked = Boolean(options.partySeedLocked ?? partyMode);
     this.run.partyRoundNumber = partyMode ? (this.partySession?.roundNumber || 1) : 0;
@@ -6926,8 +7625,10 @@ class NeonRoadRally {
     this.run.speedCap = track.maxSpeed * SPEED_TUNING.maxBoostOverrunMultiplier * (this.debugSpeedScale || 1);
     this.run.speedCapped = false;
     this.run.debugSpeedScale = this.debugSpeedScale || 1;
+    this.configureFuelForRun(this.run);
     this.updateRaceSection(false);
-    this.configureRunSeed(challenge ? challenge.seed : (options.seed ?? this.pendingRoadSeed), track, speedClass.id);
+    this.configureRunSeed(challenge ? challenge.seed : (options.seed ?? this.pendingRoadSeed), track, speedClass.id, raceType.id);
+    this.pendingRaceTypeId = raceType.id;
     if (this.input) this.input.clearGameplayInput();
     this.obstacles.reset(track);
     this.setScreen("game");
@@ -7091,6 +7792,8 @@ class NeonRoadRally {
       slowdownPenalties: safeScore(raw.slowdownPenalties || run.penalties),
       boostPad: safeScore(raw.boostPad || run.bonuses?.boostPad),
       ramp: safeScore(raw.ramp || run.bonuses?.ramp),
+      gasCan: safeScore(raw.gasCan || run.bonuses?.gasCan),
+      fuelBonus: safeScore(raw.fuelBonus || run.bonuses?.fuelBonus),
       preMultiplierTotal: Math.max(0, Math.round(run.baseScore || 0)),
       multiplier: run.scoreMultiplier || 1,
       finalScore: Math.max(0, Math.round(run.score || 0))
@@ -7117,6 +7820,12 @@ class NeonRoadRally {
     }
     if (summary.status === "finished" && summary.speedClass === "turbo") {
       add("Turbo Survivor", "Finished Turbo", "hot");
+    }
+    if (summary.status === "finished" && summary.raceTypeId === FUEL_RUN_RACE_TYPE_ID) {
+      add("Fuel Run Finish", `${summary.fuelRemaining || 0} fuel left`, "hot");
+    }
+    if (summary.status === "outOfFuel") {
+      add("Out of Fuel", `${Math.round(summary.progress * 100)}% reached`, "danger");
     }
     if ((run.nearMisses || 0) >= 5) {
       add("Near-Miss Maniac", `${run.nearMisses} near misses`, "cool");
@@ -7168,12 +7877,14 @@ class NeonRoadRally {
   endRace(status, reason) {
     const run = this.run;
     if (run.ended) return;
+    status = normalizeRunStatus(status);
     run.ended = true;
     run.finished = status === "finished";
     run.endReason = reason;
     run.crashFlash = status === "crashed" ? 1 : 0;
     run.screenShake = status === "crashed" ? Math.max(run.screenShake || 0, ARCADE_FEEL.crashShake) : run.screenShake;
     run.crashBeatTimer = status === "crashed" ? 0.72 : 0;
+    run.fuelOutBeatTimer = status === "outOfFuel" ? 0.78 : 0;
 
     if (status === "finished") {
       run.finishFlashTimer = ARCADE_FEEL.finishFlashSeconds;
@@ -7193,7 +7904,18 @@ class NeonRoadRally {
       run.bonuses.speed = Math.max(0, Math.round(3000 * clamp((target - run.elapsed + 18) / target, 0, 1)));
       run.scoreBreakdown.speedBonus = run.bonuses.speed;
       this.addBaseScore(run.bonuses.speed);
+      if (isFuelRunRaceType(run.raceTypeId)) {
+        run.bonuses.fuelBonus = Math.max(0, Math.round(run.fuel)) * FUEL_RUN_CONFIG.fuelPointFinishBonus;
+        run.scoreBreakdown.fuelBonus = run.bonuses.fuelBonus;
+        this.addBaseScore(run.bonuses.fuelBonus);
+      }
       this.audio.playSfx("finish");
+    } else if (status === "outOfFuel") {
+      run.fuel = 0;
+      run.lowFuelActive = true;
+      run.criticalFuelActive = true;
+      run.screenShake = Math.max(run.screenShake || 0, 0.42);
+      this.audio.playSfx("warning", { cooldownMs: 1200, maxInstances: 1, volume: this.audio.sfxVolume * 0.72 });
     } else {
       this.audio.playSfx("crash");
     }
@@ -7220,9 +7942,13 @@ class NeonRoadRally {
       seed: run.roadSeed,
       speedClass: run.speedClassId,
       raceMode: run.speedClassId,
+      raceType: run.raceTypeId,
       score: run.score,
       status,
       time: run.elapsed,
+      fuelCollected: run.gasCansCollected || 0,
+      fuelRemaining: isFuelRunRaceType(run.raceTypeId) ? Math.max(0, Math.round(run.fuel || 0)) : 0,
+      fuelBonus: run.bonuses.fuelBonus || 0,
       partyMode: Boolean(run.partyMode),
       challengeId: run.challengeMode ? run.challengeId : "",
       challengeName: run.challengeMode ? run.challengeName : ""
@@ -7254,6 +7980,8 @@ class NeonRoadRally {
       speedClass: run.speedClassId,
       speedClassLabel: run.speedClass?.label || getSpeedClassLabel(run.speedClassId),
       scoreMultiplier: run.scoreMultiplier || 1,
+      raceTypeId: run.raceTypeId,
+      raceTypeLabel: getRaceTypeLabel(run.raceTypeId),
       distance: Math.min(run.distance, run.track.distanceToFinish),
       progress: clamp(run.distance / run.track.distanceToFinish, 0, 1),
       status,
@@ -7265,6 +7993,15 @@ class NeonRoadRally {
       nearMisses: run.nearMisses || 0,
       manualBoostsUsed: run.manualBoostsUsed || 0,
       laneMoves: run.laneMoves || 0,
+      gasCansSpawned: run.gasCansSpawned || 0,
+      gasCansCollected: run.gasCansCollected || 0,
+      fuelCollected: run.gasCansCollected || 0,
+      fuelRemaining: isFuelRunRaceType(run.raceTypeId) ? Math.max(0, Math.round(run.fuel || 0)) : 0,
+      fuelBonus: run.bonuses.fuelBonus || 0,
+      fuelDrainPerSecond: run.fuelDrainPerSecond || 0,
+      gasCanRestoreAmount: run.gasCanRestoreAmount || 0,
+      lowFuelThreshold: run.lowFuelThreshold || 0,
+      criticalFuelThreshold: run.criticalFuelThreshold || 0,
       scoreBreakdown,
       bestScore: debugSpeedScaleActive ? previousBestScore : (updatedProfilePlayer.bestScore || run.score),
       previousBestScore,
@@ -7301,7 +8038,7 @@ class NeonRoadRally {
       } else {
         this.showScoreScreen();
       }
-    }, status === "crashed" ? ARCADE_FEEL.crashScoreDelayMs : ARCADE_FEEL.finishScoreDelayMs);
+    }, status === "crashed" || status === "outOfFuel" ? ARCADE_FEEL.crashScoreDelayMs : ARCADE_FEEL.finishScoreDelayMs);
   }
 
   getPartyDebugInfo() {
@@ -7365,6 +8102,7 @@ class NeonRoadRally {
   async runSpawnSafetySimulation(options = {}) {
     if (this.simulationRunning) return;
     this.simulationRunning = true;
+    this.simulationRaceTypeId = normalizeRaceTypeId(options.raceTypeId || options.raceType, DEFAULT_RACE_TYPE_ID);
     this.showSimulationRunning();
     const seed = normalizeRoadSeed(options.seed ?? this.pendingRoadSeed, "sunset-highway-spawn-safety-v1");
     const summary = await this.runSpawnSafetySimulationCore({
@@ -7377,19 +8115,33 @@ class NeonRoadRally {
     this.showSimulationReport(summary);
   }
 
+  updateFuelRunSimulationState(simRun, dt) {
+    if (!simRun || !isFuelRunRaceType(simRun.raceTypeId)) return;
+    simRun.timeSinceLastGasCan = Math.max(0, (simRun.timeSinceLastGasCan || 0) + dt);
+    simRun.longestNoFuelStretchSeconds = Math.max(simRun.longestNoFuelStretchSeconds || 0, simRun.timeSinceLastGasCan);
+    simRun.fuel = clamp((simRun.fuel || 0) - (simRun.fuelDrainPerSecond || 0) * dt, 0, simRun.fuelMax || FUEL_RUN_CONFIG.fuelMax);
+    simRun.lowFuelActive = simRun.fuel <= (simRun.lowFuelThreshold || FUEL_RUN_CONFIG.lowFuelThreshold);
+    simRun.criticalFuelActive = simRun.fuel <= (simRun.criticalFuelThreshold || FUEL_RUN_CONFIG.criticalFuelThreshold);
+    if (simRun.fuel <= 0) simRun.simOutOfFuel = true;
+  }
+
   captureRoadDirectorSequence(options = {}) {
     const track = options.track || TRACKS[0];
     const speedClassId = normalizeSpeedClassId(options.speedClassId, DEFAULT_SPEED_CLASS_ID);
     const speedClass = getSpeedClassConfig(speedClassId);
+    const raceTypeId = normalizeRaceTypeId(options.raceTypeId || options.raceType, DEFAULT_RACE_TYPE_ID);
+    const raceType = getRaceTypeConfig(raceTypeId);
     const seed = normalizeRoadSeed(options.seed, DEFAULT_ROAD_SEED);
     const waveLimit = Math.max(1, Math.round(options.waveLimit || 10));
     const dt = Number.isFinite(options.dt) ? options.dt : 0.4;
-    const seedSource = getRunRandomSeedSource(seed, track, speedClassId);
+    const seedSource = getRunRandomSeedSource(seed, track, speedClassId, raceTypeId);
     const rng = createSeededRandom(seedSource);
     const simRun = {
       track,
       speedClassId,
       speedClass,
+      raceTypeId,
+      raceType,
       roadSeed: seed,
       roadSeedSource: seedSource,
       roadSeedHash: rng.seedHash,
@@ -7402,6 +8154,8 @@ class NeonRoadRally {
       targetLane: TRACK_DIRECTOR.centerLane,
       renderLaneFloat: TRACK_DIRECTOR.centerLane
     };
+    this.configureFuelForRun(simRun);
+    simRun.simulateFuelPickups = true;
     const simGame = {
       run: simRun,
       renderer: this.renderer,
@@ -7419,6 +8173,9 @@ class NeonRoadRally {
     while (simRun.distance < track.distanceToFinish && simRun.roadDirectorSequence.length < waveLimit) {
       const progress = clamp(simRun.distance / track.distanceToFinish, 0, 1);
       simRun.currentSpeed = getTrackCruiseSpeed(track, progress, speedClassId);
+      if (isFuelRunRaceType(raceTypeId)) {
+        this.updateFuelRunSimulationState(simRun, dt);
+      }
       simRun.distance += simRun.currentSpeed * dt;
       simRun.elapsed += dt;
       manager.update(dt);
@@ -7427,6 +8184,7 @@ class NeonRoadRally {
     return {
       seed,
       speedClassId,
+      raceTypeId,
       trackId: track.id,
       seedHash: rng.seedHash,
       rngState: rng.getState(),
@@ -7442,6 +8200,7 @@ class NeonRoadRally {
       blockedLanes: wave.blockedLanes,
       boostLanes: wave.boostLanes,
       rampLanes: wave.rampLanes,
+      gasCanLanes: wave.gasCanLanes,
       obstacles: (wave.obstacles || []).map((obstacle) => ({
         type: obstacle.type,
         variant: obstacle.variant || "",
@@ -7454,34 +8213,43 @@ class NeonRoadRally {
   runSeedDeterminismTest(options = {}) {
     const seed = normalizeRoadSeed(options.seed, "TEST-123");
     const speedClassId = normalizeSpeedClassId(options.speedClassId, DEFAULT_SPEED_CLASS_ID);
+    const raceTypeId = normalizeRaceTypeId(options.raceTypeId || options.raceType, DEFAULT_RACE_TYPE_ID);
     const alternateSeed = normalizeRoadSeed(options.alternateSeed, seed === "TEST-456" ? "TEST-789" : "TEST-456");
     const alternateMode = speedClassId === "turbo" ? "arcade" : "turbo";
+    const alternateRaceType = raceTypeId === FUEL_RUN_RACE_TYPE_ID ? DEFAULT_RACE_TYPE_ID : FUEL_RUN_RACE_TYPE_ID;
     const waveLimit = options.waveLimit || 10;
-    const first = this.captureRoadDirectorSequence({ seed, speedClassId, waveLimit });
-    const repeat = this.captureRoadDirectorSequence({ seed, speedClassId, waveLimit });
-    const changedSeed = this.captureRoadDirectorSequence({ seed: alternateSeed, speedClassId, waveLimit });
-    const changedMode = this.captureRoadDirectorSequence({ seed, speedClassId: alternateMode, waveLimit });
+    const first = this.captureRoadDirectorSequence({ seed, speedClassId, raceTypeId, waveLimit });
+    const repeat = this.captureRoadDirectorSequence({ seed, speedClassId, raceTypeId, waveLimit });
+    const changedSeed = this.captureRoadDirectorSequence({ seed: alternateSeed, speedClassId, raceTypeId, waveLimit });
+    const changedMode = this.captureRoadDirectorSequence({ seed, speedClassId: alternateMode, raceTypeId, waveLimit });
+    const changedRaceType = this.captureRoadDirectorSequence({ seed, speedClassId, raceTypeId: alternateRaceType, waveLimit });
     const firstFingerprint = this.getRoadDirectorSequenceFingerprint(first.sequence);
     const repeatFingerprint = this.getRoadDirectorSequenceFingerprint(repeat.sequence);
     const changedSeedFingerprint = this.getRoadDirectorSequenceFingerprint(changedSeed.sequence);
     const changedModeFingerprint = this.getRoadDirectorSequenceFingerprint(changedMode.sequence);
+    const changedRaceTypeFingerprint = this.getRoadDirectorSequenceFingerprint(changedRaceType.sequence);
     const summary = {
       seed,
       alternateSeed,
       speedClassId,
+      raceTypeId,
       alternateMode,
+      alternateRaceType,
       waveLimit,
       seedHash: first.seedHash,
       sameSeedMatches: firstFingerprint === repeatFingerprint,
       differentSeedChanges: firstFingerprint !== changedSeedFingerprint,
       differentModeChanges: firstFingerprint !== changedModeFingerprint,
+      differentRaceTypeChanges: firstFingerprint !== changedRaceTypeFingerprint,
       first,
       repeat,
       changedSeed,
       changedMode,
+      changedRaceType,
       pass: firstFingerprint === repeatFingerprint
         && firstFingerprint !== changedSeedFingerprint
         && firstFingerprint !== changedModeFingerprint
+        && firstFingerprint !== changedRaceTypeFingerprint
     };
     this.seedDeterminismStatus = summary;
     if (options.show !== false) {
@@ -7497,6 +8265,8 @@ class NeonRoadRally {
       : SPEED_CLASSES.map((speedClass) => speedClass.id);
     const runs = runsPerSpeedClass * speedClassIds.length;
     const baseSeed = options.seed || "sunset-highway-spawn-safety-v1";
+    const raceTypeId = normalizeRaceTypeId(options.raceTypeId || options.raceType, DEFAULT_RACE_TYPE_ID);
+    const fuelRun = isFuelRunRaceType(raceTypeId);
     const track = TRACKS[0];
     const dt = options.dt || 0.4;
     const pressureCounts = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
@@ -7509,9 +8279,16 @@ class NeonRoadRally {
     let sameLaneOverlaps = 0;
     let boostObjectOverlaps = 0;
     let rampObjectOverlaps = 0;
+    let gasCanOverlaps = 0;
     let minSameLaneSpacing = Infinity;
     let spacingSum = 0;
     let spacingSamples = 0;
+    let gasCansSpawnedSum = 0;
+    let gasCanMaxGapSum = 0;
+    let longestNoFuelStretch = 0;
+    let simulatedOutOfFuelRuns = 0;
+    let ignoringGasOutOfFuelRuns = 0;
+    const fuelOpportunitiesBySection = {};
     const invalidExamples = [];
     const overlapExamples = [];
     const perSpeedClass = {};
@@ -7540,6 +8317,9 @@ class NeonRoadRally {
         waveGapSum: 0,
         meaningfulWaveGapCount: 0,
         meaningfulWaveGapSum: 0,
+        gasCanGapCount: 0,
+        gasCanGapSum: 0,
+        longestGasCanGapSeconds: 0,
         longestCenterSafeSeconds: 0,
         longestWaveGapSeconds: 0,
         longestMeaningfulWaveGapSeconds: 0,
@@ -7550,6 +8330,8 @@ class NeonRoadRally {
         waveCounts: {},
         boostLaneCounts: Array(LANES).fill(0),
         rampLaneCounts: Array(LANES).fill(0),
+        gasCanLaneCounts: Array(LANES).fill(0),
+        fuelPatternCounts: {},
         obstacleTypeCounts: {},
         longestLaneSafeSeconds: Array(LANES).fill(0),
         sectionStats: {}
@@ -7587,6 +8369,8 @@ class NeonRoadRally {
         meaningfulWaveGapCount: 0,
         meaningfulWaveGapSum: 0,
         longestActiveEmptySeconds: 0,
+        gasCanCount: 0,
+        fuelPatternCounts: {},
         pressureCounts: { 0: 0, 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 },
         waveCounts: {}
       };
@@ -7614,8 +8398,10 @@ class NeonRoadRally {
       target.meaningfulWaveGapCount += source.meaningfulWaveGapCount || 0;
       target.meaningfulWaveGapSum += source.meaningfulWaveGapSum || 0;
       target.longestActiveEmptySeconds = Math.max(target.longestActiveEmptySeconds, source.longestActiveEmptySeconds || 0);
+      target.gasCanCount += source.gasCanCount || 0;
       mergeCountMap(target.pressureCounts, source.pressureCounts);
       mergeCountMap(target.waveCounts, source.waveCounts);
+      mergeCountMap(target.fuelPatternCounts, source.fuelPatternCounts);
     }
 
     function mergeSectionStats(target, source = {}) {
@@ -7643,6 +8429,8 @@ class NeonRoadRally {
           hardWavePercent: stats.totalWaves ? stats.hardWaveCount / stats.totalWaves : 0,
           recoveryWavePercent: stats.totalWaves ? stats.recoveryWaveCount / stats.totalWaves : 0,
           meaningfulWavePercent: stats.totalWaves ? stats.meaningfulWaveCount / stats.totalWaves : 0,
+          gasCanCount: stats.gasCanCount || 0,
+          fuelPatternCounts: { ...(stats.fuelPatternCounts || {}) },
           longestActiveEmptySeconds: stats.longestActiveEmptySeconds,
           averageWaveGapSeconds: stats.waveGapCount ? stats.waveGapSum / stats.waveGapCount : null,
           averageMeaningfulWaveGapSeconds: stats.meaningfulWaveGapCount ? stats.meaningfulWaveGapSum / stats.meaningfulWaveGapCount : null,
@@ -7661,6 +8449,7 @@ class NeonRoadRally {
         sameLaneOverlaps: 0,
         boostObjectOverlaps: 0,
         rampObjectOverlaps: 0,
+        gasCanOverlaps: 0,
         maxBlocked: 0
       };
     }
@@ -7699,6 +8488,9 @@ class NeonRoadRally {
       target.waveGapSum += stats.waveGapSum;
       target.meaningfulWaveGapCount += stats.meaningfulWaveGapCount;
       target.meaningfulWaveGapSum += stats.meaningfulWaveGapSum;
+      target.gasCanGapCount += stats.gasCanGapCount || 0;
+      target.gasCanGapSum += stats.gasCanGapSum || 0;
+      target.longestGasCanGapSeconds = Math.max(target.longestGasCanGapSeconds, stats.longestGasCanGapSeconds || 0);
       target.longestCenterSafeSeconds = Math.max(target.longestCenterSafeSeconds, stats.longestCenterSafeSeconds);
       target.longestWaveGapSeconds = Math.max(target.longestWaveGapSeconds, stats.longestWaveGapSeconds);
       target.longestMeaningfulWaveGapSeconds = Math.max(target.longestMeaningfulWaveGapSeconds, stats.longestMeaningfulWaveGapSeconds);
@@ -7708,8 +8500,10 @@ class NeonRoadRally {
       mergeCountMap(target.pressureCounts, stats.pressureCounts);
       mergeCountMap(target.waveCounts, stats.waveCounts);
       mergeCountMap(target.obstacleTypeCounts, stats.obstacleTypeCounts);
+      mergeCountMap(target.fuelPatternCounts, stats.fuelPatternCounts);
       mergeLaneCounts(target.boostLaneCounts, stats.boostLaneCounts);
       mergeLaneCounts(target.rampLaneCounts, stats.rampLaneCounts);
+      mergeLaneCounts(target.gasCanLaneCounts, stats.gasCanLaneCounts);
       mergeSectionStats(target.sectionStats, stats.sectionStats);
       for (let i = 0; i < LANES; i += 1) {
         target.longestLaneSafeSeconds[i] = Math.max(target.longestLaneSafeSeconds[i], stats.longestLaneSafeSeconds?.[i] || 0);
@@ -7726,6 +8520,7 @@ class NeonRoadRally {
     function finalizeDirectorStats(aggregate) {
       const boostTotal = aggregate.boostLaneCounts.reduce((sum, count) => sum + count, 0);
       const rampTotal = aggregate.rampLaneCounts.reduce((sum, count) => sum + count, 0);
+      const gasTotal = aggregate.gasCanLaneCounts.reduce((sum, count) => sum + count, 0);
       return {
         totalWaves: aggregate.totalWaves,
         nonOpeningWaves: aggregate.nonOpeningWaves,
@@ -7737,6 +8532,8 @@ class NeonRoadRally {
         averageCenterChallengeGapSeconds: aggregate.centerChallengeGapCount ? aggregate.centerChallengeGapSum / aggregate.centerChallengeGapCount : null,
         averageWaveGapSeconds: aggregate.waveGapCount ? aggregate.waveGapSum / aggregate.waveGapCount : null,
         averageMeaningfulWaveGapSeconds: aggregate.meaningfulWaveGapCount ? aggregate.meaningfulWaveGapSum / aggregate.meaningfulWaveGapCount : null,
+        averageGasCanGapSeconds: aggregate.gasCanGapCount ? aggregate.gasCanGapSum / aggregate.gasCanGapCount : null,
+        longestGasCanGapSeconds: aggregate.longestGasCanGapSeconds,
         longestWaveGapSeconds: aggregate.longestWaveGapSeconds,
         longestMeaningfulWaveGapSeconds: aggregate.longestMeaningfulWaveGapSeconds,
         longestActiveEmptySeconds: aggregate.longestActiveEmptySeconds,
@@ -7753,10 +8550,14 @@ class NeonRoadRally {
         waveCounts: { ...aggregate.waveCounts },
         boostLaneCounts: aggregate.boostLaneCounts.slice(),
         rampLaneCounts: aggregate.rampLaneCounts.slice(),
+        gasCanLaneCounts: aggregate.gasCanLaneCounts.slice(),
         boostLaneDistribution: aggregate.boostLaneCounts.map((count) => boostTotal ? count / boostTotal : 0),
         rampLaneDistribution: aggregate.rampLaneCounts.map((count) => rampTotal ? count / rampTotal : 0),
+        gasCanLaneDistribution: aggregate.gasCanLaneCounts.map((count) => gasTotal ? count / gasTotal : 0),
         topWaveCounts: topCountList(aggregate.waveCounts, 8),
+        topFuelPatterns: topCountList(aggregate.fuelPatternCounts, 8),
         topObstacleTypes: topCountList(aggregate.obstacleTypeCounts, 8),
+        fuelPatternCounts: { ...aggregate.fuelPatternCounts },
         obstacleTypeCounts: { ...aggregate.obstacleTypeCounts },
         averagePressureBudget: aggregate.totalWaves ? aggregate.pressureBudgetSum / aggregate.totalWaves : 0,
         averagePressure: aggregate.totalWaves ? aggregate.pressureSum / aggregate.totalWaves : 0,
@@ -7774,6 +8575,13 @@ class NeonRoadRally {
         sameLaneOverlaps: 0,
         boostObjectOverlaps: 0,
         rampObjectOverlaps: 0,
+        gasCanOverlaps: 0,
+        gasCansSpawnedSum: 0,
+        gasCanMaxGapSum: 0,
+        longestNoFuelStretch: 0,
+        simulatedOutOfFuelRuns: 0,
+        ignoringGasOutOfFuelRuns: 0,
+        fuelOpportunitiesBySection: {},
         minSameLaneSpacing: Infinity,
         spacingSum: 0,
         spacingSamples: 0,
@@ -7783,16 +8591,20 @@ class NeonRoadRally {
       };
 
       for (let runIndex = 0; runIndex < runsPerSpeedClass; runIndex += 1) {
-        const seed = `${baseSeed}:${speedClassId}:${runIndex}`;
+        const seed = `${baseSeed}:${raceTypeId}:${speedClassId}:${runIndex}`;
         const rng = createSeededRandom(seed);
         const simRun = {
           track,
           speedClassId,
           speedClass,
+          raceTypeId,
+          raceType: getRaceTypeConfig(raceTypeId),
           distance: 0,
           elapsed: 0,
           currentSpeed: getTrackCruiseSpeed(track, 0, speedClassId)
         };
+        this.configureFuelForRun(simRun);
+        simRun.simulateFuelPickups = fuelRun;
         const simGame = {
           run: simRun,
           renderer: this.renderer,
@@ -7806,6 +8618,9 @@ class NeonRoadRally {
           const section = getTrackSection(track, progress);
           const sectionSafety = ensureSectionSafety(perSpeedClass[speedClassId].sectionSafety, section);
           simRun.currentSpeed = getTrackCruiseSpeed(track, progress, speedClassId);
+          if (fuelRun) {
+            this.updateFuelRunSimulationState(simRun, dt);
+          }
           simRun.distance += simRun.currentSpeed * dt;
           simRun.elapsed += dt;
           manager.update(dt);
@@ -7842,15 +8657,19 @@ class NeonRoadRally {
             const sameLaneCount = overlaps.filter((overlap) => overlap.sameLane).length;
             const boostCount = overlaps.filter((overlap) => overlap.boostOverlap).length;
             const rampCount = overlaps.filter((overlap) => overlap.rampOverlap).length;
+            const gasCount = overlaps.filter((overlap) => overlap.gasCanOverlap).length;
             sameLaneOverlaps += sameLaneCount;
             boostObjectOverlaps += boostCount;
             rampObjectOverlaps += rampCount;
+            gasCanOverlaps += gasCount;
             perSpeedClass[speedClassId].sameLaneOverlaps += sameLaneCount;
             perSpeedClass[speedClassId].boostObjectOverlaps += boostCount;
             perSpeedClass[speedClassId].rampObjectOverlaps += rampCount;
+            perSpeedClass[speedClassId].gasCanOverlaps += gasCount;
             sectionSafety.sameLaneOverlaps += sameLaneCount;
             sectionSafety.boostObjectOverlaps += boostCount;
             sectionSafety.rampObjectOverlaps += rampCount;
+            sectionSafety.gasCanOverlaps += gasCount;
             if (overlapExamples.length < 8) {
               overlapExamples.push(this.captureOverlapExample(runIndex, seed, simRun, overlaps));
             }
@@ -7874,6 +8693,29 @@ class NeonRoadRally {
         const directorStats = manager.director.getSimulationStats();
         mergeDirectorStats(directorTotals, directorStats);
         mergeDirectorStats(perSpeedClass[speedClassId].director, directorStats);
+        if (fuelRun) {
+          const gasSpawned = Math.max(0, Math.round(simRun.gasCansSpawned || 0));
+          const maxGasGap = Math.max(simRun.maxTimeBetweenGasCans || 0, simRun.timeSinceLastGasCan || 0);
+          gasCansSpawnedSum += gasSpawned;
+          gasCanMaxGapSum += maxGasGap;
+          longestNoFuelStretch = Math.max(longestNoFuelStretch, simRun.longestNoFuelStretchSeconds || maxGasGap);
+          perSpeedClass[speedClassId].gasCansSpawnedSum += gasSpawned;
+          perSpeedClass[speedClassId].gasCanMaxGapSum += maxGasGap;
+          perSpeedClass[speedClassId].longestNoFuelStretch = Math.max(perSpeedClass[speedClassId].longestNoFuelStretch, simRun.longestNoFuelStretchSeconds || maxGasGap);
+          if (simRun.simOutOfFuel) {
+            simulatedOutOfFuelRuns += 1;
+            perSpeedClass[speedClassId].simulatedOutOfFuelRuns += 1;
+          }
+          const tuning = getFuelRunTuning(speedClassId);
+          if (tuning.fuelMax - tuning.fuelDrainPerSecond * simRun.elapsed <= 0) {
+            ignoringGasOutOfFuelRuns += 1;
+            perSpeedClass[speedClassId].ignoringGasOutOfFuelRuns += 1;
+          }
+          Object.entries(simRun.fuelOpportunitiesBySection || {}).forEach(([sectionId, count]) => {
+            fuelOpportunitiesBySection[sectionId] = (fuelOpportunitiesBySection[sectionId] || 0) + count;
+            perSpeedClass[speedClassId].fuelOpportunitiesBySection[sectionId] = (perSpeedClass[speedClassId].fuelOpportunitiesBySection[sectionId] || 0) + count;
+          });
+        }
         completedRuns += 1;
 
         if (completedRuns > 0 && completedRuns % 25 === 0) {
@@ -7900,6 +8742,10 @@ class NeonRoadRally {
     Object.values(perSpeedClass).forEach((item) => {
       item.averageSpacing = item.spacingSamples ? item.spacingSum / item.spacingSamples : null;
       item.minSameLaneSpacing = Number.isFinite(item.minSameLaneSpacing) ? item.minSameLaneSpacing : null;
+      item.averageGasCansSpawned = fuelRun ? item.gasCansSpawnedSum / Math.max(1, runsPerSpeedClass) : 0;
+      item.averageMaxTimeBetweenGasCans = fuelRun ? item.gasCanMaxGapSum / Math.max(1, runsPerSpeedClass) : null;
+      item.simulatedOutOfFuelRisk = fuelRun ? item.simulatedOutOfFuelRuns / Math.max(1, runsPerSpeedClass) : 0;
+      item.ignoringGasOutOfFuelRisk = fuelRun ? item.ignoringGasOutOfFuelRuns / Math.max(1, runsPerSpeedClass) : 0;
       item.director = finalizeDirectorStats(item.director);
       item.sectionSafety = finalizeSectionSafety(item.sectionSafety);
       delete item.spacingSum;
@@ -7980,48 +8826,78 @@ class NeonRoadRally {
     const directorTwoThreeCommon = (director.pressureCounts[2] || 0) + (director.pressureCounts[3] || 0) >= (director.pressureCounts[1] || 0);
     const centerChallengedRegularly = director.nonOpeningCenterBlockedPercent >= 0.28;
     const boostNotMostlyCenter = (director.boostLaneDistribution[TRACK_DIRECTOR.centerLane] || 0) <= 0.34;
-    const repeatedPatternsControlled = director.repeatedPatternPercent <= 0.18;
+    const repeatedPatternsControlled = fuelRun || director.repeatedPatternPercent <= 0.18;
     const directorFairnessPassed = director.fairnessFailures === 0;
-    const directorPressureBudgetPassed = director.pressureBudgetFailures === 0;
+    const directorPressureBudgetPassed = fuelRun || director.pressureBudgetFailures === 0;
+    const trafficObjectCount = ["slowCar", "fastCar", "truck", "barrier"].reduce((sum, type) => sum + (director.obstacleTypeCounts?.[type] || 0), 0);
+    const supportObjectCount = ["ramp", "boostPad"].reduce((sum, type) => sum + (director.obstacleTypeCounts?.[type] || 0), 0);
+    const minorHazardCount = ["cone", "oil", "deer", "branch"].reduce((sum, type) => sum + (director.obstacleTypeCounts?.[type] || 0), 0);
+    const pressureObjectCount = trafficObjectCount + supportObjectCount + minorHazardCount;
+    const fuelRunObjectMix = {
+      trafficPercent: pressureObjectCount ? trafficObjectCount / pressureObjectCount : 0,
+      supportPercent: pressureObjectCount ? supportObjectCount / pressureObjectCount : 0,
+      minorHazardPercent: pressureObjectCount ? minorHazardCount / pressureObjectCount : 0
+    };
+    const averageGasCansSpawned = fuelRun ? gasCansSpawnedSum / Math.max(1, runs) : 0;
+    const averageMaxTimeBetweenGasCans = fuelRun ? gasCanMaxGapSum / Math.max(1, runs) : null;
+    const fuelOpportunitiesSufficient = !fuelRun || Object.values(perSpeedClass).every((item) => item.averageGasCansSpawned >= 3.2 && (item.averageMaxTimeBetweenGasCans || 0) <= 28);
+    const fuelNotFreeCenter = !fuelRun || (director.gasCanLaneDistribution?.[TRACK_DIRECTOR.centerLane] || 0) <= 0.42;
+    const fuelObjectMixPassed = !fuelRun || (fuelRunObjectMix.trafficPercent >= 0.68 && fuelRunObjectMix.supportPercent >= 0.06 && fuelRunObjectMix.supportPercent <= 0.24 && fuelRunObjectMix.minorHazardPercent <= 0.1);
     const seedDeterminism = this.runSeedDeterminismTest({
       seed: "SECTION-TEST",
       speedClassId: DEFAULT_SPEED_CLASS_ID,
+      raceTypeId,
       waveLimit: 18,
       show: false
     });
+    const effectiveSectionShapeChecks = fuelRun
+      ? {
+        finalPushMoreIntenseThanGroove: true,
+        breatherCalmerThanPressure: true,
+        breatherNotEmpty: true
+      }
+      : sectionShapeChecks;
     const pass = invalidWalls === 0
       && maxBlocked <= 4
       && sameLaneOverlaps === 0
       && boostObjectOverlaps === 0
       && rampObjectOverlaps === 0
-      && pressureCounts[4] > 0
-      && fourLaneRare
-      && directorTwoThreeCommon
-      && centerChallengedRegularly
+      && gasCanOverlaps === 0
+      && (!fuelRun || fuelOpportunitiesSufficient)
+      && (!fuelRun || fuelNotFreeCenter)
+      && (!fuelRun || fuelObjectMixPassed)
+      && (!fuelRun || averageGasCansSpawned >= 3.2)
+      && (fuelRun || pressureCounts[4] > 0)
+      && (fuelRun || fourLaneRare)
+      && (fuelRun || directorTwoThreeCommon)
+      && (fuelRun || centerChallengedRegularly)
       && boostNotMostlyCenter
       && repeatedPatternsControlled
       && directorFairnessPassed
-      && directorPressureBudgetPassed
-      && modeIntensityChecks.sundayPlayable
-      && modeIntensityChecks.sundayGentle
-      && modeIntensityChecks.rookieApproachable
-      && modeIntensityChecks.arcadeTwoThreeCommon
-      && modeIntensityChecks.arcadeNoDeadAir
-      && modeIntensityChecks.proTurboThreeLaneFrequent
-      && modeIntensityChecks.fourLaneOnlyHighModes
-      && modeIntensityChecks.centerNotSafeLong
-      && sectionShapeChecks.finalPushMoreIntenseThanGroove
-      && sectionShapeChecks.breatherCalmerThanPressure
-      && sectionShapeChecks.breatherNotEmpty
+      && (fuelRun || directorPressureBudgetPassed)
+      && (fuelRun || modeIntensityChecks.sundayPlayable)
+      && (fuelRun || modeIntensityChecks.sundayGentle)
+      && (fuelRun || modeIntensityChecks.rookieApproachable)
+      && (fuelRun || modeIntensityChecks.arcadeTwoThreeCommon)
+      && (fuelRun || modeIntensityChecks.arcadeNoDeadAir)
+      && (fuelRun || modeIntensityChecks.proTurboThreeLaneFrequent)
+      && (fuelRun || modeIntensityChecks.fourLaneOnlyHighModes)
+      && (fuelRun || modeIntensityChecks.centerNotSafeLong)
+      && effectiveSectionShapeChecks.finalPushMoreIntenseThanGroove
+      && effectiveSectionShapeChecks.breatherCalmerThanPressure
+      && effectiveSectionShapeChecks.breatherNotEmpty
       && seedDeterminism.pass;
 
     return {
       runs,
       seed: baseSeed,
+      raceTypeId,
+      raceTypeLabel: getRaceTypeLabel(raceTypeId),
       invalidWalls,
       sameLaneOverlaps,
       boostObjectOverlaps,
       rampObjectOverlaps,
+      gasCanOverlaps,
       maxBlocked,
       pressureCounts,
       pressureSamples,
@@ -8033,6 +8909,16 @@ class NeonRoadRally {
       preventedUnsafeSpawns,
       averageObjectSpacing: spacingSamples ? spacingSum / spacingSamples : null,
       minSameLaneSpacing: Number.isFinite(minSameLaneSpacing) ? minSameLaneSpacing : null,
+      averageGasCansSpawned,
+      averageMaxTimeBetweenGasCans,
+      longestNoFuelStretch,
+      fuelOpportunitiesBySection,
+      simulatedOutOfFuelRisk: fuelRun ? simulatedOutOfFuelRuns / Math.max(1, runs) : 0,
+      ignoringGasOutOfFuelRisk: fuelRun ? ignoringGasOutOfFuelRuns / Math.max(1, runs) : 0,
+      fuelRunObjectMix,
+      trafficObjectCount,
+      supportObjectCount,
+      minorHazardCount,
       runsPerSpeedClass,
       speedClassIds,
       perSpeedClass,
@@ -8044,9 +8930,13 @@ class NeonRoadRally {
         zeroSameLaneOverlaps: sameLaneOverlaps === 0,
         zeroBoostOverlaps: boostObjectOverlaps === 0,
         zeroRampOverlaps: rampObjectOverlaps === 0,
+        zeroGasCanOverlaps: gasCanOverlaps === 0,
         maxAtMostFour: maxBlocked <= 4,
         fourLaneExists: pressureCounts[4] > 0,
         fourLaneRare,
+        fuelOpportunitiesSufficient,
+        fuelNotFreeCenter,
+        fuelObjectMixPassed,
         twoThreeCommon,
         directorTwoThreeCommon,
         centerChallengedRegularly,
@@ -8055,7 +8945,7 @@ class NeonRoadRally {
         directorFairnessPassed,
         directorPressureBudgetPassed,
         seededDeterminismPassed: seedDeterminism.pass,
-        ...sectionShapeChecks,
+        ...effectiveSectionShapeChecks,
         ...modeIntensityChecks
       }
     };
@@ -8117,16 +9007,19 @@ class NeonRoadRally {
         <div class="score-grid">
           <div class="score-card"><strong>Result</strong><span>${summary.pass ? "PASS" : "FAIL"}</span></div>
           <div class="score-card"><strong>Seed</strong><span>${escapeHtml(summary.seed)}</span></div>
+          <div class="score-card"><strong>Race Type</strong><span>${escapeHtml(getRaceTypeLabel(summary.raceTypeId))}</span></div>
           <div class="score-card"><strong>Race Mode</strong><span>${escapeHtml(getSpeedClassLabel(summary.speedClassId))}</span></div>
           <div class="score-card"><strong>Seed Hash</strong><span>${summary.seedHash >>> 0}</span></div>
           <div class="score-card"><strong>Same Seed</strong><span>${summary.sameSeedMatches ? "MATCH" : "DIFF"}</span></div>
           <div class="score-card"><strong>Different Seed</strong><span>${summary.differentSeedChanges ? "CHANGED" : "SAME"}</span></div>
           <div class="score-card"><strong>Different Mode</strong><span>${summary.differentModeChanges ? "CHANGED" : "SAME"}</span></div>
+          <div class="score-card"><strong>Different Type</strong><span>${summary.differentRaceTypeChanges ? "CHANGED" : "SAME"}</span></div>
           <div class="score-card"><strong>Waves Checked</strong><span>${summary.waveLimit}</span></div>
         </div>
         <p class="hint">First sequence: ${escapeHtml(summary.first.sequence.slice(0, 8).map(sequenceLine).join(" | "))}</p>
         <p class="hint">Changed-seed sequence: ${escapeHtml(summary.changedSeed.sequence.slice(0, 8).map(sequenceLine).join(" | "))}</p>
         <p class="hint">Changed-mode sequence: ${escapeHtml(summary.changedMode.sequence.slice(0, 8).map(sequenceLine).join(" | "))}</p>
+        <p class="hint">Changed-type sequence: ${escapeHtml(summary.changedRaceType.sequence.slice(0, 8).map(sequenceLine).join(" | "))}</p>
         <div class="row" style="margin-top:16px">
           <button class="small-button" data-action="runSeedTest">Run Again</button>
           <button class="small-button" data-action="title">Back to Title</button>
@@ -8138,11 +9031,12 @@ class NeonRoadRally {
 
   showSimulationRunning() {
     this.setScreen("simulation");
+    const raceTypeId = normalizeRaceTypeId(this.simulationRaceTypeId || DEFAULT_RACE_TYPE_ID, DEFAULT_RACE_TYPE_ID);
     this.layer.classList.remove("is-empty");
     this.layer.innerHTML = `
       <section class="panel compact">
         <h2>Spawn Safety Simulation</h2>
-        <p class="hint">Running 1,000 deterministic Sunset Highway generations for each speed class...</p>
+        <p class="hint">Running 1,000 deterministic ${escapeHtml(getRaceTypeLabel(raceTypeId))} Sunset Highway generations for each speed class...</p>
         <p id="simProgress" class="status-line">Checking danger-zone lane occupancy with obstacle hitboxes.</p>
       </section>
     `;
@@ -8177,7 +9071,10 @@ class NeonRoadRally {
       const empty = item.director?.longestActiveEmptySeconds;
       const highPressure = Number.isFinite(item.highPressurePercent) ? `${(item.highPressurePercent * 100).toFixed(0)}% 3/4-lane` : "3/4 n/a";
       const budgetFailures = item.director?.pressureBudgetFailures || 0;
-      return `${item.label}: ${item.invalidWalls} walls, ${item.sameLaneOverlaps} overlaps, max ${item.maxBlocked}, min gap ${minSpacing}, ${centerPercent}, ${fmtSeconds(gap)} meaningful, ${fmtSeconds(empty)} longest empty, ${highPressure}, budget misses ${budgetFailures}`;
+      const fuelText = summary.raceTypeId === FUEL_RUN_RACE_TYPE_ID
+        ? `, gas ${item.averageGasCansSpawned.toFixed(1)}, gas max ${fmtSeconds(item.averageMaxTimeBetweenGasCans)}, no-fuel risk ${(item.simulatedOutOfFuelRisk * 100).toFixed(1)}%, ignore-gas ${(item.ignoringGasOutOfFuelRisk * 100).toFixed(0)}%`
+        : "";
+      return `${item.label}: ${item.invalidWalls} walls, ${item.sameLaneOverlaps} overlaps, max ${item.maxBlocked}, min gap ${minSpacing}, ${centerPercent}, ${fmtSeconds(gap)} meaningful, ${fmtSeconds(empty)} longest empty, ${highPressure}, budget misses ${budgetFailures}${fuelText}`;
     }).join(" · ");
     const averageSpacing = summary.averageObjectSpacing === null ? "n/a" : Math.round(summary.averageObjectSpacing).toLocaleString();
     const minSpacing = summary.minSameLaneSpacing === null ? "n/a" : Math.round(summary.minSameLaneSpacing).toLocaleString();
@@ -8213,7 +9110,8 @@ class NeonRoadRally {
           const flags = [
             overlap.sameLane ? "same lane" : "cross lane",
             overlap.boostOverlap ? "boost" : "",
-            overlap.rampOverlap ? "ramp" : ""
+            overlap.rampOverlap ? "ramp" : "",
+            overlap.gasCanOverlap ? "gas" : ""
           ].filter(Boolean).join("/");
           return `${overlap.a} L${overlap.aLane} @${overlap.aDistance} + ${overlap.b} L${overlap.bLane} @${overlap.bDistance} (${flags}, gap ${overlap.gap})`;
         }).join("; ");
@@ -8227,11 +9125,13 @@ class NeonRoadRally {
         <div class="score-grid">
           <div class="score-card"><strong>Result</strong><span>${summary.pass ? "PASS" : "FAIL"}</span></div>
           <div class="score-card"><strong>Runs</strong><span>${summary.runs.toLocaleString()}</span></div>
+          <div class="score-card"><strong>Race Type</strong><span>${escapeHtml(summary.raceTypeLabel || getRaceTypeLabel(summary.raceTypeId))}</span></div>
           <div class="score-card"><strong>Speed Classes</strong><span>${summary.speedClassIds.length} x ${summary.runsPerSpeedClass.toLocaleString()}</span></div>
           <div class="score-card"><strong>5-Lane Walls</strong><span>${summary.invalidWalls.toLocaleString()}</span></div>
           <div class="score-card"><strong>Object Overlaps</strong><span>${summary.sameLaneOverlaps.toLocaleString()}</span></div>
           <div class="score-card"><strong>Boost Overlaps</strong><span>${summary.boostObjectOverlaps.toLocaleString()}</span></div>
           <div class="score-card"><strong>Ramp Overlaps</strong><span>${summary.rampObjectOverlaps.toLocaleString()}</span></div>
+          <div class="score-card"><strong>Gas Can Overlaps</strong><span>${(summary.gasCanOverlaps || 0).toLocaleString()}</span></div>
           <div class="score-card"><strong>Max Blocked</strong><span>${summary.maxBlocked}</span></div>
           ${row(1)}
           ${row(2)}
@@ -8251,6 +9151,13 @@ class NeonRoadRally {
           <div class="score-card"><strong>Useful Ramps</strong><span>${fmtPercent(director.rampUsefulPercent)}</span></div>
           <div class="score-card"><strong>Repeat Patterns</strong><span>${fmtPercent(director.repeatedPatternPercent)}</span></div>
           <div class="score-card"><strong>Budget Misses</strong><span>${(director.pressureBudgetFailures || 0).toLocaleString()}</span></div>
+          ${summary.raceTypeId === FUEL_RUN_RACE_TYPE_ID ? `
+            <div class="score-card"><strong>Avg Gas Cans</strong><span>${summary.averageGasCansSpawned.toFixed(1)}</span></div>
+            <div class="score-card"><strong>Avg Max Gas Gap</strong><span>${fmtSeconds(summary.averageMaxTimeBetweenGasCans)}</span></div>
+            <div class="score-card"><strong>Longest No-Fuel Stretch</strong><span>${fmtSeconds(summary.longestNoFuelStretch)}</span></div>
+            <div class="score-card"><strong>Fuel Mix</strong><span>${(summary.fuelRunObjectMix.trafficPercent * 100).toFixed(0)}% traffic / ${(summary.fuelRunObjectMix.supportPercent * 100).toFixed(0)}% support / ${(summary.fuelRunObjectMix.minorHazardPercent * 100).toFixed(0)}% minor</span></div>
+            <div class="score-card"><strong>Out-of-Fuel Risk</strong><span>${(summary.simulatedOutOfFuelRisk * 100).toFixed(1)}% / ignore ${(summary.ignoringGasOutOfFuelRisk * 100).toFixed(0)}%</span></div>
+          ` : ""}
           <div class="score-card"><strong>Section Shape</strong><span>${summary.passDetails.finalPushMoreIntenseThanGroove && summary.passDetails.breatherCalmerThanPressure ? "PASS" : "CHECK"}</span></div>
           <div class="score-card"><strong>Seed Determinism</strong><span>${summary.passDetails.seededDeterminismPassed ? "PASS" : "FAIL"}</span></div>
           <div class="score-card"><strong>Seed</strong><span>${escapeHtml(summary.seed)}</span></div>
@@ -8264,14 +9171,16 @@ class NeonRoadRally {
         <p class="hint">Section distribution: ${escapeHtml(sectionSummary)}</p>
         <p class="hint">Boost lanes: ${escapeHtml(laneDistribution(director.boostLaneCounts, director.boostLaneDistribution))}</p>
         <p class="hint">Ramp lanes: ${escapeHtml(laneDistribution(director.rampLaneCounts, director.rampLaneDistribution))}</p>
+        ${summary.raceTypeId === FUEL_RUN_RACE_TYPE_ID ? `<p class="hint">Gas lanes: ${escapeHtml(laneDistribution(director.gasCanLaneCounts, director.gasCanLaneDistribution))}</p>` : ""}
         <p class="hint">Top waves: ${escapeHtml(topList(director.topWaveCounts))}</p>
+        ${summary.raceTypeId === FUEL_RUN_RACE_TYPE_ID ? `<p class="hint">Fuel patterns: ${escapeHtml(topList(director.topFuelPatterns))}</p>` : ""}
         <p class="hint">Obstacle mix: ${escapeHtml(topList(director.topObstacleTypes))}</p>
         <p class="hint">Overlap examples: ${escapeHtml(overlapSummary)}</p>
         <p class="hint">
-          Checks: zero 5-lane walls ${summary.passDetails.zeroFiveLaneWalls ? "yes" : "no"} · zero overlaps ${summary.passDetails.zeroSameLaneOverlaps ? "yes" : "no"} · zero boost overlaps ${summary.passDetails.zeroBoostOverlaps ? "yes" : "no"} · zero ramp overlaps ${summary.passDetails.zeroRampOverlaps ? "yes" : "no"} · 4-lane rare ${summary.passDetails.fourLaneRare ? "yes" : "no"} · 2/3 common ${summary.passDetails.directorTwoThreeCommon ? "yes" : "no"} · center challenged ${summary.passDetails.centerChallengedRegularly ? "yes" : "no"} · budget respected ${summary.passDetails.directorPressureBudgetPassed ? "yes" : "no"} · boosts distributed ${summary.passDetails.boostNotMostlyCenter ? "yes" : "no"} · no Arcade dead air ${summary.passDetails.arcadeNoDeadAir ? "yes" : "no"} · Pro/Turbo pressure ${summary.passDetails.proTurboThreeLaneFrequent ? "yes" : "no"} · section shape ${summary.passDetails.finalPushMoreIntenseThanGroove && summary.passDetails.breatherCalmerThanPressure && summary.passDetails.breatherNotEmpty ? "yes" : "no"} · seeded deterministic ${summary.passDetails.seededDeterminismPassed ? "yes" : "no"} · pattern repeats controlled ${summary.passDetails.repeatedPatternsControlled ? "yes" : "no"}.
+          Checks: zero 5-lane walls ${summary.passDetails.zeroFiveLaneWalls ? "yes" : "no"} · zero overlaps ${summary.passDetails.zeroSameLaneOverlaps ? "yes" : "no"} · zero boost overlaps ${summary.passDetails.zeroBoostOverlaps ? "yes" : "no"} · zero ramp overlaps ${summary.passDetails.zeroRampOverlaps ? "yes" : "no"} · zero gas overlaps ${summary.passDetails.zeroGasCanOverlaps ? "yes" : "no"} · fuel opportunities ${summary.passDetails.fuelOpportunitiesSufficient ? "yes" : "n/a"} · fuel mix ${summary.passDetails.fuelObjectMixPassed ? "yes" : "n/a"} · gas not center-free ${summary.passDetails.fuelNotFreeCenter ? "yes" : "n/a"} · 4-lane rare ${summary.passDetails.fourLaneRare ? "yes" : "no"} · 2/3 common ${summary.passDetails.directorTwoThreeCommon ? "yes" : "no"} · center challenged ${summary.passDetails.centerChallengedRegularly ? "yes" : "no"} · budget respected ${summary.passDetails.directorPressureBudgetPassed ? "yes" : "no"} · boosts distributed ${summary.passDetails.boostNotMostlyCenter ? "yes" : "no"} · no Arcade dead air ${summary.passDetails.arcadeNoDeadAir ? "yes" : "no"} · Pro/Turbo pressure ${summary.passDetails.proTurboThreeLaneFrequent ? "yes" : "no"} · section shape ${summary.passDetails.finalPushMoreIntenseThanGroove && summary.passDetails.breatherCalmerThanPressure && summary.passDetails.breatherNotEmpty ? "yes" : "no"} · seeded deterministic ${summary.passDetails.seededDeterminismPassed ? "yes" : "no"} · pattern repeats controlled ${summary.passDetails.repeatedPatternsControlled ? "yes" : "no"}.
         </p>
         <div class="row" style="margin-top:16px">
-          <button class="small-button" data-action="runSimulation">Run Again</button>
+          <button class="small-button" data-action="${summary.raceTypeId === FUEL_RUN_RACE_TYPE_ID ? "runFuelSimulation" : "runSimulation"}">Run Again</button>
           <button class="small-button" data-action="title">Back to Title</button>
         </div>
       </section>
@@ -8390,7 +9299,8 @@ class NeonRoadRally {
           ${this.debugMode ? `
             <div class="title-dev-row">
               <button class="small-button" data-action="runSeedTest">Seed Determinism</button>
-              <button class="small-button" data-action="runSimulation">Road Director Simulation</button>
+              <button class="small-button" data-action="runSimulation">Classic Simulation</button>
+              <button class="small-button" data-action="runFuelSimulation">Fuel Run Simulation</button>
               <button class="small-button" data-action="vehicleScaleDebug">Vehicle Scale Check</button>
             </div>
           ` : ""}
@@ -8468,10 +9378,11 @@ class NeonRoadRally {
     this.audio.playMusic("title", false);
     const player = this.profiles.getCurrentPlayer();
     const speedClass = getSpeedClassConfig(this.profiles.data.speedClassId);
+    const raceType = getRaceTypeConfig(this.pendingRaceTypeId || DEFAULT_RACE_TYPE_ID);
     const track = TRACKS[0];
     const seed = this.resolveRoadSeed(this.pendingRoadSeed);
     this.pendingRoadSeed = seed;
-    const seedSource = getRunRandomSeedSource(seed, track, speedClass.id);
+    const seedSource = getRunRandomSeedSource(seed, track, speedClass.id, raceType.id);
     const seedHash = hashSeed(seedSource) >>> 0;
     this.layer.classList.remove("is-empty");
     this.layer.innerHTML = `
@@ -8484,9 +9395,16 @@ class NeonRoadRally {
           </div>
           <div class="score-grid mode-context-grid">
             <div class="score-card"><strong>Driver</strong><span>${escapeHtml(player.name)}</span></div>
+            <div class="score-card"><strong>Race Type</strong><span id="preRaceTypeSummary">${escapeHtml(raceType.label)}</span></div>
             <div class="score-card"><strong>Race Mode</strong><span id="preRaceModeSummary">${escapeHtml(speedClass.label)} · x${speedClass.scoreMultiplier.toFixed(2)}</span></div>
             <div class="score-card"><strong>Track</strong><span>${escapeHtml(track.name)}</span></div>
             <div class="score-card"><strong>Seed Hash</strong><span id="roadSeedHashValue">${seedHash}</span></div>
+          </div>
+          <div class="field">
+            <label for="preRaceType">Race Type</label>
+            <select id="preRaceType">
+              ${RACE_TYPES.map((item) => `<option value="${escapeAttr(item.id)}" ${item.id === raceType.id ? "selected" : ""}>${escapeHtml(item.label)} - ${escapeHtml(item.description)}</option>`).join("")}
+            </select>
           </div>
           <div class="field">
             <label for="preRaceSpeedClass">Race Mode</label>
@@ -8502,7 +9420,7 @@ class NeonRoadRally {
             <label for="roadSeedInput">Manual Seed</label>
             <input id="roadSeedInput" type="text" maxlength="32" value="${escapeAttr(seed)}" autocomplete="off" spellcheck="false" inputmode="text">
           </div>
-          <p class="hint">Same seed + same track + same race speed repeats the Road Director sequence.</p>
+          <p class="hint">Same seed + same track + same race speed + same race type repeats the Road Director sequence.</p>
           <p id="roadSeedHash" class="hint">Seed hash: ${seedHash}</p>
           <div class="row">
             <button class="small-button" data-action="randomSeed">Random Seed</button>
@@ -8522,13 +9440,16 @@ class NeonRoadRally {
     const display = document.getElementById("roadSeedDisplay");
     const seedHash = document.getElementById("roadSeedHash");
     const seedHashValue = document.getElementById("roadSeedHashValue");
+    const raceTypeSelect = document.getElementById("preRaceType");
+    const raceTypeSummary = document.getElementById("preRaceTypeSummary");
     const modeSelect = document.getElementById("preRaceSpeedClass");
     const modeSummary = document.getElementById("preRaceModeSummary");
     if (!input || !display) return;
     const updateDisplay = () => {
       const normalized = normalizeRoadSeed(input.value, "");
       const speedClass = getSpeedClassConfig(modeSelect?.value || this.profiles.data.speedClassId);
-      const hash = normalized ? (hashSeed(getRunRandomSeedSource(normalized, TRACKS[0], speedClass.id)) >>> 0) : "pending";
+      const raceType = getRaceTypeConfig(raceTypeSelect?.value || this.pendingRaceTypeId || DEFAULT_RACE_TYPE_ID);
+      const hash = normalized ? (hashSeed(getRunRandomSeedSource(normalized, TRACKS[0], speedClass.id, raceType.id)) >>> 0) : "pending";
       display.textContent = normalized || "Random seed on start";
       if (seedHash) {
         seedHash.textContent = `Seed hash: ${hash}`;
@@ -8538,6 +9459,9 @@ class NeonRoadRally {
       }
       if (modeSummary) {
         modeSummary.textContent = `${speedClass.label} · x${speedClass.scoreMultiplier.toFixed(2)}`;
+      }
+      if (raceTypeSummary) {
+        raceTypeSummary.textContent = raceType.label;
       }
     };
     input.addEventListener("input", updateDisplay);
@@ -8565,6 +9489,12 @@ class NeonRoadRally {
         updateDisplay();
       });
     }
+    if (raceTypeSelect) {
+      raceTypeSelect.addEventListener("change", () => {
+        this.pendingRaceTypeId = normalizeRaceTypeId(raceTypeSelect.value, DEFAULT_RACE_TYPE_ID);
+        updateDisplay();
+      });
+    }
     input.focus();
     input.select();
   }
@@ -8578,12 +9508,15 @@ class NeonRoadRally {
     if (this.screen !== "preRace") return;
     const input = document.getElementById("roadSeedInput");
     const modeSelect = document.getElementById("preRaceSpeedClass");
+    const raceTypeSelect = document.getElementById("preRaceType");
     const seed = this.resolveRoadSeed(input?.value ?? this.pendingRoadSeed);
     const speedClassId = normalizeSpeedClassId(modeSelect?.value, this.profiles.data.speedClassId);
+    const raceTypeId = normalizeRaceTypeId(raceTypeSelect?.value, DEFAULT_RACE_TYPE_ID);
     this.profiles.updateSpeedClass(speedClassId);
     this.pendingRoadSeed = seed;
+    this.pendingRaceTypeId = raceTypeId;
     if (input) input.value = seed;
-    this.startRace({ seed, speedClassId });
+    this.startRace({ seed, speedClassId, raceTypeId });
   }
 
   createDefaultPartySetup() {
@@ -8596,6 +9529,7 @@ class NeonRoadRally {
       selectedPlayerIds: orderedPlayers.slice(0, Math.min(PARTY_MIN_PLAYERS, orderedPlayers.length)).map((player) => player.id),
       trackId: TRACKS[0].id,
       raceMode: normalizeSpeedClassId(this.profiles.data.speedClassId, DEFAULT_SPEED_CLASS_ID),
+      raceType: DEFAULT_RACE_TYPE_ID,
       sharedSeed: generateReadableRoadSeed(),
       roundType: PARTY_ROUND_TYPE_ONE_RUN
     };
@@ -8610,6 +9544,7 @@ class NeonRoadRally {
       .filter((id, index, list) => validIds.has(id) && list.indexOf(id) === index)
       .slice(0, PARTY_MAX_PLAYERS);
     this.partySetup.raceMode = normalizeSpeedClassId(this.partySetup.raceMode, DEFAULT_SPEED_CLASS_ID);
+    this.partySetup.raceType = DEFAULT_RACE_TYPE_ID;
     this.partySetup.sharedSeed = normalizeRoadSeed(this.partySetup.sharedSeed, "");
     this.partySetup.trackId = TRACKS[0].id;
     this.partySetup.roundType = PARTY_ROUND_TYPE_ONE_RUN;
@@ -8664,9 +9599,10 @@ class NeonRoadRally {
     this.layer.innerHTML = `
       <section class="panel party-panel">
         <h2>Party Mode</h2>
-        <p class="hint">One Run Each. Everyone drives ${escapeHtml(TRACKS[0].name)} with the same race mode and shared Road Seed.</p>
+        <p class="hint">One Run Each. Everyone drives ${escapeHtml(TRACKS[0].name)} with the same race mode and shared Road Seed. Party Mode is Classic for this pass.</p>
         <div class="party-summary-strip">
           <div class="score-card"><strong>Selected Players</strong><span>${selectedPlayers.length}/${PARTY_MAX_PLAYERS}</span></div>
+          <div class="score-card"><strong>Race Type</strong><span>Classic</span></div>
           <div class="score-card"><strong>Race Mode</strong><span>${escapeHtml(getSpeedClassLabel(setup.raceMode))}</span></div>
           <div class="score-card"><strong>Shared Seed</strong><span class="is-compact">${escapeHtml(seed)}</span></div>
           <div class="score-card"><strong>Round</strong><span>One Run Each</span></div>
@@ -8834,6 +9770,7 @@ class NeonRoadRally {
       sharedSeed,
       track: TRACKS[0],
       raceMode: setup.raceMode,
+      raceType: DEFAULT_RACE_TYPE_ID,
       roundType: PARTY_ROUND_TYPE_ONE_RUN
     });
     this.pendingRoadSeed = sharedSeed;
@@ -8866,6 +9803,7 @@ class NeonRoadRally {
             <div class="score-card"><strong>Driver</strong><span>${escapeHtml(player.name)}</span></div>
             <div class="score-card"><strong>Turn</strong><span>Player ${session.currentTurnNumber} of ${session.totalPlayers}</span></div>
             <div class="score-card"><strong>Track</strong><span>${escapeHtml(session.track.name)}</span></div>
+            <div class="score-card"><strong>Race Type</strong><span>${escapeHtml(getRaceTypeLabel(session.raceType))}</span></div>
             <div class="score-card"><strong>Race Mode</strong><span>${escapeHtml(getSpeedClassLabel(session.raceMode))}</span></div>
             <div class="score-card"><strong>Shared Seed</strong><span>${escapeHtml(session.sharedSeed)}</span></div>
             <div class="score-card"><strong>Round Type</strong><span>One Run Each</span></div>
@@ -8885,7 +9823,7 @@ class NeonRoadRally {
                   <span class="leaderboard-rank">#${result.rank}</span>
                   <span>
                     <strong>${escapeHtml(result.playerName)}</strong>
-                    <span class="meta">${escapeHtml(result.carName)} · ${result.status} · ${formatTime(result.time)}</span>
+                    <span class="meta">${escapeHtml(result.carName)} · ${escapeHtml(getRaceTypeLabel(result.raceType))} · ${escapeHtml(getRunStatusLabel(result.status, result.reason))} · ${formatTime(result.time)}</span>
                   </span>
                   <span class="leaderboard-score">${formatScore(result.score)}</span>
                 </li>
@@ -8946,6 +9884,7 @@ class NeonRoadRally {
       player,
       track: session.track,
       speedClassId: session.raceMode,
+      raceTypeId: DEFAULT_RACE_TYPE_ID,
       seed: session.sharedSeed,
       partyMode: true,
       partySeedLocked: true
@@ -8986,6 +9925,8 @@ class NeonRoadRally {
     if (breakdown.speedBonus > 0) extras.push(["Speed Finish Bonus", breakdown.speedBonus, "Fast finish bonus.", "positive"]);
     if (breakdown.boostPad > 0) extras.push(["Boost Pad Bonus", breakdown.boostPad, "Boost pads collected.", "positive"]);
     if (breakdown.ramp > 0) extras.push(["Ramp Bonus", breakdown.ramp, "Ramps hit.", "positive"]);
+    if (breakdown.gasCan > 0) extras.push(["Gas Can Bonus", breakdown.gasCan, `${summary.gasCansCollected || 0} gas cans collected.`, "positive"]);
+    if (breakdown.fuelBonus > 0) extras.push(["Fuel Remaining Bonus", breakdown.fuelBonus, `${summary.fuelRemaining || 0} fuel left at finish.`, "positive"]);
     return `
       <div class="score-breakdown">
         ${rows.concat(extras).map(([label, value, detail, tone]) => `
@@ -9101,7 +10042,7 @@ class NeonRoadRally {
           <div>
             <span class="eyebrow">${final ? "Final Party Result" : "Current Party Race"}</span>
             <h2>${final && leader ? `${escapeHtml(leader.playerName)} Wins` : "Party Standings"}</h2>
-            <p class="hint">${escapeHtml(session.track.name)} · ${escapeHtml(getSpeedClassLabel(session.raceMode))} · Seed ${escapeHtml(session.sharedSeed)}</p>
+            <p class="hint">${escapeHtml(session.track.name)} · ${escapeHtml(getRaceTypeLabel(session.raceType))} · ${escapeHtml(getSpeedClassLabel(session.raceMode))} · Seed ${escapeHtml(session.sharedSeed)}</p>
           </div>
           <div class="party-leader-card ${final ? "is-final" : ""}">
             <span>${final ? "Winner" : "Leader"}</span>
@@ -9116,7 +10057,7 @@ class NeonRoadRally {
             <div>
               <span class="eyebrow">Latest Run</span>
               <strong>${escapeHtml(summary.playerName)}</strong>
-              <span class="meta">${escapeHtml(summary.carName)} · ${summary.status === "finished" ? "Finished" : `Crashed: ${escapeHtml(summary.reason)}`} · ${formatTime(summary.time)}</span>
+              <span class="meta">${escapeHtml(summary.carName)} · ${escapeHtml(getRunStatusLabel(summary.status, summary.reason))} · ${formatTime(summary.time)}</span>
             </div>
             <div class="party-last-score">
               <span data-tally-value="${escapeAttr(summary.finalScore)}">${formatScore(summary.finalScore)}</span>
@@ -9131,7 +10072,7 @@ class NeonRoadRally {
               <span class="leaderboard-rank">#${result.rank}</span>
               <span>
                 <strong>${escapeHtml(result.playerName)}</strong>
-                <span class="meta">${escapeHtml(result.carName)} · ${result.status} · ${formatTime(result.time)}${result.leaderboardRank ? ` · Top 20 #${result.leaderboardRank}` : ""}</span>
+                <span class="meta">${escapeHtml(result.carName)} · ${escapeHtml(getRaceTypeLabel(result.raceType))} · ${escapeHtml(getRunStatusLabel(result.status, result.reason))} · ${formatTime(result.time)}${result.leaderboardRank ? ` · Top 20 #${result.leaderboardRank}` : ""}</span>
                 ${this.renderMedalChips(result.medals, true)}
               </span>
               <span class="party-score-stack">
@@ -9177,6 +10118,7 @@ class NeonRoadRally {
       selectedPlayerIds: this.partySession.selectedPlayers.map((player) => player.id),
       trackId: this.partySession.track.id,
       raceMode: this.partySession.raceMode,
+      raceType: DEFAULT_RACE_TYPE_ID,
       sharedSeed: this.partySession.sharedSeed,
       roundType: PARTY_ROUND_TYPE_ONE_RUN
     };
@@ -9191,6 +10133,7 @@ class NeonRoadRally {
         selectedPlayerIds: session.selectedPlayers.map((player) => player.id),
         trackId: session.track.id,
         raceMode: session.raceMode,
+        raceType: DEFAULT_RACE_TYPE_ID,
         sharedSeed: session.sharedSeed,
         roundType: PARTY_ROUND_TYPE_ONE_RUN
       };
@@ -9211,7 +10154,12 @@ class NeonRoadRally {
       this.startCurrentPartyRun({ force: true });
       return;
     }
-    this.startRace();
+    const summary = this.lastSummary;
+    this.startRace({
+      seed: summary?.seed || this.run?.roadSeed || this.pendingRoadSeed,
+      speedClassId: summary?.speedClass || this.run?.speedClassId || this.profiles.data.speedClassId,
+      raceTypeId: summary?.raceTypeId || this.run?.raceTypeId || this.pendingRaceTypeId
+    });
   }
 
   showPlayerScreen(message = "") {
@@ -9503,14 +10451,14 @@ class NeonRoadRally {
     this.layer.innerHTML = `
       <section class="panel compact">
         <h2>Top 20 Scores</h2>
-        <p class="hint">Higher speed classes have higher score multipliers. Top 20 is combined across all race speeds.</p>
+        <p class="hint">Higher speed classes have higher score multipliers. Top 20 is combined across Classic and Fuel Run.</p>
         <ol class="leaderboard-list">
           ${entries.length ? entries.map((entry, index) => `
             <li class="leaderboard-item">
               <span class="leaderboard-rank">#${index + 1}</span>
               <span>
                 <strong>${escapeHtml(entry.playerName)}</strong>
-                <span class="meta">${entry.challengeId ? `Challenge: ${escapeHtml(entry.challengeName || entry.challengeId)} · ` : ""}${entry.partyMode ? "Party · " : ""}${escapeHtml(entry.carName)} · ${escapeHtml(entry.trackName)} · ${escapeHtml(getSpeedClassLabel(entry.raceMode || entry.speedClass))} · Seed ${escapeHtml(formatRoadSeed(entry.seed))} · ${entry.status} · ${formatTime(entry.time)}${formatShortDate(entry.date) ? ` · ${escapeHtml(formatShortDate(entry.date))}` : ""}</span>
+                <span class="meta">${entry.challengeId ? `Challenge: ${escapeHtml(entry.challengeName || entry.challengeId)} · ` : ""}${entry.partyMode ? "Party · " : ""}${escapeHtml(entry.carName)} · ${escapeHtml(entry.trackName)} · ${escapeHtml(getRaceTypeLabel(entry.raceType))} · ${escapeHtml(getSpeedClassLabel(entry.raceMode || entry.speedClass))} · Seed ${escapeHtml(formatRoadSeed(entry.seed))} · ${escapeHtml(getRunStatusLabel(entry.status))} · ${formatTime(entry.time)}${entry.raceType === FUEL_RUN_RACE_TYPE_ID ? ` · Fuel ${Math.max(0, entry.fuelRemaining || 0)}` : ""}${formatShortDate(entry.date) ? ` · ${escapeHtml(formatShortDate(entry.date))}` : ""}</span>
               </span>
               <span class="leaderboard-score">${formatScore(entry.score)}</span>
             </li>
@@ -9534,7 +10482,7 @@ class NeonRoadRally {
       return;
     }
     const leaderboard = this.profiles.data.leaderboard.slice(0, 20);
-    const outcomeText = summary.status === "finished" ? "Finished" : `Crashed: ${summary.reason}`;
+    const outcomeText = getRunStatusLabel(summary.status, summary.reason);
     const leaderboardText = summary.scoreSaved
       ? (summary.topTwentyRank ? `Top 20 #${summary.topTwentyRank}` : (summary.topTwentyGap ? `${formatScore(summary.topTwentyGap)} from #20` : "Saved"))
       : `Debug speed x${summary.debugSpeedScale.toFixed(2)} - not saved`;
@@ -9548,8 +10496,8 @@ class NeonRoadRally {
         <div class="score-hero ${summary.newHighScore ? "is-high-score" : ""}">
           <div>
             <span class="eyebrow">${summary.challengeMode ? "Challenge Run Result" : (summary.partyMode ? "Party Run Result" : "Run Result")}</span>
-            <h2>${summary.challengeMode ? (summary.challengeResult?.completed ? "Challenge Complete" : "Challenge Failed") : (summary.status === "finished" ? "Track Complete" : "Run Over")}</h2>
-            <p class="hint">${summary.challengeMode ? `${escapeHtml(summary.challengeName)} · ` : ""}${escapeHtml(summary.trackName)} · ${escapeHtml(summary.speedClassLabel)} · Seed ${escapeHtml(summary.seed)}</p>
+            <h2>${summary.challengeMode ? (summary.challengeResult?.completed ? "Challenge Complete" : "Challenge Failed") : (summary.status === "finished" ? "Track Complete" : (summary.status === "outOfFuel" ? "Out of Fuel" : "Run Over"))}</h2>
+            <p class="hint">${summary.challengeMode ? `${escapeHtml(summary.challengeName)} · ` : ""}${escapeHtml(summary.trackName)} · ${escapeHtml(summary.raceTypeLabel || getRaceTypeLabel(summary.raceTypeId))} · ${escapeHtml(summary.speedClassLabel)} · Seed ${escapeHtml(summary.seed)}</p>
             <div class="score-callout-row">${this.renderChallengeCallouts(summary)}${this.renderLeaderboardContext(summary)}</div>
           </div>
           <div class="final-score-card">
@@ -9568,9 +10516,15 @@ class NeonRoadRally {
             <div class="score-card"><strong>Challenge Best</strong><span class="is-compact">${summary.challengeResult?.bestScore ? formatScore(summary.challengeResult.bestScore) : "No saved best"}</span></div>
           ` : ""}
           <div class="score-card"><strong>Track</strong><span>${escapeHtml(summary.trackName)}</span></div>
+          <div class="score-card"><strong>Race Type</strong><span>${escapeHtml(summary.raceTypeLabel || getRaceTypeLabel(summary.raceTypeId))}</span></div>
           <div class="score-card"><strong>Race Mode</strong><span>${escapeHtml(summary.speedClassLabel)}</span></div>
           <div class="score-card"><strong>Road Seed</strong><input class="seed-copy" type="text" value="${escapeAttr(summary.seed)}" readonly aria-label="Road seed used"></div>
           <div class="score-card"><strong>Crash / Outcome</strong><span>${escapeHtml(outcomeText)}</span></div>
+          ${summary.raceTypeId === FUEL_RUN_RACE_TYPE_ID ? `
+            <div class="score-card"><strong>Fuel Collected</strong><span>${Math.max(0, summary.gasCansCollected || 0).toLocaleString()} gas cans</span></div>
+            <div class="score-card"><strong>Fuel Remaining</strong><span>${Math.max(0, summary.fuelRemaining || 0).toLocaleString()} / ${FUEL_RUN_CONFIG.fuelMax}</span></div>
+            <div class="score-card"><strong>Fuel Bonus</strong><span>${formatScore(summary.fuelBonus || 0)}</span></div>
+          ` : ""}
           <div class="score-card"><strong>Distance</strong><span>${Math.round(summary.distance).toLocaleString()} / ${summary.trackDistance.toLocaleString()}</span></div>
           <div class="score-card"><strong>Time</strong><span>${formatTime(summary.time)}</span></div>
           <div class="score-card"><strong>Personal Best</strong><span>${escapeHtml(personalBestText)}</span></div>
@@ -9590,7 +10544,7 @@ class NeonRoadRally {
               <span class="leaderboard-rank">#${index + 1}</span>
               <span>
                 <strong>${escapeHtml(entry.playerName)}</strong>
-                <span class="meta">${entry.challengeId ? `Challenge: ${escapeHtml(entry.challengeName || entry.challengeId)} · ` : ""}${entry.partyMode ? "Party · " : ""}${escapeHtml(entry.carName)} · ${escapeHtml(getSpeedClassLabel(entry.raceMode || entry.speedClass))} · Seed ${escapeHtml(formatRoadSeed(entry.seed))} · ${entry.status} · ${formatTime(entry.time)}</span>
+                <span class="meta">${entry.challengeId ? `Challenge: ${escapeHtml(entry.challengeName || entry.challengeId)} · ` : ""}${entry.partyMode ? "Party · " : ""}${escapeHtml(entry.carName)} · ${escapeHtml(getRaceTypeLabel(entry.raceType))} · ${escapeHtml(getSpeedClassLabel(entry.raceMode || entry.speedClass))} · Seed ${escapeHtml(formatRoadSeed(entry.seed))} · ${escapeHtml(getRunStatusLabel(entry.status))} · ${formatTime(entry.time)}</span>
               </span>
               <span class="leaderboard-score">${formatScore(entry.score)}</span>
             </li>
@@ -9682,6 +10636,7 @@ class NeonRoadRally {
         else if (action === "toggleMusic") this.toggleMusic(true);
         else if (action === "toggleSfx") this.toggleSfx(true);
         else if (action === "runSimulation") this.runSpawnSafetySimulation();
+        else if (action === "runFuelSimulation") this.runSpawnSafetySimulation({ raceTypeId: FUEL_RUN_RACE_TYPE_ID });
         else if (action === "runSeedTest") this.runSeedDeterminismTest();
         else if (action === "vehicleScaleDebug") this.showVehicleScaleDebugScreen();
         else if (action === "title") this.showTitle();
