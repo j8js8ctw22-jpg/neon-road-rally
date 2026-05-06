@@ -53,7 +53,9 @@ When debug mode is active on the title screen, a `Run Spawn Safety Simulation` b
 - While airborne, the player can pass over small ground hazards.
 - Tall vehicles, trucks, and barriers are still dangerous.
 - Warning signs appear before deer crossings and construction zones.
-- The spawner validates obstacle hitboxes in the lower danger zone so it cannot create a five-lane unavoidable wall.
+- The Road Director builds intentional obstacle waves from reusable templates instead of spawning isolated random objects.
+- The Road Director validates obstacle hitboxes in the lower danger zone so it cannot create a five-lane unavoidable wall.
+- Debug simulation checks 1,000 deterministic runs per speed class and reports center pressure, wave frequency, obstacle mix, boost/ramp lane distribution, empty stretches, pattern repeats, and overlap/fairness failures.
 
 ## Scoring
 
@@ -142,11 +144,18 @@ Add the type in three places in `game.js`:
 2. Add a drawing helper or extend `Renderer.drawObstacle()`.
 3. Add collision behavior in `CollisionSystem.resolveHit()` if it needs special rules.
 
-Spawn it from one of the `ObstacleManager.spawn...` methods.
+Spawn it from a `RoadDirector` wave template or add a new template when the object needs its own rhythm.
 
 ## Adjusting Difficulty
 
-Tune these values in the Sunset Highway track config:
+Tune Road Director values near the top of `game.js`:
+
+- `ROAD_DIRECTOR.modeCadence`: wave timing, recovery scale, center safety timing, and movement pressure by speed class
+- `ROAD_DIRECTOR.pressureValues`: simple pressure budget values for each obstacle/reward type
+- `ROAD_DIRECTOR.modeIntensity`: target pressure budget by speed class
+- `TRACK_DIRECTOR_BANDS`: opening, early-mid, late-mid, and final wave template weights
+
+Tune these values in the Sunset Highway track config only when the whole race pace or length needs to change:
 
 - `baseSpeed`: starting pace
 - `maxSpeed`: top pace
