@@ -310,6 +310,84 @@ button:disabled {
   width: min(1040px, 100%);
 }
 
+.challenge-panel {
+  width: min(1120px, 100%);
+}
+
+.challenge-header {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: minmax(0, 1fr) minmax(220px, 0.36fr);
+  align-items: start;
+  margin-bottom: 18px;
+}
+
+.challenge-player-card,
+.challenge-card,
+.challenge-result-card {
+  border: 1px solid rgba(40, 246, 255, 0.38);
+  border-radius: 8px;
+  background: rgba(5, 8, 20, 0.72);
+}
+
+.challenge-player-card {
+  display: grid;
+  gap: 5px;
+  padding: 12px;
+}
+
+.challenge-player-card strong {
+  color: var(--yellow);
+  text-transform: uppercase;
+}
+
+.challenge-card-grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+}
+
+.challenge-card {
+  display: grid;
+  gap: 11px;
+  align-content: start;
+  padding: 13px;
+}
+
+.challenge-card.is-complete {
+  border-color: var(--yellow);
+  box-shadow: 0 0 14px rgba(255, 228, 94, 0.16);
+}
+
+.challenge-card-title h3 {
+  margin: 3px 0 0;
+  color: var(--text);
+  font-size: 1.25rem;
+  text-transform: uppercase;
+}
+
+.challenge-meta-grid {
+  display: grid;
+  gap: 7px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.challenge-meta-grid span {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  color: var(--muted);
+  font-size: 0.78rem;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+
+.challenge-meta-grid strong {
+  color: var(--yellow);
+  font-size: 0.72rem;
+  text-transform: uppercase;
+}
+
 .party-setup-grid {
   display: grid;
   gap: 18px;
@@ -468,6 +546,12 @@ button:disabled {
   display: block;
   margin-top: 4px;
   font-size: 1.2rem;
+}
+
+.score-card span.is-compact {
+  font-size: 0.96rem;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
 }
 
 .score-card .tally-score {
@@ -700,6 +784,50 @@ button:disabled {
   background: rgba(5, 8, 20, 0.76);
 }
 
+.challenge-result-card {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  margin: 12px 0 16px;
+  padding: 12px;
+}
+
+.challenge-result-card.is-complete {
+  border-color: var(--yellow);
+  background: rgba(255, 228, 94, 0.1);
+}
+
+.challenge-result-card.is-failed {
+  border-color: rgba(255, 59, 88, 0.5);
+}
+
+.challenge-result-card strong {
+  display: block;
+  color: var(--text);
+  font-size: 1.2rem;
+  text-transform: uppercase;
+}
+
+.challenge-result-stack {
+  display: grid;
+  gap: 2px;
+  justify-items: end;
+  text-align: right;
+}
+
+.challenge-result-stack span,
+.challenge-result-stack small {
+  color: var(--yellow);
+  text-transform: uppercase;
+}
+
+.challenge-result-stack strong {
+  color: var(--green);
+  font-size: clamp(1.5rem, 4vw, 2.4rem);
+  text-shadow: 0 0 12px rgba(68, 255, 153, 0.5);
+}
+
 .party-last-run-card > .medal-row {
   grid-column: 1 / -1;
 }
@@ -801,6 +929,8 @@ button:disabled {
 
   .title-panel,
   .split,
+  .challenge-header,
+  .challenge-result-card,
   .party-setup-grid,
   .score-hero,
   .party-drama-header,

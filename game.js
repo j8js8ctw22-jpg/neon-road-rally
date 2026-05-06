@@ -196,6 +196,60 @@ const SPEED_CLASSES = [
   { id: "turbo", label: "Turbo", startSpeed: 1500, endSpeed: 2600, scoreMultiplier: 1.4 }
 ];
 
+const CHALLENGE_SAVE_VERSION = 1;
+const CHALLENGES = [
+  {
+    id: "first-run",
+    name: "First Run",
+    description: "An approachable Sunset Highway finish.",
+    trackId: "sunset-highway",
+    raceMode: "rookie",
+    seed: "FIRST-RUN",
+    objective: { type: "finish", label: "Finish the race" },
+    purpose: "Approachable onboarding challenge"
+  },
+  {
+    id: "turbo-dare",
+    name: "Turbo Dare",
+    description: "Survive Sunset Highway at party-speed intensity.",
+    trackId: "sunset-highway",
+    raceMode: "turbo",
+    seed: "TURBO-DARE",
+    objective: { type: "finish", label: "Finish the race" },
+    purpose: "Intense adult/party-style challenge"
+  },
+  {
+    id: "clean-line",
+    name: "Clean Line",
+    description: "Hold a precise Arcade line without slowdown hits.",
+    trackId: "sunset-highway",
+    raceMode: "arcade",
+    seed: "CLEAN-LINE",
+    objective: { type: "noSlowdownHits", label: "Finish with no slowdown hits" },
+    purpose: "Precision challenge"
+  },
+  {
+    id: "boost-hunter",
+    name: "Boost Hunter",
+    description: "Spend every manual boost and still reach the finish.",
+    trackId: "sunset-highway",
+    raceMode: "pro",
+    seed: "BOOST-HUNTER",
+    objective: { type: "useAllManualBoosts", label: "Finish and use all manual boosts", target: 3 },
+    purpose: "Risk/reward boost challenge"
+  },
+  {
+    id: "near-miss-run",
+    name: "Near-Miss Run",
+    description: "Push the scoring lane and bank five close calls.",
+    trackId: "sunset-highway",
+    raceMode: "pro",
+    seed: "NEAR-MISS",
+    objective: { type: "nearMisses", label: "Earn at least 5 near-miss bonuses", target: 5 },
+    purpose: "Advanced scoring challenge"
+  }
+];
+
 const SPEED_TUNING = {
   minSpeed: 250,
   manualBoostMultiplier: 1.24,
@@ -504,6 +558,20 @@ function getSpeedClassLabel(value) {
   return getSpeedClassConfig(value).label;
 }
 
+function getTrackById(value) {
+  const id = String(value || "").trim();
+  return TRACKS.find((track) => track.id === id) || TRACKS[0];
+}
+
+function getChallengeById(value) {
+  const id = String(value || "").trim();
+  return CHALLENGES.find((challenge) => challenge.id === id) || null;
+}
+
+function getChallengeObjectiveLabel(challenge) {
+  return String(challenge?.objective?.label || "Finish the race");
+}
+
 function getSpeedClassStartSpeed(value) {
   const speedClass = getSpeedClassConfig(value);
   return speedClass.startSpeed ?? TRACKS[0].baseSpeed * (speedClass.startMultiplier ?? 1);
@@ -639,6 +707,126 @@ function safeJsonParse(raw) {
   } catch (error) {
     return null;
   }
+}
+
+function createDefaultChallengeSave() {
+  return {
+    version: CHALLENGE_SAVE_VERSION,
+    progress: {}
+  };
+}
+
+function normalizeChallengeRunSummary(summary) {
+  if (!summary || typeof summary !== "object") return null;
+  return {
+    status: summary.status === "finished" ? "finished" : "crashed",
+    score: Math.max(0, Math.round(Number.isFinite(summary.score) ? summary.score : summary.finalScore || 0)),
+    raceMode: normalizeSpeedClassId(summary.raceMode || summary.speedClass, DEFAULT_SPEED_CLASS_ID),
+    seed: normalizeStoredRoadSeed(summary.seed, ""),
+    time: Number.isFinite(summary.time) ? Math.max(0, summary.time) : 0,
+    slowdownHits: Math.max(0, Math.round(Number.isFinite(summary.slowdownHits) ? summary.slowdownHits : 0)),
+    nearMisses: Math.max(0, Math.round(Number.isFinite(summary.nearMisses) ? summary.nearMisses : 0)),
+    manualBoostsUsed: Math.max(0, Math.round(Number.isFinite(summary.manualBoostsUsed) ? summary.manualBoostsUsed : 0)),
+    medalsEarned: Array.isArray(summary.medalsEarned || summary.medals)
+      ? (summary.medalsEarned || summary.medals).map((medal) => String(medal?.title || medal)).filter(Boolean).slice(0, 5)
+      : []
+  };
+}
+
+function normalizeChallengeProgressEntry(entry, challengeId) {
+  if (!entry || typeof entry !== "object") return null;
+  const bestScore = Number.isFinite(entry.bestScore) ? entry.bestScore : entry.score;
+  return {
+    challengeId: String(entry.challengeId || challengeId || ""),
+    completed: Boolean(entry.completed || entry.bestCompletionStatus),
+    bestCompletionStatus: Boolean(entry.completed || entry.bestCompletionStatus),
+    bestScore: Math.max(0, Math.round(Number.isFinite(bestScore) ? bestScore : 0)),
+    bestDate: String(entry.bestDate || entry.date || ""),
+    bestRunSummary: normalizeChallengeRunSummary(entry.bestRunSummary || entry.runSummary || entry.summary)
+  };
+}
+
+function normalizeChallengeSave(value) {
+  const fallback = createDefaultChallengeSave();
+  if (!value || typeof value !== "object") return fallback;
+  const source = value.progress && typeof value.progress === "object" ? value.progress : value;
+  const progress = {};
+  CHALLENGES.forEach((challenge) => {
+    const entry = normalizeChallengeProgressEntry(source[challenge.id], challenge.id);
+    if (entry) {
+      progress[challenge.id] = {
+        ...entry,
+        challengeId: challenge.id
+      };
+    }
+  });
+  return {
+    version: CHALLENGE_SAVE_VERSION,
+    progress
+  };
+}
+
+function getChallengeRunStats(summary) {
+  const breakdown = summary?.scoreBreakdown || {};
+  return {
+    finished: summary?.status === "finished",
+    finalScore: Math.max(0, Math.round(summary?.finalScore || 0)),
+    raceMode: normalizeSpeedClassId(summary?.speedClass, DEFAULT_SPEED_CLASS_ID),
+    seed: normalizeStoredRoadSeed(summary?.seed, ""),
+    slowdownHits: Math.max(0, Math.round(summary?.slowdownHits || 0)),
+    nearMisses: Math.max(0, Math.round(summary?.nearMisses || 0)),
+    nearMissScore: Math.max(0, Math.round(breakdown.nearMiss || 0)),
+    boostUseCount: Math.max(0, Math.round(summary?.manualBoostsUsed || 0)),
+    medalsEarned: Array.isArray(summary?.medals)
+      ? summary.medals.map((medal) => String(medal.title || "")).filter(Boolean)
+      : []
+  };
+}
+
+function evaluateChallengeObjective(challenge, summary) {
+  const objective = challenge?.objective || {};
+  const stats = getChallengeRunStats(summary);
+  let completed = false;
+  let detail = "Objective not met";
+
+  if (objective.type === "noSlowdownHits") {
+    completed = stats.finished && stats.slowdownHits === 0;
+    detail = completed
+      ? "Finished without slowdown hits"
+      : `${stats.slowdownHits} slowdown hit${stats.slowdownHits === 1 ? "" : "s"}`;
+  } else if (objective.type === "useAllManualBoosts") {
+    const target = Math.max(1, Math.round(objective.target || 3));
+    completed = stats.finished && stats.boostUseCount >= target;
+    detail = completed
+      ? `Used ${stats.boostUseCount}/${target} manual boosts and finished`
+      : `Used ${stats.boostUseCount}/${target} manual boosts${stats.finished ? "" : ", finish still needed"}`;
+  } else if (objective.type === "nearMisses") {
+    const target = Math.max(1, Math.round(objective.target || 5));
+    completed = stats.nearMisses >= target;
+    detail = completed
+      ? `${stats.nearMisses}/${target} near misses`
+      : `${stats.nearMisses}/${target} near misses`;
+  } else {
+    completed = stats.finished;
+    detail = completed ? "Finished the race" : "Finish still needed";
+  }
+
+  return {
+    challengeId: challenge?.id || "",
+    challengeName: challenge?.name || "Challenge",
+    objective: getChallengeObjectiveLabel(challenge),
+    completed,
+    detail,
+    score: stats.finalScore,
+    raceMode: stats.raceMode,
+    seed: stats.seed,
+    slowdownHits: stats.slowdownHits,
+    nearMisses: stats.nearMisses,
+    nearMissScore: stats.nearMissScore,
+    boostUseCount: stats.boostUseCount,
+    medalsEarned: stats.medalsEarned,
+    date: new Date().toISOString()
+  };
 }
 
 function randomChoice(items, rng = Math.random) {
@@ -848,6 +1036,7 @@ class PlayerProfileManager {
       currentPlayerId: null,
       speedClassId: DEFAULT_SPEED_CLASS_ID,
       leaderboard: [],
+      challengeProgress: createDefaultChallengeSave(),
       audio: {
         musicMuted: false,
         sfxMuted: false,
@@ -879,6 +1068,8 @@ class PlayerProfileManager {
       .filter((entry) => entry && Number.isFinite(entry.score))
       .map((entry) => {
         const speedClass = normalizeSpeedClassId(entry.speedClass || entry.raceMode, DEFAULT_SPEED_CLASS_ID);
+        const challenge = getChallengeById(entry.challengeId);
+        const challengeId = challenge ? challenge.id : (entry.challengeId ? String(entry.challengeId) : "");
         return {
           playerName: sanitizeName(entry.playerName, "PLAYER"),
           playerId: entry.playerId ? String(entry.playerId) : "",
@@ -891,7 +1082,9 @@ class PlayerProfileManager {
           status: entry.status === "finished" ? "finished" : "crashed",
           time: Number.isFinite(entry.time) ? Math.max(0, entry.time) : 0,
           date: String(entry.date || new Date().toISOString()),
-          partyMode: Boolean(entry.partyMode)
+          partyMode: Boolean(entry.partyMode),
+          challengeId,
+          challengeName: challengeId ? sanitizeName(entry.challengeName || challenge?.name, challenge?.name || "Challenge") : ""
         };
       })
       .sort((a, b) => b.score - a.score)
@@ -917,6 +1110,7 @@ class PlayerProfileManager {
       currentPlayerId,
       speedClassId: normalizeSpeedClassId(parsed.speedClassId, fallback.speedClassId),
       leaderboard,
+      challengeProgress: normalizeChallengeSave(parsed.challengeProgress || parsed.challenges),
       audio
     };
   }
@@ -1010,6 +1204,8 @@ class PlayerProfileManager {
 
   recordScore(entry) {
     const speedClass = normalizeSpeedClassId(entry.speedClass || entry.raceMode, DEFAULT_SPEED_CLASS_ID);
+    const challenge = getChallengeById(entry.challengeId);
+    const challengeId = challenge ? challenge.id : (entry.challengeId ? String(entry.challengeId) : "");
     const cleanEntry = {
       playerName: sanitizeName(entry.playerName, "PLAYER"),
       playerId: entry.playerId ? String(entry.playerId) : "",
@@ -1022,7 +1218,9 @@ class PlayerProfileManager {
       status: entry.status === "finished" ? "finished" : "crashed",
       time: Number.isFinite(entry.time) ? Math.max(0, entry.time) : 0,
       date: new Date().toISOString(),
-      partyMode: Boolean(entry.partyMode)
+      partyMode: Boolean(entry.partyMode),
+      challengeId,
+      challengeName: challengeId ? sanitizeName(entry.challengeName || challenge?.name, challenge?.name || "Challenge") : ""
     };
     this.data.leaderboard.push(cleanEntry);
     this.data.leaderboard.sort((a, b) => b.score - a.score);
@@ -1034,6 +1232,65 @@ class PlayerProfileManager {
     }
     this.save();
     return cleanEntry;
+  }
+
+  getChallengeProgress(challengeId) {
+    const id = String(challengeId || "");
+    return this.data.challengeProgress?.progress?.[id] || null;
+  }
+
+  recordChallengeResult(challenge, summary, evaluation) {
+    if (!challenge?.id || !evaluation) return null;
+    const save = normalizeChallengeSave(this.data.challengeProgress);
+    const existing = save.progress[challenge.id] || {
+      challengeId: challenge.id,
+      completed: false,
+      bestCompletionStatus: false,
+      bestScore: 0,
+      bestDate: "",
+      bestRunSummary: null
+    };
+    const score = Math.max(0, Math.round(summary?.finalScore || evaluation.score || 0));
+    const scoreImproved = score > (existing.bestScore || 0);
+    const completionImproved = Boolean(evaluation.completed && !existing.completed);
+    const shouldStoreRun = scoreImproved || completionImproved || !existing.bestDate;
+    const date = evaluation.date || new Date().toISOString();
+    const bestRunSummary = shouldStoreRun
+      ? normalizeChallengeRunSummary({
+        status: summary?.status,
+        score,
+        raceMode: summary?.speedClass,
+        seed: summary?.seed,
+        time: summary?.time,
+        slowdownHits: summary?.slowdownHits,
+        nearMisses: summary?.nearMisses,
+        manualBoostsUsed: summary?.manualBoostsUsed,
+        medalsEarned: evaluation.medalsEarned
+      })
+      : existing.bestRunSummary;
+
+    const updated = {
+      challengeId: challenge.id,
+      completed: Boolean(existing.completed || evaluation.completed),
+      bestCompletionStatus: Boolean(existing.completed || evaluation.completed),
+      bestScore: Math.max(existing.bestScore || 0, score),
+      bestDate: shouldStoreRun ? date : existing.bestDate,
+      bestRunSummary
+    };
+    save.progress[challenge.id] = updated;
+    this.data.challengeProgress = save;
+    this.save();
+    return {
+      ...evaluation,
+      saved: true,
+      previousBestScore: existing.bestScore || 0,
+      bestScore: updated.bestScore,
+      bestCompletionStatus: updated.bestCompletionStatus,
+      newBest: scoreImproved,
+      newlyCompleted: completionImproved,
+      bestDate: updated.bestDate,
+      bestRunSummary: updated.bestRunSummary
+    };
   }
 }
 
@@ -4704,12 +4961,21 @@ class Renderer {
     const eta = run.currentSpeed > 0 ? (run.track.distanceToFinish - run.distance) / run.currentSpeed : 0;
     const directorDebug = this.game.obstacles.director.getDebugInfo();
     const partyDebug = this.game.getPartyDebugInfo();
+    const challengeDebug = this.game.getChallengeDebugInfo();
     const partyLines = partyDebug.active ? [
       "party mode: active",
       `party player: ${partyDebug.currentPlayer}`,
       `party turn: ${partyDebug.currentTurn}/${partyDebug.totalPlayers}`,
       `party seed: ${partyDebug.sharedSeed}`,
       `party results: ${partyDebug.resultsCount}`
+    ] : [];
+    const challengeLines = challengeDebug.active ? [
+      "challenge mode: active",
+      `challenge id: ${challengeDebug.challengeId}`,
+      `challenge name: ${challengeDebug.challengeName}`,
+      `objective: ${challengeDebug.objective}`,
+      `challenge status: ${challengeDebug.completionStatus}`,
+      `fixed seed: ${challengeDebug.fixedSeed}`
     ] : [];
     const spriteDebug = getPlayerSpriteDebugInfo(run.player.car, {
       airborne: run.airborne,
@@ -4720,6 +4986,7 @@ class Renderer {
       `mode: ${run.speedClass?.label || getSpeedClassLabel(run.speedClassId)} score x${(run.scoreMultiplier || 1).toFixed(2)}`,
       `seed: ${directorDebug.seed}`,
       ...partyLines,
+      ...challengeLines,
       `seed hash: ${directorDebug.seedHash >>> 0} rng ${directorDebug.rngState >>> 0}`,
       `configured: ${classStartSpeed.toFixed(0)} -> ${classEndSpeed.toFixed(0)}`,
       `base speed: ${(run.baseCruiseSpeed || classStartSpeed).toFixed(0)} raw ${(run.rawCruiseSpeed || classStartSpeed).toFixed(0)}`,
@@ -5862,6 +6129,11 @@ class NeonRoadRally {
       partyRoundNumber: 0,
       partyTurnNumber: 0,
       partyTotalPlayers: 0,
+      challengeMode: false,
+      challengeId: "",
+      challengeName: "",
+      challengeObjective: "",
+      challengeFixedSeed: "",
       lastDistanceDelta: 0,
       boostMultiplier: 1,
       manualBoosts: 3,
@@ -6137,11 +6409,100 @@ class NeonRoadRally {
     this.showPreRaceScreen();
   }
 
+  showChallengeScreen(message = "") {
+    this.partySession = null;
+    this.setScreen("challenges");
+    this.audio.playMusic("title", false);
+    const player = this.profiles.getCurrentPlayer();
+    this.layer.classList.remove("is-empty");
+    this.layer.innerHTML = `
+      <section class="panel challenge-panel">
+        <div class="challenge-header">
+          <div>
+            <span class="eyebrow">Challenge Mode</span>
+            <h2>Sunset Highway Challenges</h2>
+            <p class="hint">Curated solo runs with fixed seeds, race modes, and music-shaped Road Director sections.</p>
+          </div>
+          <div class="challenge-player-card">
+            <strong>${player ? escapeHtml(player.name) : "No Player"}</strong>
+            <span>${player ? `Driving ${escapeHtml(player.car.name)}` : "Create a local player first"}</span>
+          </div>
+        </div>
+        <div class="challenge-card-grid">
+          ${CHALLENGES.map((challenge) => this.renderChallengeCard(challenge)).join("")}
+        </div>
+        <div class="row" style="margin-top:16px">
+          <button class="small-button" data-action="title">Back to Title</button>
+          <button class="small-button" data-action="leaderboard">Top 20 Scores</button>
+        </div>
+        <p class="status-line">${escapeHtml(message)}</p>
+      </section>
+    `;
+    this.bindLayerButtons();
+  }
+
+  renderChallengeCard(challenge) {
+    const progress = this.profiles.getChallengeProgress(challenge.id);
+    const track = getTrackById(challenge.trackId);
+    const completed = Boolean(progress?.completed);
+    const bestScore = progress?.bestScore ? formatScore(progress.bestScore) : "No score yet";
+    const bestDate = progress?.bestDate ? new Date(progress.bestDate).toLocaleDateString() : "";
+    return `
+      <article class="challenge-card ${completed ? "is-complete" : ""}">
+        <div class="challenge-card-title">
+          <span class="eyebrow">${completed ? "Complete" : "Open"}</span>
+          <h3>${escapeHtml(challenge.name)}</h3>
+        </div>
+        <p class="hint">${escapeHtml(challenge.description)}</p>
+        <div class="challenge-meta-grid">
+          <span><strong>Track</strong>${escapeHtml(track.name)}</span>
+          <span><strong>Race Mode</strong>${escapeHtml(getSpeedClassLabel(challenge.raceMode))}</span>
+          <span><strong>Seed</strong>${escapeHtml(normalizeRoadSeed(challenge.seed, DEFAULT_ROAD_SEED))}</span>
+          <span><strong>Objective</strong>${escapeHtml(getChallengeObjectiveLabel(challenge))}</span>
+          <span><strong>Best Score</strong>${escapeHtml(bestScore)}</span>
+          <span><strong>Status</strong>${completed ? `Completed${bestDate ? ` ${escapeHtml(bestDate)}` : ""}` : "Not completed"}</span>
+        </div>
+        <button class="small-button primary" data-action="startChallenge" data-id="${escapeAttr(challenge.id)}">Start Challenge</button>
+      </article>
+    `;
+  }
+
+  handleStartChallenge(challengeId) {
+    const challenge = getChallengeById(challengeId);
+    if (!challenge) {
+      this.showChallengeScreen("Challenge not found.");
+      return;
+    }
+    if (!this.profiles.getCurrentPlayer()) {
+      this.showPlayerScreen("Create or choose a player before starting Challenge Mode.");
+      return;
+    }
+    this.startChallengeRun(challenge);
+  }
+
+  startChallengeRun(challengeOrId) {
+    const challenge = typeof challengeOrId === "string" ? getChallengeById(challengeOrId) : getChallengeById(challengeOrId?.id);
+    if (!challenge) {
+      this.showChallengeScreen("Challenge not found.");
+      return;
+    }
+    this.partySession = null;
+    this.partySetup = null;
+    this.pendingRoadSeed = normalizeRoadSeed(challenge.seed, DEFAULT_ROAD_SEED);
+    this.startRace({
+      challenge,
+      track: getTrackById(challenge.trackId),
+      speedClassId: challenge.raceMode,
+      seed: challenge.seed
+    });
+  }
+
   startRace(options = {}) {
-    const partyMode = Boolean(options.partyMode);
+    const challenge = options.challenge ? getChallengeById(options.challenge.id || options.challenge) : getChallengeById(options.challengeId);
+    const partyMode = Boolean(options.partyMode) && !challenge;
     const player = options.player ? snapshotPartyPlayer(options.player) : this.profiles.ensureDefaultPlayer();
-    const track = options.track || TRACKS[0];
-    const speedClass = getSpeedClassConfig(options.speedClassId ?? this.profiles.data.speedClassId);
+    const track = challenge ? getTrackById(challenge.trackId) : (options.track || TRACKS[0]);
+    const speedClass = getSpeedClassConfig(challenge ? challenge.raceMode : (options.speedClassId ?? this.profiles.data.speedClassId));
     if (this.scoreTallyFrame) {
       cancelAnimationFrame(this.scoreTallyFrame);
       this.scoreTallyFrame = null;
@@ -6161,6 +6522,11 @@ class NeonRoadRally {
     this.run.partyRoundNumber = partyMode ? (this.partySession?.roundNumber || 1) : 0;
     this.run.partyTurnNumber = partyMode ? (this.partySession?.currentTurnNumber || 1) : 0;
     this.run.partyTotalPlayers = partyMode ? (this.partySession?.totalPlayers || 0) : 0;
+    this.run.challengeMode = Boolean(challenge);
+    this.run.challengeId = challenge?.id || "";
+    this.run.challengeName = challenge?.name || "";
+    this.run.challengeObjective = challenge ? getChallengeObjectiveLabel(challenge) : "";
+    this.run.challengeFixedSeed = challenge ? normalizeRoadSeed(challenge.seed, DEFAULT_ROAD_SEED) : "";
     this.run.currentSpeed = getTrackCruiseSpeed(track, 0, speedClass.id);
     this.run.rawCruiseSpeed = getTrackRawCruiseSpeed(track, 0, speedClass.id);
     this.run.baseCruiseSpeed = this.run.currentSpeed;
@@ -6168,7 +6534,7 @@ class NeonRoadRally {
     this.run.speedCapped = false;
     this.run.debugSpeedScale = this.debugSpeedScale || 1;
     this.updateRaceSection(false);
-    this.configureRunSeed(options.seed ?? this.pendingRoadSeed, track, speedClass.id);
+    this.configureRunSeed(challenge ? challenge.seed : (options.seed ?? this.pendingRoadSeed), track, speedClass.id);
     if (this.input) this.input.clearGameplayInput();
     this.obstacles.reset(track);
     this.setScreen("game");
@@ -6370,6 +6736,27 @@ class NeonRoadRally {
     return medals;
   }
 
+  buildChallengeResult(summary) {
+    const challenge = getChallengeById(summary.challengeId);
+    if (!challenge) return null;
+    const evaluation = evaluateChallengeObjective(challenge, summary);
+    if (summary.debugSpeedScaleActive) {
+      const progress = this.profiles.getChallengeProgress(challenge.id);
+      return {
+        ...evaluation,
+        saved: false,
+        previousBestScore: progress?.bestScore || 0,
+        bestScore: progress?.bestScore || 0,
+        bestCompletionStatus: Boolean(progress?.completed),
+        newBest: false,
+        newlyCompleted: false,
+        bestDate: progress?.bestDate || "",
+        bestRunSummary: progress?.bestRunSummary || null
+      };
+    }
+    return this.profiles.recordChallengeResult(challenge, summary, evaluation);
+  }
+
   endRace(status, reason) {
     const run = this.run;
     if (run.ended) return;
@@ -6428,7 +6815,9 @@ class NeonRoadRally {
       score: run.score,
       status,
       time: run.elapsed,
-      partyMode: Boolean(run.partyMode)
+      partyMode: Boolean(run.partyMode),
+      challengeId: run.challengeMode ? run.challengeId : "",
+      challengeName: run.challengeMode ? run.challengeName : ""
     });
     const updatedProfilePlayer = this.profiles.getPlayerById(player.id) || profilePlayer;
     const topTwentyRank = entry ? this.profiles.data.leaderboard.indexOf(entry) + 1 : null;
@@ -6445,6 +6834,11 @@ class NeonRoadRally {
       carName: player.car.name,
       trackName: run.track.name,
       partyMode: Boolean(run.partyMode),
+      challengeMode: Boolean(run.challengeMode),
+      challengeId: run.challengeId || "",
+      challengeName: run.challengeName || "",
+      challengeObjective: run.challengeObjective || "",
+      challengeFixedSeed: run.challengeFixedSeed || "",
       baseScore: Math.max(0, Math.round(run.baseScore || 0)),
       finalScore: run.score,
       seed: run.roadSeed,
@@ -6477,6 +6871,16 @@ class NeonRoadRally {
       debugSpeedScale: this.debugSpeedScale || 1
     };
     summary.medals = this.buildRunMedals(summary, run, previousBestScore);
+    if (summary.challengeMode) {
+      summary.challengeResult = this.buildChallengeResult(summary);
+      if (summary.challengeResult?.completed) {
+        summary.medals = [{
+          title: "Challenge Complete",
+          detail: summary.challengeName,
+          tone: "hot"
+        }].concat(summary.medals).slice(0, 3);
+      }
+    }
     this.lastSummary = summary;
     if (run.partyMode && this.partySession?.isPartyMode) {
       this.lastSummary.partyResult = this.partySession.addResult(this.lastSummary);
@@ -6513,6 +6917,29 @@ class NeonRoadRally {
       totalPlayers: run?.partyMode ? (run.partyTotalPlayers || session?.totalPlayers || 0) : (session?.totalPlayers || 0),
       sharedSeed: session?.sharedSeed || run?.roadSeed || "none",
       resultsCount: session?.results?.length || 0
+    };
+  }
+
+  getChallengeDebugInfo() {
+    const run = this.run;
+    if (!run?.challengeMode) {
+      return {
+        active: false,
+        challengeId: "none",
+        challengeName: "none",
+        objective: "none",
+        completionStatus: "none",
+        fixedSeed: "none"
+      };
+    }
+    const progress = this.profiles.getChallengeProgress(run.challengeId);
+    return {
+      active: true,
+      challengeId: run.challengeId || "unknown",
+      challengeName: run.challengeName || "Challenge",
+      objective: run.challengeObjective || "Objective",
+      completionStatus: progress?.completed ? "completed" : "not completed",
+      fixedSeed: run.challengeFixedSeed || run.roadSeed || "none"
     };
   }
 
@@ -7530,6 +7957,7 @@ class NeonRoadRally {
             <p class="hint">Higher speed classes start faster and award higher scores. Arcade is the standard race.</p>
           </div>
           <button class="menu-button primary" data-action="start">Start Game</button>
+          <button class="menu-button" data-action="challengeMode">Challenge Mode</button>
           <button class="menu-button" data-action="partyMode">Party Mode</button>
           <button class="menu-button" data-action="players">Choose/Create Player</button>
           <button class="menu-button" data-action="customize">Customize Car</button>
@@ -7572,7 +8000,7 @@ class NeonRoadRally {
     this.layer.innerHTML = `
       <section class="panel compact">
         <div class="form-stack">
-          <h2>Seeded Challenge Run</h2>
+          <h2>Seeded Solo Run</h2>
           <p class="hint">${escapeHtml(track.name)} · ${escapeHtml(speedClass.label)} · ${escapeHtml(player.name)}</p>
           <div class="seed-display" aria-live="polite">
             <span>Current Road Seed</span>
@@ -8052,6 +8480,48 @@ class NeonRoadRally {
     `;
   }
 
+  renderChallengeCallouts(summary) {
+    if (!summary.challengeMode) return "";
+    const result = summary.challengeResult || {};
+    const callouts = [];
+    if (!result.saved && summary.debugSpeedScaleActive) {
+      callouts.push(`<span class="score-callout is-muted">Challenge Not Saved</span>`);
+    }
+    callouts.push(result.completed
+      ? `<span class="score-callout is-hot">Challenge Complete</span>`
+      : `<span class="score-callout is-muted">Challenge Failed</span>`);
+    if (result.newBest) {
+      callouts.push(`<span class="score-callout is-hot">New Challenge Best</span>`);
+    } else if (result.bestScore > 0) {
+      callouts.push(`<span class="score-callout">Challenge Best ${formatScore(result.bestScore)}</span>`);
+    }
+    return callouts.join("");
+  }
+
+  renderChallengeResultPanel(summary) {
+    if (!summary.challengeMode) return "";
+    const result = summary.challengeResult || {};
+    const bestText = result.bestScore ? formatScore(result.bestScore) : "No saved best";
+    const completionText = result.bestCompletionStatus ? "Completed" : "Not completed";
+    const saveText = !result.saved && summary.debugSpeedScaleActive
+      ? "Not saved in debug speed"
+      : (result.newlyCompleted ? "First completion" : (result.newBest ? "New challenge best" : "Saved locally"));
+    return `
+      <div class="challenge-result-card ${result.completed ? "is-complete" : "is-failed"}">
+        <div>
+          <span class="eyebrow">${result.completed ? "Challenge Complete" : "Challenge Failed"}</span>
+          <strong>${escapeHtml(summary.challengeName)}</strong>
+          <span class="meta">${escapeHtml(result.objective || summary.challengeObjective)} · ${escapeHtml(result.detail || "Objective checked")}</span>
+        </div>
+        <div class="challenge-result-stack">
+          <span>${escapeHtml(completionText)}</span>
+          <strong>${escapeHtml(bestText)}</strong>
+          <small>${escapeHtml(saveText)}</small>
+        </div>
+      </div>
+    `;
+  }
+
   renderLeaderboardContext(summary) {
     if (!summary.scoreSaved) {
       return `<span class="score-callout is-muted">Debug speed run - score not saved</span>`;
@@ -8197,6 +8667,11 @@ class NeonRoadRally {
   }
 
   handleRestartRun() {
+    const challengeId = this.lastSummary?.challengeMode ? this.lastSummary.challengeId : (this.run?.challengeMode ? this.run.challengeId : "");
+    if (challengeId) {
+      this.startChallengeRun(challengeId);
+      return;
+    }
     if (this.run?.partyMode && this.partySession?.isPartyMode) {
       this.startCurrentPartyRun();
       return;
@@ -8385,7 +8860,7 @@ class NeonRoadRally {
               <span class="leaderboard-rank">#${index + 1}</span>
               <span>
                 <strong>${escapeHtml(entry.playerName)}</strong>
-                <span class="meta">${entry.partyMode ? "Party · " : ""}${escapeHtml(entry.carName)} · ${escapeHtml(entry.trackName)} · ${escapeHtml(getSpeedClassLabel(entry.raceMode || entry.speedClass))} · Seed ${escapeHtml(formatRoadSeed(entry.seed))} · ${entry.status} · ${formatTime(entry.time)} · ${new Date(entry.date).toLocaleDateString()}</span>
+                <span class="meta">${entry.challengeId ? `Challenge: ${escapeHtml(entry.challengeName || entry.challengeId)} · ` : ""}${entry.partyMode ? "Party · " : ""}${escapeHtml(entry.carName)} · ${escapeHtml(entry.trackName)} · ${escapeHtml(getSpeedClassLabel(entry.raceMode || entry.speedClass))} · Seed ${escapeHtml(formatRoadSeed(entry.seed))} · ${entry.status} · ${formatTime(entry.time)} · ${new Date(entry.date).toLocaleDateString()}</span>
               </span>
               <span class="leaderboard-score">${formatScore(entry.score)}</span>
             </li>
@@ -8421,10 +8896,10 @@ class NeonRoadRally {
       <section class="panel score-results-panel">
         <div class="score-hero ${summary.newHighScore ? "is-high-score" : ""}">
           <div>
-            <span class="eyebrow">${summary.partyMode ? "Party Run Result" : "Run Result"}</span>
-            <h2>${summary.status === "finished" ? "Track Complete" : "Run Over"}</h2>
-            <p class="hint">${escapeHtml(summary.trackName)} · ${escapeHtml(summary.speedClassLabel)} · Seed ${escapeHtml(summary.seed)}</p>
-            <div class="score-callout-row">${this.renderLeaderboardContext(summary)}</div>
+            <span class="eyebrow">${summary.challengeMode ? "Challenge Run Result" : (summary.partyMode ? "Party Run Result" : "Run Result")}</span>
+            <h2>${summary.challengeMode ? (summary.challengeResult?.completed ? "Challenge Complete" : "Challenge Failed") : (summary.status === "finished" ? "Track Complete" : "Run Over")}</h2>
+            <p class="hint">${summary.challengeMode ? `${escapeHtml(summary.challengeName)} · ` : ""}${escapeHtml(summary.trackName)} · ${escapeHtml(summary.speedClassLabel)} · Seed ${escapeHtml(summary.seed)}</p>
+            <div class="score-callout-row">${this.renderChallengeCallouts(summary)}${this.renderLeaderboardContext(summary)}</div>
           </div>
           <div class="final-score-card">
             <span>Final Score</span>
@@ -8433,7 +8908,14 @@ class NeonRoadRally {
           </div>
         </div>
         ${this.renderMedalChips(summary.medals)}
+        ${this.renderChallengeResultPanel(summary)}
         <div class="score-grid score-info-grid">
+          ${summary.challengeMode ? `
+            <div class="score-card"><strong>Challenge</strong><span class="is-compact">${escapeHtml(summary.challengeName)}</span></div>
+            <div class="score-card"><strong>Objective</strong><span class="is-compact">${escapeHtml(summary.challengeObjective)}</span></div>
+            <div class="score-card"><strong>Challenge Result</strong><span class="is-compact">${summary.challengeResult?.completed ? "Complete" : "Failed"}</span></div>
+            <div class="score-card"><strong>Challenge Best</strong><span class="is-compact">${summary.challengeResult?.bestScore ? formatScore(summary.challengeResult.bestScore) : "No saved best"}</span></div>
+          ` : ""}
           <div class="score-card"><strong>Track</strong><span>${escapeHtml(summary.trackName)}</span></div>
           <div class="score-card"><strong>Race Mode</strong><span>${escapeHtml(summary.speedClassLabel)}</span></div>
           <div class="score-card"><strong>Road Seed</strong><input class="seed-copy" type="text" value="${escapeAttr(summary.seed)}" readonly aria-label="Road seed used"></div>
@@ -8457,7 +8939,7 @@ class NeonRoadRally {
               <span class="leaderboard-rank">#${index + 1}</span>
               <span>
                 <strong>${escapeHtml(entry.playerName)}</strong>
-                <span class="meta">${entry.partyMode ? "Party · " : ""}${escapeHtml(entry.carName)} · ${escapeHtml(getSpeedClassLabel(entry.raceMode || entry.speedClass))} · Seed ${escapeHtml(formatRoadSeed(entry.seed))} · ${entry.status} · ${formatTime(entry.time)}</span>
+                <span class="meta">${entry.challengeId ? `Challenge: ${escapeHtml(entry.challengeName || entry.challengeId)} · ` : ""}${entry.partyMode ? "Party · " : ""}${escapeHtml(entry.carName)} · ${escapeHtml(getSpeedClassLabel(entry.raceMode || entry.speedClass))} · Seed ${escapeHtml(formatRoadSeed(entry.seed))} · ${entry.status} · ${formatTime(entry.time)}</span>
               </span>
               <span class="leaderboard-score">${formatScore(entry.score)}</span>
             </li>
@@ -8519,6 +9001,8 @@ class NeonRoadRally {
         this.audio.playSfx("menu");
         const action = button.dataset.action;
         if (action === "start") this.startRaceFromTitle();
+        else if (action === "challengeMode") this.showChallengeScreen();
+        else if (action === "startChallenge") this.handleStartChallenge(button.dataset.id);
         else if (action === "partyMode") this.showPartySetupScreen();
         else if (action === "players") this.showPlayerScreen();
         else if (action === "customize") this.showCustomizeScreen();
@@ -8591,7 +9075,7 @@ class NeonRoadRally {
   }
 
   handleResetData() {
-    const confirmed = window.confirm("Reset all Neon Road Rally players, car settings, scores, and audio settings?");
+    const confirmed = window.confirm("Reset all Neon Road Rally players, car settings, scores, challenge progress, and audio settings?");
     if (!confirmed) return;
     this.profiles.resetAll();
     this.audio.setMusicMuted(false);
