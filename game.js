@@ -466,9 +466,7 @@ const TRAFFIC_SPRITE_ASSETS = {
     { id: "truck-1", path: "assets/traffic/truck-1.png" },
     { id: "truck-2", path: "assets/traffic/truck-2.png" }
   ],
-  barrier: [
-    { id: "barrier-1", path: "assets/traffic/barrier-1.png" }
-  ]
+  barrier: []
 };
 
 const PLAYER_CANVAS_WIDTH = 76;
@@ -1914,6 +1912,7 @@ class InputManager {
 
   onKeyDown(event) {
     const key = event.key;
+    const lowerKey = String(key || "").toLowerCase();
     if (this.isEditableTarget(event.target) && key !== "Escape") return;
     const keyId = this.getKeyId(event);
     const isControlKey = this.isControlKey(keyId);
@@ -1948,18 +1947,24 @@ class InputManager {
       return;
     }
 
-    if (key.toLowerCase() === "m") {
+    if (lowerKey === "m") {
       this.game.toggleMusic();
       return;
     }
 
-    if (key.toLowerCase() === "n") {
+    if (lowerKey === "n") {
       this.game.toggleSfx();
       return;
     }
 
+    if (lowerKey === "f" && (!this.game.debugMode || this.game.screen !== "game")) {
+      event.preventDefault();
+      this.game.toggleFullscreen();
+      return;
+    }
+
     if (this.game.debugMode) {
-      const lower = key.toLowerCase();
+      const lower = lowerKey;
       if (event.shiftKey && (key === "+" || key === "=")) {
         event.preventDefault();
         this.game.adjustDebugSpeedScale(0.1);
@@ -5204,12 +5209,10 @@ class Renderer {
     ctx.fillStyle = "#b8c6d9";
     ctx.font = "700 12px Trebuchet MS, Verdana, sans-serif";
     const sectionLabel = String(run.currentSectionLabel || getTrackSection(run.track, progress).label || "").toUpperCase();
-    const audioText = `MUSIC ${this.game.audio.musicMuted ? "OFF" : "ON"}  SFX ${this.game.audio.sfxMuted ? "OFF" : "ON"}`;
     const contextParts = [`${Math.round(progress * 100)}%`, sectionLabel];
     if (run.challengeMode) contextParts.push(`CHALLENGE ${run.challengeName}`);
     if (run.partyMode) contextParts.push(`PARTY ${run.partyTurnNumber}/${run.partyTotalPlayers}`);
     if (w >= 840) contextParts.push(`SEED ${formatRoadSeed(run.roadSeed)}`);
-    if (w >= 930) contextParts.push(audioText);
     const statusX = w >= 760 ? barX + barW + 18 : barX;
     const statusY = w >= 760 ? 47 : 62;
     const statusMaxWidth = w >= 760 ? Math.max(80, w - statusX - 12) : w - 32;
@@ -6418,6 +6421,10 @@ class NeonRoadRally {
       if (this.screen === "vehicleScaleDebug") this.renderVehicleScaleDebugCanvas();
     });
     this.renderer = new Renderer(this.canvas, this);
+    document.addEventListener("fullscreenchange", () => {
+      this.renderer.resize();
+      this.focusControls();
+    });
     this.obstacles = new ObstacleManager(this);
     this.collision = new CollisionSystem(this);
     this.input = new InputManager(this);
@@ -6828,6 +6835,7 @@ class NeonRoadRally {
     const completed = Boolean(progress?.completed);
     const bestScore = progress?.bestScore ? formatScore(progress.bestScore) : "No score yet";
     const bestDate = progress?.bestDate ? formatShortDate(progress.bestDate) : "";
+    const statusText = completed ? `Completed${bestDate ? ` ${bestDate}` : ""}` : "Not completed";
     return `
       <article class="challenge-card ${completed ? "is-complete" : ""}">
         <div class="challenge-card-title">
@@ -6835,13 +6843,16 @@ class NeonRoadRally {
           <h3>${escapeHtml(challenge.name)}</h3>
         </div>
         <p class="hint">${escapeHtml(challenge.description)}</p>
+        <div class="challenge-objective">
+          <span>Objective</span>
+          <strong>${escapeHtml(getChallengeObjectiveLabel(challenge))}</strong>
+        </div>
         <div class="challenge-meta-grid">
           <span><strong>Track</strong>${escapeHtml(track.name)}</span>
           <span><strong>Race Mode</strong>${escapeHtml(getSpeedClassLabel(challenge.raceMode))}</span>
-          <span><strong>Seed</strong>${escapeHtml(normalizeRoadSeed(challenge.seed, DEFAULT_ROAD_SEED))}</span>
-          <span><strong>Objective</strong>${escapeHtml(getChallengeObjectiveLabel(challenge))}</span>
+          <span><strong>Fixed Seed</strong>${escapeHtml(normalizeRoadSeed(challenge.seed, DEFAULT_ROAD_SEED))}</span>
           <span><strong>Best Score</strong>${escapeHtml(bestScore)}</span>
-          <span><strong>Status</strong>${completed ? `Completed${bestDate ? ` ${escapeHtml(bestDate)}` : ""}` : "Not completed"}</span>
+          <span><strong>Status</strong>${escapeHtml(statusText)}</span>
         </div>
         <button class="small-button primary" data-action="startChallenge" data-id="${escapeAttr(challenge.id)}">Start Challenge</button>
       </article>
@@ -6976,6 +6987,21 @@ class NeonRoadRally {
     if (this.canvas && typeof this.canvas.focus === "function") {
       this.canvas.focus({ preventScroll: true });
     }
+  }
+
+  toggleFullscreen() {
+    const root = document.getElementById("arcadeCabinet") || document.documentElement;
+    let promise = null;
+    if (document.fullscreenElement) {
+      promise = document.exitFullscreen?.();
+    } else if (root.requestFullscreen) {
+      promise = root.requestFullscreen();
+    }
+    if (promise && typeof promise.catch === "function") {
+      promise.catch(() => {});
+    }
+    this.focusControls();
+    return promise;
   }
 
   recordInputEvent(keyId) {
@@ -8317,22 +8343,84 @@ class NeonRoadRally {
     this.audio.playMusic("title", false);
     const player = this.profiles.getCurrentPlayer();
     const selectedSpeedClass = getSpeedClassConfig(this.profiles.data.speedClassId);
+    const playerName = player ? escapeHtml(player.name) : "No Player";
+    const playerDetail = player ? `Driving ${escapeHtml(player.car.name)}` : "Create or choose a local driver";
+    const audioStatus = `Music ${this.audio.musicMuted ? "Muted" : "On"} / SFX ${this.audio.sfxMuted ? "Muted" : "On"}`;
     this.layer.classList.remove("is-empty");
     this.layer.innerHTML = `
-      <section class="panel title-panel">
+      <section class="panel title-panel show-title-panel">
         <div class="title-block">
-          <div class="eyebrow">Local-only arcade racer</div>
-          <h1 class="game-title">Neon<br>Road<br>Rally</h1>
-          <p class="subtitle">Dodge the traffic, hit the boost pads, save three manual boosts for the right moment, and survive Sunset Highway.</p>
-          <p class="status-line">${player ? `Current player: ${escapeHtml(player.name)} driving ${escapeHtml(player.car.name)}` : "Choose or create a player before racing."}</p>
+          <div class="eyebrow">Sunset Highway Show Build</div>
+          <h1 class="game-title"><span>Neon</span><span>Road</span><span>Rally</span></h1>
+          <p class="subtitle title-tagline">Five lanes. One car. No brakes. Beat the room.</p>
+          <div class="title-status-grid">
+            <div class="title-status-card">
+              <span>Current Player</span>
+              <strong>${playerName}</strong>
+              <small>${playerDetail}</small>
+            </div>
+            <div class="title-status-card">
+              <span>Race Mode</span>
+              <strong>${escapeHtml(selectedSpeedClass.label)}</strong>
+              <small>Score x${selectedSpeedClass.scoreMultiplier.toFixed(2)}</small>
+            </div>
+            <div class="title-status-card">
+              <span>Audio</span>
+              <strong>${escapeHtml(audioStatus)}</strong>
+              <small>M/N toggles</small>
+            </div>
+          </div>
+          <p class="keyboard-hints">Enter starts Solo. Arrows/WASD drive. Space boosts. F fullscreen. Backtick opens debug tools.</p>
         </div>
-        <div class="menu-stack">
-          <button class="menu-button primary" data-action="start">Solo / Seeded Run</button>
-          <button class="menu-button" data-action="challengeMode">Challenge Mode</button>
-          <button class="menu-button" data-action="partyMode">Party Mode</button>
+        <div class="title-menu-card">
+          <div class="menu-stack main-menu">
+            <button class="menu-button primary" data-action="start"><strong>Solo / Seeded Run</strong><span>Set a road seed and chase the finish.</span></button>
+            <button class="menu-button" data-action="challengeMode"><strong>Challenge Mode</strong><span>Fixed seeds, clear objectives, saved bests.</span></button>
+            <button class="menu-button" data-action="partyMode"><strong>Party Mode</strong><span>Pass the keyboard, same seed, fastest run wins.</span></button>
+            <button class="menu-button" data-action="customize"><strong>Customize Car</strong><span>Pick the local driver car.</span></button>
+            <button class="menu-button" data-action="leaderboard"><strong>Leaderboard</strong><span>Top 20 local scores.</span></button>
+            <button class="menu-button" data-action="settings"><strong>Settings</strong><span>Audio, race mode, fullscreen.</span></button>
+          </div>
+          <div class="title-utility-row">
+            <button class="small-button" data-action="players">Choose / Create Player</button>
+            <button class="small-button" data-action="toggleMusic">Music: ${this.audio.musicMuted ? "Muted" : "On"}</button>
+            <button class="small-button" data-action="toggleSfx">SFX: ${this.audio.sfxMuted ? "Muted" : "On"}</button>
+            <button class="small-button" data-action="fullscreen">Fullscreen</button>
+          </div>
+          ${this.debugMode ? `
+            <div class="title-dev-row">
+              <button class="small-button" data-action="runSeedTest">Seed Determinism</button>
+              <button class="small-button" data-action="runSimulation">Road Director Simulation</button>
+              <button class="small-button" data-action="vehicleScaleDebug">Vehicle Scale Check</button>
+            </div>
+          ` : ""}
+        </div>
+      </section>
+    `;
+    this.bindLayerButtons();
+    this.bindTitleAudioControls();
+  }
+
+  showSettingsScreen(message = "") {
+    this.setScreen("settings");
+    this.audio.playMusic("title", false);
+    const selectedSpeedClass = getSpeedClassConfig(this.profiles.data.speedClassId);
+    this.layer.classList.remove("is-empty");
+    this.layer.innerHTML = `
+      <section class="panel compact settings-panel">
+        <div class="form-stack">
+          <div>
+            <span class="eyebrow">Show Build Settings</span>
+            <h2>Settings</h2>
+            <p class="hint">Audio and default Solo race mode are saved locally in this browser.</p>
+          </div>
+          <div class="score-grid">
+            <div class="score-card"><strong>Default Race Mode</strong><span>${escapeHtml(selectedSpeedClass.label)}</span></div>
+            <div class="score-card"><strong>Audio</strong><span>${this.audio.musicMuted ? "Music muted" : "Music on"} · ${this.audio.sfxMuted ? "SFX muted" : "SFX on"}</span></div>
+          </div>
           <div class="speed-class-panel">
             <div class="speed-class-header">
-              <span>Race Speed</span>
+              <span>Default Solo Race Mode</span>
               <strong>${escapeHtml(selectedSpeedClass.label)} · Score x${selectedSpeedClass.scoreMultiplier.toFixed(2)}</strong>
             </div>
             <div class="speed-class-grid">
@@ -8343,16 +8431,7 @@ class NeonRoadRally {
                 </button>
               `).join("")}
             </div>
-            <p class="hint">Higher speed classes start faster and award higher scores. Arcade is the standard race.</p>
           </div>
-          <button class="menu-button" data-action="players">Choose / Create Player</button>
-          <button class="menu-button" data-action="customize">Customize Car</button>
-          <button class="menu-button" data-action="leaderboard">Leaderboard</button>
-          <button class="menu-button" data-action="toggleMusic">Music: ${this.audio.musicMuted ? "Muted" : "On"}</button>
-          <button class="menu-button" data-action="toggleSfx">SFX: ${this.audio.sfxMuted ? "Muted" : "On"}</button>
-          ${this.debugMode ? `<button class="menu-button" data-action="runSeedTest">Run Seed Determinism Test</button>` : ""}
-          ${this.debugMode ? `<button class="menu-button" data-action="runSimulation">Run Spawn Safety Simulation</button>` : ""}
-          ${this.debugMode ? `<button class="menu-button" data-action="vehicleScaleDebug">Vehicle Scale Check</button>` : ""}
           <div class="audio-grid">
             <div class="field">
               <label for="musicVolume">Music volume</label>
@@ -8363,6 +8442,14 @@ class NeonRoadRally {
               <input id="sfxVolume" type="range" min="0" max="1" step="0.05" value="${this.audio.sfxVolume}">
             </div>
           </div>
+          <div class="row">
+            <button class="small-button" data-action="toggleMusic">Music: ${this.audio.musicMuted ? "Muted" : "On"}</button>
+            <button class="small-button" data-action="toggleSfx">SFX: ${this.audio.sfxMuted ? "Muted" : "On"}</button>
+            <button class="small-button" data-action="fullscreen">Fullscreen</button>
+            <button class="small-button primary" data-action="title">Back to Title</button>
+          </div>
+          <p class="keyboard-hints">F toggles fullscreen. In debug gameplay, F keeps the debug finish shortcut.</p>
+          <p class="status-line">${escapeHtml(message)}</p>
         </div>
       </section>
     `;
@@ -8385,12 +8472,28 @@ class NeonRoadRally {
     const seed = this.resolveRoadSeed(this.pendingRoadSeed);
     this.pendingRoadSeed = seed;
     const seedSource = getRunRandomSeedSource(seed, track, speedClass.id);
+    const seedHash = hashSeed(seedSource) >>> 0;
     this.layer.classList.remove("is-empty");
     this.layer.innerHTML = `
-      <section class="panel compact">
+      <section class="panel compact pre-race-panel">
         <div class="form-stack">
-          <h2>Solo / Seeded Run</h2>
-          <p class="hint">${escapeHtml(track.name)} · ${escapeHtml(speedClass.label)} · ${escapeHtml(player.name)}</p>
+          <div>
+            <span class="eyebrow">Solo / Seeded Run</span>
+            <h2>Sunset Highway</h2>
+            <p class="hint">One driver, one seed, one clean run through the current show-build track.</p>
+          </div>
+          <div class="score-grid mode-context-grid">
+            <div class="score-card"><strong>Driver</strong><span>${escapeHtml(player.name)}</span></div>
+            <div class="score-card"><strong>Race Mode</strong><span id="preRaceModeSummary">${escapeHtml(speedClass.label)} · x${speedClass.scoreMultiplier.toFixed(2)}</span></div>
+            <div class="score-card"><strong>Track</strong><span>${escapeHtml(track.name)}</span></div>
+            <div class="score-card"><strong>Seed Hash</strong><span id="roadSeedHashValue">${seedHash}</span></div>
+          </div>
+          <div class="field">
+            <label for="preRaceSpeedClass">Race Mode</label>
+            <select id="preRaceSpeedClass">
+              ${SPEED_CLASSES.map((item) => `<option value="${escapeAttr(item.id)}" ${item.id === speedClass.id ? "selected" : ""}>${escapeHtml(item.label)} · ${Math.round(getSpeedClassStartSpeed(item.id))}-${Math.round(getSpeedClassEndSpeed(item.id, track))} MPH · x${item.scoreMultiplier.toFixed(2)}</option>`).join("")}
+            </select>
+          </div>
           <div class="seed-display" aria-live="polite">
             <span>Current Road Seed</span>
             <strong id="roadSeedDisplay">${escapeHtml(seed)}</strong>
@@ -8400,7 +8503,7 @@ class NeonRoadRally {
             <input id="roadSeedInput" type="text" maxlength="32" value="${escapeAttr(seed)}" autocomplete="off" spellcheck="false" inputmode="text">
           </div>
           <p class="hint">Same seed + same track + same race speed repeats the Road Director sequence.</p>
-          <p id="roadSeedHash" class="hint">Seed hash: ${hashSeed(seedSource) >>> 0}</p>
+          <p id="roadSeedHash" class="hint">Seed hash: ${seedHash}</p>
           <div class="row">
             <button class="small-button" data-action="randomSeed">Random Seed</button>
             <button class="small-button primary" data-action="startSeededRace">Start Race</button>
@@ -8418,15 +8521,23 @@ class NeonRoadRally {
     const input = document.getElementById("roadSeedInput");
     const display = document.getElementById("roadSeedDisplay");
     const seedHash = document.getElementById("roadSeedHash");
+    const seedHashValue = document.getElementById("roadSeedHashValue");
+    const modeSelect = document.getElementById("preRaceSpeedClass");
+    const modeSummary = document.getElementById("preRaceModeSummary");
     if (!input || !display) return;
     const updateDisplay = () => {
       const normalized = normalizeRoadSeed(input.value, "");
-      const speedClass = getSpeedClassConfig(this.profiles.data.speedClassId);
+      const speedClass = getSpeedClassConfig(modeSelect?.value || this.profiles.data.speedClassId);
+      const hash = normalized ? (hashSeed(getRunRandomSeedSource(normalized, TRACKS[0], speedClass.id)) >>> 0) : "pending";
       display.textContent = normalized || "Random seed on start";
       if (seedHash) {
-        seedHash.textContent = normalized
-          ? `Seed hash: ${hashSeed(getRunRandomSeedSource(normalized, TRACKS[0], speedClass.id)) >>> 0}`
-          : "Seed hash: pending";
+        seedHash.textContent = `Seed hash: ${hash}`;
+      }
+      if (seedHashValue) {
+        seedHashValue.textContent = String(hash);
+      }
+      if (modeSummary) {
+        modeSummary.textContent = `${speedClass.label} · x${speedClass.scoreMultiplier.toFixed(2)}`;
       }
     };
     input.addEventListener("input", updateDisplay);
@@ -8447,6 +8558,13 @@ class NeonRoadRally {
         this.handleStartSeededRace();
       }
     });
+    if (modeSelect) {
+      modeSelect.addEventListener("change", () => {
+        const speedClass = getSpeedClassConfig(modeSelect.value);
+        this.profiles.updateSpeedClass(speedClass.id);
+        updateDisplay();
+      });
+    }
     input.focus();
     input.select();
   }
@@ -8459,10 +8577,13 @@ class NeonRoadRally {
   handleStartSeededRace() {
     if (this.screen !== "preRace") return;
     const input = document.getElementById("roadSeedInput");
+    const modeSelect = document.getElementById("preRaceSpeedClass");
     const seed = this.resolveRoadSeed(input?.value ?? this.pendingRoadSeed);
+    const speedClassId = normalizeSpeedClassId(modeSelect?.value, this.profiles.data.speedClassId);
+    this.profiles.updateSpeedClass(speedClassId);
     this.pendingRoadSeed = seed;
     if (input) input.value = seed;
-    this.startRace({ seed });
+    this.startRace({ seed, speedClassId });
   }
 
   createDefaultPartySetup() {
@@ -8544,6 +8665,12 @@ class NeonRoadRally {
       <section class="panel party-panel">
         <h2>Party Mode</h2>
         <p class="hint">One Run Each. Everyone drives ${escapeHtml(TRACKS[0].name)} with the same race mode and shared Road Seed.</p>
+        <div class="party-summary-strip">
+          <div class="score-card"><strong>Selected Players</strong><span>${selectedPlayers.length}/${PARTY_MAX_PLAYERS}</span></div>
+          <div class="score-card"><strong>Race Mode</strong><span>${escapeHtml(getSpeedClassLabel(setup.raceMode))}</span></div>
+          <div class="score-card"><strong>Shared Seed</strong><span class="is-compact">${escapeHtml(seed)}</span></div>
+          <div class="score-card"><strong>Round</strong><span>One Run Each</span></div>
+        </div>
         <div class="party-setup-grid">
           <div>
             <h2>Local Players</h2>
@@ -8731,7 +8858,10 @@ class NeonRoadRally {
     this.layer.innerHTML = `
       <section class="panel split party-turn-panel">
         <div class="form-stack">
-          <h2>Party Turn</h2>
+          <div>
+            <span class="eyebrow">Party Turn ${session.currentTurnNumber} of ${session.totalPlayers}</span>
+            <h2>${escapeHtml(player.name)}'s Run</h2>
+          </div>
           <div class="score-grid">
             <div class="score-card"><strong>Driver</strong><span>${escapeHtml(player.name)}</span></div>
             <div class="score-card"><strong>Turn</strong><span>Player ${session.currentTurnNumber} of ${session.totalPlayers}</span></div>
@@ -9449,9 +9579,9 @@ class NeonRoadRally {
         <h2>Score Breakdown</h2>
         ${this.renderScoreBreakdown(summary)}
         <div class="row score-action-row">
-          <button class="small-button" data-action="restart">${escapeHtml(restartLabel)}</button>
-          <button class="small-button" data-action="title">Return to Title</button>
+          <button class="small-button primary" data-action="restart">${escapeHtml(restartLabel)}</button>
           <button class="small-button" data-action="leaderboard">Top 20</button>
+          <button class="small-button" data-action="title">Return to Title</button>
         </div>
         <h2>Leaderboard</h2>
         <ol class="leaderboard-list">
@@ -9534,6 +9664,8 @@ class NeonRoadRally {
         else if (action === "players") this.showPlayerScreen();
         else if (action === "customize") this.showCustomizeScreen();
         else if (action === "leaderboard") this.showLeaderboard();
+        else if (action === "settings") this.showSettingsScreen();
+        else if (action === "fullscreen") this.toggleFullscreen();
         else if (action === "setSpeedClass") this.handleSetSpeedClass(button.dataset.id);
         else if (action === "randomSeed") this.handleRandomSeed();
         else if (action === "startSeededRace") this.handleStartSeededRace();
@@ -9599,7 +9731,11 @@ class NeonRoadRally {
 
   handleSetSpeedClass(id) {
     this.profiles.updateSpeedClass(id);
-    this.showTitle();
+    if (this.screen === "settings") {
+      this.showSettingsScreen("Default Solo race mode updated.");
+    } else {
+      this.showTitle();
+    }
   }
 
   handleResetData() {
@@ -9617,11 +9753,13 @@ class NeonRoadRally {
       if (this.screen === "game" && !this.run.paused && this.run.raceActive) this.startRaceMusic(false);
       else if (this.screen !== "game") this.audio.playMusic("title", false);
     }
+    if (this.screen === "settings") this.showSettingsScreen();
     if ((refreshTitle || this.screen === "title") && this.screen === "title") this.showTitle();
   }
 
   toggleSfx(refreshTitle = false) {
     this.audio.setSfxMuted(!this.audio.sfxMuted);
+    if (this.screen === "settings") this.showSettingsScreen();
     if ((refreshTitle || this.screen === "title") && this.screen === "title") this.showTitle();
   }
 }

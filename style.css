@@ -98,12 +98,14 @@ button {
 
 .title-panel {
   display: grid;
-  gap: 22px;
-  grid-template-columns: minmax(0, 1fr) minmax(260px, 340px);
+  gap: clamp(20px, 4vw, 42px);
+  grid-template-columns: minmax(0, 1.06fr) minmax(300px, 0.82fr);
   align-items: start;
 }
 
 .title-block {
+  display: grid;
+  gap: 14px;
   min-width: 0;
 }
 
@@ -114,9 +116,11 @@ button {
 }
 
 .game-title {
-  margin: 4px 0 12px;
+  display: grid;
+  gap: 0;
+  margin: 0;
   color: #fff;
-  font-size: clamp(3rem, 9vw, 6.8rem);
+  font-size: 5.8rem;
   line-height: 0.9;
   text-transform: uppercase;
   text-shadow:
@@ -125,12 +129,63 @@ button {
     0 0 30px var(--magenta);
 }
 
+.game-title span {
+  display: block;
+}
+
 .subtitle {
   max-width: 52ch;
   margin: 0;
   color: var(--muted);
-  font-size: clamp(1rem, 2.3vw, 1.2rem);
+  font-size: 1.12rem;
   line-height: 1.45;
+}
+
+.title-tagline {
+  color: #fff;
+  font-weight: 700;
+  text-shadow: 0 0 14px rgba(255, 63, 209, 0.42);
+}
+
+.title-status-grid,
+.party-summary-strip {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(auto-fit, minmax(145px, 1fr));
+}
+
+.title-status-card {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+  border: 1px solid rgba(40, 246, 255, 0.32);
+  border-radius: 6px;
+  padding: 10px;
+  background: rgba(5, 8, 20, 0.66);
+}
+
+.title-status-card span,
+.keyboard-hints {
+  color: var(--yellow);
+  font-size: 0.76rem;
+  text-transform: uppercase;
+}
+
+.title-status-card strong {
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+
+.title-status-card small,
+.keyboard-hints {
+  color: var(--muted);
+  line-height: 1.35;
+}
+
+.title-menu-card,
+.settings-panel {
+  display: grid;
+  gap: 12px;
 }
 
 .menu-stack,
@@ -154,6 +209,23 @@ button {
   text-transform: uppercase;
 }
 
+.menu-button {
+  display: grid;
+  gap: 4px;
+}
+
+.menu-button strong {
+  font-size: 0.98rem;
+  letter-spacing: 0.04em;
+}
+
+.menu-button span {
+  color: var(--muted);
+  font-size: 0.76rem;
+  line-height: 1.25;
+  text-transform: none;
+}
+
 .menu-button:hover,
 .menu-button:focus-visible,
 .small-button:hover,
@@ -168,6 +240,18 @@ button {
   border-color: var(--magenta);
   background: linear-gradient(90deg, rgba(255, 63, 209, 0.34), rgba(40, 246, 255, 0.16));
   box-shadow: var(--shadow-magenta);
+}
+
+.title-utility-row,
+.title-dev-row {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.title-dev-row {
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  padding-top: 10px;
 }
 
 .seed-display {
@@ -194,7 +278,7 @@ button {
 }
 
 .seed-display strong {
-  font-size: clamp(1.7rem, 6vw, 2.7rem);
+  font-size: 2.15rem;
 }
 
 .seed-copy {
@@ -366,6 +450,26 @@ button:disabled {
   text-transform: uppercase;
 }
 
+.challenge-objective {
+  display: grid;
+  gap: 3px;
+  border: 1px solid rgba(255, 228, 94, 0.35);
+  border-radius: 6px;
+  padding: 10px;
+  background: rgba(255, 228, 94, 0.08);
+}
+
+.challenge-objective span {
+  color: var(--yellow);
+  font-size: 0.72rem;
+  text-transform: uppercase;
+}
+
+.challenge-objective strong {
+  color: var(--text);
+  line-height: 1.25;
+}
+
 .challenge-meta-grid {
   display: grid;
   gap: 7px;
@@ -393,6 +497,11 @@ button:disabled {
   gap: 18px;
   grid-template-columns: minmax(240px, 0.85fr) minmax(320px, 1.15fr);
   align-items: start;
+}
+
+.party-summary-strip {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  margin: 14px 0 18px;
 }
 
 .party-player-list,
@@ -589,7 +698,7 @@ button:disabled {
 .score-hero h2,
 .party-drama-header h2 {
   margin-bottom: 6px;
-  font-size: clamp(2rem, 6vw, 3.5rem);
+  font-size: 2.9rem;
   line-height: 0.95;
 }
 
@@ -622,18 +731,18 @@ button:disabled {
 }
 
 .final-score-card strong {
-  font-size: clamp(2.4rem, 7vw, 4.6rem);
+  font-size: 3.8rem;
   line-height: 0.95;
 }
 
 .party-leader-card strong {
   color: #fff;
-  font-size: clamp(1.4rem, 4vw, 2.1rem);
+  font-size: 1.85rem;
   text-transform: uppercase;
 }
 
 .party-leader-card em {
-  font-size: clamp(1.7rem, 5vw, 2.8rem);
+  font-size: 2.35rem;
 }
 
 .final-score-card small,
@@ -824,7 +933,7 @@ button:disabled {
 
 .challenge-result-stack strong {
   color: var(--green);
-  font-size: clamp(1.5rem, 4vw, 2.4rem);
+  font-size: 2rem;
   text-shadow: 0 0 12px rgba(68, 255, 153, 0.5);
 }
 
@@ -847,7 +956,7 @@ button:disabled {
 
 .party-last-score span {
   color: var(--green);
-  font-size: clamp(1.8rem, 5vw, 3rem);
+  font-size: 2.55rem;
   font-weight: 800;
   text-shadow: 0 0 12px rgba(68, 255, 153, 0.5);
 }
@@ -928,9 +1037,13 @@ button:disabled {
   }
 
   .title-panel,
+  .title-status-grid,
+  .title-utility-row,
+  .title-dev-row,
   .split,
   .challenge-header,
   .challenge-result-card,
+  .party-summary-strip,
   .party-setup-grid,
   .score-hero,
   .party-drama-header,
@@ -942,7 +1055,7 @@ button:disabled {
   }
 
   .game-title {
-    font-size: clamp(2.5rem, 16vw, 4.6rem);
+    font-size: 3.25rem;
   }
 
   .panel {
@@ -973,5 +1086,20 @@ button:disabled {
   .party-last-score {
     text-align: left;
     justify-items: start;
+  }
+}
+
+@media (max-width: 420px) {
+  .game-title {
+    font-size: 2.85rem;
+  }
+
+  .score-hero h2,
+  .party-drama-header h2 {
+    font-size: 2.1rem;
+  }
+
+  .final-score-card strong {
+    font-size: 2.7rem;
   }
 }
