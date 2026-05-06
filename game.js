@@ -12,7 +12,7 @@
 
 const STORAGE_KEY = "neonRoadRally.v1";
 const LANES = 5;
-const VIEW_DISTANCE = 1900;
+const VIEW_DISTANCE = 1700;
 const PLAYER_START_Y_RATIO = 0.82;
 const PLAYER_MIN_Y_RATIO = 0.6;
 const PLAYER_MAX_Y_RATIO = 0.84;
@@ -27,9 +27,9 @@ const TRACKS = [
     name: "Sunset Highway",
     music: "audio/sunset-highway.mp3",
     targetDurationSeconds: 115,
-    distanceToFinish: 90000,
-    baseSpeed: 575,
-    maxSpeed: 1500,
+    distanceToFinish: 155000,
+    baseSpeed: 1000,
+    maxSpeed: 3000,
     speedCurveType: "smoothstep",
     startSpeedMultiplier: 1,
     earlySpeedMultiplier: 1.15,
@@ -44,10 +44,10 @@ const TRACKS = [
       lateSpacingSeconds: 1.22,
       spacingRandomSecondsEarly: 0.7,
       spacingRandomSecondsLate: 0.25,
-      spawnLeadSeconds: 5.8,
+      spawnLeadSeconds: 7.2,
       firstObstacleAt: 1700,
       warningLead: 520,
-      warningLeadSeconds: 2.05
+      warningLeadSeconds: 2.75
     },
     difficultyCurve(progress) {
       return Math.min(1, Math.max(0, Math.pow(progress, 0.82)));
@@ -56,11 +56,11 @@ const TRACKS = [
 ];
 
 const SPEED_CLASSES = [
-  { id: "sunday", label: "Sunday Drive", startSpeed: 450, endSpeed: 700, scoreMultiplier: 0.75 },
-  { id: "rookie", label: "Rookie", startSpeed: 500, endSpeed: 850, scoreMultiplier: 0.9 },
-  { id: "arcade", label: "Arcade", startSpeed: 575, endSpeed: 1100, scoreMultiplier: 1 },
-  { id: "pro", label: "Pro", startSpeed: 675, endSpeed: 1300, scoreMultiplier: 1.2 },
-  { id: "turbo", label: "Turbo", startSpeed: 775, endSpeed: 1500, scoreMultiplier: 1.4 }
+  { id: "sunday", label: "Sunday Drive", startSpeed: 700, endSpeed: 1100, scoreMultiplier: 0.75 },
+  { id: "rookie", label: "Rookie", startSpeed: 850, endSpeed: 1350, scoreMultiplier: 0.9 },
+  { id: "arcade", label: "Arcade", startSpeed: 1000, endSpeed: 1700, scoreMultiplier: 1 },
+  { id: "pro", label: "Pro", startSpeed: 1250, endSpeed: 2100, scoreMultiplier: 1.2 },
+  { id: "turbo", label: "Turbo", startSpeed: 1500, endSpeed: 2600, scoreMultiplier: 1.4 }
 ];
 
 const SPEED_TUNING = {
@@ -70,7 +70,7 @@ const SPEED_TUNING = {
   manualBoostDuration: 2.25,
   padBoostDuration: 1.05,
   maxBoostOverrunMultiplier: 1.18,
-  roadStripeScrollScale: 0.34
+  roadStripeScrollScale: 0.82
 };
 
 const ARCADE_FEEL = {
@@ -87,8 +87,133 @@ const ARCADE_FEEL = {
   finishFlashSeconds: 0.9,
   floatingTextSeconds: 1.15,
   scoreTallyMs: 950,
-  highSpeedLineStartRatio: 0.72
+  highSpeedLineStartRatio: 0.45
 };
+
+const TRACK_VISUALS = {
+  roadDetailIntensity: 0.48,
+  sceneryDensity: 1,
+  speedStreakIntensity: 0.72,
+  horizonGlowStrength: 0.85,
+  roadsideSignFrequency: 0.28,
+  asphaltBandSpacing: 118,
+  roadSeamSpacing: 76,
+  edgeLightSpacing: 86,
+  reflectorSpacing: 172,
+  scenerySpacing: 260,
+  finalStretchStart: 0.78,
+  bottomCarMargin: 18
+};
+
+const TRACK_DIRECTOR = {
+  centerLane: 2,
+  centerHoldSeconds: 3.2,
+  centerSafeSecondsLimit: 5.5,
+  laneSafeSecondsLimit: 12,
+  fourLaneMinProgress: 0.78,
+  hardWaveRecoveryChance: 0.18,
+  modeCadence: {
+    sunday: { early: 3.25, mid: 2.65, late: 2.2, randomEarly: 0.45, randomLate: 0.18, spacingScale: 1.08, recoveryScale: 1.18, centerSafe: 8, laneStill: 5.2, forceMeaningful: 4.2 },
+    rookie: { early: 2.65, mid: 2.1, late: 1.65, randomEarly: 0.34, randomLate: 0.14, spacingScale: 0.98, recoveryScale: 0.95, centerSafe: 6.6, laneStill: 4.2, forceMeaningful: 3.3 },
+    arcade: { early: 2.05, mid: 1.52, late: 1.1, randomEarly: 0.22, randomLate: 0.09, spacingScale: 0.82, recoveryScale: 0.62, centerSafe: 5.2, laneStill: 3, forceMeaningful: 2.35 },
+    pro: { early: 1.55, mid: 1.15, late: 0.88, randomEarly: 0.16, randomLate: 0.06, spacingScale: 0.66, recoveryScale: 0.42, centerSafe: 4, laneStill: 2.2, forceMeaningful: 1.75 },
+    turbo: { early: 1.16, mid: 0.88, late: 0.68, randomEarly: 0.1, randomLate: 0.04, spacingScale: 0.54, recoveryScale: 0.28, centerSafe: 3.1, laneStill: 1.55, forceMeaningful: 1.25 }
+  },
+  pressureValues: {
+    cone: 0.45,
+    branch: 0.4,
+    oil: 0.65,
+    deer: 1.1,
+    slowCar: 1.2,
+    fastCar: 1.35,
+    truck: 1.8,
+    barrier: 1.7,
+    ramp: -0.8,
+    boostPad: -0.45
+  },
+  modeIntensity: {
+    sunday: 0.72,
+    rookie: 0.88,
+    arcade: 1.16,
+    pro: 1.42,
+    turbo: 1.68
+  }
+};
+
+const TRACK_DIRECTOR_BANDS = [
+  {
+    id: "opening",
+    label: "Opening",
+    min: 0,
+    max: 0.2,
+    budget: [1.1, 2.15],
+    weights: {
+      singleBlocker: 3.2,
+      doubleGate: 1.25,
+      offsetPair: 0.75,
+      centerBlock: 0.9,
+      boostTemptation: 0.85,
+      recoveryGap: 0.34
+    }
+  },
+  {
+    id: "earlyMid",
+    label: "Early-Mid",
+    min: 0.2,
+    max: 0.45,
+    budget: [2.15, 3.35],
+    weights: {
+      doubleGate: 2.45,
+      offsetPair: 1.75,
+      centerBlock: 1.65,
+      leftRightSweep: 1.6,
+      constructionSqueeze: 1.65,
+      boostTemptation: 0.72,
+      rampEscape: 0.95,
+      deerCrossing: 0.95,
+      recoveryGap: 0.18
+    }
+  },
+  {
+    id: "lateMid",
+    label: "Late-Mid",
+    min: 0.45,
+    max: 0.75,
+    budget: [2.85, 4.2],
+    weights: {
+      doubleGate: 1.7,
+      offsetPair: 1.85,
+      centerBlock: 1.65,
+      leftRightSweep: 1.85,
+      constructionSqueeze: 2,
+      deerCrossing: 1.15,
+      rampEscape: 1.18,
+      boostTemptation: 0.55,
+      nearMissCorridor: 1.7,
+      recoveryGap: 0.16
+    }
+  },
+  {
+    id: "final",
+    label: "Final",
+    min: 0.75,
+    max: 1,
+    budget: [3.25, 4.85],
+    weights: {
+      doubleGate: 1.45,
+      offsetPair: 1.6,
+      centerBlock: 1.35,
+      leftRightSweep: 1.85,
+      constructionSqueeze: 2.05,
+      deerCrossing: 1.15,
+      rampEscape: 1.25,
+      boostTemptation: 0.42,
+      nearMissCorridor: 2.1,
+      fourLaneSpike: 0.32,
+      recoveryGap: 0.14
+    }
+  }
+];
 
 const DEFAULT_CAR = {
   name: "Neon Runner",
@@ -224,14 +349,17 @@ function getTrackBaseSpeedCurveT(track, progress) {
 
 function getTrackSpeedMultiplier(track, progress, speedClassId = DEFAULT_SPEED_CLASS_ID) {
   const startSpeed = getSpeedClassStartSpeed(speedClassId);
-  const cruiseSpeed = lerp(startSpeed, getSpeedClassEndSpeed(speedClassId, track), getTrackBaseSpeedCurveT(track, progress));
+  const cruiseSpeed = getTrackRawCruiseSpeed(track, progress, speedClassId);
   return cruiseSpeed / Math.max(1, startSpeed);
 }
 
-function getTrackCruiseSpeed(track, progress, speedClassId = DEFAULT_SPEED_CLASS_ID) {
+function getTrackRawCruiseSpeed(track, progress, speedClassId = DEFAULT_SPEED_CLASS_ID) {
   const startSpeed = getSpeedClassStartSpeed(speedClassId);
-  const speed = lerp(startSpeed, getSpeedClassEndSpeed(speedClassId, track), getTrackBaseSpeedCurveT(track, progress));
-  return clamp(speed, SPEED_TUNING.minSpeed, track.maxSpeed);
+  return lerp(startSpeed, getSpeedClassEndSpeed(speedClassId, track), getTrackBaseSpeedCurveT(track, progress));
+}
+
+function getTrackCruiseSpeed(track, progress, speedClassId = DEFAULT_SPEED_CLASS_ID) {
+  return clamp(getTrackRawCruiseSpeed(track, progress, speedClassId), SPEED_TUNING.minSpeed, track.maxSpeed);
 }
 
 function getCountdownLabel(timer) {
@@ -294,6 +422,18 @@ function randomChoice(items, rng = Math.random) {
   return items[Math.floor(rng() * items.length)];
 }
 
+function weightedChoice(items, rng = Math.random) {
+  const choices = items.filter((item) => item && item.weight > 0);
+  if (!choices.length) return undefined;
+  const total = choices.reduce((sum, item) => sum + item.weight, 0);
+  let roll = rng() * total;
+  for (const item of choices) {
+    roll -= item.weight;
+    if (roll <= 0) return item.value;
+  }
+  return choices[choices.length - 1].value;
+}
+
 function shuffle(items, rng = Math.random) {
   const copy = items.slice();
   for (let i = copy.length - 1; i > 0; i -= 1) {
@@ -322,6 +462,22 @@ function createSeededRandom(seed) {
     t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
     return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
   };
+}
+
+function deterministicNoise(index, salt = 0) {
+  const x = Math.sin((index + 1) * 12.9898 + (salt + 1) * 78.233) * 43758.5453;
+  return x - Math.floor(x);
+}
+
+function getTrackDirectorBand(progress) {
+  const safeProgress = Number.isFinite(progress) ? clamp(progress, 0, 1) : 0;
+  return TRACK_DIRECTOR_BANDS.find((band) => safeProgress >= band.min && safeProgress < band.max)
+    || TRACK_DIRECTOR_BANDS[TRACK_DIRECTOR_BANDS.length - 1];
+}
+
+function getTrackDirectorCadence(speedClassId = DEFAULT_SPEED_CLASS_ID) {
+  return TRACK_DIRECTOR.modeCadence[normalizeSpeedClassId(speedClassId)]
+    || TRACK_DIRECTOR.modeCadence[DEFAULT_SPEED_CLASS_ID];
 }
 
 function contrastText(hex) {
@@ -564,6 +720,23 @@ class AudioManager {
     this.sfxVolume = clampNumber(settings.sfxVolume, 0, 1, 0.82);
     this.musicKey = null;
     this.fadeId = null;
+    this.sfxLastPlayed = {};
+    this.sfxActiveCounts = {};
+    this.lastPlayedSfx = "none";
+    this.sfxCooldowns = {
+      menu: 100,
+      countdownBeep: 120,
+      go: 300,
+      boost: 200,
+      slowdown: 250,
+      oil: 250,
+      ramp: 220,
+      nearMiss: 300,
+      warning: 1000,
+      finish: 600,
+      crash: 600,
+      newHighScore: 900
+    };
     this.tracks = {
       title: { path: "audio/title-theme.mp3", audio: null, loaded: "untested" },
       race: { path: "audio/sunset-highway.mp3", audio: null, loaded: "untested" }
@@ -573,13 +746,22 @@ class AudioManager {
       crash: { path: "audio/crash.wav", audio: null, loaded: "untested" },
       slowdown: { path: "audio/slowdown.wav", audio: null, loaded: "untested" },
       finish: { path: "audio/finish.wav", audio: null, loaded: "untested" },
-      menu: { path: "audio/menu-select.wav", audio: null, loaded: "untested" }
+      menu: { path: "audio/menu-select.wav", audio: null, loaded: "untested" },
+      nearMiss: { path: "audio/near-miss.wav", audio: null, loaded: "untested" },
+      oil: { path: "audio/oil.wav", audio: null, loaded: "untested" },
+      ramp: { path: "audio/ramp.wav", audio: null, loaded: "untested" },
+      countdownBeep: { path: "audio/countdown-beep.wav", audio: null, loaded: "untested" },
+      go: { path: "audio/go.wav", audio: null, loaded: "untested" },
+      newHighScore: { path: "audio/new-high-score.wav", audio: null, loaded: "untested" },
+      warning: { path: "audio/warning.wav", audio: null, loaded: "untested" }
     };
   }
 
   activate() {
     if (this.userActivated) return;
     this.userActivated = true;
+    this.preloadMusic();
+    this.preloadSfx();
   }
 
   createAudio(entry, loop) {
@@ -588,6 +770,7 @@ class AudioManager {
     audio.preload = "auto";
     audio.loop = Boolean(loop);
     audio.volume = loop ? this.musicVolume : this.sfxVolume;
+    entry.loaded = "loading";
     audio.addEventListener("loadedmetadata", () => {
       entry.loaded = "loaded";
     }, { once: true });
@@ -599,7 +782,32 @@ class AudioManager {
     });
     audio.src = entry.path;
     entry.audio = audio;
+    try {
+      audio.load();
+    } catch (error) {
+      entry.loaded = "missing";
+    }
     return audio;
+  }
+
+  preloadMusic() {
+    Object.values(this.tracks).forEach((entry) => {
+      try {
+        this.createAudio(entry, true);
+      } catch (error) {
+        entry.loaded = "missing";
+      }
+    });
+  }
+
+  preloadSfx() {
+    Object.values(this.sfx).forEach((entry) => {
+      try {
+        this.createAudio(entry, false);
+      } catch (error) {
+        entry.loaded = "missing";
+      }
+    });
   }
 
   playMusic(key, restart = false) {
@@ -666,19 +874,49 @@ class AudioManager {
     this.fadeId = requestAnimationFrame(fade);
   }
 
-  playSfx(key) {
-    if (!this.userActivated || this.sfxMuted) return;
+  playSfx(key, options = {}) {
+    if (!this.userActivated || this.sfxMuted) return false;
     const entry = this.sfx[key];
-    if (!entry) return;
+    if (!entry || entry.loaded === "missing") return false;
+    const now = performance.now();
+    const cooldownMs = options.cooldownMs ?? this.sfxCooldowns[key] ?? 0;
+    const last = this.sfxLastPlayed[key] || -Infinity;
+    if (cooldownMs > 0 && now - last < cooldownMs) return false;
+    const activeCount = this.sfxActiveCounts[key] || 0;
+    const maxInstances = options.maxInstances ?? 3;
+    if (activeCount >= maxInstances) return false;
     const source = this.createAudio(entry, false);
-    const audio = source.cloneNode(true);
-    audio.volume = this.sfxVolume;
+    if (entry.loaded === "missing") return false;
+    let audio;
+    try {
+      audio = source.cloneNode(true);
+    } catch (error) {
+      audio = new Audio(entry.path);
+    }
+    audio.loop = false;
+    audio.volume = clampNumber(options.volume ?? this.sfxVolume, 0, 1, this.sfxVolume);
+    this.sfxLastPlayed[key] = now;
+    this.sfxActiveCounts[key] = activeCount + 1;
+    this.lastPlayedSfx = key;
+    let settled = false;
+    const finish = () => {
+      if (settled) return;
+      settled = true;
+      this.sfxActiveCounts[key] = Math.max(0, (this.sfxActiveCounts[key] || 1) - 1);
+    };
+    audio.addEventListener("ended", finish, { once: true });
+    audio.addEventListener("error", () => {
+      entry.loaded = "missing";
+      finish();
+    }, { once: true });
     const promise = audio.play();
     if (promise && typeof promise.catch === "function") {
       promise.catch((error) => {
         entry.loaded = error?.name === "NotAllowedError" ? "blocked" : "missing";
+        finish();
       });
     }
+    return true;
   }
 
   setMusicMuted(value) {
@@ -733,6 +971,17 @@ class AudioManager {
 
   sfxLoadedStatus() {
     return Object.entries(this.sfx).map(([key, entry]) => `${key}:${entry.loaded}`).join(" ");
+  }
+
+  sfxLoadedCount() {
+    return Object.values(this.sfx).filter((entry) => entry.loaded === "loaded").length;
+  }
+
+  missingSfxList() {
+    const missing = Object.entries(this.sfx)
+      .filter(([, entry]) => entry.loaded === "missing")
+      .map(([key]) => key);
+    return missing.length ? missing.join(",") : "none";
   }
 }
 
@@ -844,6 +1093,21 @@ class InputManager {
 
     if (this.game.debugMode) {
       const lower = key.toLowerCase();
+      if (event.shiftKey && (key === "+" || key === "=")) {
+        event.preventDefault();
+        this.game.adjustDebugSpeedScale(0.1);
+        return;
+      }
+      if (event.shiftKey && (key === "_" || key === "-")) {
+        event.preventDefault();
+        this.game.adjustDebugSpeedScale(-0.1);
+        return;
+      }
+      if (event.shiftKey && key === "0") {
+        event.preventDefault();
+        this.game.resetDebugSpeedScale();
+        return;
+      }
       if (lower === "r") {
         this.game.startRace();
         return;
@@ -887,16 +1151,20 @@ class InputManager {
 
     if (this.game.screen === "score") {
       if (key === "Enter") {
+        this.game.audio.playSfx("menu");
         this.game.startRace();
       } else if (key === "Escape") {
+        this.game.audio.playSfx("menu");
         this.game.showTitle();
       }
       return;
     }
 
     if (key === "Enter" && this.game.screen === "title") {
+      this.game.audio.playSfx("menu");
       this.game.startRaceFromTitle();
     } else if (key === "Escape" && !["title", "game"].includes(this.game.screen)) {
+      this.game.audio.playSfx("menu");
       this.game.showTitle();
     }
   }
@@ -929,6 +1197,750 @@ class InputManager {
 // Obstacle manager
 // ---------------------------------------------------------------------------
 
+class TrackDirector {
+  constructor(manager) {
+    this.manager = manager;
+    this.reset(null);
+  }
+
+  reset(track) {
+    this.track = track;
+    this.currentWave = null;
+    this.lastWaveType = "";
+    this.sameWaveStreak = 0;
+    this.recentWaves = [];
+    this.centerLaneHoldSeconds = 0;
+    this.centerSafeSeconds = 0;
+    this.decisionSafeSeconds = 0;
+    this.timeSinceWaveSeconds = 0;
+    this.timeSinceMeaningfulWaveSeconds = 0;
+    this.activeEmptySeconds = 0;
+    this.laneStillSeconds = 0;
+    this.lastObservedLane = TRACK_DIRECTOR.centerLane;
+    this.laneSafeSeconds = Array(LANES).fill(0);
+    this.forceRecoveryNext = false;
+    this.lastFairnessPassed = true;
+    this.stats = this.createStats();
+  }
+
+  createStats() {
+    return {
+      totalWaves: 0,
+      nonOpeningWaves: 0,
+      centerBlockedWaves: 0,
+      nonOpeningCenterBlockedWaves: 0,
+      blockedLaneSum: 0,
+      repeatedPatternCount: 0,
+      hardWaveCount: 0,
+      recoveryWaveCount: 0,
+      fairnessFailures: 0,
+      pressureCounts: { 0: 0, 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 },
+      waveCounts: {},
+      boostLaneCounts: Array(LANES).fill(0),
+      rampLaneCounts: Array(LANES).fill(0),
+      obstacleTypeCounts: {},
+      movementGapSeconds: [],
+      centerChallengeGapSeconds: [],
+      waveGapSeconds: [],
+      meaningfulWaveGapSeconds: [],
+      longestCenterSafeSeconds: 0,
+      longestWaveGapSeconds: 0,
+      longestMeaningfulWaveGapSeconds: 0,
+      longestActiveEmptySeconds: 0,
+      meaningfulWaveCount: 0,
+      rampUsefulCount: 0,
+      longestLaneSafeSeconds: Array(LANES).fill(0),
+      pressureBudgetSum: 0
+    };
+  }
+
+  random() {
+    return this.manager.random();
+  }
+
+  update(dt) {
+    const run = this.manager.game.run || {};
+    const laneValue = Number.isFinite(run.renderLaneFloat)
+      ? run.renderLaneFloat
+      : (Number.isFinite(run.targetLane) ? run.targetLane : TRACK_DIRECTOR.centerLane);
+    const currentLane = Math.round(clamp(laneValue, 0, LANES - 1));
+    if (currentLane === TRACK_DIRECTOR.centerLane) {
+      this.centerLaneHoldSeconds += dt;
+    } else {
+      this.centerLaneHoldSeconds = Math.max(0, this.centerLaneHoldSeconds - dt * 1.5);
+    }
+    if (currentLane === this.lastObservedLane) {
+      this.laneStillSeconds += dt;
+    } else {
+      this.lastObservedLane = currentLane;
+      this.laneStillSeconds = 0;
+    }
+    this.centerSafeSeconds += dt;
+    this.decisionSafeSeconds += dt;
+    this.timeSinceWaveSeconds += dt;
+    this.timeSinceMeaningfulWaveSeconds += dt;
+    if (this.hasActivePressureAhead()) {
+      this.activeEmptySeconds = 0;
+    } else {
+      this.activeEmptySeconds += dt;
+    }
+    this.stats.longestCenterSafeSeconds = Math.max(this.stats.longestCenterSafeSeconds, this.centerSafeSeconds);
+    this.stats.longestWaveGapSeconds = Math.max(this.stats.longestWaveGapSeconds, this.timeSinceWaveSeconds);
+    this.stats.longestMeaningfulWaveGapSeconds = Math.max(this.stats.longestMeaningfulWaveGapSeconds, this.timeSinceMeaningfulWaveSeconds);
+    this.stats.longestActiveEmptySeconds = Math.max(this.stats.longestActiveEmptySeconds, this.activeEmptySeconds);
+    for (let lane = 0; lane < LANES; lane += 1) {
+      this.laneSafeSeconds[lane] += dt;
+      this.stats.longestLaneSafeSeconds[lane] = Math.max(this.stats.longestLaneSafeSeconds[lane], this.laneSafeSeconds[lane]);
+    }
+  }
+
+  getContext(distance) {
+    const track = this.track || this.manager.track;
+    const run = this.manager.game.run || {};
+    const progress = clamp(distance / Math.max(1, track.distanceToFinish), 0, 1);
+    const band = getTrackDirectorBand(progress);
+    const difficulty = track.difficultyCurve(progress);
+    const speedClassId = this.manager.getSpeedClassId();
+    const cadence = getTrackDirectorCadence(speedClassId);
+    const modeIntensity = TRACK_DIRECTOR.modeIntensity[speedClassId] || 1;
+    const playerLane = Math.round(clamp(
+      Number.isFinite(run.targetLane) ? run.targetLane : TRACK_DIRECTOR.centerLane,
+      0,
+      LANES - 1
+    ));
+    const bandT = clamp((progress - band.min) / Math.max(0.001, band.max - band.min), 0, 1);
+    const budget = lerp(band.budget[0], band.budget[1], bandT) * modeIntensity;
+    const centerSafeLimit = cadence.centerSafe ?? TRACK_DIRECTOR.centerSafeSecondsLimit;
+    const laneStillLimit = cadence.laneStill ?? 3;
+    const centerNeedsChallenge = progress > 0.12
+      && (this.centerLaneHoldSeconds >= TRACK_DIRECTOR.centerHoldSeconds
+        || this.centerSafeSeconds >= centerSafeLimit);
+    const needsMovementChallenge = progress > 0.16 && this.laneStillSeconds >= laneStillLimit;
+
+    return {
+      track,
+      run,
+      distance,
+      progress,
+      band,
+      difficulty,
+      speedClassId,
+      cadence,
+      modeIntensity,
+      playerLane,
+      pressureBudget: budget,
+      centerNeedsChallenge,
+      needsMovementChallenge,
+      cruiseSpeed: getTrackCruiseSpeed(track, progress, speedClassId)
+    };
+  }
+
+  spawnWave(distance) {
+    const context = this.getContext(distance);
+    const waveType = this.chooseWaveType(context) || "singleBlocker";
+    const result = this.createWaveResult(waveType, context);
+    this.applyWave(waveType, distance, context, result);
+
+    if (!result.spawned.length && waveType !== "recoveryGap") {
+      this.applyWave("singleBlocker", distance + 40, context, result);
+      result.fallbackUsed = true;
+    }
+
+    this.recordWave(result, context);
+    return result;
+  }
+
+  chooseWaveType(context) {
+    if (this.forceRecoveryNext) {
+      this.forceRecoveryNext = false;
+      return "recoveryGap";
+    }
+    if (this.timeSinceMeaningfulWaveSeconds >= (context.cadence.forceMeaningful ?? 3)) {
+      return this.chooseForcedMeaningfulWave(context);
+    }
+
+    const entries = Object.entries(context.band.weights).map(([type, baseWeight]) => {
+      let weight = baseWeight;
+      if (!this.isWaveAllowed(type, context)) return { value: type, weight: 0 };
+
+      if (context.centerNeedsChallenge) {
+        if (["centerBlock", "constructionSqueeze", "nearMissCorridor"].includes(type)) weight *= 3.1;
+        if (["doubleGate", "offsetPair", "leftRightSweep", "boostTemptation", "rampEscape"].includes(type)) weight *= 1.7;
+        if (type === "singleBlocker") weight *= 1.2;
+      }
+      if (context.needsMovementChallenge) {
+        if (["offsetPair", "leftRightSweep", "constructionSqueeze", "nearMissCorridor", "rampEscape"].includes(type)) weight *= 1.85;
+        if (["centerBlock", "doubleGate", "boostTemptation"].includes(type)) weight *= 1.35;
+        if (type === "recoveryGap") weight *= 0.25;
+      }
+
+      if (this.lastWaveType === type) {
+        weight *= this.sameWaveStreak >= 2 ? 0.08 : 0.28;
+      }
+
+      if (context.speedClassId === "sunday") {
+        if (["deerCrossing", "constructionSqueeze", "nearMissCorridor"].includes(type)) weight *= 0.58;
+        if (type === "rampEscape") weight *= 0.75;
+      } else if (context.speedClassId === "pro" || context.speedClassId === "turbo") {
+        if (["offsetPair", "leftRightSweep", "constructionSqueeze", "nearMissCorridor", "rampEscape"].includes(type)) weight *= context.speedClassId === "turbo" ? 1.45 : 1.28;
+        if (type === "doubleGate") weight *= 0.82;
+        if (type === "recoveryGap") weight *= context.speedClassId === "turbo" ? 0.32 : 0.5;
+      }
+
+      if (this.recentWaves.slice(-3).some((wave) => wave.type === type)) {
+        weight *= 0.62;
+      }
+
+      return { value: type, weight };
+    });
+
+    return weightedChoice(entries, () => this.random());
+  }
+
+  chooseForcedMeaningfulWave(context) {
+    const weights = [
+      { value: "doubleGate", weight: context.band.id === "opening" ? 1.5 : 1.1 },
+      { value: "centerBlock", weight: context.centerNeedsChallenge ? 2.4 : 1.2 },
+      { value: "offsetPair", weight: context.band.id === "opening" ? 0.8 : 1.6 },
+      { value: "leftRightSweep", weight: context.band.id === "opening" ? 0 : 1.5 },
+      { value: "constructionSqueeze", weight: this.isWaveAllowed("constructionSqueeze", context) ? 1.5 : 0 },
+      { value: "nearMissCorridor", weight: this.isWaveAllowed("nearMissCorridor", context) ? 1.35 : 0 },
+      { value: "rampEscape", weight: this.isWaveAllowed("rampEscape", context) ? 0.95 : 0 }
+    ];
+    if (context.speedClassId === "pro" || context.speedClassId === "turbo") {
+      weights.find((item) => item.value === "nearMissCorridor").weight *= 1.35;
+      weights.find((item) => item.value === "leftRightSweep").weight *= 1.25;
+      weights.find((item) => item.value === "doubleGate").weight *= 0.8;
+    }
+    return weightedChoice(weights, () => this.random()) || "doubleGate";
+  }
+
+  isWaveAllowed(type, context) {
+    if (type === "fourLaneSpike") {
+      if (context.progress < TRACK_DIRECTOR.fourLaneMinProgress) return false;
+      if (context.speedClassId === "sunday" || context.speedClassId === "rookie") return false;
+      return context.distance - this.manager.lastFourLanePressureDistance >= FOUR_LANE_PRESSURE_COOLDOWN;
+    }
+    if (type === "nearMissCorridor" && context.band.id === "opening") return false;
+    if (type === "deerCrossing" && context.progress < 0.22) return false;
+    if (type === "constructionSqueeze" && context.progress < 0.18) return false;
+    return true;
+  }
+
+  createWaveResult(type, context) {
+    return {
+      type,
+      label: this.getWaveLabel(type),
+      band: context.band,
+      pressureBudget: context.pressureBudget,
+      spawned: [],
+      blockedLanes: new Set(),
+      boostLanes: [],
+      rampLanes: [],
+      obstacleTypes: {},
+      pressure: 0,
+      centerBlocked: false,
+      fairnessPassed: true,
+      hard: false,
+      fallbackUsed: false
+    };
+  }
+
+  getWaveLabel(type) {
+    const labels = {
+      singleBlocker: "Single Blocker",
+      doubleGate: "Double Gate",
+      offsetPair: "Offset Pair",
+      centerBlock: "Center Block",
+      leftRightSweep: "Left-Right Sweep",
+      constructionSqueeze: "Construction Squeeze",
+      deerCrossing: "Deer Crossing",
+      rampEscape: "Ramp Escape",
+      boostTemptation: "Boost Temptation",
+      nearMissCorridor: "Near-Miss Corridor",
+      fourLaneSpike: "Four-Lane Spike",
+      recoveryGap: "Recovery Gap"
+    };
+    return labels[type] || type;
+  }
+
+  applyWave(type, distance, context, result) {
+    const handlers = {
+      singleBlocker: () => this.waveSingleBlocker(distance, context, result),
+      doubleGate: () => this.waveDoubleGate(distance, context, result),
+      offsetPair: () => this.waveOffsetPair(distance, context, result),
+      centerBlock: () => this.waveCenterBlock(distance, context, result),
+      leftRightSweep: () => this.waveLeftRightSweep(distance, context, result),
+      constructionSqueeze: () => this.waveConstructionSqueeze(distance, context, result),
+      deerCrossing: () => this.waveDeerCrossing(distance, context, result),
+      rampEscape: () => this.waveRampEscape(distance, context, result),
+      boostTemptation: () => this.waveBoostTemptation(distance, context, result),
+      nearMissCorridor: () => this.waveNearMissCorridor(distance, context, result),
+      fourLaneSpike: () => this.waveFourLaneSpike(distance, context, result),
+      recoveryGap: () => this.waveRecoveryGap(distance, context, result)
+    };
+    (handlers[type] || handlers.singleBlocker)();
+  }
+
+  spawn(type, lane, distance, result, options = {}) {
+    const spawned = this.manager.addObstacle(type, lane, distance, {
+      allowLaneAdjust: false,
+      ...options
+    });
+    if (spawned) this.recordPlacement(spawned, result);
+    return spawned;
+  }
+
+  trySpawn(type, preferredLanes, distance, result, options = {}) {
+    const lanes = Array.isArray(preferredLanes) ? preferredLanes : [preferredLanes];
+    for (const lane of lanes) {
+      if (!Number.isFinite(lane)) continue;
+      const spawned = this.spawn(type, lane, distance, result, options);
+      if (spawned) return spawned;
+    }
+    return null;
+  }
+
+  recordPlacement(obstacle, result) {
+    result.spawned.push(obstacle);
+    result.obstacleTypes[obstacle.type] = (result.obstacleTypes[obstacle.type] || 0) + 1;
+    result.pressure += TRACK_DIRECTOR.pressureValues[obstacle.type] || 0;
+
+    const lane = Math.round(clamp(Number.isFinite(obstacle.laneFloat) ? obstacle.laneFloat : obstacle.lane, 0, LANES - 1));
+    if (obstacle.type === "boostPad") {
+      result.boostLanes.push(lane);
+    } else if (obstacle.type === "ramp") {
+      result.rampLanes.push(lane);
+    }
+
+    if (this.manager.isFairnessBlocker(obstacle)) {
+      const blockedLane = obstacle.type === "deer" ? TRACK_DIRECTOR.centerLane : lane;
+      result.blockedLanes.add(blockedLane);
+      if (blockedLane === TRACK_DIRECTOR.centerLane) result.centerBlocked = true;
+    }
+  }
+
+  recordWave(result, context) {
+    const blockedCount = clamp(result.blockedLanes.size, 0, 5);
+    const safety = this.manager.validateObstaclePattern(this.manager.obstacles, this.manager.game.run.distance);
+    result.fairnessPassed = !safety.invalid;
+    result.maxDangerBlocked = safety.maxBlocked;
+    result.hard = result.type === "fourLaneSpike"
+      || blockedCount >= 3
+      || result.pressure >= context.pressureBudget + 0.45;
+
+    const stats = this.stats;
+    stats.totalWaves += 1;
+    if (context.band.id !== "opening") stats.nonOpeningWaves += 1;
+    stats.blockedLaneSum += blockedCount;
+    stats.pressureCounts[blockedCount] = (stats.pressureCounts[blockedCount] || 0) + 1;
+    stats.waveCounts[result.type] = (stats.waveCounts[result.type] || 0) + 1;
+    stats.pressureBudgetSum += context.pressureBudget;
+    if (result.hard) stats.hardWaveCount += 1;
+    if (result.type === "recoveryGap") stats.recoveryWaveCount += 1;
+    if (!result.fairnessPassed) stats.fairnessFailures += 1;
+    stats.waveGapSeconds.push(this.timeSinceWaveSeconds);
+    stats.longestWaveGapSeconds = Math.max(stats.longestWaveGapSeconds, this.timeSinceWaveSeconds);
+    this.timeSinceWaveSeconds = 0;
+
+    if (this.lastWaveType === result.type) {
+      this.sameWaveStreak += 1;
+      stats.repeatedPatternCount += 1;
+    } else {
+      this.sameWaveStreak = 0;
+    }
+
+    if (result.centerBlocked) {
+      stats.centerBlockedWaves += 1;
+      if (context.band.id !== "opening") stats.nonOpeningCenterBlockedWaves += 1;
+      stats.centerChallengeGapSeconds.push(this.centerSafeSeconds);
+      this.centerSafeSeconds = 0;
+    }
+
+    const requiresMovement = result.centerBlocked || blockedCount >= 2 || result.type === "boostTemptation" || result.type === "rampEscape";
+    if (requiresMovement) {
+      stats.movementGapSeconds.push(this.decisionSafeSeconds);
+      this.decisionSafeSeconds = 0;
+    }
+    const meaningfulWave = result.type !== "recoveryGap" && (blockedCount > 0 || this.hasActivePressureAhead());
+    if (meaningfulWave) {
+      stats.meaningfulWaveCount += 1;
+      stats.meaningfulWaveGapSeconds.push(this.timeSinceMeaningfulWaveSeconds);
+      stats.longestMeaningfulWaveGapSeconds = Math.max(stats.longestMeaningfulWaveGapSeconds, this.timeSinceMeaningfulWaveSeconds);
+      this.timeSinceMeaningfulWaveSeconds = 0;
+    }
+    if (result.type === "rampEscape" && result.rampLanes.length && blockedCount >= 2) {
+      stats.rampUsefulCount += 1;
+    }
+
+    for (const lane of result.blockedLanes) {
+      this.laneSafeSeconds[lane] = 0;
+    }
+    for (const lane of result.boostLanes) {
+      stats.boostLaneCounts[lane] += 1;
+    }
+    for (const lane of result.rampLanes) {
+      stats.rampLaneCounts[lane] += 1;
+    }
+    Object.entries(result.obstacleTypes).forEach(([type, count]) => {
+      stats.obstacleTypeCounts[type] = (stats.obstacleTypeCounts[type] || 0) + count;
+    });
+
+    this.currentWave = {
+      type: result.type,
+      label: result.label,
+      band: context.band.label,
+      pressureBudget: context.pressureBudget,
+      pressure: result.pressure,
+      blockedLanes: Array.from(result.blockedLanes).sort((a, b) => a - b),
+      centerBlocked: result.centerBlocked,
+      fairnessPassed: result.fairnessPassed
+    };
+    this.lastFairnessPassed = result.fairnessPassed;
+    this.lastWaveType = result.type;
+    this.recentWaves.push(this.currentWave);
+    if (this.recentWaves.length > 6) this.recentWaves.shift();
+
+    const modeRecoveryScale = context.cadence.recoveryScale ?? 1;
+    const needsRecovery = result.type === "fourLaneSpike" || result.pressure >= context.pressureBudget + 1.25;
+    if (needsRecovery && result.type !== "recoveryGap" && this.random() < TRACK_DIRECTOR.hardWaveRecoveryChance * modeRecoveryScale) {
+      this.forceRecoveryNext = true;
+    }
+  }
+
+  hasActivePressureAhead() {
+    const runDistance = this.manager.game.run?.distance || 0;
+    return this.manager.obstacles.some((obstacle) => {
+      if (!this.manager.isFairnessBlocker(obstacle)) return false;
+      const ahead = obstacle.distance - runDistance;
+      return ahead > 0 && ahead < VIEW_DISTANCE * 0.92;
+    });
+  }
+
+  getSpacingMultiplier(result) {
+    if (!result) return 1;
+    const cadence = getTrackDirectorCadence(this.manager.getSpeedClassId());
+    const multipliers = {
+      recoveryGap: 0.72,
+      singleBlocker: 0.72,
+      doubleGate: 0.88,
+      offsetPair: 0.92,
+      centerBlock: 0.82,
+      leftRightSweep: 0.96,
+      constructionSqueeze: 1.02,
+      deerCrossing: 1.02,
+      rampEscape: 0.94,
+      boostTemptation: 0.78,
+      nearMissCorridor: 1,
+      fourLaneSpike: 1.16
+    };
+    const recoveryScale = result.type === "recoveryGap" ? (cadence.recoveryScale ?? 1) : 1;
+    return (multipliers[result.type] || 1) * (cadence.spacingScale ?? 1) * recoveryScale;
+  }
+
+  getRandomSecondsScale(result) {
+    if (!result) return 1;
+    const cadence = getTrackDirectorCadence(this.manager.getSpeedClassId());
+    if (result.type === "recoveryGap") return 0.28 * (cadence.recoveryScale ?? 1);
+    if (result.hard) return 0.38;
+    return 0.52;
+  }
+
+  getDebugInfo() {
+    const current = this.currentWave || {};
+    return {
+      band: current.band || getTrackDirectorBand(this.manager.game.run?.distance / Math.max(1, this.manager.track?.distanceToFinish || 1)).label,
+      wave: current.label || "none",
+      budget: Number.isFinite(current.pressureBudget) ? current.pressureBudget : 0,
+      pressure: Number.isFinite(current.pressure) ? current.pressure : 0,
+      centerSafeSeconds: this.centerSafeSeconds,
+      centerHoldSeconds: this.centerLaneHoldSeconds,
+      laneStillSeconds: this.laneStillSeconds,
+      meaningfulGapSeconds: this.timeSinceMeaningfulWaveSeconds,
+      lanePressure: Array.isArray(current.blockedLanes) && current.blockedLanes.length ? current.blockedLanes.join(",") : "none",
+      recentWaves: this.recentWaves.map((wave) => wave.label).join(" > "),
+      fairnessPassed: this.lastFairnessPassed
+    };
+  }
+
+  getSimulationStats() {
+    const stats = this.stats;
+    const averageGap = (items) => items.length ? items.reduce((sum, value) => sum + value, 0) / items.length : null;
+    const gapSum = (items) => items.reduce((sum, value) => sum + value, 0);
+    return {
+      totalWaves: stats.totalWaves,
+      nonOpeningWaves: stats.nonOpeningWaves,
+      centerBlockedWaves: stats.centerBlockedWaves,
+      nonOpeningCenterBlockedWaves: stats.nonOpeningCenterBlockedWaves,
+      repeatedPatternCount: stats.repeatedPatternCount,
+      hardWaveCount: stats.hardWaveCount,
+      recoveryWaveCount: stats.recoveryWaveCount,
+      meaningfulWaveCount: stats.meaningfulWaveCount,
+      rampUsefulCount: stats.rampUsefulCount,
+      blockedLaneSum: stats.blockedLaneSum,
+      pressureBudgetSum: stats.pressureBudgetSum,
+      averageBlockedLanesPerWave: stats.totalWaves ? stats.blockedLaneSum / stats.totalWaves : 0,
+      centerBlockedPercent: stats.totalWaves ? stats.centerBlockedWaves / stats.totalWaves : 0,
+      nonOpeningCenterBlockedPercent: stats.nonOpeningWaves ? stats.nonOpeningCenterBlockedWaves / stats.nonOpeningWaves : 0,
+      longestCenterSafeSeconds: Math.max(stats.longestCenterSafeSeconds, this.centerSafeSeconds),
+      averageDecisionGapSeconds: averageGap(stats.movementGapSeconds),
+      averageCenterChallengeGapSeconds: averageGap(stats.centerChallengeGapSeconds),
+      repeatedPatternPercent: stats.totalWaves ? stats.repeatedPatternCount / stats.totalWaves : 0,
+      hardWavePercent: stats.totalWaves ? stats.hardWaveCount / stats.totalWaves : 0,
+      recoveryWavePercent: stats.totalWaves ? stats.recoveryWaveCount / stats.totalWaves : 0,
+      fairnessFailures: stats.fairnessFailures,
+      movementGapCount: stats.movementGapSeconds.length,
+      movementGapSum: gapSum(stats.movementGapSeconds),
+      centerChallengeGapCount: stats.centerChallengeGapSeconds.length,
+      centerChallengeGapSum: gapSum(stats.centerChallengeGapSeconds),
+      waveGapCount: stats.waveGapSeconds.length,
+      waveGapSum: gapSum(stats.waveGapSeconds),
+      meaningfulWaveGapCount: stats.meaningfulWaveGapSeconds.length,
+      meaningfulWaveGapSum: gapSum(stats.meaningfulWaveGapSeconds),
+      averageWaveGapSeconds: averageGap(stats.waveGapSeconds),
+      averageMeaningfulWaveGapSeconds: averageGap(stats.meaningfulWaveGapSeconds),
+      longestWaveGapSeconds: Math.max(stats.longestWaveGapSeconds, this.timeSinceWaveSeconds),
+      longestMeaningfulWaveGapSeconds: Math.max(stats.longestMeaningfulWaveGapSeconds, this.timeSinceMeaningfulWaveSeconds),
+      longestActiveEmptySeconds: Math.max(stats.longestActiveEmptySeconds, this.activeEmptySeconds),
+      pressureCounts: { ...stats.pressureCounts },
+      waveCounts: { ...stats.waveCounts },
+      boostLaneCounts: stats.boostLaneCounts.slice(),
+      rampLaneCounts: stats.rampLaneCounts.slice(),
+      obstacleTypeCounts: { ...stats.obstacleTypeCounts },
+      averagePressureBudget: stats.totalWaves ? stats.pressureBudgetSum / stats.totalWaves : 0,
+      longestLaneSafeSeconds: stats.longestLaneSafeSeconds.slice()
+    };
+  }
+
+  allLanes() {
+    return [0, 1, 2, 3, 4];
+  }
+
+  lanesExcept(excluded) {
+    const list = Array.isArray(excluded) ? excluded : [excluded];
+    return this.allLanes().filter((lane) => !list.includes(lane));
+  }
+
+  pickPressureLane(context, centerChance = 0.25, excluded = []) {
+    const blocked = Array.isArray(excluded) ? excluded : [excluded];
+    if (context.needsMovementChallenge && !blocked.includes(context.playerLane) && this.random() < 0.74) {
+      return context.playerLane;
+    }
+    if (!blocked.includes(TRACK_DIRECTOR.centerLane)) {
+      if (context.centerNeedsChallenge && this.random() < 0.84) return TRACK_DIRECTOR.centerLane;
+      if (context.progress > 0.18 && this.random() < centerChance) return TRACK_DIRECTOR.centerLane;
+    }
+    if (!blocked.includes(context.playerLane) && context.progress > 0.24 && this.random() < 0.3) {
+      return context.playerLane;
+    }
+    return randomChoice(shuffle(this.lanesExcept(blocked), () => this.random()), () => this.random());
+  }
+
+  pickSafeLane(context, preferSide = false, excluded = []) {
+    const blocked = Array.isArray(excluded) ? excluded.slice() : [excluded];
+    let lanes = this.lanesExcept(blocked);
+    if (preferSide || context.centerNeedsChallenge) {
+      const sideLanes = lanes.filter((lane) => lane !== TRACK_DIRECTOR.centerLane);
+      if (sideLanes.length) lanes = sideLanes;
+    }
+    return randomChoice(shuffle(lanes, () => this.random()), () => this.random());
+  }
+
+  pickRewardLane(context, excluded = []) {
+    const lanes = this.lanesExcept(excluded).filter((lane) => lane !== TRACK_DIRECTOR.centerLane);
+    const sideLanes = lanes.length ? lanes : this.lanesExcept(excluded);
+    if (context.playerLane !== TRACK_DIRECTOR.centerLane && sideLanes.includes(TRACK_DIRECTOR.centerLane) && this.random() < 0.16) {
+      return TRACK_DIRECTOR.centerLane;
+    }
+    return randomChoice(shuffle(sideLanes, () => this.random()), () => this.random());
+  }
+
+  chooseBlockerType(context, heavyChance = 0.25) {
+    const difficulty = context.difficulty;
+    const options = [
+      { value: "slowCar", weight: 1.5 },
+      { value: "fastCar", weight: 0.55 + difficulty * 1.2 },
+      { value: "truck", weight: Math.max(0, heavyChance - 0.05) + difficulty * 0.35 },
+      { value: "barrier", weight: heavyChance * 0.65 + difficulty * 0.25 },
+      { value: "cone", weight: context.band.id === "opening" ? 1.05 : 0.45 },
+      { value: "oil", weight: context.band.id === "opening" ? 0.15 : 0.42 + difficulty * 0.25 }
+    ];
+    if (context.speedClassId === "sunday") {
+      options.find((item) => item.value === "truck").weight *= 0.35;
+      options.find((item) => item.value === "barrier").weight *= 0.45;
+    }
+    return weightedChoice(options, () => this.random()) || "slowCar";
+  }
+
+  waveSingleBlocker(distance, context, result) {
+    const lane = this.pickPressureLane(context, context.band.id === "opening" ? 0.24 : 0.38);
+    const type = context.band.id === "opening" && this.random() < 0.35
+      ? "cone"
+      : this.chooseBlockerType(context, 0.12);
+    this.spawn(type, lane, distance, result);
+  }
+
+  waveDoubleGate(distance, context, result) {
+    const safeLane = this.pickSafeLane(context, context.centerNeedsChallenge);
+    let lanes = shuffle(this.lanesExcept(safeLane), () => this.random());
+    if (context.centerNeedsChallenge && lanes.includes(TRACK_DIRECTOR.centerLane)) {
+      lanes = [TRACK_DIRECTOR.centerLane].concat(lanes.filter((lane) => lane !== TRACK_DIRECTOR.centerLane));
+    }
+    this.spawn(this.chooseBlockerType(context, 0.12), lanes[0], distance, result);
+    this.spawn(this.random() < 0.55 ? "slowCar" : (context.difficulty > 0.4 ? "oil" : "cone"), lanes[1], distance, result);
+    const addThird = context.progress > 0.42
+      && (context.speedClassId === "arcade" || context.speedClassId === "pro" || context.speedClassId === "turbo")
+      && this.random() < (context.speedClassId === "arcade" ? 0.34 : (context.speedClassId === "pro" ? 0.58 : 0.72));
+    if (addThird) {
+      this.spawn(this.random() < 0.55 ? "cone" : "oil", lanes[2], distance + 90, result);
+    }
+  }
+
+  waveOffsetPair(distance, context, result) {
+    const firstLane = this.pickPressureLane(context, 0.35);
+    const secondLane = randomChoice(shuffle(this.lanesExcept(firstLane), () => this.random()), () => this.random());
+    const stagger = lerp(170, 285, this.random());
+    this.spawn(this.chooseBlockerType(context, 0.18), firstLane, distance, result);
+    this.spawn(this.random() < 0.5 ? "cone" : this.chooseBlockerType(context, 0.12), secondLane, distance + stagger, result);
+    if (context.progress > 0.36 && context.speedClassId !== "sunday" && this.random() < (context.speedClassId === "rookie" ? 0.28 : 0.56)) {
+      const thirdLane = randomChoice(shuffle(this.lanesExcept([firstLane, secondLane]), () => this.random()), () => this.random());
+      this.spawn(this.random() < 0.55 ? "cone" : "slowCar", thirdLane, distance + stagger * 0.55, result);
+    }
+  }
+
+  waveCenterBlock(distance, context, result) {
+    const type = context.progress < 0.3 ? (this.random() < 0.45 ? "cone" : "slowCar") : this.chooseBlockerType(context, 0.2);
+    this.spawn(type, TRACK_DIRECTOR.centerLane, distance, result);
+    if (context.progress > 0.2) {
+      const sideLane = this.pickPressureLane(context, 0, [TRACK_DIRECTOR.centerLane]);
+      this.spawn(this.random() < 0.55 ? "cone" : "oil", sideLane, distance, result);
+      if (context.progress > 0.48 && ["arcade", "pro", "turbo"].includes(context.speedClassId) && this.random() < (context.speedClassId === "arcade" ? 0.36 : 0.64)) {
+        const thirdLane = this.pickPressureLane(context, 0, [TRACK_DIRECTOR.centerLane, sideLane]);
+        this.spawn(this.random() < 0.5 ? "cone" : "slowCar", thirdLane, distance + 110, result);
+      }
+    }
+    if (context.progress > 0.22 && this.random() < 0.45) {
+      const rewardLane = this.pickRewardLane(context, [TRACK_DIRECTOR.centerLane]);
+      this.spawn("boostPad", rewardLane, distance + 420, result);
+    }
+  }
+
+  waveLeftRightSweep(distance, context, result) {
+    const direction = this.random() < 0.5 ? 1 : -1;
+    const start = direction > 0 ? 0 : 4;
+    const count = context.band.id === "final" || context.speedClassId === "pro" || context.speedClassId === "turbo" ? 4 : 3;
+    const step = clamp(context.cruiseSpeed * 0.17, 150, 285);
+    for (let i = 0; i < count; i += 1) {
+      const lane = start + i * direction;
+      if (lane < 0 || lane >= LANES) continue;
+      const type = i === 0 ? "cone" : (this.random() < 0.42 ? "slowCar" : this.chooseBlockerType(context, 0.1));
+      this.spawn(type, lane, distance + i * step, result);
+    }
+  }
+
+  waveConstructionSqueeze(distance, context, result) {
+    const safeLane = this.pickSafeLane(context, true);
+    this.manager.addWarning(distance, safeLane, "work");
+    let lanes = shuffle(this.lanesExcept(safeLane), () => this.random());
+    if (context.centerNeedsChallenge && lanes.includes(TRACK_DIRECTOR.centerLane)) {
+      lanes = [TRACK_DIRECTOR.centerLane].concat(lanes.filter((lane) => lane !== TRACK_DIRECTOR.centerLane));
+    }
+    const count = context.speedClassId === "sunday" && context.band.id === "earlyMid"
+      ? 2
+      : (context.speedClassId === "rookie" && context.band.id === "earlyMid" && this.random() < 0.45 ? 2 : 3);
+    const types = ["barrier", this.random() < 0.58 ? "cone" : "oil", context.difficulty > 0.5 ? "barrier" : "cone"];
+    for (let i = 0; i < count; i += 1) {
+      this.spawn(types[i], lanes[i], distance + (i < 3 ? 0 : 135), result);
+    }
+  }
+
+  waveDeerCrossing(distance, context, result) {
+    const direction = this.random() < 0.5 ? 1 : -1;
+    const signLane = direction > 0 ? 0 : 4;
+    this.manager.addWarning(distance, signLane, "deer");
+    if (context.progress > 0.35 && context.speedClassId !== "sunday") {
+      const laneA = this.pickPressureLane(context, 0.24);
+      const laneB = this.pickPressureLane(context, 0.18, [laneA]);
+      this.spawn(this.random() < 0.6 ? "cone" : "oil", laneA, distance - 180, result);
+      if (["arcade", "pro", "turbo"].includes(context.speedClassId) && this.random() < 0.65) {
+        this.spawn("cone", laneB, distance + 170, result);
+      }
+    }
+    this.spawn("deer", TRACK_DIRECTOR.centerLane, distance, result, {
+      laneFloat: direction > 0 ? -0.45 : LANES - 0.55,
+      direction
+    });
+  }
+
+  waveRampEscape(distance, context, result) {
+    const rampLane = this.pickRewardLane(context);
+    this.spawn("ramp", rampLane, distance, result);
+    const lanes = shuffle(this.lanesExcept(rampLane), () => this.random());
+    const hazardDistance = distance + clamp(context.cruiseSpeed * 0.32, 300, 520);
+    this.spawn("cone", lanes[0], hazardDistance, result);
+    this.spawn(this.random() < 0.55 ? "oil" : "branch", lanes[1], hazardDistance + 40, result);
+    if (context.band.id !== "opening" && context.speedClassId !== "sunday") {
+      this.spawn("cone", lanes[2], hazardDistance + (context.speedClassId === "turbo" ? 40 : 100), result);
+    }
+    if (context.band.id === "final" && (context.speedClassId === "pro" || context.speedClassId === "turbo")) {
+      this.spawn(this.random() < 0.5 ? "oil" : "branch", lanes[3], hazardDistance + 160, result);
+    }
+  }
+
+  waveBoostTemptation(distance, context, result) {
+    const blockerLane = this.pickPressureLane(context, 0.46);
+    const rewardLane = this.pickRewardLane(context, [blockerLane]);
+    this.spawn(this.random() < 0.72 ? "slowCar" : "cone", blockerLane, distance, result);
+    if (context.progress > 0.25) {
+      const secondLane = this.pickPressureLane(context, 0.18, [blockerLane, rewardLane]);
+      this.spawn(this.random() < 0.62 ? "cone" : "oil", secondLane, distance + (context.speedClassId === "turbo" ? 0 : 40), result);
+    }
+    this.spawn("boostPad", rewardLane, distance + clamp(context.cruiseSpeed * 0.27, 260, 430), result);
+  }
+
+  waveNearMissCorridor(distance, context, result) {
+    const safeLane = this.pickSafeLane(context, context.centerNeedsChallenge);
+    let lanes = shuffle(this.lanesExcept(safeLane), () => this.random());
+    if (context.centerNeedsChallenge && lanes.includes(TRACK_DIRECTOR.centerLane)) {
+      lanes = [TRACK_DIRECTOR.centerLane].concat(lanes.filter((lane) => lane !== TRACK_DIRECTOR.centerLane));
+    }
+    const count = context.band.id === "final" || context.speedClassId === "arcade" || context.speedClassId === "pro" || context.speedClassId === "turbo" ? 3 : 2;
+    for (let i = 0; i < count; i += 1) {
+      const type = i === 0 ? "fastCar" : (i === 1 && context.difficulty > 0.6 ? "truck" : "slowCar");
+      this.spawn(type, lanes[i], distance + (i === 2 ? (context.speedClassId === "turbo" ? 90 : 140) : 0), result);
+    }
+  }
+
+  waveFourLaneSpike(distance, context, result) {
+    const safeLane = this.pickSafeLane(context, true);
+    const lanes = shuffle(this.lanesExcept(safeLane), () => this.random());
+    const types = ["slowCar", "fastCar", "barrier", this.random() < 0.5 ? "cone" : "oil"];
+    const candidates = types.map((type, index) => this.manager.createObstacle(type, lanes[index], distance, {
+      allowFourLanePressure: true
+    }));
+    const scan = this.manager.scanPatternSafety(candidates, this.manager.obstacles);
+    if (scan.invalid) {
+      result.fairnessPassed = false;
+      this.manager.preventedUnsafeSpawns += 1;
+      this.manager.lastSafetySummary = { ...scan, reason: "director four-lane group rejected" };
+      this.waveNearMissCorridor(distance, context, result);
+      return;
+    }
+    for (let i = 0; i < 4; i += 1) {
+      this.spawn(types[i], lanes[i], distance, result, {
+        allowFourLanePressure: true
+      });
+    }
+  }
+
+  waveRecoveryGap(distance, context, result) {
+    if (context.progress > 0.18 && this.random() < (context.speedClassId === "sunday" ? 0.38 : 0.24)) {
+      const lane = this.pickRewardLane(context);
+      this.spawn("boostPad", lane, distance + clamp(context.cruiseSpeed * 0.24, 230, 390), result);
+    }
+  }
+}
+
 class ObstacleManager {
   constructor(game) {
     this.game = game;
@@ -939,6 +1951,7 @@ class ObstacleManager {
     this.lastFourLanePressureDistance = -Infinity;
     this.preventedUnsafeSpawns = 0;
     this.lastSafetySummary = null;
+    this.director = new TrackDirector(this);
   }
 
   reset(track) {
@@ -950,6 +1963,7 @@ class ObstacleManager {
     this.lastFourLanePressureDistance = -Infinity;
     this.preventedUnsafeSpawns = 0;
     this.lastSafetySummary = null;
+    this.director.reset(track);
   }
 
   random() {
@@ -959,19 +1973,23 @@ class ObstacleManager {
   update(dt) {
     const run = this.game.run;
     const track = this.track;
+    this.director.update(dt);
     const spawnLeadDistance = this.getSpawnLeadDistance(run);
     while (this.nextSpawnDistance < run.distance + spawnLeadDistance && this.nextSpawnDistance < track.distanceToFinish - 650) {
-      this.spawnPattern(this.nextSpawnDistance);
+      const wave = this.spawnPattern(this.nextSpawnDistance);
       const progress = this.nextSpawnDistance / track.distanceToFinish;
       const difficulty = track.difficultyCurve(progress);
       const cruiseSpeed = getTrackCruiseSpeed(track, progress, this.getSpeedClassId());
       const baseSpacing = this.getPatternSpacing(progress, difficulty, cruiseSpeed);
+      const spacingMultiplier = this.director.getSpacingMultiplier(wave);
+      const randomScale = this.director.getRandomSecondsScale(wave);
+      const cadence = getTrackDirectorCadence(this.getSpeedClassId());
       const randomSeconds = lerp(
-        track.obstacleSettings.spacingRandomSecondsEarly ?? 0.7,
-        track.obstacleSettings.spacingRandomSecondsLate ?? 0.25,
+        cadence.randomEarly ?? track.obstacleSettings.spacingRandomSecondsEarly ?? 0.7,
+        cadence.randomLate ?? track.obstacleSettings.spacingRandomSecondsLate ?? 0.25,
         difficulty
       );
-      this.nextSpawnDistance += baseSpacing + this.random() * cruiseSpeed * randomSeconds;
+      this.nextSpawnDistance += baseSpacing * spacingMultiplier + this.random() * cruiseSpeed * randomSeconds * randomScale;
     }
 
     this.obstacles = this.obstacles.filter((obstacle) => {
@@ -979,8 +1997,21 @@ class ObstacleManager {
       if (obstacle.type === "deer") {
         this.updateDeer(obstacle, ahead);
       }
+      if (obstacle.type === "warning") {
+        this.maybePlayWarningSfx(obstacle, ahead);
+      }
       return ahead > -260 && !obstacle.remove;
     });
+  }
+
+  maybePlayWarningSfx(obstacle, ahead) {
+    if (obstacle.sfxPlayed || this.game.screen !== "game") return;
+    const run = this.game.run;
+    if (!run || run.paused || run.ended) return;
+    if (ahead <= VIEW_DISTANCE + 40 && ahead > -120) {
+      obstacle.sfxPlayed = true;
+      this.game.audio.playSfx("warning");
+    }
   }
 
   getSpawnLeadDistance(run) {
@@ -994,13 +2025,14 @@ class ObstacleManager {
 
   getPatternSpacing(progress, difficulty, cruiseSpeed) {
     const settings = this.track.obstacleSettings;
+    const cadence = getTrackDirectorCadence(this.getSpeedClassId());
     const seconds = sampleProgressCurve([
-      { progress: 0, value: settings.earlySpacingSeconds ?? 3 },
-      { progress: 0.5, value: settings.midSpacingSeconds ?? 1.9 },
-      { progress: 1, value: settings.lateSpacingSeconds ?? 1.25 }
+      { progress: 0, value: cadence.early ?? settings.earlySpacingSeconds ?? 3 },
+      { progress: 0.5, value: cadence.mid ?? settings.midSpacingSeconds ?? 1.9 },
+      { progress: 1, value: cadence.late ?? settings.lateSpacingSeconds ?? 1.25 }
     ], progress, this.track.speedCurveType);
     const timeBasedSpacing = cruiseSpeed * seconds;
-    const legacySpacingFloor = lerp(settings.earlySpacing ?? timeBasedSpacing, settings.lateSpacing ?? timeBasedSpacing, difficulty);
+    const legacySpacingFloor = lerp(settings.earlySpacing ?? timeBasedSpacing, settings.lateSpacing ?? timeBasedSpacing, difficulty) * (cadence.spacingScale ?? 1);
     return Math.max(timeBasedSpacing, legacySpacingFloor);
   }
 
@@ -1015,40 +2047,7 @@ class ObstacleManager {
   }
 
   spawnPattern(distance) {
-    const track = this.track;
-    const run = this.game.run;
-    const progress = distance / track.distanceToFinish;
-    const difficulty = track.difficultyCurve(progress);
-    const safeLane = this.pickSafeLane();
-    this.lastPatternSafeLane = safeLane;
-
-    if (distance < track.distanceToFinish * 0.16) {
-      this.spawnEarly(distance, safeLane);
-      return;
-    }
-
-    const roll = this.random();
-    if (progress > 0.78 && distance - this.lastFourLanePressureDistance > FOUR_LANE_PRESSURE_COOLDOWN && roll < 0.055) {
-      this.spawnFourLanePressure(distance, safeLane);
-    } else if (roll < 0.24) {
-      this.spawnVehiclePattern(distance, safeLane, difficulty);
-    } else if (roll < 0.42) {
-      this.spawnConstructionPattern(distance, safeLane, difficulty);
-    } else if (roll < 0.52) {
-      this.spawnDeerPattern(distance);
-    } else if (roll < 0.68) {
-      this.spawnOilOrCones(distance, safeLane, difficulty);
-    } else if (roll < 0.79) {
-      this.spawnRampChallenge(distance, safeLane);
-    } else if (roll < 0.87) {
-      this.spawnBoostPad(distance, safeLane);
-    } else {
-      this.spawnMixedPattern(distance, safeLane, difficulty);
-    }
-
-    if (run.distance > 12000 && this.random() < 0.12 + difficulty * 0.1) {
-      this.spawnBoostPad(distance + 320, randomChoice([0, 1, 2, 3, 4], () => this.random()));
-    }
+    return this.director.spawnWave(distance);
   }
 
   pickSafeLane() {
@@ -1110,6 +2109,7 @@ class ObstacleManager {
       direction: options.direction || 1,
       variant: options.variant || "",
       remove: false,
+      sfxPlayed: false,
       allowFourLanePressure: Boolean(options.allowFourLanePressure)
     };
   }
@@ -1153,7 +2153,7 @@ class ObstacleManager {
 
   getObjectDistanceHalfSize(info) {
     const roadH = this.game.renderer?.road?.h || 720;
-    return Math.max(34, (info.h * info.hitH * VIEW_DISTANCE / Math.max(1, roadH)) / 2);
+    return Math.max(42, (info.h * info.hitH * 1.18 * VIEW_DISTANCE / Math.max(1, roadH)) / 2);
   }
 
   getSpawnSpacingClass(obstacle) {
@@ -1165,10 +2165,10 @@ class ObstacleManager {
 
   getMinimumSameLaneGap(a, b) {
     const baseByClass = {
-      heavy: 240,
-      assist: 285,
-      animal: 220,
-      small: 190
+      heavy: 360,
+      assist: 340,
+      animal: 320,
+      small: 250
     };
     const base = Math.max(
       baseByClass[this.getSpawnSpacingClass(a)] || 155,
@@ -1595,6 +2595,7 @@ class CollisionSystem {
       } else if (this.isNearMiss(playerBox, obstacleBox, obstacle, info)) {
         obstacle.nearMissAwarded = true;
         this.game.addScoreEvent("nearMiss", 150);
+        this.game.audio.playSfx("nearMiss");
         run.nearMisses += 1;
         run.collisionState = `near miss ${info.label}`;
       }
@@ -1623,6 +2624,7 @@ class CollisionSystem {
     if (obstacle.type === "ramp") {
       this.game.launchJump();
       this.game.addScoreEvent("ramp", 80);
+      this.game.audio.playSfx("ramp");
       return;
     }
 
@@ -1637,7 +2639,7 @@ class CollisionSystem {
 
     if (obstacle.type === "oil") {
       run.oilTimer = 2;
-      this.game.applySlowdown(0.78, -350, "oil");
+      this.game.applySlowdown(0.78, -350, "oil", "oil");
       return;
     }
 
@@ -1710,10 +2712,24 @@ class Renderer {
     return lerp(0.72, 1.12, t);
   }
 
+  getPlayerVisualSize() {
+    const run = this.game.run;
+    const car = run?.player?.car || DEFAULT_CAR;
+    return getPlayerCarDrawSize(car, {
+      airborne: false,
+      laneWidth: this.road.laneW
+    }, this.game.carSprites);
+  }
+
   getPlayerDriveZone() {
+    const size = this.getPlayerVisualSize();
+    const bottomSafeY = this.height - TRACK_VISUALS.bottomCarMargin - size.h * 0.5;
+    const topSafeY = this.road.y + size.h * 0.48;
+    const minY = Math.max(this.height * PLAYER_MIN_Y_RATIO, topSafeY);
+    const maxY = Math.min(this.height * PLAYER_MAX_Y_RATIO, bottomSafeY);
     return {
-      minY: this.height * PLAYER_MIN_Y_RATIO,
-      maxY: Math.min(this.height * PLAYER_MAX_Y_RATIO, this.height - 58)
+      minY,
+      maxY: Math.max(minY, maxY)
     };
   }
 
@@ -1809,29 +2825,40 @@ class Renderer {
     const h = this.height;
     const w = this.width;
     const sky = ctx.createLinearGradient(0, 0, 0, h);
-    sky.addColorStop(0, "#151139");
-    sky.addColorStop(0.35, "#35104a");
-    sky.addColorStop(0.58, "#11101f");
+    sky.addColorStop(0, "#100c2b");
+    sky.addColorStop(0.26, "#2c0d46");
+    sky.addColorStop(0.44, "#5a1943");
+    sky.addColorStop(0.58, "#171224");
     sky.addColorStop(1, "#05050a");
     ctx.fillStyle = sky;
     ctx.fillRect(0, 0, w, h);
 
-    const sunY = Math.min(190, h * 0.26);
-    const sunR = Math.min(118, w * 0.16);
+    const horizonY = Math.max(235, Math.min(h * 0.46, this.road.y + this.road.h * 0.42));
+    const sunY = Math.min(horizonY - 72, h * 0.27);
+    const sunR = Math.min(132, w * 0.17);
     const sun = ctx.createRadialGradient(w * 0.5, sunY, 10, w * 0.5, sunY, sunR);
-    sun.addColorStop(0, "rgba(255, 228, 94, 0.95)");
-    sun.addColorStop(0.45, "rgba(255, 123, 84, 0.62)");
+    sun.addColorStop(0, `rgba(255, 228, 94, ${0.95 * TRACK_VISUALS.horizonGlowStrength})`);
+    sun.addColorStop(0.42, `rgba(255, 130, 75, ${0.66 * TRACK_VISUALS.horizonGlowStrength})`);
     sun.addColorStop(1, "rgba(255, 63, 209, 0)");
     ctx.fillStyle = sun;
     ctx.beginPath();
     ctx.arc(w * 0.5, sunY, sunR, 0, Math.PI * 2);
     ctx.fill();
 
+    const horizonGlow = ctx.createRadialGradient(w * 0.5, horizonY, 4, w * 0.5, horizonY, Math.max(w * 0.28, 320));
+    horizonGlow.addColorStop(0, `rgba(255, 148, 72, ${0.42 * TRACK_VISUALS.horizonGlowStrength})`);
+    horizonGlow.addColorStop(0.38, `rgba(255, 63, 209, ${0.17 * TRACK_VISUALS.horizonGlowStrength})`);
+    horizonGlow.addColorStop(1, "rgba(40, 246, 255, 0)");
+    ctx.fillStyle = horizonGlow;
+    ctx.fillRect(0, horizonY - 180, w, 360);
+
+    this.drawHorizonSilhouettes(horizonY);
+
     ctx.save();
-    ctx.globalAlpha = 0.22;
+    ctx.globalAlpha = 0.24;
     ctx.strokeStyle = "#28f6ff";
     ctx.lineWidth = 1;
-    const gridY = Math.max(260, h * 0.43);
+    const gridY = horizonY + 12;
     for (let y = gridY; y < h; y += 34) {
       ctx.beginPath();
       ctx.moveTo(0, y);
@@ -1847,8 +2874,210 @@ class Renderer {
     ctx.restore();
   }
 
+  drawHorizonSilhouettes(horizonY) {
+    const ctx = this.ctx;
+    const w = this.width;
+    ctx.save();
+    ctx.fillStyle = "rgba(11, 8, 24, 0.88)";
+    ctx.beginPath();
+    ctx.moveTo(0, horizonY + 26);
+    for (let i = 0; i <= 12; i += 1) {
+      const x = (w / 12) * i;
+      const peak = horizonY - 34 - deterministicNoise(i, 2) * 52;
+      ctx.lineTo(x, peak);
+      ctx.lineTo(x + w / 24, horizonY + 18 - deterministicNoise(i, 3) * 16);
+    }
+    ctx.lineTo(w, this.height);
+    ctx.lineTo(0, this.height);
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.fillStyle = "rgba(5, 7, 18, 0.72)";
+    const cityBase = horizonY + 34;
+    for (let i = 0; i < 28; i += 1) {
+      const buildingW = 12 + deterministicNoise(i, 8) * 22;
+      const x = i * (w / 28) + deterministicNoise(i, 9) * 10;
+      const height = 24 + deterministicNoise(i, 10) * 76;
+      ctx.fillRect(x, cityBase - height, buildingW, height);
+      if (deterministicNoise(i, 11) > 0.56) {
+        ctx.fillStyle = "rgba(255, 228, 94, 0.38)";
+        ctx.fillRect(x + buildingW * 0.35, cityBase - height + 12, 3, 3);
+        ctx.fillStyle = "rgba(5, 7, 18, 0.72)";
+      }
+    }
+    ctx.restore();
+  }
+
+  getVisualDistance() {
+    return this.game.screen === "game" || this.game.screen === "score"
+      ? this.game.run.distance
+      : this.game.attractDistance;
+  }
+
+  getVisualSpeedRatio() {
+    const run = this.game.run;
+    if (!run || !run.track) return 0.25;
+    return clamp(run.currentSpeed / Math.max(1, run.track.maxSpeed), 0, 1.18);
+  }
+
+  getFinalStretchIntensity() {
+    const run = this.game.run;
+    if (!run || !run.track || this.game.screen !== "game") return 0;
+    const progress = clamp(run.distance / run.track.distanceToFinish, 0, 1);
+    return clamp((progress - TRACK_VISUALS.finalStretchStart) / Math.max(0.01, 1 - TRACK_VISUALS.finalStretchStart), 0, 1);
+  }
+
+  drawRoadsideScenery(alpha = 1) {
+    const ctx = this.ctx;
+    const road = this.road;
+    const scrollSource = this.getVisualDistance();
+    const speedRatio = this.getVisualSpeedRatio();
+    const spacing = TRACK_VISUALS.scenerySpacing / Math.max(0.55, TRACK_VISUALS.sceneryDensity);
+    const sceneryScrollScale = 0.22 + speedRatio * 0.12;
+    const scroll = (scrollSource * sceneryScrollScale) % spacing;
+    const count = Math.ceil(this.height / spacing) + 4;
+    const leftMin = 16;
+    const leftMax = Math.max(leftMin + 8, road.x - 36);
+    const rightMin = Math.min(this.width - 16, road.x + road.w + 36);
+    const rightMax = this.width - 16;
+
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    for (let i = -2; i < count; i += 1) {
+      const worldIndex = Math.floor((scrollSource * sceneryScrollScale) / spacing) + i;
+      const y = road.y - spacing + i * spacing + scroll;
+      const side = deterministicNoise(worldIndex, 20) > 0.5 ? 1 : -1;
+      const x = side < 0
+        ? lerp(leftMin, leftMax, deterministicNoise(worldIndex, 21))
+        : lerp(rightMin, rightMax, deterministicNoise(worldIndex, 22));
+      const depth = clamp((y - road.y) / Math.max(1, road.h), 0, 1);
+      const scale = lerp(0.56, 1.12, depth);
+      const typeRoll = deterministicNoise(worldIndex, 23);
+      const signRoll = deterministicNoise(worldIndex, 24);
+      const warmth = this.getFinalStretchIntensity();
+
+      if (typeRoll < 0.42) {
+        this.drawPalmSilhouette(x, y, scale, side);
+      } else if (typeRoll < 0.68) {
+        this.drawRoadsideBillboard(x, y, scale, side, signRoll < TRACK_VISUALS.roadsideSignFrequency ? "SUNSET HWY" : "");
+      } else if (typeRoll < 0.82) {
+        this.drawNeonMileSign(x, y, scale, side, signRoll < 0.5 ? "GAS" : "EAT");
+      } else {
+        this.drawLowDesertRock(x, y, scale, warmth);
+      }
+    }
+
+    const parallaxScroll = (scrollSource * (0.12 + speedRatio * 0.07)) % 120;
+    ctx.globalAlpha = alpha * 0.16;
+    ctx.strokeStyle = "#28f6ff";
+    ctx.lineWidth = 1;
+    for (let y = this.road.y + parallaxScroll - 120; y < this.height + 120; y += 120) {
+      ctx.beginPath();
+      ctx.moveTo(0, y);
+      ctx.lineTo(road.x - 18, y + 64);
+      ctx.moveTo(road.x + road.w + 18, y + 64);
+      ctx.lineTo(this.width, y);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  drawPalmSilhouette(x, y, scale, side) {
+    const ctx = this.ctx;
+    const trunkH = 72 * scale;
+    const trunkW = 5 * scale;
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.fillStyle = "rgba(4, 5, 12, 0.82)";
+    ctx.fillRect(-trunkW / 2, -trunkH, trunkW, trunkH);
+    ctx.strokeStyle = "rgba(40, 246, 255, 0.18)";
+    ctx.lineWidth = Math.max(1, 2 * scale);
+    ctx.beginPath();
+    ctx.moveTo(0, -trunkH);
+    ctx.lineTo(side * 22 * scale, -trunkH - 18 * scale);
+    ctx.moveTo(0, -trunkH);
+    ctx.lineTo(side * -22 * scale, -trunkH - 16 * scale);
+    ctx.moveTo(0, -trunkH);
+    ctx.lineTo(side * 28 * scale, -trunkH + 2 * scale);
+    ctx.moveTo(0, -trunkH);
+    ctx.lineTo(side * -28 * scale, -trunkH + 4 * scale);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  drawRoadsideBillboard(x, y, scale, side, label) {
+    const ctx = this.ctx;
+    const w = 92 * scale;
+    const h = 44 * scale;
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.fillStyle = "rgba(4, 5, 12, 0.78)";
+    ctx.fillRect(-w / 2, -h, w, h);
+    ctx.strokeStyle = label ? "#ff3fd1" : "rgba(255, 228, 94, 0.48)";
+    ctx.shadowBlur = label ? 14 * scale : 0;
+    ctx.shadowColor = "#ff3fd1";
+    ctx.lineWidth = Math.max(1, 2 * scale);
+    ctx.strokeRect(-w / 2, -h, w, h);
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = "rgba(6, 7, 14, 0.9)";
+    ctx.fillRect(-w * 0.28, 0, w * 0.08, 34 * scale);
+    ctx.fillRect(w * 0.2, 0, w * 0.08, 34 * scale);
+    if (label) {
+      ctx.fillStyle = "#ffe45e";
+      ctx.font = `800 ${Math.max(8, 10 * scale)}px Trebuchet MS, Verdana, sans-serif`;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText(label, 0, -h * 0.5);
+    } else {
+      ctx.fillStyle = side < 0 ? "#28f6ff" : "#ffe45e";
+      ctx.fillRect(-w * 0.32, -h * 0.62, w * 0.64, 4 * scale);
+      ctx.fillRect(-w * 0.22, -h * 0.38, w * 0.44, 4 * scale);
+    }
+    ctx.restore();
+  }
+
+  drawNeonMileSign(x, y, scale, side, label) {
+    const ctx = this.ctx;
+    const w = 42 * scale;
+    const h = 58 * scale;
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.fillStyle = "rgba(6, 7, 14, 0.86)";
+    ctx.fillRect(-w / 2, -h, w, h);
+    ctx.strokeStyle = side < 0 ? "#28f6ff" : "#ffe45e";
+    ctx.shadowBlur = 12 * scale;
+    ctx.shadowColor = ctx.strokeStyle;
+    ctx.strokeRect(-w / 2, -h, w, h);
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = "#f6fbff";
+    ctx.font = `800 ${Math.max(8, 11 * scale)}px Trebuchet MS, Verdana, sans-serif`;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(label, 0, -h * 0.5);
+    ctx.restore();
+  }
+
+  drawLowDesertRock(x, y, scale, warmth) {
+    const ctx = this.ctx;
+    const w = 54 * scale;
+    const h = 26 * scale;
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.fillStyle = `rgba(${Math.round(20 + warmth * 36)}, ${Math.round(11 + warmth * 18)}, ${Math.round(28 + warmth * 18)}, 0.82)`;
+    ctx.beginPath();
+    ctx.moveTo(-w * 0.48, 0);
+    ctx.lineTo(-w * 0.22, -h * 0.92);
+    ctx.lineTo(w * 0.1, -h * 0.72);
+    ctx.lineTo(w * 0.46, -h * 0.18);
+    ctx.lineTo(w * 0.38, 0);
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+  }
+
   drawAttractRoad() {
     const ctx = this.ctx;
+    this.drawRoadsideScenery(0.62);
     this.drawRoadBase(0.45);
     ctx.save();
     ctx.globalAlpha = 0.28;
@@ -1868,7 +3097,9 @@ class Renderer {
     if (shake > 0) {
       ctx.translate((Math.random() - 0.5) * 18 * shake, (Math.random() - 0.5) * 14 * shake);
     }
+    this.drawRoadsideScenery(1);
     this.drawRoadBase(1);
+    this.drawStartLineIfVisible();
     this.drawSpeedLines();
     this.drawFinishLineIfVisible();
 
@@ -1909,6 +3140,9 @@ class Renderer {
       }
     }
 
+    const scrollSource = this.getVisualDistance();
+    this.drawRoadSurfaceDetails(scrollSource, alpha);
+
     ctx.shadowBlur = 14;
     ctx.shadowColor = "#28f6ff";
     ctx.strokeStyle = "#28f6ff";
@@ -1919,12 +3153,10 @@ class Renderer {
     ctx.moveTo(road.x + road.w, road.y);
     ctx.lineTo(road.x + road.w, this.height);
     ctx.stroke();
+    this.drawRoadEdgeDetails(scrollSource, alpha);
 
     const dashHeight = 56;
     const gap = 46;
-    const scrollSource = this.game.screen === "game" || this.game.screen === "score"
-      ? this.game.run.distance
-      : this.game.attractDistance;
     const scroll = (scrollSource * SPEED_TUNING.roadStripeScrollScale) % (dashHeight + gap);
     for (let lane = 1; lane < LANES; lane += 1) {
       const x = road.x + lane * road.laneW;
@@ -1946,6 +3178,118 @@ class Renderer {
     ctx.strokeStyle = "rgba(68, 255, 153, 0.36)";
     ctx.lineWidth = 3;
     ctx.strokeRect(glowX + 6, road.y + 6, road.laneW - 12, road.h - 12);
+    this.drawFinalStretchRoadGlow(alpha);
+    ctx.restore();
+  }
+
+  drawRoadSurfaceDetails(scrollSource, alpha) {
+    const ctx = this.ctx;
+    const road = this.road;
+    const intensity = TRACK_VISUALS.roadDetailIntensity * alpha;
+    const bandSpacing = TRACK_VISUALS.asphaltBandSpacing;
+    const seamSpacing = TRACK_VISUALS.roadSeamSpacing;
+    const bandScroll = (scrollSource * 0.28) % bandSpacing;
+    const seamScroll = (scrollSource * 0.62) % seamSpacing;
+    const speedRatio = this.getVisualSpeedRatio();
+
+    ctx.save();
+    ctx.globalAlpha = intensity;
+    for (let y = road.y - bandSpacing + bandScroll; y < this.height + bandSpacing; y += bandSpacing) {
+      const shade = ctx.createLinearGradient(0, y, 0, y + 22);
+      shade.addColorStop(0, "rgba(255, 255, 255, 0.035)");
+      shade.addColorStop(1, "rgba(0, 0, 0, 0)");
+      ctx.fillStyle = shade;
+      ctx.fillRect(road.x + 14, y, road.w - 28, 22);
+    }
+
+    ctx.globalAlpha = intensity * 0.42;
+    ctx.strokeStyle = "rgba(255, 255, 255, 0.16)";
+    ctx.lineWidth = 1;
+    for (let y = road.y - seamSpacing + seamScroll; y < this.height + seamSpacing; y += seamSpacing) {
+      ctx.beginPath();
+      ctx.moveTo(road.x + 20, y);
+      ctx.lineTo(road.x + road.w - 20, y);
+      ctx.stroke();
+    }
+
+    ctx.globalAlpha = intensity * (0.18 + speedRatio * 0.14);
+    for (let lane = 0; lane < LANES; lane += 1) {
+      const x = road.x + lane * road.laneW;
+      const laneGlow = ctx.createLinearGradient(x, 0, x + road.laneW, 0);
+      laneGlow.addColorStop(0, "rgba(40, 246, 255, 0.02)");
+      laneGlow.addColorStop(0.5, lane % 2 ? "rgba(255, 63, 209, 0.035)" : "rgba(255, 228, 94, 0.025)");
+      laneGlow.addColorStop(1, "rgba(40, 246, 255, 0.02)");
+      ctx.fillStyle = laneGlow;
+      ctx.fillRect(x + 3, road.y, road.laneW - 6, road.h);
+    }
+    ctx.restore();
+  }
+
+  drawRoadEdgeDetails(scrollSource, alpha) {
+    const ctx = this.ctx;
+    const road = this.road;
+    const speedRatio = this.getVisualSpeedRatio();
+    const lightSpacing = TRACK_VISUALS.edgeLightSpacing;
+    const reflectorSpacing = TRACK_VISUALS.reflectorSpacing;
+    const lightScroll = (scrollSource * (0.72 + speedRatio * 0.42)) % lightSpacing;
+    const reflectorScroll = (scrollSource * 0.58) % reflectorSpacing;
+
+    ctx.save();
+    ctx.globalAlpha = alpha * 0.85;
+    for (let y = road.y - lightSpacing + lightScroll; y < this.height + lightSpacing; y += lightSpacing) {
+      const t = clamp((y - road.y) / Math.max(1, road.h), 0, 1);
+      const size = lerp(3, 7, t);
+      const color = Math.floor(y / lightSpacing) % 2 ? "#ff3fd1" : "#28f6ff";
+      ctx.shadowBlur = 12;
+      ctx.shadowColor = color;
+      ctx.fillStyle = color;
+      ctx.fillRect(road.x - 14, y, size, size * 2.3);
+      ctx.fillRect(road.x + road.w + 14 - size, y, size, size * 2.3);
+    }
+
+    ctx.shadowBlur = 0;
+    ctx.globalAlpha = alpha * 0.42;
+    ctx.fillStyle = "#ffe45e";
+    for (let y = road.y - reflectorSpacing + reflectorScroll; y < this.height + reflectorSpacing; y += reflectorSpacing) {
+      ctx.fillRect(road.x + 10, y, 5, 16);
+      ctx.fillRect(road.x + road.w - 15, y, 5, 16);
+    }
+    ctx.restore();
+  }
+
+  drawFinalStretchRoadGlow(alpha) {
+    const finalStretch = this.getFinalStretchIntensity();
+    if (finalStretch <= 0) return;
+    const ctx = this.ctx;
+    const road = this.road;
+    ctx.save();
+    ctx.globalAlpha = alpha * finalStretch * 0.22;
+    const glow = ctx.createLinearGradient(0, road.y, 0, this.height);
+    glow.addColorStop(0, "rgba(255, 228, 94, 0)");
+    glow.addColorStop(0.6, "rgba(255, 95, 68, 0.24)");
+    glow.addColorStop(1, "rgba(255, 63, 209, 0.12)");
+    ctx.fillStyle = glow;
+    ctx.fillRect(road.x, road.y, road.w, road.h);
+    ctx.restore();
+  }
+
+  drawStartLineIfVisible() {
+    const run = this.game.run;
+    if (!run || this.game.screen !== "game" || run.distance > 360) return;
+    const y = this.road.y + this.road.h + (run.distance / VIEW_DISTANCE) * this.road.h;
+    if (y > this.height + 90) return;
+    const ctx = this.ctx;
+    ctx.save();
+    ctx.globalAlpha = clamp(1 - run.distance / 360, 0, 1);
+    ctx.shadowBlur = 18;
+    ctx.shadowColor = "#44ff99";
+    ctx.fillStyle = "#44ff99";
+    ctx.fillRect(this.road.x, y - 5, this.road.w, 10);
+    ctx.fillStyle = "#08080d";
+    const cell = Math.max(16, this.road.w / 26);
+    for (let x = this.road.x; x < this.road.x + this.road.w; x += cell * 2) {
+      ctx.fillRect(x, y - 5, cell, 10);
+    }
     ctx.restore();
   }
 
@@ -1954,7 +3298,49 @@ class Renderer {
     const finishDistance = run.track.distanceToFinish;
     if (finishDistance - run.distance > VIEW_DISTANCE) return;
     const y = this.yForDistance(finishDistance);
+    this.drawFinishGantry(y, this.scaleForY(y));
     drawFinishLine(this.ctx, this.road.x, y, this.road.w, this.scaleForY(y));
+  }
+
+  drawFinishGantry(y, scale) {
+    if (y < this.road.y - 110 || y > this.height + 140) return;
+    const ctx = this.ctx;
+    const road = this.road;
+    const postH = 104 * scale;
+    const topY = y - postH;
+    const leftX = road.x - 38 * scale;
+    const rightX = road.x + road.w + 38 * scale;
+    ctx.save();
+    ctx.globalAlpha = 0.96;
+    ctx.shadowBlur = 22;
+    ctx.shadowColor = "#ffe45e";
+    ctx.strokeStyle = "#ffe45e";
+    ctx.lineWidth = Math.max(3, 5 * scale);
+    ctx.beginPath();
+    ctx.moveTo(leftX, y + 30 * scale);
+    ctx.lineTo(leftX, topY);
+    ctx.lineTo(rightX, topY);
+    ctx.lineTo(rightX, y + 30 * scale);
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = "rgba(5, 7, 18, 0.9)";
+    ctx.fillRect(leftX + 12 * scale, topY - 20 * scale, rightX - leftX - 24 * scale, 36 * scale);
+    ctx.strokeStyle = "#28f6ff";
+    ctx.lineWidth = Math.max(2, 3 * scale);
+    ctx.strokeRect(leftX + 12 * scale, topY - 20 * scale, rightX - leftX - 24 * scale, 36 * scale);
+    ctx.fillStyle = "#f6fbff";
+    ctx.font = `900 ${Math.max(12, 18 * scale)}px Trebuchet MS, Verdana, sans-serif`;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText("SUNSET HWY", road.x + road.w / 2, topY - 2 * scale);
+    for (let i = 0; i < 6; i += 1) {
+      const x = lerp(leftX + 38 * scale, rightX - 38 * scale, i / 5);
+      ctx.fillStyle = i % 2 ? "#ff3fd1" : "#44ff99";
+      ctx.beginPath();
+      ctx.arc(x, y + 38 * scale, 6 * scale, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.restore();
   }
 
   drawObstacle(ctx, obstacle, x, y, scale) {
@@ -2070,17 +3456,24 @@ class Renderer {
     const boosting = run.boostTimer > 0 || run.padBoostTimer > 0;
     if (!(boosting || highSpeed)) return;
     const ctx = this.ctx;
-    const intensity = run.boostTimer > 0 ? 0.42 : (run.padBoostTimer > 0 ? 0.32 : 0.18);
-    const lineCount = run.boostTimer > 0 ? 30 : (run.padBoostTimer > 0 ? 22 : 14);
+    const speedRatio = this.getVisualSpeedRatio();
+    const finalStretch = this.getFinalStretchIntensity();
+    const intensity = (run.boostTimer > 0 ? 0.42 : (run.padBoostTimer > 0 ? 0.32 : 0.18))
+      * TRACK_VISUALS.speedStreakIntensity
+      * (1 + finalStretch * 0.25);
+    const lineCount = Math.round((run.boostTimer > 0 ? 34 : (run.padBoostTimer > 0 ? 24 : 16)) * (0.85 + speedRatio * 0.35));
     ctx.save();
     ctx.globalAlpha = intensity;
     ctx.strokeStyle = boosting ? "#28f6ff" : "#f6fbff";
     ctx.lineWidth = boosting ? 2.5 : 1.5;
     for (let i = 0; i < lineCount; i += 1) {
-      const sideBand = i % 3 === 0 ? this.road.laneW * 0.42 : 0;
-      const x = this.road.x + sideBand + Math.random() * Math.max(1, this.road.w - sideBand * 2);
+      const side = i % 2 === 0 ? -1 : 1;
+      const edgeInset = this.road.laneW * (i % 4 === 0 ? 0.16 : 0.34);
+      const edgeX = side < 0 ? this.road.x + edgeInset : this.road.x + this.road.w - edgeInset;
+      const outsideOffset = i % 5 === 0 ? side * (18 + Math.random() * 28) : 0;
+      const x = edgeX + outsideOffset + (Math.random() - 0.5) * 18;
       const y = this.road.y + Math.random() * this.road.h;
-      const length = (boosting ? 92 : 56) + Math.random() * (boosting ? 98 : 52);
+      const length = (boosting ? 102 : 64) + Math.random() * (boosting ? 114 : 64) + speedRatio * 42;
       ctx.beginPath();
       ctx.moveTo(x, y);
       ctx.lineTo(x, y + length);
@@ -2286,7 +3679,12 @@ class Renderer {
     const progress = clamp(run.distance / run.track.distanceToFinish, 0, 1);
     const speedMultiplier = getTrackSpeedMultiplier(run.track, progress, run.speedClassId);
     const classStartSpeed = getSpeedClassStartSpeed(run.speedClassId);
+    const classEndSpeed = getSpeedClassEndSpeed(run.speedClassId, run.track);
+    const actualDt = this.game.lastDt || 0;
+    const obstacleDeltaPerFrame = run.currentSpeed * actualDt * this.road.h / VIEW_DISTANCE;
+    const roadMarkerDeltaPerFrame = run.currentSpeed * actualDt * SPEED_TUNING.roadStripeScrollScale;
     const eta = run.currentSpeed > 0 ? (run.track.distanceToFinish - run.distance) / run.currentSpeed : 0;
+    const directorDebug = this.game.obstacles.director.getDebugInfo();
     const spriteDebug = getPlayerSpriteDebugInfo(run.player.car, {
       airborne: run.airborne,
       laneWidth: this.road.laneW
@@ -2294,11 +3692,17 @@ class Renderer {
     const lines = [
       "DEBUG `",
       `mode: ${run.speedClass?.label || getSpeedClassLabel(run.speedClassId)} score x${(run.scoreMultiplier || 1).toFixed(2)}`,
-      `base speed: ${classStartSpeed.toFixed(0)}`,
+      `configured: ${classStartSpeed.toFixed(0)} -> ${classEndSpeed.toFixed(0)}`,
+      `base speed: ${(run.baseCruiseSpeed || classStartSpeed).toFixed(0)} raw ${(run.rawCruiseSpeed || classStartSpeed).toFixed(0)}`,
       `curve mult: ${speedMultiplier.toFixed(2)}x`,
       `actual scroll: ${run.currentSpeed.toFixed(1)}`,
+      `obstacle/frame: ${obstacleDeltaPerFrame.toFixed(1)}px`,
+      `road marker/frame: ${roadMarkerDeltaPerFrame.toFixed(1)}px`,
+      `distance/sec: ${run.currentSpeed.toFixed(1)}`,
       `boost mult: ${(run.boostMultiplier || 1).toFixed(2)}x`,
-      `max speed: ${run.track.maxSpeed}`,
+      `max speed: ${run.track.maxSpeed} cap ${(run.speedCap || run.track.maxSpeed).toFixed(0)} capped ${run.speedCapped ? "yes" : "no"}`,
+      `mph display: ${Math.round(run.currentSpeed)} MPH`,
+      `debug scale: ${(this.game.debugSpeedScale || 1).toFixed(2)}x`,
       `finish dist: ${run.track.distanceToFinish}`,
       `eta now: ${formatTime(eta)}`,
       `lane: ${run.targetLane} render ${run.renderLaneFloat.toFixed(2)}`,
@@ -2311,6 +3715,14 @@ class Renderer {
       `last hit: ${run.lastCollision}`,
       `danger max: ${this.game.obstacles.lastSafetySummary?.maxBlocked ?? 0}`,
       `prevented: ${this.game.obstacles.preventedUnsafeSpawns}`,
+      `band: ${directorDebug.band}`,
+      `wave: ${directorDebug.wave}`,
+      `budget: ${directorDebug.budget.toFixed(2)} pressure ${directorDebug.pressure.toFixed(2)}`,
+      `center safe: ${directorDebug.centerSafeSeconds.toFixed(1)}s hold ${directorDebug.centerHoldSeconds.toFixed(1)}s`,
+      `lane still: ${directorDebug.laneStillSeconds.toFixed(1)}s empty ${directorDebug.meaningfulGapSeconds.toFixed(1)}s`,
+      `lane pressure: ${directorDebug.lanePressure}`,
+      `wave fair: ${directorDebug.fairnessPassed}`,
+      `recent: ${directorDebug.recentWaves || "none"}`,
       `sprite: ${spriteDebug.mode}`,
       `src img: ${spriteDebug.natural}`,
       `opaque: ${spriteDebug.opaque}`,
@@ -2322,8 +3734,12 @@ class Renderer {
       `race music: ${this.game.audio.tracks.race.loaded}`,
       `music muted: ${this.game.audio.musicMuted}`,
       `sfx muted: ${this.game.audio.sfxMuted}`,
+      `sfx loaded: ${this.game.audio.sfxLoadedCount()}/${Object.keys(this.game.audio.sfx).length}`,
+      `missing sfx: ${this.game.audio.missingSfxList()}`,
+      `last sfx: ${this.game.audio.lastPlayedSfx}`,
       `sfx: ${this.game.audio.sfxLoadedStatus()}`,
-      "R restart  F finish  C crash  L scores  P sim"
+      "R restart  F finish  C crash  L scores  P sim",
+      "Shift+Plus/Minus speed scale  Shift+0 reset"
     ];
     const panelWidth = 356;
     const x = Math.max(8, this.width - panelWidth - 16);
@@ -3102,11 +4518,13 @@ class NeonRoadRally {
     this.input = new InputManager(this);
     this.screen = "title";
     this.debugMode = false;
+    this.debugSpeedScale = 1;
     this.attractDistance = 0;
     this.randomFloat = Math.random;
     this.simulationStatus = null;
     this.simulationRunning = false;
     this.lastFrame = performance.now();
+    this.lastDt = 0;
     this.run = this.createEmptyRun();
     this.lastSummary = null;
     this.scoreTallyFrame = null;
@@ -3142,7 +4560,12 @@ class NeonRoadRally {
       queuedLaneMove: 0,
       queuedMoveTimer: 0,
       currentSpeed: getTrackCruiseSpeed(track, 0, speedClass.id),
+      rawCruiseSpeed: getTrackRawCruiseSpeed(track, 0, speedClass.id),
       baseCruiseSpeed: getTrackCruiseSpeed(track, 0, speedClass.id),
+      speedCap: track.maxSpeed * SPEED_TUNING.maxBoostOverrunMultiplier,
+      speedCapped: false,
+      debugSpeedScale: 1,
+      lastDistanceDelta: 0,
       boostMultiplier: 1,
       manualBoosts: 3,
       boostTimer: 0,
@@ -3177,6 +4600,7 @@ class NeonRoadRally {
       finishFlashTimer: 0,
       crashBeatTimer: 0,
       countdownTimer: ARCADE_FEEL.enabled ? ARCADE_FEEL.countdownSeconds : 0,
+      lastCountdownSfxLabel: "",
       raceActive: !ARCADE_FEEL.enabled,
       floatingTexts: [],
       finished: false,
@@ -3189,6 +4613,7 @@ class NeonRoadRally {
   loop(time) {
     const dt = Math.min(0.05, (time - this.lastFrame) / 1000 || 0);
     this.lastFrame = time;
+    this.lastDt = dt;
     if (this.screen === "game" && !this.run.paused && !this.run.ended) {
       this.updateRun(dt);
     } else if (this.screen !== "game") {
@@ -3223,6 +4648,7 @@ class NeonRoadRally {
   updateRun(dt) {
     const run = this.run;
     if (run.countdownTimer > 0) {
+      this.playCountdownSfx();
       run.countdownTimer = Math.max(0, run.countdownTimer - dt);
       if (run.countdownTimer <= 0) {
         run.raceActive = true;
@@ -3265,15 +4691,24 @@ class NeonRoadRally {
     }
 
     const progress = clamp(run.distance / run.track.distanceToFinish, 0, 1);
-    const base = getTrackCruiseSpeed(run.track, progress, run.speedClassId);
+    const rawBase = getTrackRawCruiseSpeed(run.track, progress, run.speedClassId);
+    const base = clamp(rawBase, SPEED_TUNING.minSpeed, run.track.maxSpeed);
     const manualBoost = run.boostTimer > 0 ? SPEED_TUNING.manualBoostMultiplier : 1;
     const padBoost = run.padBoostTimer > 0 ? SPEED_TUNING.padBoostMultiplier : 1;
     const boostMultiplier = manualBoost * padBoost;
     const slowdown = run.slowdownTimer > 0 ? run.slowdownFactor : 1;
+    const debugScale = this.debugSpeedScale || 1;
+    const unclampedSpeed = base * boostMultiplier * slowdown * debugScale;
+    const speedCap = run.track.maxSpeed * SPEED_TUNING.maxBoostOverrunMultiplier * debugScale;
+    run.rawCruiseSpeed = rawBase;
     run.baseCruiseSpeed = base;
     run.boostMultiplier = boostMultiplier;
-    run.currentSpeed = clamp(base * boostMultiplier * slowdown, SPEED_TUNING.minSpeed, run.track.maxSpeed * SPEED_TUNING.maxBoostOverrunMultiplier);
+    run.debugSpeedScale = debugScale;
+    run.speedCap = speedCap;
+    run.speedCapped = rawBase > run.track.maxSpeed || unclampedSpeed > speedCap;
+    run.currentSpeed = clamp(unclampedSpeed, SPEED_TUNING.minSpeed, speedCap);
     const distanceDelta = run.currentSpeed * dt;
+    run.lastDistanceDelta = distanceDelta;
     run.distance += distanceDelta;
     this.addBaseScore(distanceDelta * (run.boostTimer > 0 ? 1.6 : 1));
     this.addBaseScore(run.currentSpeed * dt * 0.04);
@@ -3293,6 +4728,19 @@ class NeonRoadRally {
 
     if (run.distance >= run.track.distanceToFinish && !run.ended) {
       this.endRace("finished", "Finish Line");
+    }
+  }
+
+  playCountdownSfx() {
+    const run = this.run;
+    if (!run || run.ended || run.paused || run.countdownTimer <= 0) return;
+    const label = getCountdownLabel(run.countdownTimer);
+    if (!label || label === run.lastCountdownSfxLabel) return;
+    run.lastCountdownSfxLabel = label;
+    if (label === "GO") {
+      this.audio.playSfx("go");
+    } else if (["3", "2", "1"].includes(label)) {
+      this.audio.playSfx("countdownBeep");
     }
   }
 
@@ -3323,6 +4771,11 @@ class NeonRoadRally {
     this.run.speedClass = speedClass;
     this.run.scoreMultiplier = speedClass.scoreMultiplier;
     this.run.currentSpeed = getTrackCruiseSpeed(track, 0, speedClass.id);
+    this.run.rawCruiseSpeed = getTrackRawCruiseSpeed(track, 0, speedClass.id);
+    this.run.baseCruiseSpeed = this.run.currentSpeed;
+    this.run.speedCap = track.maxSpeed * SPEED_TUNING.maxBoostOverrunMultiplier * (this.debugSpeedScale || 1);
+    this.run.speedCapped = false;
+    this.run.debugSpeedScale = this.debugSpeedScale || 1;
     if (this.input) this.input.clearVerticalInput();
     this.obstacles.reset(track);
     this.setScreen("game");
@@ -3373,7 +4826,7 @@ class NeonRoadRally {
     run.airborne = true;
   }
 
-  applySlowdown(factor, penalty, reason) {
+  applySlowdown(factor, penalty, reason, sfxKey = "slowdown") {
     const run = this.run;
     run.slowdownFactor = Math.min(run.slowdownFactor, factor);
     run.slowdownTimer = Math.max(run.slowdownTimer, 1.45);
@@ -3389,7 +4842,7 @@ class NeonRoadRally {
       life: 0.95,
       yOffset: -44
     });
-    this.audio.playSfx("slowdown");
+    this.audio.playSfx(sfxKey);
   }
 
   addBaseScore(points) {
@@ -3471,7 +4924,13 @@ class NeonRoadRally {
     this.audio.stopMusic(0.28);
 
     const player = this.profiles.getCurrentPlayer() || this.profiles.ensureDefaultPlayer();
-    const entry = this.profiles.recordScore({
+    const previousBestScore = player.bestScore || 0;
+    const leaderboard = this.profiles.data.leaderboard || [];
+    const topTwentyCutoff = leaderboard.length < 20 ? -1 : Math.min(...leaderboard.slice(0, 20).map((item) => item.score || 0));
+    const debugSpeedScaleActive = Math.abs((this.debugSpeedScale || 1) - 1) > 0.001;
+    const isNewPersonalBest = !debugSpeedScaleActive && run.score > previousBestScore;
+    const entersTopTwenty = !debugSpeedScaleActive && (leaderboard.length < 20 || run.score > topTwentyCutoff);
+    const entry = debugSpeedScaleActive ? null : this.profiles.recordScore({
       playerName: player.name,
       carName: player.car.name,
       trackName: run.track.name,
@@ -3495,8 +4954,14 @@ class NeonRoadRally {
       time: run.elapsed,
       bonuses: { ...run.bonuses },
       penalties: run.penalties,
-      bestScore: this.profiles.getCurrentPlayer()?.bestScore || run.score,
-      trackDistance: run.track.distanceToFinish
+      bestScore: debugSpeedScaleActive ? previousBestScore : (this.profiles.getCurrentPlayer()?.bestScore || run.score),
+      trackDistance: run.track.distanceToFinish,
+      newPersonalBest: isNewPersonalBest,
+      entersTopTwenty,
+      newHighScore: isNewPersonalBest || entersTopTwenty,
+      scoreSaved: !debugSpeedScaleActive,
+      debugSpeedScaleActive,
+      debugSpeedScale: this.debugSpeedScale || 1
     };
 
     setTimeout(() => {
@@ -3553,7 +5018,134 @@ class NeonRoadRally {
     const invalidExamples = [];
     const overlapExamples = [];
     const perSpeedClass = {};
+    const directorTotals = createDirectorAggregate();
     let completedRuns = 0;
+
+    function createDirectorAggregate() {
+      return {
+        totalWaves: 0,
+        nonOpeningWaves: 0,
+        centerBlockedWaves: 0,
+        nonOpeningCenterBlockedWaves: 0,
+        blockedLaneSum: 0,
+        repeatedPatternCount: 0,
+        hardWaveCount: 0,
+        recoveryWaveCount: 0,
+        meaningfulWaveCount: 0,
+        rampUsefulCount: 0,
+        fairnessFailures: 0,
+        movementGapCount: 0,
+        movementGapSum: 0,
+        centerChallengeGapCount: 0,
+        centerChallengeGapSum: 0,
+        waveGapCount: 0,
+        waveGapSum: 0,
+        meaningfulWaveGapCount: 0,
+        meaningfulWaveGapSum: 0,
+        longestCenterSafeSeconds: 0,
+        longestWaveGapSeconds: 0,
+        longestMeaningfulWaveGapSeconds: 0,
+        longestActiveEmptySeconds: 0,
+        pressureBudgetSum: 0,
+        pressureCounts: { 0: 0, 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 },
+        waveCounts: {},
+        boostLaneCounts: Array(LANES).fill(0),
+        rampLaneCounts: Array(LANES).fill(0),
+        obstacleTypeCounts: {},
+        longestLaneSafeSeconds: Array(LANES).fill(0)
+      };
+    }
+
+    function mergeCountMap(target, source) {
+      Object.entries(source || {}).forEach(([key, value]) => {
+        target[key] = (target[key] || 0) + value;
+      });
+    }
+
+    function mergeLaneCounts(target, source) {
+      for (let i = 0; i < LANES; i += 1) {
+        target[i] += source?.[i] || 0;
+      }
+    }
+
+    function mergeDirectorStats(target, stats) {
+      target.totalWaves += stats.totalWaves;
+      target.nonOpeningWaves += stats.nonOpeningWaves;
+      target.centerBlockedWaves += stats.centerBlockedWaves;
+      target.nonOpeningCenterBlockedWaves += stats.nonOpeningCenterBlockedWaves;
+      target.blockedLaneSum += stats.blockedLaneSum;
+      target.repeatedPatternCount += stats.repeatedPatternCount;
+      target.hardWaveCount += stats.hardWaveCount;
+      target.recoveryWaveCount += stats.recoveryWaveCount;
+      target.meaningfulWaveCount += stats.meaningfulWaveCount;
+      target.rampUsefulCount += stats.rampUsefulCount;
+      target.fairnessFailures += stats.fairnessFailures;
+      target.movementGapCount += stats.movementGapCount;
+      target.movementGapSum += stats.movementGapSum;
+      target.centerChallengeGapCount += stats.centerChallengeGapCount;
+      target.centerChallengeGapSum += stats.centerChallengeGapSum;
+      target.waveGapCount += stats.waveGapCount;
+      target.waveGapSum += stats.waveGapSum;
+      target.meaningfulWaveGapCount += stats.meaningfulWaveGapCount;
+      target.meaningfulWaveGapSum += stats.meaningfulWaveGapSum;
+      target.longestCenterSafeSeconds = Math.max(target.longestCenterSafeSeconds, stats.longestCenterSafeSeconds);
+      target.longestWaveGapSeconds = Math.max(target.longestWaveGapSeconds, stats.longestWaveGapSeconds);
+      target.longestMeaningfulWaveGapSeconds = Math.max(target.longestMeaningfulWaveGapSeconds, stats.longestMeaningfulWaveGapSeconds);
+      target.longestActiveEmptySeconds = Math.max(target.longestActiveEmptySeconds, stats.longestActiveEmptySeconds);
+      target.pressureBudgetSum += stats.pressureBudgetSum;
+      mergeCountMap(target.pressureCounts, stats.pressureCounts);
+      mergeCountMap(target.waveCounts, stats.waveCounts);
+      mergeCountMap(target.obstacleTypeCounts, stats.obstacleTypeCounts);
+      mergeLaneCounts(target.boostLaneCounts, stats.boostLaneCounts);
+      mergeLaneCounts(target.rampLaneCounts, stats.rampLaneCounts);
+      for (let i = 0; i < LANES; i += 1) {
+        target.longestLaneSafeSeconds[i] = Math.max(target.longestLaneSafeSeconds[i], stats.longestLaneSafeSeconds?.[i] || 0);
+      }
+    }
+
+    function topCountList(counts, limit = 6) {
+      return Object.entries(counts || {})
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, limit)
+        .map(([name, count]) => ({ name, count }));
+    }
+
+    function finalizeDirectorStats(aggregate) {
+      const boostTotal = aggregate.boostLaneCounts.reduce((sum, count) => sum + count, 0);
+      const rampTotal = aggregate.rampLaneCounts.reduce((sum, count) => sum + count, 0);
+      return {
+        totalWaves: aggregate.totalWaves,
+        nonOpeningWaves: aggregate.nonOpeningWaves,
+        averageBlockedLanesPerWave: aggregate.totalWaves ? aggregate.blockedLaneSum / aggregate.totalWaves : 0,
+        centerBlockedPercent: aggregate.totalWaves ? aggregate.centerBlockedWaves / aggregate.totalWaves : 0,
+        nonOpeningCenterBlockedPercent: aggregate.nonOpeningWaves ? aggregate.nonOpeningCenterBlockedWaves / aggregate.nonOpeningWaves : 0,
+        longestCenterSafeSeconds: aggregate.longestCenterSafeSeconds,
+        averageDecisionGapSeconds: aggregate.movementGapCount ? aggregate.movementGapSum / aggregate.movementGapCount : null,
+        averageCenterChallengeGapSeconds: aggregate.centerChallengeGapCount ? aggregate.centerChallengeGapSum / aggregate.centerChallengeGapCount : null,
+        averageWaveGapSeconds: aggregate.waveGapCount ? aggregate.waveGapSum / aggregate.waveGapCount : null,
+        averageMeaningfulWaveGapSeconds: aggregate.meaningfulWaveGapCount ? aggregate.meaningfulWaveGapSum / aggregate.meaningfulWaveGapCount : null,
+        longestWaveGapSeconds: aggregate.longestWaveGapSeconds,
+        longestMeaningfulWaveGapSeconds: aggregate.longestMeaningfulWaveGapSeconds,
+        longestActiveEmptySeconds: aggregate.longestActiveEmptySeconds,
+        repeatedPatternPercent: aggregate.totalWaves ? aggregate.repeatedPatternCount / aggregate.totalWaves : 0,
+        hardWavePercent: aggregate.totalWaves ? aggregate.hardWaveCount / aggregate.totalWaves : 0,
+        recoveryWavePercent: aggregate.totalWaves ? aggregate.recoveryWaveCount / aggregate.totalWaves : 0,
+        meaningfulWavePercent: aggregate.totalWaves ? aggregate.meaningfulWaveCount / aggregate.totalWaves : 0,
+        rampUsefulPercent: aggregate.rampLaneCounts.reduce((sum, count) => sum + count, 0)
+          ? aggregate.rampUsefulCount / aggregate.rampLaneCounts.reduce((sum, count) => sum + count, 0)
+          : 0,
+        fairnessFailures: aggregate.fairnessFailures,
+        pressureCounts: { ...aggregate.pressureCounts },
+        boostLaneCounts: aggregate.boostLaneCounts.slice(),
+        rampLaneCounts: aggregate.rampLaneCounts.slice(),
+        boostLaneDistribution: aggregate.boostLaneCounts.map((count) => boostTotal ? count / boostTotal : 0),
+        rampLaneDistribution: aggregate.rampLaneCounts.map((count) => rampTotal ? count / rampTotal : 0),
+        topWaveCounts: topCountList(aggregate.waveCounts, 8),
+        topObstacleTypes: topCountList(aggregate.obstacleTypeCounts, 8),
+        averagePressureBudget: aggregate.totalWaves ? aggregate.pressureBudgetSum / aggregate.totalWaves : 0,
+        longestLaneSafeSeconds: aggregate.longestLaneSafeSeconds.slice()
+      };
+    }
 
     for (const speedClassId of speedClassIds) {
       const speedClass = getSpeedClassConfig(speedClassId);
@@ -3567,7 +5159,8 @@ class NeonRoadRally {
         minSameLaneSpacing: Infinity,
         spacingSum: 0,
         spacingSamples: 0,
-        pressureCounts: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 }
+        pressureCounts: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 },
+        director: createDirectorAggregate()
       };
 
       for (let runIndex = 0; runIndex < runsPerSpeedClass; runIndex += 1) {
@@ -3652,6 +5245,9 @@ class NeonRoadRally {
           }
         }
         preventedUnsafeSpawns += manager.preventedUnsafeSpawns;
+        const directorStats = manager.director.getSimulationStats();
+        mergeDirectorStats(directorTotals, directorStats);
+        mergeDirectorStats(perSpeedClass[speedClassId].director, directorStats);
         completedRuns += 1;
 
         if (completedRuns > 0 && completedRuns % 25 === 0) {
@@ -3673,6 +5269,46 @@ class NeonRoadRally {
     });
     const fourLaneRare = pressureSamples > 0 && frequencies[4].pressurePercent < 0.08;
     const twoThreeCommon = pressureCounts[2] + pressureCounts[3] >= pressureCounts[1];
+    const director = finalizeDirectorStats(directorTotals);
+
+    Object.values(perSpeedClass).forEach((item) => {
+      item.averageSpacing = item.spacingSamples ? item.spacingSum / item.spacingSamples : null;
+      item.minSameLaneSpacing = Number.isFinite(item.minSameLaneSpacing) ? item.minSameLaneSpacing : null;
+      item.director = finalizeDirectorStats(item.director);
+      delete item.spacingSum;
+      delete item.spacingSamples;
+    });
+
+    const modeIntensityChecks = {
+      sundayPlayable: true,
+      arcadeNoDeadAir: true,
+      proTurboThreeLaneFrequent: true,
+      centerNotSafeLong: true
+    };
+    for (const id of speedClassIds) {
+      const item = perSpeedClass[id];
+      const stats = item.director;
+      const wavePressureTotal = Math.max(1, (stats.pressureCounts[1] || 0) + (stats.pressureCounts[2] || 0) + (stats.pressureCounts[3] || 0) + (stats.pressureCounts[4] || 0));
+      const highPressurePercent = ((stats.pressureCounts[3] || 0) + (stats.pressureCounts[4] || 0)) / wavePressureTotal;
+      item.highPressurePercent = highPressurePercent;
+      if (id === "arcade") {
+        modeIntensityChecks.arcadeNoDeadAir = (stats.averageMeaningfulWaveGapSeconds || Infinity) <= 2.15
+          && stats.longestActiveEmptySeconds <= 4.8;
+      }
+      if (id === "pro" || id === "turbo") {
+        const target = id === "turbo" ? 0.28 : 0.22;
+        modeIntensityChecks.proTurboThreeLaneFrequent = modeIntensityChecks.proTurboThreeLaneFrequent && highPressurePercent >= target;
+      }
+      const centerLimit = id === "turbo" ? 4.2 : (id === "pro" ? 5.2 : (id === "arcade" ? 7.2 : 10.5));
+      modeIntensityChecks.centerNotSafeLong = modeIntensityChecks.centerNotSafeLong
+        && (stats.averageCenterChallengeGapSeconds === null || stats.averageCenterChallengeGapSeconds <= centerLimit);
+    }
+
+    const directorTwoThreeCommon = (director.pressureCounts[2] || 0) + (director.pressureCounts[3] || 0) >= (director.pressureCounts[1] || 0);
+    const centerChallengedRegularly = director.nonOpeningCenterBlockedPercent >= 0.36;
+    const boostNotMostlyCenter = (director.boostLaneDistribution[TRACK_DIRECTOR.centerLane] || 0) <= 0.34;
+    const repeatedPatternsControlled = director.repeatedPatternPercent <= 0.18;
+    const directorFairnessPassed = director.fairnessFailures === 0;
     const pass = invalidWalls === 0
       && maxBlocked <= 4
       && sameLaneOverlaps === 0
@@ -3680,14 +5316,16 @@ class NeonRoadRally {
       && rampObjectOverlaps === 0
       && pressureCounts[4] > 0
       && fourLaneRare
-      && twoThreeCommon;
-
-    Object.values(perSpeedClass).forEach((item) => {
-      item.averageSpacing = item.spacingSamples ? item.spacingSum / item.spacingSamples : null;
-      item.minSameLaneSpacing = Number.isFinite(item.minSameLaneSpacing) ? item.minSameLaneSpacing : null;
-      delete item.spacingSum;
-      delete item.spacingSamples;
-    });
+      && twoThreeCommon
+      && directorTwoThreeCommon
+      && centerChallengedRegularly
+      && boostNotMostlyCenter
+      && repeatedPatternsControlled
+      && directorFairnessPassed
+      && modeIntensityChecks.sundayPlayable
+      && modeIntensityChecks.arcadeNoDeadAir
+      && modeIntensityChecks.proTurboThreeLaneFrequent
+      && modeIntensityChecks.centerNotSafeLong;
 
     return {
       runs,
@@ -3710,6 +5348,7 @@ class NeonRoadRally {
       runsPerSpeedClass,
       speedClassIds,
       perSpeedClass,
+      director,
       pass,
       passDetails: {
         zeroFiveLaneWalls: invalidWalls === 0,
@@ -3719,7 +5358,13 @@ class NeonRoadRally {
         maxAtMostFour: maxBlocked <= 4,
         fourLaneExists: pressureCounts[4] > 0,
         fourLaneRare,
-        twoThreeCommon
+        twoThreeCommon,
+        directorTwoThreeCommon,
+        centerChallengedRegularly,
+        boostNotMostlyCenter,
+        repeatedPatternsControlled,
+        directorFairnessPassed,
+        ...modeIntensityChecks
       }
     };
   }
@@ -3792,13 +5437,27 @@ class NeonRoadRally {
       `;
     };
     const worst = summary.worstPressure;
+    const fmtPercent = (value) => Number.isFinite(value) ? `${(value * 100).toFixed(1)}%` : "n/a";
+    const fmtSeconds = (value) => Number.isFinite(value) ? `${value.toFixed(1)}s` : "n/a";
     const speedClassSummary = (summary.speedClassIds || []).map((id) => {
       const item = summary.perSpeedClass[id];
       const minSpacing = item.minSameLaneSpacing === null ? "n/a" : `${Math.round(item.minSameLaneSpacing)}`;
-      return `${item.label}: ${item.invalidWalls} walls, ${item.sameLaneOverlaps} overlaps, max ${item.maxBlocked}, min gap ${minSpacing}`;
+      const centerPercent = item.director ? `${(item.director.nonOpeningCenterBlockedPercent * 100).toFixed(0)}% center` : "center n/a";
+      const gap = item.director?.averageMeaningfulWaveGapSeconds;
+      const highPressure = Number.isFinite(item.highPressurePercent) ? `${(item.highPressurePercent * 100).toFixed(0)}% 3/4-lane` : "3/4 n/a";
+      return `${item.label}: ${item.invalidWalls} walls, ${item.sameLaneOverlaps} overlaps, max ${item.maxBlocked}, min gap ${minSpacing}, ${centerPercent}, ${fmtSeconds(gap)} meaningful, ${highPressure}`;
     }).join(" · ");
     const averageSpacing = summary.averageObjectSpacing === null ? "n/a" : Math.round(summary.averageObjectSpacing).toLocaleString();
     const minSpacing = summary.minSameLaneSpacing === null ? "n/a" : Math.round(summary.minSameLaneSpacing).toLocaleString();
+    const director = summary.director || {};
+    const laneDistribution = (counts = [], distribution = []) => counts
+      .map((count, lane) => `L${lane + 1} ${count.toLocaleString()} (${fmtPercent(distribution[lane] || 0)})`)
+      .join(" · ");
+    const topList = (items = []) => items.map((item) => `${item.name} ${item.count.toLocaleString()}`).join(" · ") || "none";
+    const directorPressure = [1, 2, 3, 4].map((blocked) => {
+      const count = director.pressureCounts?.[blocked] || 0;
+      return `${blocked}-lane ${count.toLocaleString()}`;
+    }).join(" · ");
     const overlapSummary = (summary.overlapExamples || []).length
       ? (summary.overlapExamples || []).slice(0, 4).map((example) => {
         const pairs = example.overlaps.map((overlap) => {
@@ -3832,15 +5491,30 @@ class NeonRoadRally {
           <div class="score-card"><strong>Avg Same-Lane Gap</strong><span>${averageSpacing}</span></div>
           <div class="score-card"><strong>Min Same-Lane Gap</strong><span>${minSpacing}</span></div>
           <div class="score-card"><strong>Prevented Spawns</strong><span>${summary.preventedUnsafeSpawns.toLocaleString()}</span></div>
+          <div class="score-card"><strong>Director Waves</strong><span>${(director.totalWaves || 0).toLocaleString()}</span></div>
+          <div class="score-card"><strong>Avg Wave Pressure</strong><span>${Number.isFinite(director.averageBlockedLanesPerWave) ? director.averageBlockedLanesPerWave.toFixed(2) : "n/a"}</span></div>
+          <div class="score-card"><strong>Center Challenged</strong><span>${fmtPercent(director.nonOpeningCenterBlockedPercent)}</span></div>
+          <div class="score-card"><strong>Longest Center Safe</strong><span>${fmtSeconds(director.longestCenterSafeSeconds)}</span></div>
+          <div class="score-card"><strong>Decision Gap</strong><span>${fmtSeconds(director.averageDecisionGapSeconds)}</span></div>
+          <div class="score-card"><strong>Meaningful Gap</strong><span>${fmtSeconds(director.averageMeaningfulWaveGapSeconds)}</span></div>
+          <div class="score-card"><strong>Longest Empty</strong><span>${fmtSeconds(director.longestActiveEmptySeconds)}</span></div>
+          <div class="score-card"><strong>Longest Wave Gap</strong><span>${fmtSeconds(director.longestMeaningfulWaveGapSeconds)}</span></div>
+          <div class="score-card"><strong>Useful Ramps</strong><span>${fmtPercent(director.rampUsefulPercent)}</span></div>
+          <div class="score-card"><strong>Repeat Patterns</strong><span>${fmtPercent(director.repeatedPatternPercent)}</span></div>
           <div class="score-card"><strong>Seed</strong><span>${escapeHtml(summary.seed)}</span></div>
         </div>
         <p class="hint">
           Worst pressure: ${worst ? `${worst.maxBlocked} lanes at run ${worst.runIndex}, distance ${worst.distance}, y ${worst.sliceY}, lanes ${worst.lanes.join(", ")}` : "none"}.
         </p>
         <p class="hint">${escapeHtml(speedClassSummary)}</p>
+        <p class="hint">Director pressure: ${escapeHtml(directorPressure)}.</p>
+        <p class="hint">Boost lanes: ${escapeHtml(laneDistribution(director.boostLaneCounts, director.boostLaneDistribution))}</p>
+        <p class="hint">Ramp lanes: ${escapeHtml(laneDistribution(director.rampLaneCounts, director.rampLaneDistribution))}</p>
+        <p class="hint">Top waves: ${escapeHtml(topList(director.topWaveCounts))}</p>
+        <p class="hint">Obstacle mix: ${escapeHtml(topList(director.topObstacleTypes))}</p>
         <p class="hint">Overlap examples: ${escapeHtml(overlapSummary)}</p>
         <p class="hint">
-          Checks: zero 5-lane walls ${summary.passDetails.zeroFiveLaneWalls ? "yes" : "no"} · zero overlaps ${summary.passDetails.zeroSameLaneOverlaps ? "yes" : "no"} · zero boost overlaps ${summary.passDetails.zeroBoostOverlaps ? "yes" : "no"} · zero ramp overlaps ${summary.passDetails.zeroRampOverlaps ? "yes" : "no"} · 4-lane rare ${summary.passDetails.fourLaneRare ? "yes" : "no"} · 2/3 common ${summary.passDetails.twoThreeCommon ? "yes" : "no"}.
+          Checks: zero 5-lane walls ${summary.passDetails.zeroFiveLaneWalls ? "yes" : "no"} · zero overlaps ${summary.passDetails.zeroSameLaneOverlaps ? "yes" : "no"} · zero boost overlaps ${summary.passDetails.zeroBoostOverlaps ? "yes" : "no"} · zero ramp overlaps ${summary.passDetails.zeroRampOverlaps ? "yes" : "no"} · 4-lane rare ${summary.passDetails.fourLaneRare ? "yes" : "no"} · 2/3 common ${summary.passDetails.twoThreeCommon ? "yes" : "no"} · center challenged ${summary.passDetails.centerChallengedRegularly ? "yes" : "no"} · boosts distributed ${summary.passDetails.boostNotMostlyCenter ? "yes" : "no"} · no Arcade dead air ${summary.passDetails.arcadeNoDeadAir ? "yes" : "no"} · Pro/Turbo pressure ${summary.passDetails.proTurboThreeLaneFrequent ? "yes" : "no"} · pattern repeats controlled ${summary.passDetails.repeatedPatternsControlled ? "yes" : "no"}.
         </p>
         <div class="row" style="margin-top:16px">
           <button class="small-button" data-action="runSimulation">Run Again</button>
@@ -3872,6 +5546,22 @@ class NeonRoadRally {
     } else {
       this.clearLayer();
       this.audio.playMusic("race", false);
+    }
+  }
+
+  adjustDebugSpeedScale(delta) {
+    this.debugSpeedScale = clamp(Math.round(((this.debugSpeedScale || 1) + delta) * 100) / 100, 0.5, 2.5);
+    if (this.run) {
+      this.run.debugSpeedScale = this.debugSpeedScale;
+      this.run.speedCap = this.run.track.maxSpeed * SPEED_TUNING.maxBoostOverrunMultiplier * this.debugSpeedScale;
+    }
+  }
+
+  resetDebugSpeedScale() {
+    this.debugSpeedScale = 1;
+    if (this.run) {
+      this.run.debugSpeedScale = 1;
+      this.run.speedCap = this.run.track.maxSpeed * SPEED_TUNING.maxBoostOverrunMultiplier;
     }
   }
 
@@ -4036,6 +5726,15 @@ class NeonRoadRally {
       const el = document.getElementById(id);
       if (el) el.addEventListener("input", updatePreview);
     });
+    ["bodyStyle", "useSprite"].forEach((id) => {
+      const el = document.getElementById(id);
+      if (el) {
+        el.addEventListener("change", () => {
+          this.audio.activate();
+          this.audio.playSfx("menu");
+        });
+      }
+    });
     updatePreview();
   }
 
@@ -4150,6 +5849,7 @@ class NeonRoadRally {
           <div class="score-card"><strong>Driving</strong><span>Clean ${formatScore(summary.bonuses.clean)} · Near Miss ${formatScore(summary.bonuses.nearMiss)} · Penalties -${formatScore(summary.penalties)}</span></div>
           <div class="score-card"><strong>Player Best</strong><span>${formatScore(summary.bestScore)}</span></div>
           <div class="score-card"><strong>Progress</strong><span>${Math.round(summary.progress * 100)}%</span></div>
+          <div class="score-card"><strong>Save Status</strong><span>${summary.scoreSaved ? "Saved" : `Debug speed x${summary.debugSpeedScale.toFixed(2)} - not saved`}</span></div>
         </div>
         <div class="row" style="margin:18px 0">
           <button class="small-button" data-action="restart">Restart</button>
@@ -4173,6 +5873,9 @@ class NeonRoadRally {
     `;
     this.bindLayerButtons();
     this.animateScoreTally(summary.finalScore);
+    if (summary.newHighScore) {
+      this.audio.playSfx("newHighScore");
+    }
   }
 
   animateScoreTally(finalScore) {
