@@ -28,8 +28,8 @@ Recommended first demo path:
 
 1. Choose or create a player.
 2. Customize or select a car.
-3. Run Solo / Seeded Run on Arcade with the generated seed.
-4. Run Solo / Seeded Run on Turbo with a manual seed.
+3. Run Solo / Seeded Run in Classic on Arcade with the generated seed.
+4. Run Solo / Seeded Run in Fuel Run with a manual seed.
 5. Open Challenge Mode and play First Run or Turbo Dare.
 6. Open Party Mode with 2 players, then try Rematch Same Seed and Rematch New Seed.
 7. Show Leaderboard, Settings/audio mute, and fullscreen.
@@ -38,7 +38,9 @@ To clear local test data, open Leaderboard, choose `Reset Local Data`, and accep
 
 Audio files live in `audio/`. Player car sprites live in `assets/cars/`, and traffic sprites live in `assets/traffic/`.
 
-Known demo limitations: Sunset Highway is the only track, Party Mode is pass-the-keyboard only, saves are browser-local, and there are no Fuel Run, online, account, or cloud-save features.
+Known demo limitations: Sunset Highway is the only track, Party Mode is pass-the-keyboard only, saves are browser-local, and there are no online, account, cloud-save, payment, upload, chat, or backend API features.
+
+For public static-hosting safety checks, see `WEB_DEMO_CHECKLIST.md`.
 
 ## Controls
 
@@ -136,6 +138,26 @@ It saves:
 
 If save data is missing or corrupted, the game falls back to a clean local save state. `Reset Local Data` is available from the leaderboard and requires browser confirmation.
 
+Local player names are capped to 20 characters, local car names are capped to 24 characters, manual road seeds normalize to uppercase seed text capped at 32 characters, and the local leaderboard is capped to Top 20 entries.
+
+## Website Demo Safety
+
+The current build is safe to host as static files when served with the local assets in this repo. It does not use external scripts, analytics, CDN dependencies, backend/API calls, file uploads, accounts, cloud saves, or payment flows.
+
+Suggested starting CSP for future deployment:
+
+```http
+Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; media-src 'self'; connect-src 'self';
+```
+
+If inline styles are avoided later, the style policy can be tightened.
+
+Privacy note: profiles, settings, challenge progress, and scores are stored locally in this browser only. Clearing browser data may erase progress. A future global leaderboard should be optional and should submit only a constrained racer tag plus score metadata, not local player names.
+
+Future public racer tags should use exactly 3 uppercase letters followed by 2 numbers, for example `AAA01`, `JDX77`, `SUN08`, or `DAD01`, validated by `/^[A-Z]{3}[0-9]{2}$/`. Do not submit free-form local player names to a future global leaderboard.
+
+Mobile status: desktop/laptop keyboard play is primary. iPad with a keyboard may work. Touch controls are not implemented yet, and phone portrait is not supported or recommended.
+
 ## Audio Files
 
 Audio is optional, but the show build expects these files in `audio/`:
@@ -203,8 +225,8 @@ The Road Director simulation checks deterministic runs across race modes and rep
 ## Known Limitations
 
 - The current show build has one track: Sunset Highway.
-- There is no Fuel Run mode.
 - There are no online features, accounts, or cloud saves.
 - Saves are local to the current browser.
 - Party Mode is pass-the-keyboard only.
+- Touch controls are not implemented yet.
 - Debug gameplay uses F for the finish-line shortcut, so fullscreen F is disabled during debug gameplay.

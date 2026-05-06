@@ -11,6 +11,15 @@
 // ---------------------------------------------------------------------------
 
 const STORAGE_KEY = "neonRoadRally.v1";
+const LOCAL_PLAYER_NAME_MAX_LENGTH = 20;
+const LOCAL_CAR_NAME_MAX_LENGTH = 24;
+const ROAD_SEED_MAX_LENGTH = 32;
+const DISPLAY_TEXT_MAX_LENGTH = 48;
+const STORAGE_ID_MAX_LENGTH = 64;
+const LOCAL_PLAYER_MAX_COUNT = 16;
+const LEADERBOARD_MAX_ENTRIES = 20;
+const LEADERBOARD_IMPORT_SCAN_LIMIT = 200;
+const MAX_DISPLAY_SCORE = 999999999;
 const LANES = 5;
 const VIEW_DISTANCE = 1700;
 const PLAYER_START_Y_RATIO = 0.82;
@@ -771,9 +780,76 @@ function uid() {
   return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
-function sanitizeName(value, fallback) {
-  const clean = String(value || "").trim().replace(/\s+/g, " ").slice(0, 24);
+function truncateCharacters(value, maxLength) {
+  return Array.from(String(value ?? "")).slice(0, Math.max(0, maxLength)).join("");
+}
+
+function sanitizeDisplayText(value, fallback = "", maxLength = DISPLAY_TEXT_MAX_LENGTH) {
+  const source = String(value ?? "");
+  const normalized = typeof source.normalize === "function" ? source.normalize("NFKC") : source;
+  const clean = normalized
+    .replace(/<[^>]*>/g, " ")
+    .replace(/[<>]/g, "")
+    .replace(/[\u0000-\u001f\u007f-\u009f\u202a-\u202e\u2066-\u2069]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  const capped = truncateCharacters(clean, maxLength).trim();
+  return capped || fallback;
+}
+
+function sanitizeName(value, fallback, maxLength = DISPLAY_TEXT_MAX_LENGTH) {
+  return sanitizeDisplayText(value, fallback, maxLength);
+}
+
+function sanitizePlayerName(value, fallback = "PLAYER") {
+  return sanitizeDisplayText(value, fallback, LOCAL_PLAYER_NAME_MAX_LENGTH);
+}
+
+function sanitizeCarName(value, fallback = DEFAULT_CAR.name) {
+  return sanitizeDisplayText(value, fallback, LOCAL_CAR_NAME_MAX_LENGTH);
+}
+
+function normalizeStorageId(value, fallback = "") {
+  const clean = sanitizeDisplayText(value, "", STORAGE_ID_MAX_LENGTH)
+    .replace(/[^a-zA-Z0-9_-]/g, "");
   return clean || fallback;
+}
+
+function normalizeHexColor(value, fallback) {
+  const clean = String(value ?? "").trim();
+  return /^#[0-9a-fA-F]{6}$/.test(clean) ? clean.toLowerCase() : fallback;
+}
+
+function normalizeNonNegativeInteger(value, fallback = 0, max = MAX_DISPLAY_SCORE) {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return fallback;
+  return clamp(Math.round(numeric), 0, max);
+}
+
+function normalizeNonNegativeNumber(value, fallback = 0, max = Number.MAX_SAFE_INTEGER) {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return fallback;
+  return clamp(numeric, 0, max);
+}
+
+function normalizeDateString(value, fallback = "") {
+  const clean = sanitizeDisplayText(value, "", 40);
+  const time = clean ? Date.parse(clean) : NaN;
+  return Number.isFinite(time) ? new Date(time).toISOString() : fallback;
+}
+
+function normalizeCarConfig(value, fallback = DEFAULT_CAR) {
+  const source = value && typeof value === "object" ? value : {};
+  const fallbackCar = { ...DEFAULT_CAR, ...(fallback && typeof fallback === "object" ? fallback : {}) };
+  const style = CAR_BODY_STYLES.some((item) => item.id === source.bodyStyle) ? source.bodyStyle : fallbackCar.bodyStyle;
+  return {
+    name: sanitizeCarName(source.name, fallbackCar.name),
+    bodyColor: normalizeHexColor(source.bodyColor, fallbackCar.bodyColor),
+    stripeColor: normalizeHexColor(source.stripeColor, fallbackCar.stripeColor),
+    windowColor: normalizeHexColor(source.windowColor, fallbackCar.windowColor),
+    bodyStyle: style,
+    useSprite: source.useSprite !== false
+  };
 }
 
 function normalizeRoadSeed(value, fallback = "") {
@@ -783,7 +859,7 @@ function normalizeRoadSeed(value, fallback = "") {
     .replace(/[^A-Z0-9]+/g, "-")
     .replace(/-+/g, "-")
     .replace(/^-|-$/g, "")
-    .slice(0, 32)
+    .slice(0, ROAD_SEED_MAX_LENGTH)
     .replace(/-$/g, "");
   return clean || fallback;
 }
@@ -815,7 +891,7 @@ function getRunRandomSeedSource(seed, track, speedClassId, raceTypeId = DEFAULT_
 }
 
 function formatScore(value) {
-  return Math.max(0, Math.round(value)).toLocaleString();
+  return normalizeNonNegativeInteger(value).toLocaleString();
 }
 
 function normalizeRunStatus(value) {
@@ -855,7 +931,7 @@ function formatSignedScore(value) {
 }
 
 function formatTime(seconds) {
-  const whole = Math.max(0, Math.floor(seconds));
+  const whole = Math.floor(normalizeNonNegativeNumber(seconds, 0, 24 * 60 * 60));
   const mins = Math.floor(whole / 60);
   const secs = whole % 60;
   return `${mins}:${String(secs).padStart(2, "0")}`;
@@ -875,6 +951,32 @@ function safeJsonParse(raw) {
   }
 }
 
+function safeStorageGetItem(key) {
+  try {
+    return localStorage.getItem(key);
+  } catch (error) {
+    return null;
+  }
+}
+
+function safeStorageSetItem(key, value) {
+  try {
+    localStorage.setItem(key, value);
+    return true;
+  } catch (error) {
+    return false;
+  }
+}
+
+function safeStorageRemoveItem(key) {
+  try {
+    localStorage.removeItem(key);
+    return true;
+  } catch (error) {
+    return false;
+  }
+}
+
 function createDefaultChallengeSave() {
   return {
     version: CHALLENGE_SAVE_VERSION,
@@ -885,30 +987,33 @@ function createDefaultChallengeSave() {
 function normalizeChallengeRunSummary(summary) {
   if (!summary || typeof summary !== "object") return null;
   return {
-    status: summary.status === "finished" ? "finished" : "crashed",
-    score: Math.max(0, Math.round(Number.isFinite(summary.score) ? summary.score : summary.finalScore || 0)),
+    status: normalizeRunStatus(summary.status),
+    score: normalizeNonNegativeInteger(Number.isFinite(Number(summary.score)) ? summary.score : summary.finalScore || 0),
     raceType: normalizeRaceTypeId(summary.raceType || summary.raceTypeId, DEFAULT_RACE_TYPE_ID),
     raceMode: normalizeSpeedClassId(summary.raceMode || summary.speedClass, DEFAULT_SPEED_CLASS_ID),
     seed: normalizeStoredRoadSeed(summary.seed, ""),
-    time: Number.isFinite(summary.time) ? Math.max(0, summary.time) : 0,
-    slowdownHits: Math.max(0, Math.round(Number.isFinite(summary.slowdownHits) ? summary.slowdownHits : 0)),
-    nearMisses: Math.max(0, Math.round(Number.isFinite(summary.nearMisses) ? summary.nearMisses : 0)),
-    manualBoostsUsed: Math.max(0, Math.round(Number.isFinite(summary.manualBoostsUsed) ? summary.manualBoostsUsed : 0)),
+    time: normalizeNonNegativeNumber(summary.time, 0, 24 * 60 * 60),
+    slowdownHits: normalizeNonNegativeInteger(summary.slowdownHits, 0, 999),
+    nearMisses: normalizeNonNegativeInteger(summary.nearMisses, 0, 999),
+    manualBoostsUsed: normalizeNonNegativeInteger(summary.manualBoostsUsed, 0, 99),
     medalsEarned: Array.isArray(summary.medalsEarned || summary.medals)
-      ? (summary.medalsEarned || summary.medals).map((medal) => String(medal?.title || medal)).filter(Boolean).slice(0, 5)
+      ? (summary.medalsEarned || summary.medals)
+        .map((medal) => sanitizeName(medal?.title || medal, "", DISPLAY_TEXT_MAX_LENGTH))
+        .filter(Boolean)
+        .slice(0, 5)
       : []
   };
 }
 
 function normalizeChallengeProgressEntry(entry, challengeId) {
   if (!entry || typeof entry !== "object") return null;
-  const bestScore = Number.isFinite(entry.bestScore) ? entry.bestScore : entry.score;
+  const bestScore = Number.isFinite(Number(entry.bestScore)) ? entry.bestScore : entry.score;
   return {
-    challengeId: String(entry.challengeId || challengeId || ""),
+    challengeId: normalizeStorageId(entry.challengeId || challengeId || "", challengeId || ""),
     completed: Boolean(entry.completed || entry.bestCompletionStatus),
     bestCompletionStatus: Boolean(entry.completed || entry.bestCompletionStatus),
-    bestScore: Math.max(0, Math.round(Number.isFinite(bestScore) ? bestScore : 0)),
-    bestDate: String(entry.bestDate || entry.date || ""),
+    bestScore: normalizeNonNegativeInteger(bestScore),
+    bestDate: normalizeDateString(entry.bestDate || entry.date, ""),
     bestRunSummary: normalizeChallengeRunSummary(entry.bestRunSummary || entry.runSummary || entry.summary)
   };
 }
@@ -931,6 +1036,44 @@ function normalizeChallengeSave(value) {
     version: CHALLENGE_SAVE_VERSION,
     progress
   };
+}
+
+function normalizeLeaderboardEntry(entry) {
+  if (!entry || typeof entry !== "object" || !Number.isFinite(Number(entry.score))) return null;
+  const speedClass = normalizeSpeedClassId(entry.speedClass || entry.raceMode, DEFAULT_SPEED_CLASS_ID);
+  const raceType = normalizeRaceTypeId(entry.raceType || entry.raceTypeId, DEFAULT_RACE_TYPE_ID);
+  const challenge = getChallengeById(entry.challengeId);
+  const challengeId = challenge ? challenge.id : "";
+  return {
+    playerName: sanitizePlayerName(entry.playerName, "PLAYER"),
+    playerId: normalizeStorageId(entry.playerId, ""),
+    carName: sanitizeCarName(entry.carName, "CAR"),
+    trackName: sanitizeName(entry.trackName, "TRACK", DISPLAY_TEXT_MAX_LENGTH),
+    speedClass,
+    raceMode: normalizeSpeedClassId(entry.raceMode || speedClass, speedClass),
+    raceType,
+    seed: normalizeStoredRoadSeed(entry.seed, CLASSIC_SEED_LABEL),
+    score: normalizeNonNegativeInteger(entry.score),
+    status: normalizeRunStatus(entry.status),
+    time: normalizeNonNegativeNumber(entry.time, 0, 24 * 60 * 60),
+    fuelCollected: normalizeNonNegativeInteger(Number.isFinite(Number(entry.fuelCollected)) ? entry.fuelCollected : entry.gasCansCollected || 0, 0, 999),
+    fuelRemaining: normalizeNonNegativeInteger(entry.fuelRemaining, 0, FUEL_RUN_CONFIG.fuelMax),
+    fuelBonus: normalizeNonNegativeInteger(entry.fuelBonus),
+    date: normalizeDateString(entry.date, ""),
+    partyMode: Boolean(entry.partyMode),
+    challengeId,
+    challengeName: challengeId ? sanitizeName(entry.challengeName || challenge?.name, challenge?.name || "Challenge", DISPLAY_TEXT_MAX_LENGTH) : ""
+  };
+}
+
+function normalizeLeaderboardList(value) {
+  if (!Array.isArray(value)) return [];
+  return value
+    .slice(0, LEADERBOARD_IMPORT_SCAN_LIMIT)
+    .map((entry) => normalizeLeaderboardEntry(entry))
+    .filter(Boolean)
+    .sort((a, b) => b.score - a.score)
+    .slice(0, LEADERBOARD_MAX_ENTRIES);
 }
 
 function getChallengeRunStats(summary) {
@@ -1231,53 +1374,33 @@ class PlayerProfileManager {
   }
 
   load() {
-    const parsed = safeJsonParse(localStorage.getItem(this.storageKey));
+    const rawSave = safeStorageGetItem(this.storageKey);
+    const parsed = safeJsonParse(rawSave);
     if (!parsed || typeof parsed !== "object") {
-      this.saveStatus = parsed === null && localStorage.getItem(this.storageKey) ? "Recovered from corrupted save" : "No save found";
+      this.saveStatus = parsed === null && rawSave ? "Recovered from corrupted save" : "No save found";
       return this.defaultData();
     }
 
     const fallback = this.defaultData();
-    const players = Array.isArray(parsed.players) ? parsed.players.map((player, index) => ({
-      id: String(player.id || uid()),
-      name: sanitizeName(player.name, `PLAYER ${index + 1}`),
-      car: {
-        ...DEFAULT_CAR,
-        ...(player.car && typeof player.car === "object" ? player.car : {})
-      },
-      bestScore: Number.isFinite(player.bestScore) ? Math.max(0, Math.round(player.bestScore)) : 0
-    })) : [];
-
-    const leaderboard = Array.isArray(parsed.leaderboard) ? parsed.leaderboard
-      .filter((entry) => entry && Number.isFinite(entry.score))
-      .map((entry) => {
-        const speedClass = normalizeSpeedClassId(entry.speedClass || entry.raceMode, DEFAULT_SPEED_CLASS_ID);
-        const raceType = normalizeRaceTypeId(entry.raceType || entry.raceTypeId, DEFAULT_RACE_TYPE_ID);
-        const challenge = getChallengeById(entry.challengeId);
-        const challengeId = challenge ? challenge.id : (entry.challengeId ? String(entry.challengeId) : "");
+    const seenPlayerIds = new Set();
+    const players = Array.isArray(parsed.players) ? parsed.players
+      .slice(0, LOCAL_PLAYER_MAX_COUNT)
+      .map((player, index) => {
+        const id = normalizeStorageId(player?.id, uid());
         return {
-          playerName: sanitizeName(entry.playerName, "PLAYER"),
-          playerId: entry.playerId ? String(entry.playerId) : "",
-          carName: sanitizeName(entry.carName, "CAR"),
-          trackName: sanitizeName(entry.trackName, "TRACK"),
-          speedClass,
-          raceMode: normalizeSpeedClassId(entry.raceMode || speedClass, speedClass),
-          raceType,
-          seed: normalizeStoredRoadSeed(entry.seed, CLASSIC_SEED_LABEL),
-          score: Math.max(0, Math.round(entry.score)),
-          status: normalizeRunStatus(entry.status),
-          time: Number.isFinite(entry.time) ? Math.max(0, entry.time) : 0,
-          fuelCollected: Math.max(0, Math.round(Number.isFinite(entry.fuelCollected) ? entry.fuelCollected : entry.gasCansCollected || 0)),
-          fuelRemaining: Math.max(0, Math.round(Number.isFinite(entry.fuelRemaining) ? entry.fuelRemaining : 0)),
-          fuelBonus: Math.max(0, Math.round(Number.isFinite(entry.fuelBonus) ? entry.fuelBonus : 0)),
-          date: String(entry.date || new Date().toISOString()),
-          partyMode: Boolean(entry.partyMode),
-          challengeId,
-          challengeName: challengeId ? sanitizeName(entry.challengeName || challenge?.name, challenge?.name || "Challenge") : ""
+          id,
+          name: sanitizePlayerName(player?.name, `PLAYER ${index + 1}`),
+          car: normalizeCarConfig(player?.car),
+          bestScore: normalizeNonNegativeInteger(player?.bestScore)
         };
       })
-      .sort((a, b) => b.score - a.score)
-      .slice(0, 20) : [];
+      .filter((player) => {
+        if (seenPlayerIds.has(player.id)) return false;
+        seenPlayerIds.add(player.id);
+        return true;
+      }) : [];
+
+    const leaderboard = normalizeLeaderboardList(parsed.leaderboard);
 
     const audio = {
       ...fallback.audio,
@@ -1288,8 +1411,9 @@ class PlayerProfileManager {
     audio.musicMuted = Boolean(audio.musicMuted);
     audio.sfxMuted = Boolean(audio.sfxMuted);
 
-    const currentPlayerId = players.some((player) => player.id === parsed.currentPlayerId)
-      ? parsed.currentPlayerId
+    const storedCurrentPlayerId = normalizeStorageId(parsed.currentPlayerId, "");
+    const currentPlayerId = players.some((player) => player.id === storedCurrentPlayerId)
+      ? storedCurrentPlayerId
       : (players[0] ? players[0].id : null);
 
     this.saveStatus = "Save loaded";
@@ -1305,18 +1429,16 @@ class PlayerProfileManager {
   }
 
   save() {
-    try {
-      localStorage.setItem(this.storageKey, JSON.stringify(this.data));
+    if (safeStorageSetItem(this.storageKey, JSON.stringify(this.data))) {
       this.saveStatus = `Saved ${new Date().toLocaleTimeString()}`;
       return true;
-    } catch (error) {
-      this.saveStatus = "Save failed";
-      return false;
     }
+    this.saveStatus = "Save failed";
+    return false;
   }
 
   resetAll() {
-    localStorage.removeItem(this.storageKey);
+    safeStorageRemoveItem(this.storageKey);
     this.data = this.defaultData();
     this.saveStatus = "Local data reset";
   }
@@ -1340,9 +1462,13 @@ class PlayerProfileManager {
   }
 
   createPlayer(name) {
+    if (this.data.players.length >= LOCAL_PLAYER_MAX_COUNT) {
+      this.saveStatus = `Local player limit reached (${LOCAL_PLAYER_MAX_COUNT})`;
+      return null;
+    }
     const player = {
       id: uid(),
-      name: sanitizeName(name, "PLAYER"),
+      name: sanitizePlayerName(name, "PLAYER"),
       car: { ...DEFAULT_CAR },
       bestScore: 0
     };
@@ -1364,14 +1490,7 @@ class PlayerProfileManager {
   updateCurrentCar(carConfig) {
     const player = this.getCurrentPlayer();
     if (!player) return false;
-    player.car = {
-      name: sanitizeName(carConfig.name, DEFAULT_CAR.name),
-      bodyColor: carConfig.bodyColor || DEFAULT_CAR.bodyColor,
-      stripeColor: carConfig.stripeColor || DEFAULT_CAR.stripeColor,
-      windowColor: carConfig.windowColor || DEFAULT_CAR.windowColor,
-      bodyStyle: CAR_BODY_STYLES.some((style) => style.id === carConfig.bodyStyle) ? carConfig.bodyStyle : DEFAULT_CAR.bodyStyle,
-      useSprite: carConfig.useSprite !== false
-    };
+    player.car = normalizeCarConfig(carConfig);
     this.save();
     return true;
   }
@@ -1392,33 +1511,14 @@ class PlayerProfileManager {
   }
 
   recordScore(entry) {
-    const speedClass = normalizeSpeedClassId(entry.speedClass || entry.raceMode, DEFAULT_SPEED_CLASS_ID);
-    const raceType = normalizeRaceTypeId(entry.raceType || entry.raceTypeId, DEFAULT_RACE_TYPE_ID);
-    const challenge = getChallengeById(entry.challengeId);
-    const challengeId = challenge ? challenge.id : (entry.challengeId ? String(entry.challengeId) : "");
-    const cleanEntry = {
-      playerName: sanitizeName(entry.playerName, "PLAYER"),
-      playerId: entry.playerId ? String(entry.playerId) : "",
-      carName: sanitizeName(entry.carName, "CAR"),
-      trackName: sanitizeName(entry.trackName, "TRACK"),
-      speedClass,
-      raceMode: normalizeSpeedClassId(entry.raceMode || speedClass, speedClass),
-      raceType,
-      seed: normalizeStoredRoadSeed(entry.seed, CLASSIC_SEED_LABEL),
-      score: Math.max(0, Math.round(entry.score)),
-      status: normalizeRunStatus(entry.status),
-      time: Number.isFinite(entry.time) ? Math.max(0, entry.time) : 0,
-      fuelCollected: Math.max(0, Math.round(Number.isFinite(entry.fuelCollected) ? entry.fuelCollected : entry.gasCansCollected || 0)),
-      fuelRemaining: Math.max(0, Math.round(Number.isFinite(entry.fuelRemaining) ? entry.fuelRemaining : 0)),
-      fuelBonus: Math.max(0, Math.round(Number.isFinite(entry.fuelBonus) ? entry.fuelBonus : 0)),
-      date: new Date().toISOString(),
-      partyMode: Boolean(entry.partyMode),
-      challengeId,
-      challengeName: challengeId ? sanitizeName(entry.challengeName || challenge?.name, challenge?.name || "Challenge") : ""
-    };
+    const cleanEntry = normalizeLeaderboardEntry({
+      ...entry,
+      date: new Date().toISOString()
+    });
+    if (!cleanEntry) return null;
     this.data.leaderboard.push(cleanEntry);
     this.data.leaderboard.sort((a, b) => b.score - a.score);
-    this.data.leaderboard = this.data.leaderboard.slice(0, 20);
+    this.data.leaderboard = this.data.leaderboard.slice(0, LEADERBOARD_MAX_ENTRIES);
 
     const player = cleanEntry.playerId ? this.getPlayerById(cleanEntry.playerId) : this.getCurrentPlayer();
     if (player && cleanEntry.score > player.bestScore) {
@@ -1491,13 +1591,10 @@ class PlayerProfileManager {
 
 function snapshotPartyPlayer(player) {
   return {
-    id: String(player.id || uid()),
-    name: sanitizeName(player.name, "PLAYER"),
-    car: {
-      ...DEFAULT_CAR,
-      ...(player.car && typeof player.car === "object" ? player.car : {})
-    },
-    bestScore: Number.isFinite(player.bestScore) ? Math.max(0, Math.round(player.bestScore)) : 0
+    id: normalizeStorageId(player.id, uid()),
+    name: sanitizePlayerName(player.name, "PLAYER"),
+    car: normalizeCarConfig(player.car),
+    bestScore: normalizeNonNegativeInteger(player.bestScore)
   };
 }
 
@@ -1534,19 +1631,19 @@ class PartySession {
     const player = this.currentPlayer || snapshotPartyPlayer(summary?.player || {});
     const result = {
       playerId: player.id,
-      playerName: sanitizeName(player.name, "PLAYER"),
-      carName: sanitizeName(player.car?.name, DEFAULT_CAR.name),
-      score: Math.max(0, Math.round(summary?.finalScore || 0)),
+      playerName: sanitizePlayerName(player.name, "PLAYER"),
+      carName: sanitizeCarName(player.car?.name, DEFAULT_CAR.name),
+      score: normalizeNonNegativeInteger(summary?.finalScore || 0),
       status: normalizeRunStatus(summary?.status),
-      reason: String(summary?.reason || ""),
-      time: Number.isFinite(summary?.time) ? Math.max(0, summary.time) : 0,
+      reason: sanitizeName(summary?.reason, "", DISPLAY_TEXT_MAX_LENGTH),
+      time: normalizeNonNegativeNumber(summary?.time, 0, 24 * 60 * 60),
       raceMode: normalizeSpeedClassId(summary?.speedClass || this.raceMode, this.raceMode),
       raceType: normalizeRaceTypeId(summary?.raceTypeId || summary?.raceType || this.raceType, this.raceType),
       seed: normalizeStoredRoadSeed(summary?.seed || this.sharedSeed, this.sharedSeed),
-      trackName: sanitizeName(summary?.trackName || this.track?.name, "TRACK"),
-      fuelCollected: Math.max(0, Math.round(summary?.fuelCollected || 0)),
-      fuelRemaining: Math.max(0, Math.round(summary?.fuelRemaining || 0)),
-      fuelBonus: Math.max(0, Math.round(summary?.fuelBonus || 0)),
+      trackName: sanitizeName(summary?.trackName || this.track?.name, "TRACK", DISPLAY_TEXT_MAX_LENGTH),
+      fuelCollected: normalizeNonNegativeInteger(summary?.fuelCollected || 0, 0, 999),
+      fuelRemaining: normalizeNonNegativeInteger(summary?.fuelRemaining || 0, 0, FUEL_RUN_CONFIG.fuelMax),
+      fuelBonus: normalizeNonNegativeInteger(summary?.fuelBonus || 0),
       scoreSaved: summary?.scoreSaved !== false,
       leaderboardRank: Number.isFinite(summary?.topTwentyRank) ? summary.topTwentyRank : null,
       medals: Array.isArray(summary?.medals) ? summary.medals.slice(0, 3) : [],
@@ -7930,10 +8027,10 @@ class NeonRoadRally {
     const profilePlayer = this.profiles.getPlayerById(player.id) || player;
     const previousBestScore = profilePlayer.bestScore || 0;
     const leaderboard = this.profiles.data.leaderboard || [];
-    const topTwentyCutoff = leaderboard.length < 20 ? -1 : Math.min(...leaderboard.slice(0, 20).map((item) => item.score || 0));
+    const topTwentyCutoff = leaderboard.length < LEADERBOARD_MAX_ENTRIES ? -1 : Math.min(...leaderboard.slice(0, LEADERBOARD_MAX_ENTRIES).map((item) => item.score || 0));
     const debugSpeedScaleActive = Math.abs((this.debugSpeedScale || 1) - 1) > 0.001;
     const isNewPersonalBest = !debugSpeedScaleActive && run.score > previousBestScore;
-    const entersTopTwenty = !debugSpeedScaleActive && (leaderboard.length < 20 || run.score > topTwentyCutoff);
+    const entersTopTwenty = !debugSpeedScaleActive && (leaderboard.length < LEADERBOARD_MAX_ENTRIES || run.score > topTwentyCutoff);
     const entry = debugSpeedScaleActive ? null : this.profiles.recordScore({
       playerId: player.id,
       playerName: player.name,
@@ -9447,6 +9544,7 @@ class NeonRoadRally {
     if (!input || !display) return;
     const updateDisplay = () => {
       const normalized = normalizeRoadSeed(input.value, "");
+      if (input.value !== normalized) input.value = normalized;
       const speedClass = getSpeedClassConfig(modeSelect?.value || this.profiles.data.speedClassId);
       const raceType = getRaceTypeConfig(raceTypeSelect?.value || this.pendingRaceTypeId || DEFAULT_RACE_TYPE_ID);
       const hash = normalized ? (hashSeed(getRunRandomSeedSource(normalized, TRACKS[0], speedClass.id, raceType.id)) >>> 0) : "pending";
@@ -9682,6 +9780,7 @@ class NeonRoadRally {
     const updateSeedDisplay = () => {
       if (!input || !display) return;
       const normalized = normalizeRoadSeed(input.value, "");
+      if (input.value !== normalized) input.value = normalized;
       const mode = normalizeSpeedClassId(raceMode?.value, DEFAULT_SPEED_CLASS_ID);
       display.textContent = normalized || "Random seed on start";
       if (seedHash) {
@@ -10175,7 +10274,7 @@ class NeonRoadRally {
           <p class="hint">${current ? `Current player: ${escapeHtml(current.name)} driving ${escapeHtml(current.car.name)}.` : "Profiles live only in this browser through localStorage."}</p>
           <div class="field">
             <label for="playerName">New player name</label>
-            <input id="playerName" type="text" maxlength="24" value="" placeholder="PLAYER NAME">
+            <input id="playerName" type="text" maxlength="${LOCAL_PLAYER_NAME_MAX_LENGTH}" value="" placeholder="PLAYER NAME">
           </div>
           <div class="row">
             <button class="small-button" data-action="createPlayer">Create Player</button>
@@ -10231,7 +10330,7 @@ class NeonRoadRally {
           <p class="hint">Sprite cars use their painted colors. Color pickers apply to classic car mode.</p>
           <div class="field">
             <label for="carName">Car name</label>
-            <input id="carName" type="text" maxlength="24" value="${escapeAttr(car.name)}">
+            <input id="carName" type="text" maxlength="${LOCAL_CAR_NAME_MAX_LENGTH}" value="${escapeAttr(car.name)}">
           </div>
           <div class="field">
             <label for="bodyStyle">Body style</label>
@@ -10434,10 +10533,10 @@ class NeonRoadRally {
 
   readCarForm() {
     return {
-      name: sanitizeName(document.getElementById("carName")?.value, DEFAULT_CAR.name),
-      bodyColor: document.getElementById("bodyColor")?.value || DEFAULT_CAR.bodyColor,
-      stripeColor: document.getElementById("stripeColor")?.value || DEFAULT_CAR.stripeColor,
-      windowColor: document.getElementById("windowColor")?.value || DEFAULT_CAR.windowColor,
+      name: sanitizeCarName(document.getElementById("carName")?.value, DEFAULT_CAR.name),
+      bodyColor: normalizeHexColor(document.getElementById("bodyColor")?.value, DEFAULT_CAR.bodyColor),
+      stripeColor: normalizeHexColor(document.getElementById("stripeColor")?.value, DEFAULT_CAR.stripeColor),
+      windowColor: normalizeHexColor(document.getElementById("windowColor")?.value, DEFAULT_CAR.windowColor),
       bodyStyle: document.getElementById("bodyStyle")?.value || DEFAULT_CAR.bodyStyle,
       useSprite: document.getElementById("useSprite")?.checked !== false
     };
@@ -10481,7 +10580,7 @@ class NeonRoadRally {
       this.showTitle();
       return;
     }
-    const leaderboard = this.profiles.data.leaderboard.slice(0, 20);
+    const leaderboard = this.profiles.data.leaderboard.slice(0, LEADERBOARD_MAX_ENTRIES);
     const outcomeText = getRunStatusLabel(summary.status, summary.reason);
     const leaderboardText = summary.scoreSaved
       ? (summary.topTwentyRank ? `Top 20 #${summary.topTwentyRank}` : (summary.topTwentyGap ? `${formatScore(summary.topTwentyGap)} from #20` : "Saved"))
@@ -10667,9 +10766,13 @@ class NeonRoadRally {
 
   handleCreatePlayer() {
     const input = document.getElementById("playerName");
-    const name = sanitizeName(input?.value, `PLAYER ${this.profiles.data.players.length + 1}`);
-    this.profiles.createPlayer(name);
-    this.showPlayerScreen(`${name} is ready.`);
+    const name = sanitizePlayerName(input?.value, `PLAYER ${this.profiles.data.players.length + 1}`);
+    const player = this.profiles.createPlayer(name);
+    if (!player) {
+      this.showPlayerScreen(`Local player limit is ${LOCAL_PLAYER_MAX_COUNT}.`);
+      return;
+    }
+    this.showPlayerScreen(`${player.name} is ready.`);
   }
 
   handleSelectPlayer(id) {
@@ -10694,7 +10797,7 @@ class NeonRoadRally {
   }
 
   handleResetData() {
-    const confirmed = window.confirm("Reset all Neon Road Rally players, car settings, scores, challenge progress, and audio settings?");
+    const confirmed = window.confirm("Reset Neon Road Rally local data in this browser? This deletes only the neonRoadRally.v1 key: local players, car settings, scores, challenge progress, and audio/default race settings.");
     if (!confirmed) return;
     this.profiles.resetAll();
     this.audio.setMusicMuted(false);
