@@ -490,6 +490,14 @@ function formatScore(value) {
   return Math.max(0, Math.round(value)).toLocaleString();
 }
 
+function formatSignedScore(value) {
+  const numeric = Number(value);
+  const rounded = Math.round(Number.isFinite(numeric) ? numeric : 0);
+  if (rounded > 0) return `+${formatScore(rounded)}`;
+  if (rounded < 0) return `-${formatScore(Math.abs(rounded))}`;
+  return "0";
+}
+
 function formatTime(seconds) {
   const whole = Math.max(0, Math.floor(seconds));
   const mins = Math.floor(whole / 60);
@@ -917,6 +925,8 @@ class PartySession {
       seed: normalizeStoredRoadSeed(summary?.seed || this.sharedSeed, this.sharedSeed),
       trackName: sanitizeName(summary?.trackName || this.track?.name, "TRACK"),
       scoreSaved: summary?.scoreSaved !== false,
+      leaderboardRank: Number.isFinite(summary?.topTwentyRank) ? summary.topTwentyRank : null,
+      medals: Array.isArray(summary?.medals) ? summary.medals.slice(0, 3) : [],
       date: new Date().toISOString()
     };
     this.results.push(result);
@@ -928,13 +938,15 @@ class PartySession {
   }
 
   standings() {
-    return this.results
+    const sorted = this.results
       .slice()
-      .sort((a, b) => b.score - a.score || a.time - b.time || a.playerName.localeCompare(b.playerName))
-      .map((result, index) => ({
-        ...result,
-        rank: index + 1
-      }));
+      .sort((a, b) => b.score - a.score || a.time - b.time || a.playerName.localeCompare(b.playerName));
+    const leaderScore = sorted[0]?.score || 0;
+    return sorted.map((result, index) => ({
+      ...result,
+      rank: index + 1,
+      leaderMargin: index === 0 ? 0 : Math.max(0, leaderScore - result.score)
+    }));
   }
 
   marginOfVictory() {
@@ -5485,6 +5497,7 @@ class NeonRoadRally {
       lastDistanceDelta: 0,
       boostMultiplier: 1,
       manualBoosts: 3,
+      manualBoostsUsed: 0,
       boostTimer: 0,
       padBoostTimer: 0,
       oilTimer: 0,
@@ -5498,6 +5511,8 @@ class NeonRoadRally {
       cleanBonusCount: 0,
       nearMisses: 0,
       penalties: 0,
+      slowdownHits: 0,
+      laneMoves: 0,
       eventScore: 0,
       bonuses: {
         finish: 0,
@@ -5505,6 +5520,18 @@ class NeonRoadRally {
         unusedBoosts: 0,
         clean: 0,
         nearMiss: 0,
+        boostPad: 0,
+        ramp: 0
+      },
+      scoreBreakdown: {
+        distance: 0,
+        pace: 0,
+        finish: 0,
+        speedBonus: 0,
+        clean: 0,
+        nearMiss: 0,
+        unusedBoosts: 0,
+        slowdownPenalties: 0,
         boostPad: 0,
         ramp: 0
       },
@@ -5627,8 +5654,12 @@ class NeonRoadRally {
     const distanceDelta = run.currentSpeed * dt;
     run.lastDistanceDelta = distanceDelta;
     run.distance += distanceDelta;
-    this.addBaseScore(distanceDelta * (run.boostTimer > 0 ? 1.6 : 1));
-    this.addBaseScore(run.currentSpeed * dt * 0.04);
+    const distanceScore = distanceDelta * (run.boostTimer > 0 ? 1.6 : 1);
+    const paceScore = run.currentSpeed * dt * 0.04;
+    this.addBaseScore(distanceScore);
+    run.scoreBreakdown.distance += distanceScore;
+    this.addBaseScore(paceScore);
+    run.scoreBreakdown.pace += paceScore;
 
     this.updateLaneVisual(dt);
 
@@ -5780,6 +5811,7 @@ class NeonRoadRally {
     run.laneChangeDistance = Math.max(0.001, Math.abs(nextLane - run.renderLaneFloat));
     run.laneChangeElapsed = 0;
     run.laneChangeProgress = 0;
+    run.laneMoves += 1;
     return true;
   }
 
@@ -5787,6 +5819,7 @@ class NeonRoadRally {
     const run = this.run;
     if (run.paused || run.ended || run.countdownTimer > 0 || run.manualBoosts <= 0) return;
     run.manualBoosts -= 1;
+    run.manualBoostsUsed += 1;
     run.boostTimer = Math.max(run.boostTimer, SPEED_TUNING.manualBoostDuration);
     run.boostBurstTimer = Math.max(run.boostBurstTimer || 0, ARCADE_FEEL.boostBurstSeconds);
     run.screenShake = Math.max(run.screenShake || 0, 0.18);
@@ -5822,6 +5855,8 @@ class NeonRoadRally {
     run.slowdownTimer = Math.max(run.slowdownTimer, 1.45);
     run.cleanTimer = 0;
     run.penalties += Math.abs(penalty);
+    run.slowdownHits += 1;
+    run.scoreBreakdown.slowdownPenalties += Math.abs(penalty);
     this.addBaseScore(penalty);
     run.lastCollision = reason;
     run.bumpFlashTimer = Math.max(run.bumpFlashTimer || 0, ARCADE_FEEL.bumpFlashSeconds);
@@ -5847,6 +5882,9 @@ class NeonRoadRally {
     run.eventScore += points;
     if (run.bonuses[type] !== undefined) {
       run.bonuses[type] += points;
+    }
+    if (run.scoreBreakdown && run.scoreBreakdown[type] !== undefined) {
+      run.scoreBreakdown[type] += points;
     }
     this.addFloatingScoreText(getScoreEventLabel(type, points), {
       color: getScoreEventColor(type),
@@ -5877,6 +5915,73 @@ class NeonRoadRally {
     }
   }
 
+  buildRunScoreBreakdown(run) {
+    const raw = run.scoreBreakdown || {};
+    const safeScore = (value) => Math.max(0, Math.round(Number.isFinite(value) ? value : 0));
+    return {
+      distance: safeScore(raw.distance),
+      pace: safeScore(raw.pace),
+      finish: safeScore(raw.finish || run.bonuses?.finish),
+      speedBonus: safeScore(raw.speedBonus || run.bonuses?.speed),
+      clean: safeScore(raw.clean || run.bonuses?.clean),
+      nearMiss: safeScore(raw.nearMiss || run.bonuses?.nearMiss),
+      unusedBoosts: safeScore(raw.unusedBoosts || run.bonuses?.unusedBoosts),
+      slowdownPenalties: safeScore(raw.slowdownPenalties || run.penalties),
+      boostPad: safeScore(raw.boostPad || run.bonuses?.boostPad),
+      ramp: safeScore(raw.ramp || run.bonuses?.ramp),
+      preMultiplierTotal: Math.max(0, Math.round(run.baseScore || 0)),
+      multiplier: run.scoreMultiplier || 1,
+      finalScore: Math.max(0, Math.round(run.score || 0))
+    };
+  }
+
+  buildRunMedals(summary, run, previousBestScore) {
+    const medals = [];
+    const add = (title, detail, tone = "neutral") => {
+      if (medals.length >= 3) return;
+      medals.push({ title, detail, tone });
+    };
+    const previousBest = Math.max(0, Math.round(previousBestScore || 0));
+    const scoreGap = previousBest - summary.finalScore;
+
+    if (summary.newPersonalBest) {
+      add("Personal Best", previousBest > 0 ? `Beat ${formatScore(previousBest)}` : "First best posted", "hot");
+    }
+    if (summary.entersTopTwenty) {
+      add("Top 20", summary.topTwentyRank ? `Placed #${summary.topTwentyRank}` : "Leaderboard run", "hot");
+    }
+    if (summary.status === "finished" && (run.slowdownHits || 0) === 0 && (run.penalties || 0) === 0) {
+      add("Clean Run", "No slowdown hits", "clean");
+    }
+    if (summary.status === "finished" && summary.speedClass === "turbo") {
+      add("Turbo Survivor", "Finished Turbo", "hot");
+    }
+    if ((run.nearMisses || 0) >= 5) {
+      add("Near-Miss Maniac", `${run.nearMisses} near misses`, "cool");
+    } else if ((run.nearMisses || 0) >= 3) {
+      add("Near-Miss Streak", `${run.nearMisses} near misses`, "cool");
+    }
+    if (summary.status === "finished" && (run.manualBoostsUsed || 0) === 0) {
+      add("No Boost Hero", "Finished without boosts", "cool");
+    }
+    if ((run.manualBoostsUsed || 0) >= 3 && run.manualBoosts <= 0) {
+      add("Boost Addict", "Spent every boost", "hot");
+    }
+    if ((run.laneMoves || 0) <= 1 && summary.progress >= 0.35) {
+      add("Center-Lane Camper", "Barely left the middle", "shame");
+    }
+    if (summary.status === "crashed" && summary.progress < 0.35) {
+      add("Crashout", "Early exit", "danger");
+    }
+    if (!summary.newPersonalBest && previousBest > 0 && scoreGap > 0 && scoreGap <= Math.max(1000, previousBest * 0.08)) {
+      add("One More Run", `${formatScore(scoreGap)} from PB`, "cool");
+    }
+    if (medals.length === 0) {
+      add(summary.status === "finished" ? "Banked Run" : "Run Logged", summary.status === "finished" ? "Score on the board" : "Score saved", "neutral");
+    }
+    return medals;
+  }
+
   endRace(status, reason) {
     const run = this.run;
     if (run.ended) return;
@@ -5890,6 +5995,7 @@ class NeonRoadRally {
     if (status === "finished") {
       run.finishFlashTimer = ARCADE_FEEL.finishFlashSeconds;
       run.bonuses.finish = 5000;
+      run.scoreBreakdown.finish = run.bonuses.finish;
       this.addBaseScore(run.bonuses.finish);
       this.addFloatingScoreText(getScoreEventLabel("finish", run.bonuses.finish), {
         color: "#f6fbff",
@@ -5902,6 +6008,7 @@ class NeonRoadRally {
       });
       const target = run.track.targetDurationSeconds;
       run.bonuses.speed = Math.max(0, Math.round(3000 * clamp((target - run.elapsed + 18) / target, 0, 1)));
+      run.scoreBreakdown.speedBonus = run.bonuses.speed;
       this.addBaseScore(run.bonuses.speed);
       this.audio.playSfx("finish");
     } else {
@@ -5909,6 +6016,7 @@ class NeonRoadRally {
     }
 
     run.bonuses.unusedBoosts = run.manualBoosts * 750;
+    run.scoreBreakdown.unusedBoosts = run.bonuses.unusedBoosts;
     this.addBaseScore(run.bonuses.unusedBoosts);
     run.score = Math.max(0, Math.round(run.score));
     this.audio.stopMusic(0.28);
@@ -5935,8 +6043,13 @@ class NeonRoadRally {
       partyMode: Boolean(run.partyMode)
     });
     const updatedProfilePlayer = this.profiles.getPlayerById(player.id) || profilePlayer;
+    const topTwentyRank = entry ? this.profiles.data.leaderboard.indexOf(entry) + 1 : null;
+    const topTwentyGap = !debugSpeedScaleActive && !entersTopTwenty && topTwentyCutoff >= 0
+      ? Math.max(1, Math.round(topTwentyCutoff - run.score + 1))
+      : 0;
+    const scoreBreakdown = this.buildRunScoreBreakdown(run);
 
-    this.lastSummary = {
+    const summary = {
       scoreEntry: entry,
       player: snapshotPartyPlayer(player),
       playerId: player.id,
@@ -5958,15 +6071,25 @@ class NeonRoadRally {
       time: run.elapsed,
       bonuses: { ...run.bonuses },
       penalties: run.penalties,
+      slowdownHits: run.slowdownHits || 0,
+      nearMisses: run.nearMisses || 0,
+      manualBoostsUsed: run.manualBoostsUsed || 0,
+      laneMoves: run.laneMoves || 0,
+      scoreBreakdown,
       bestScore: debugSpeedScaleActive ? previousBestScore : (updatedProfilePlayer.bestScore || run.score),
+      previousBestScore,
       trackDistance: run.track.distanceToFinish,
       newPersonalBest: isNewPersonalBest,
       entersTopTwenty,
+      topTwentyRank: topTwentyRank > 0 ? topTwentyRank : null,
+      topTwentyGap,
       newHighScore: isNewPersonalBest || entersTopTwenty,
       scoreSaved: !debugSpeedScaleActive,
       debugSpeedScaleActive,
       debugSpeedScale: this.debugSpeedScale || 1
     };
+    summary.medals = this.buildRunMedals(summary, run, previousBestScore);
+    this.lastSummary = summary;
     if (run.partyMode && this.partySession?.isPartyMode) {
       this.lastSummary.partyResult = this.partySession.addResult(this.lastSummary);
     }
@@ -7293,6 +7416,87 @@ class NeonRoadRally {
     });
   }
 
+  renderMedalChips(medals, compact = false) {
+    const items = Array.isArray(medals) ? medals.slice(0, 3) : [];
+    if (!items.length) return "";
+    const validTones = new Set(["hot", "clean", "cool", "shame", "danger", "neutral"]);
+    return `
+      <div class="medal-row ${compact ? "is-compact" : ""}">
+        ${items.map((medal) => {
+          const tone = validTones.has(medal.tone) ? medal.tone : "neutral";
+          return `
+            <span class="medal-chip is-${tone}">
+              <strong>${escapeHtml(medal.title)}</strong>
+              <span>${escapeHtml(medal.detail)}</span>
+            </span>
+          `;
+        }).join("")}
+      </div>
+    `;
+  }
+
+  renderScoreBreakdown(summary) {
+    const breakdown = summary.scoreBreakdown || {};
+    const rows = [
+      ["Distance Score", breakdown.distance, "Road covered, including boost pace.", "positive"],
+      ["Pace Score", breakdown.pace, "Speed carried during the run.", "positive"],
+      ["Finish Bonus", breakdown.finish, "Awarded for reaching the finish.", "positive"],
+      ["Clean Driving Bonus", breakdown.clean, "Ten-second clean driving streaks.", "positive"],
+      ["Near-Miss Bonus", breakdown.nearMiss, `${summary.nearMisses || 0} close calls banked.`, "positive"],
+      ["Unused Boost Bonus", breakdown.unusedBoosts, `${Math.max(0, 3 - (summary.manualBoostsUsed || 0))} boosts left at run end.`, "positive"],
+      ["Slowdown Penalties", -(breakdown.slowdownPenalties || 0), `${summary.slowdownHits || 0} slowdown hits.`, "negative"]
+    ];
+    const extras = [];
+    if (breakdown.speedBonus > 0) extras.push(["Speed Finish Bonus", breakdown.speedBonus, "Fast finish bonus.", "positive"]);
+    if (breakdown.boostPad > 0) extras.push(["Boost Pad Bonus", breakdown.boostPad, "Boost pads collected.", "positive"]);
+    if (breakdown.ramp > 0) extras.push(["Ramp Bonus", breakdown.ramp, "Ramps hit.", "positive"]);
+    return `
+      <div class="score-breakdown">
+        ${rows.concat(extras).map(([label, value, detail, tone]) => `
+          <div class="score-breakdown-row is-${tone}">
+            <span>
+              <strong>${escapeHtml(label)}</strong>
+              <span class="meta">${escapeHtml(detail)}</span>
+            </span>
+            <span class="score-breakdown-value" data-tally-value="${escapeAttr(value)}" data-tally-signed="true">${formatSignedScore(value)}</span>
+          </div>
+        `).join("")}
+        <div class="score-breakdown-total">
+          <span>
+            <strong>Pre-Multiplier Total</strong>
+            <span class="meta">Existing score after bonuses and penalties.</span>
+          </span>
+          <span data-tally-value="${escapeAttr(breakdown.preMultiplierTotal || 0)}">${formatScore(breakdown.preMultiplierTotal || 0)}</span>
+        </div>
+        <div class="score-breakdown-total">
+          <span>
+            <strong>Race Mode Multiplier</strong>
+            <span class="meta">${escapeHtml(summary.speedClassLabel)} scoring.</span>
+          </span>
+          <span>x${(summary.scoreMultiplier || 1).toFixed(2)}</span>
+        </div>
+      </div>
+    `;
+  }
+
+  renderLeaderboardContext(summary) {
+    if (!summary.scoreSaved) {
+      return `<span class="score-callout is-muted">Debug speed run - score not saved</span>`;
+    }
+    const callouts = [];
+    callouts.push(summary.newPersonalBest
+      ? `<span class="score-callout is-hot">New Personal Best</span>`
+      : `<span class="score-callout">Personal Best ${formatScore(summary.bestScore)}</span>`);
+    if (summary.entersTopTwenty) {
+      callouts.push(`<span class="score-callout is-hot">Top 20 #${summary.topTwentyRank || "?"}</span>`);
+    } else if (summary.topTwentyGap > 0) {
+      callouts.push(`<span class="score-callout">#20 Gap ${formatScore(summary.topTwentyGap)}</span>`);
+    } else {
+      callouts.push(`<span class="score-callout">Top 20 Pending</span>`);
+    }
+    return callouts.join("");
+  }
+
   showPartyStandingsScreen(message = "") {
     const session = this.partySession;
     if (!session?.isPartyMode) {
@@ -7304,46 +7508,65 @@ class NeonRoadRally {
     const leader = standings[0] || null;
     const margin = session.marginOfVictory();
     const nextPlayer = session.currentPlayer;
+    const summary = this.lastSummary;
+    const recentResult = summary?.partyResult || null;
     this.setScreen(final ? "partyFinal" : "partyStandings");
     this.audio.playMusic("title", false);
     if (final && !session.finalSfxPlayed) {
       this.audio.playSfx("newHighScore");
       session.finalSfxPlayed = true;
     }
-    const summary = this.lastSummary;
     this.layer.classList.remove("is-empty");
     this.layer.innerHTML = `
-      <section class="panel">
-        <h2>${final ? "Party Winner" : "Party Standings"}</h2>
-        <p class="hint">
-          ${final && leader
-            ? `${escapeHtml(leader.playerName)} wins by ${formatScore(margin || 0)} on ${escapeHtml(session.track.name)} · ${escapeHtml(getSpeedClassLabel(session.raceMode))} · Seed ${escapeHtml(session.sharedSeed)}.`
-            : `${escapeHtml(nextPlayer?.name || "Next player")} is up next on ${escapeHtml(session.track.name)} · ${escapeHtml(getSpeedClassLabel(session.raceMode))} · Seed ${escapeHtml(session.sharedSeed)}.`}
-        </p>
+      <section class="panel party-panel party-results-panel">
+        <div class="party-drama-header ${final ? "is-final" : ""}">
+          <div>
+            <span class="eyebrow">${final ? "Final Party Result" : "Current Party Race"}</span>
+            <h2>${final && leader ? `${escapeHtml(leader.playerName)} Wins` : "Party Standings"}</h2>
+            <p class="hint">${escapeHtml(session.track.name)} · ${escapeHtml(getSpeedClassLabel(session.raceMode))} · Seed ${escapeHtml(session.sharedSeed)}</p>
+          </div>
+          <div class="party-leader-card ${final ? "is-final" : ""}">
+            <span>${final ? "Winner" : "Leader"}</span>
+            <strong>${leader ? escapeHtml(leader.playerName) : "No runs yet"}</strong>
+            <em>${leader ? formatScore(leader.score) : "0"}</em>
+            ${leader && final ? `<small>Victory margin ${formatScore(margin || 0)}</small>` : ""}
+            ${leader && !final ? `<small>${standings.length}/${session.totalPlayers} runs complete</small>` : ""}
+          </div>
+        </div>
         ${summary?.partyMode ? `
-          <div class="score-grid party-last-run">
-            <div class="score-card"><strong>Last Run</strong><span>${escapeHtml(summary.playerName)}</span></div>
-            <div class="score-card"><strong>Score</strong><span>${formatScore(summary.finalScore)}</span></div>
-            <div class="score-card"><strong>Status</strong><span>${summary.status === "finished" ? "Finished" : `Crashed: ${escapeHtml(summary.reason)}`}</span></div>
-            <div class="score-card"><strong>Time</strong><span>${formatTime(summary.time)}</span></div>
+          <div class="party-last-run-card">
+            <div>
+              <span class="eyebrow">Latest Run</span>
+              <strong>${escapeHtml(summary.playerName)}</strong>
+              <span class="meta">${escapeHtml(summary.carName)} · ${summary.status === "finished" ? "Finished" : `Crashed: ${escapeHtml(summary.reason)}`} · ${formatTime(summary.time)}</span>
+            </div>
+            <div class="party-last-score">
+              <span data-tally-value="${escapeAttr(summary.finalScore)}">${formatScore(summary.finalScore)}</span>
+              ${summary.topTwentyRank ? `<small>Top 20 #${summary.topTwentyRank}</small>` : `<small>${summary.newPersonalBest ? "Personal Best" : "Run Score"}</small>`}
+            </div>
+            ${this.renderMedalChips(summary.medals, true)}
           </div>
         ` : ""}
         <ol class="leaderboard-list party-standings-list">
           ${standings.length ? standings.map((result, index) => `
-            <li class="leaderboard-item ${final && index === 0 ? "is-winner" : ""}">
+            <li class="leaderboard-item party-standing-row ${final && index === 0 ? "is-winner" : ""} ${recentResult && result.playerId === recentResult.playerId && result.date === recentResult.date ? "is-recent" : ""}">
               <span class="leaderboard-rank">#${result.rank}</span>
               <span>
                 <strong>${escapeHtml(result.playerName)}</strong>
-                <span class="meta">${escapeHtml(result.carName)} · ${escapeHtml(getSpeedClassLabel(result.raceMode))} · Seed ${escapeHtml(result.seed)} · ${result.status} · ${formatTime(result.time)}</span>
+                <span class="meta">${escapeHtml(result.carName)} · ${result.status} · ${formatTime(result.time)}${result.leaderboardRank ? ` · Top 20 #${result.leaderboardRank}` : ""}</span>
+                ${this.renderMedalChips(result.medals, true)}
               </span>
-              <span class="leaderboard-score">${formatScore(result.score)}</span>
+              <span class="party-score-stack">
+                <span class="leaderboard-score">${formatScore(result.score)}</span>
+                <span class="party-margin">${result.leaderMargin === 0 ? "Leader" : `${formatScore(result.leaderMargin)} back`}</span>
+              </span>
             </li>
           `).join("") : `<li class="leaderboard-item"><span class="meta">No party runs recorded yet.</span></li>`}
         </ol>
-        <div class="row" style="margin-top:18px">
+        <div class="party-action-row">
           ${final ? `
             <button class="small-button primary" data-action="partyRematchSameSeed">Rematch Same Seed</button>
-            <button class="small-button" data-action="partyRematchNewSeed">Rematch New Seed</button>
+            <button class="small-button primary" data-action="partyRematchNewSeed">Rematch New Seed</button>
             <button class="small-button" data-action="partyChangeSetup">Change Players/Mode</button>
             <button class="small-button" data-action="title">Return to Title</button>
           ` : `
@@ -7352,10 +7575,12 @@ class NeonRoadRally {
             <button class="small-button" data-action="title">Return to Title</button>
           `}
         </div>
+        ${!final && nextPlayer ? `<p class="hint next-player-hint">Next up: ${escapeHtml(nextPlayer.name)}. Press Enter to continue.</p>` : `<p class="hint next-player-hint">Press Enter for a same-seed rematch.</p>`}
         <p class="status-line">${escapeHtml(message)}</p>
       </section>
     `;
     this.bindLayerButtons();
+    this.animateScoreTally();
   }
 
   handlePartyNextPlayer() {
@@ -7611,33 +7836,51 @@ class NeonRoadRally {
       return;
     }
     const leaderboard = this.profiles.data.leaderboard.slice(0, 20);
+    const outcomeText = summary.status === "finished" ? "Finished" : `Crashed: ${summary.reason}`;
+    const leaderboardText = summary.scoreSaved
+      ? (summary.topTwentyRank ? `Top 20 #${summary.topTwentyRank}` : (summary.topTwentyGap ? `${formatScore(summary.topTwentyGap)} from #20` : "Saved"))
+      : `Debug speed x${summary.debugSpeedScale.toFixed(2)} - not saved`;
+    const personalBestText = summary.newPersonalBest
+      ? `New PB: ${formatScore(summary.finalScore)}`
+      : `PB: ${formatScore(summary.bestScore)}`;
     this.layer.classList.remove("is-empty");
     this.layer.innerHTML = `
-      <section class="panel">
-        <h2>${summary.status === "finished" ? "Track Complete" : "Run Over"}</h2>
-        <div class="score-grid">
-          <div class="score-card"><strong>Final Score</strong><span id="finalScoreValue" class="tally-score" data-final-score="${summary.finalScore}">0</span></div>
-          <div class="score-card"><strong>Status</strong><span>${summary.status === "finished" ? "Finished" : `Crashed: ${escapeHtml(summary.reason)}`}</span></div>
-          <div class="score-card"><strong>Speed Class</strong><span>${escapeHtml(summary.speedClassLabel)}</span></div>
+      <section class="panel score-results-panel">
+        <div class="score-hero ${summary.newHighScore ? "is-high-score" : ""}">
+          <div>
+            <span class="eyebrow">${summary.partyMode ? "Party Run Result" : "Run Result"}</span>
+            <h2>${summary.status === "finished" ? "Track Complete" : "Run Over"}</h2>
+            <p class="hint">${escapeHtml(summary.trackName)} · ${escapeHtml(summary.speedClassLabel)} · Seed ${escapeHtml(summary.seed)}</p>
+            <div class="score-callout-row">${this.renderLeaderboardContext(summary)}</div>
+          </div>
+          <div class="final-score-card">
+            <span>Final Score</span>
+            <strong id="finalScoreValue" class="tally-score" data-tally-value="${escapeAttr(summary.finalScore)}">0</strong>
+            <small>${escapeHtml(outcomeText)}</small>
+          </div>
+        </div>
+        ${this.renderMedalChips(summary.medals)}
+        <div class="score-grid score-info-grid">
+          <div class="score-card"><strong>Track</strong><span>${escapeHtml(summary.trackName)}</span></div>
+          <div class="score-card"><strong>Race Mode</strong><span>${escapeHtml(summary.speedClassLabel)}</span></div>
           <div class="score-card"><strong>Road Seed</strong><input class="seed-copy" type="text" value="${escapeAttr(summary.seed)}" readonly aria-label="Road seed used"></div>
-          <div class="score-card"><strong>Score Multiplier</strong><span>${formatScore(summary.baseScore)} x ${summary.scoreMultiplier.toFixed(2)}</span></div>
+          <div class="score-card"><strong>Crash / Outcome</strong><span>${escapeHtml(outcomeText)}</span></div>
           <div class="score-card"><strong>Distance</strong><span>${Math.round(summary.distance).toLocaleString()} / ${summary.trackDistance.toLocaleString()}</span></div>
           <div class="score-card"><strong>Time</strong><span>${formatTime(summary.time)}</span></div>
-          <div class="score-card"><strong>Bonuses</strong><span>Finish ${formatScore(summary.bonuses.finish)} · Speed ${formatScore(summary.bonuses.speed)} · Unused Boosts ${formatScore(summary.bonuses.unusedBoosts)}</span></div>
-          <div class="score-card"><strong>Driving</strong><span>Clean ${formatScore(summary.bonuses.clean)} · Near Miss ${formatScore(summary.bonuses.nearMiss)} · Penalties -${formatScore(summary.penalties)}</span></div>
-          <div class="score-card"><strong>Player Best</strong><span>${formatScore(summary.bestScore)}</span></div>
-          <div class="score-card"><strong>Progress</strong><span>${Math.round(summary.progress * 100)}%</span></div>
-          <div class="score-card"><strong>Save Status</strong><span>${summary.scoreSaved ? "Saved" : `Debug speed x${summary.debugSpeedScale.toFixed(2)} - not saved`}</span></div>
+          <div class="score-card"><strong>Personal Best</strong><span>${escapeHtml(personalBestText)}</span></div>
+          <div class="score-card"><strong>Top 20</strong><span>${escapeHtml(leaderboardText)}</span></div>
         </div>
-        <div class="row" style="margin:18px 0">
+        <h2>Score Breakdown</h2>
+        ${this.renderScoreBreakdown(summary)}
+        <div class="row score-action-row">
           <button class="small-button" data-action="restart">Restart</button>
           <button class="small-button" data-action="title">Return to Title</button>
           <button class="small-button" data-action="leaderboard">Top 20</button>
         </div>
         <h2>Leaderboard</h2>
         <ol class="leaderboard-list">
-          ${leaderboard.map((entry, index) => `
-            <li class="leaderboard-item">
+          ${leaderboard.length ? leaderboard.map((entry, index) => `
+            <li class="leaderboard-item ${entry === summary.scoreEntry ? "is-recent" : ""}">
               <span class="leaderboard-rank">#${index + 1}</span>
               <span>
                 <strong>${escapeHtml(entry.playerName)}</strong>
@@ -7645,42 +7888,51 @@ class NeonRoadRally {
               </span>
               <span class="leaderboard-score">${formatScore(entry.score)}</span>
             </li>
-          `).join("")}
+          `).join("") : `<li class="leaderboard-item"><span class="meta">No scores saved yet.</span></li>`}
         </ol>
       </section>
     `;
     this.bindLayerButtons();
-    this.animateScoreTally(summary.finalScore);
+    this.animateScoreTally();
     if (summary.newHighScore) {
       this.audio.playSfx("newHighScore");
     }
   }
 
-  animateScoreTally(finalScore) {
-    const element = document.getElementById("finalScoreValue");
-    if (!element) return;
+  animateScoreTally() {
+    const elements = Array.from(this.layer.querySelectorAll("[data-tally-value]"));
+    if (!elements.length) return;
     if (this.scoreTallyFrame) {
       cancelAnimationFrame(this.scoreTallyFrame);
       this.scoreTallyFrame = null;
     }
     if (!ARCADE_FEEL.enabled || ARCADE_FEEL.scoreTallyMs <= 0) {
-      element.textContent = formatScore(finalScore);
+      elements.forEach((element) => {
+        const value = Number(element.dataset.tallyValue || 0);
+        element.textContent = element.dataset.tallySigned === "true" ? formatSignedScore(value) : formatScore(value);
+      });
       return;
     }
     const start = performance.now();
-    const duration = ARCADE_FEEL.scoreTallyMs;
+    const duration = Math.min(ARCADE_FEEL.scoreTallyMs, 900);
     const tick = (now) => {
-      if (this.screen !== "score" || !document.body.contains(element)) {
+      if (!["score", "partyStandings", "partyFinal"].includes(this.screen) || elements.some((element) => !document.body.contains(element))) {
         this.scoreTallyFrame = null;
         return;
       }
       const progress = clamp((now - start) / duration, 0, 1);
       const eased = easeOutCubic(progress);
-      element.textContent = formatScore(finalScore * eased);
+      elements.forEach((element) => {
+        const value = Number(element.dataset.tallyValue || 0);
+        element.textContent = element.dataset.tallySigned === "true" ? formatSignedScore(value * eased) : formatScore(value * eased);
+      });
       if (progress < 1) {
         this.scoreTallyFrame = requestAnimationFrame(tick);
       } else {
-        element.textContent = formatScore(finalScore);
+        elements.forEach((element) => {
+          const value = Number(element.dataset.tallyValue || 0);
+          element.textContent = element.dataset.tallySigned === "true" ? formatSignedScore(value) : formatScore(value);
+        });
         this.scoreTallyFrame = null;
       }
     };
