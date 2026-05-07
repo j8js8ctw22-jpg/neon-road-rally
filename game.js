@@ -115,18 +115,31 @@ const LAUNCH_PACING_CONFIG = {
     boostWeightMultiplier: 0.7,
     rampWeightMultiplier: 0.75
   },
-  turbo: {
-    spawnLeadSeconds: 3.35,
-    spacingMultiplier: 1.58,
-    randomSecondsMultiplier: 1.65,
-    pressureBudgetMultiplier: 0.7,
-    pressureBudgetAllowance: 1.05,
-    forceMeaningfulMultiplier: 1.65,
+  pro: {
+    spawnLeadSeconds: 3.5,
+    spacingMultiplier: 1.42,
+    randomSecondsMultiplier: 1.48,
+    pressureBudgetMultiplier: 0.76,
+    pressureBudgetAllowance: 1.08,
+    forceMeaningfulMultiplier: 1.5,
     centerChallengeStartProgress: 0.18,
     softCenterStartProgress: 0.22,
-    minorScaleMultiplier: 0.24,
-    boostWeightMultiplier: 0.2,
-    rampWeightMultiplier: 0.48
+    minorScaleMultiplier: 0.32,
+    boostWeightMultiplier: 0.28,
+    rampWeightMultiplier: 0.55
+  },
+  turbo: {
+    spawnLeadSeconds: 3.25,
+    spacingMultiplier: 1.74,
+    randomSecondsMultiplier: 1.85,
+    pressureBudgetMultiplier: 0.62,
+    pressureBudgetAllowance: 1.05,
+    forceMeaningfulMultiplier: 1.8,
+    centerChallengeStartProgress: 0.18,
+    softCenterStartProgress: 0.22,
+    minorScaleMultiplier: 0.2,
+    boostWeightMultiplier: 0.18,
+    rampWeightMultiplier: 0.45
   }
 };
 const SPAWN_VISIBILITY_CONFIG = {
@@ -365,7 +378,7 @@ const TRACKS = [
     ],
     distanceToFinish: 155000,
     baseSpeed: 1000,
-    maxSpeed: 3000,
+    maxSpeed: 4300,
     speedCurveType: "smoothstep",
     startSpeedMultiplier: 1,
     earlySpeedMultiplier: 1.15,
@@ -392,11 +405,11 @@ const TRACKS = [
 ];
 
 const SPEED_CLASSES = [
-  { id: "sunday", label: "Sunday Drive", startSpeed: 700, endSpeed: 1100, scoreMultiplier: 0.75 },
-  { id: "rookie", label: "Rookie", startSpeed: 850, endSpeed: 1350, scoreMultiplier: 0.9 },
-  { id: "arcade", label: "Arcade", startSpeed: 1000, endSpeed: 1700, scoreMultiplier: 1 },
-  { id: "pro", label: "Pro", startSpeed: 1250, endSpeed: 2100, scoreMultiplier: 1.2 },
-  { id: "turbo", label: "Turbo", startSpeed: 1900, endSpeed: 3000, scoreMultiplier: 1.4 }
+  { id: "sunday", label: "Sunday Drive", startSpeed: 700, endSpeed: 1100, scoreMultiplier: 0.75, distanceMultiplier: 0.82 },
+  { id: "rookie", label: "Rookie", startSpeed: 950, endSpeed: 1500, scoreMultiplier: 0.9, distanceMultiplier: 0.92 },
+  { id: "arcade", label: "Arcade", startSpeed: 1250, endSpeed: 2100, scoreMultiplier: 1, distanceMultiplier: 1 },
+  { id: "pro", label: "Pro", startSpeed: 2250, endSpeed: 3600, scoreMultiplier: 1.25, distanceMultiplier: 1.25 },
+  { id: "turbo", label: "Turbo", startSpeed: 2700, endSpeed: 4300, scoreMultiplier: 1.55, distanceMultiplier: 1.2 }
 ];
 
 const RACE_TYPES = [
@@ -417,21 +430,21 @@ const RACE_TYPES = [
 const FUEL_RUN_CONFIG = {
   fuelMax: 100,
   fuelDrainPerSecond: {
-    sunday: 0.7,
-    rookie: 0.85,
-    arcade: 1,
-    pro: 1.18,
-    turbo: 1.35
+    sunday: 0.95,
+    rookie: 1.15,
+    arcade: 1.65,
+    pro: 2.65,
+    turbo: 3.1
   },
   gasCanRestoreAmount: {
     sunday: 24,
-    rookie: 24,
-    arcade: 24,
-    pro: 22,
-    turbo: 20
+    rookie: 23,
+    arcade: 20,
+    pro: 18,
+    turbo: 16
   },
-  lowFuelThreshold: 30,
-  criticalFuelThreshold: 12,
+  lowFuelThreshold: 35,
+  criticalFuelThreshold: 14,
   gasCanScore: 500,
   fuelPointFinishBonus: 40,
   warningCooldownSeconds: 4,
@@ -577,30 +590,30 @@ const ROAD_DIRECTOR = {
   modeCadence: {
     sunday: { early: 3.35, mid: 2.9, late: 2.42, randomEarly: 0.48, randomLate: 0.2, spacingScale: 1.14, recoveryScale: 1.35, centerSafe: 10, laneStill: 5.6, forceMeaningful: 4.6 },
     rookie: { early: 2.75, mid: 2.2, late: 1.75, randomEarly: 0.36, randomLate: 0.15, spacingScale: 1.02, recoveryScale: 1.05, centerSafe: 8, laneStill: 4.4, forceMeaningful: 3.55 },
-    arcade: { early: 1.96, mid: 1.5, late: 1.1, randomEarly: 0.2, randomLate: 0.085, spacingScale: 0.82, recoveryScale: 0.66, centerSafe: 5.5, centerHold: 3.5, laneStill: 2.9, forceMeaningful: 2.35 },
-    pro: { early: 1.52, mid: 1.14, late: 0.88, randomEarly: 0.13, randomLate: 0.055, spacingScale: 0.66, recoveryScale: 0.45, centerSafe: 3.35, centerHold: 2.45, laneStill: 1.95, forceMeaningful: 1.55 },
-    turbo: { early: 1.12, mid: 0.86, late: 0.66, randomEarly: 0.09, randomLate: 0.04, spacingScale: 0.62, recoveryScale: 0.42, centerSafe: 2.25, centerHold: 1.9, laneStill: 1.4, forceMeaningful: 1.15 }
+    arcade: { early: 1.55, mid: 1.18, late: 0.9, randomEarly: 0.14, randomLate: 0.06, spacingScale: 0.7, recoveryScale: 0.52, centerSafe: 3.6, centerHold: 2.65, laneStill: 2.1, forceMeaningful: 1.75 },
+    pro: { early: 1.34, mid: 1.08, late: 0.84, randomEarly: 0.11, randomLate: 0.05, spacingScale: 0.68, recoveryScale: 0.5, centerSafe: 2.25, centerHold: 1.9, laneStill: 1.4, forceMeaningful: 1.34 },
+    turbo: { early: 1.52, mid: 1.22, late: 0.98, randomEarly: 0.13, randomLate: 0.06, spacingScale: 0.78, recoveryScale: 0.62, centerSafe: 2.1, centerHold: 1.75, laneStill: 1.25, forceMeaningful: 1.55 }
   },
   centerChallengeMinSeconds: {
     sunday: 8,
     rookie: 6.8,
-    arcade: 4.2,
-    pro: 2.35,
-    turbo: 1.65
+    arcade: 2.7,
+    pro: 1.9,
+    turbo: 1.75
   },
   centerSoftPressure: {
     sunday: 0.1,
     rookie: 0.14,
-    arcade: 0.42,
-    pro: 0.75,
-    turbo: 1
+    arcade: 0.65,
+    pro: 0.9,
+    turbo: 0.92
   },
   centerRestChance: {
     sunday: 0.72,
     rookie: 0.64,
-    arcade: 0.32,
-    pro: 0.1,
-    turbo: 0.02
+    arcade: 0.16,
+    pro: 0.04,
+    turbo: 0.03
   },
   pressureBudgetAllowance: {
     sunday: 2.6,
@@ -625,9 +638,9 @@ const ROAD_DIRECTOR = {
   modeIntensity: {
     sunday: 0.95,
     rookie: 1.05,
-    arcade: 1.32,
-    pro: 1.85,
-    turbo: 2.45
+    arcade: 1.55,
+    pro: 2.25,
+    turbo: 2.35
   }
 };
 
@@ -914,6 +927,25 @@ function getSpeedClassEndSpeed(value, track = TRACKS[0]) {
   return speedClass.endSpeed ?? track.baseSpeed * (speedClass.endMultiplier ?? 2);
 }
 
+function getSpeedClassDistanceMultiplier(value) {
+  const speedClass = getSpeedClassConfig(value);
+  const multiplier = Number(speedClass.distanceMultiplier);
+  return Number.isFinite(multiplier) ? clamp(multiplier, 0.5, 1.8) : 1;
+}
+
+function createRaceTrackForSpeedClass(track = TRACKS[0], speedClassId = DEFAULT_SPEED_CLASS_ID) {
+  const sourceTrack = track || TRACKS[0];
+  const multiplier = getSpeedClassDistanceMultiplier(speedClassId);
+  if (Math.abs(multiplier - 1) < 0.001) return sourceTrack;
+  const baseDistance = Math.max(1, Math.round(sourceTrack.distanceToFinish || TRACKS[0].distanceToFinish || 1));
+  return {
+    ...sourceTrack,
+    baseDistanceToFinish: baseDistance,
+    distanceMultiplier: multiplier,
+    distanceToFinish: Math.max(1, Math.round(baseDistance * multiplier))
+  };
+}
+
 function getTrackBaseSpeedCurveT(track, progress) {
   const start = track.startSpeedMultiplier ?? 1;
   const end = track.endSpeedMultiplier ?? 2;
@@ -1024,6 +1056,22 @@ function normalizeNonNegativeNumber(value, fallback = 0, max = Number.MAX_SAFE_I
   const numeric = Number(value);
   if (!Number.isFinite(numeric)) return fallback;
   return clamp(numeric, 0, max);
+}
+
+function normalizeOptionalFuelAmount(value) {
+  if (value === null || value === undefined || value === "") return null;
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? clamp(numeric, 0, FUEL_RUN_CONFIG.fuelMax) : null;
+}
+
+function normalizeSectionCountMap(value) {
+  const source = value && typeof value === "object" ? value : {};
+  const result = {};
+  Object.entries(source).slice(0, 16).forEach(([key, count]) => {
+    const id = normalizeStorageId(key, "");
+    if (id) result[id] = normalizeNonNegativeInteger(count, 0, 9999);
+  });
+  return result;
 }
 
 function normalizeDateString(value, fallback = "") {
@@ -1352,6 +1400,11 @@ function normalizePlaytestRunSummary(entry) {
     gasCansCollected: normalizeNonNegativeInteger(entry.gasCansCollected || entry.fuelCollected, 0, 9999),
     fuelRemaining: normalizeNonNegativeNumber(entry.fuelRemaining, 0, FUEL_RUN_CONFIG.fuelMax),
     lowestFuelReached: normalizeNonNegativeNumber(entry.lowestFuelReached, 0, FUEL_RUN_CONFIG.fuelMax),
+    fuelAt25Percent: normalizeOptionalFuelAmount(entry.fuelAt25Percent),
+    fuelAt50Percent: normalizeOptionalFuelAmount(entry.fuelAt50Percent),
+    fuelAt75Percent: normalizeOptionalFuelAmount(entry.fuelAt75Percent),
+    gasCansSpawnedBySection: normalizeSectionCountMap(entry.gasCansSpawnedBySection),
+    gasCansCollectedBySection: normalizeSectionCountMap(entry.gasCansCollectedBySection),
     longestNoFuelStretch: normalizeNonNegativeNumber(entry.longestNoFuelStretch, 0, 24 * 60 * 60),
     lowFuelTime: normalizeNonNegativeNumber(entry.lowFuelTime, 0, 24 * 60 * 60),
     criticalFuelTime: normalizeNonNegativeNumber(entry.criticalFuelTime, 0, 24 * 60 * 60),
@@ -3444,6 +3497,9 @@ class RoadDirector {
     run.lastGasCanDistance = obstacle.distance;
     run.maxTimeBetweenGasCans = Math.max(run.maxTimeBetweenGasCans || 0, gap);
     if (Array.isArray(run.gasCanGapSamples)) run.gasCanGapSamples.push(gap);
+    if (run.gasCansSpawnedBySection && context.section?.id) {
+      run.gasCansSpawnedBySection[context.section.id] = (run.gasCansSpawnedBySection[context.section.id] || 0) + 1;
+    }
     if (run.fuelOpportunitiesBySection && context.section?.id) {
       run.fuelOpportunitiesBySection[context.section.id] = (run.fuelOpportunitiesBySection[context.section.id] || 0) + 1;
     }
@@ -3655,6 +3711,11 @@ class RoadDirector {
   getSpacingMultiplier(result) {
     if (!result) return 1;
     const cadence = getTrackDirectorCadence(this.manager.getSpeedClassId());
+    const turboFuelSpacing = this.manager.getSpeedClassId() === "turbo"
+      && this.manager.getRaceTypeId() === FUEL_RUN_RACE_TYPE_ID
+      && String(result.type || "").startsWith("fuel")
+      ? 1.12
+      : 1;
     const sectionCadence = getSectionNumber(result.section, "cadenceMultiplier", 1, 0.5, 1.5);
     const sectionRecovery = result.type === "recoveryGap"
       ? getSectionNumber(result.section, "recoveryGapMultiplier", 1, 0.45, 1.6)
@@ -3687,7 +3748,8 @@ class RoadDirector {
       * recoveryScale
       * sectionCadence
       * sectionRecovery
-      * (launchPacing?.spacingMultiplier ?? 1);
+      * (launchPacing?.spacingMultiplier ?? 1)
+      * turboFuelSpacing;
   }
 
   getRandomSecondsScale(result) {
@@ -9027,8 +9089,8 @@ class NeonRoadRally {
       car: { ...DEFAULT_CAR },
       bestScore: 0
     };
-    const track = TRACKS[0];
     const speedClass = getSpeedClassConfig(this.profiles?.data?.speedClassId);
+    const track = createRaceTrackForSpeedClass(TRACKS[0], speedClass.id);
     const section = getTrackSection(track, 0);
     return {
       runId: uid(),
@@ -9059,9 +9121,14 @@ class NeonRoadRally {
       gasCansCollected: 0,
       fuelCollected: 0,
       lowestFuelReached: 0,
+      fuelAt25Percent: null,
+      fuelAt50Percent: null,
+      fuelAt75Percent: null,
       lowFuelSeconds: 0,
       criticalFuelSeconds: 0,
       fuelOpportunitiesBySection: {},
+      gasCansSpawnedBySection: {},
+      gasCansCollectedBySection: {},
       simulatedFuelRestored: 0,
       roadSeed: DEFAULT_ROAD_SEED,
       roadSeedSource: getRunRandomSeedSource(DEFAULT_ROAD_SEED, track, speedClass.id, DEFAULT_RACE_TYPE_ID),
@@ -9309,9 +9376,14 @@ class NeonRoadRally {
     run.gasCansCollected = 0;
     run.fuelCollected = 0;
     run.lowestFuelReached = fuelRun ? tuning.fuelMax : 0;
+    run.fuelAt25Percent = null;
+    run.fuelAt50Percent = null;
+    run.fuelAt75Percent = null;
     run.lowFuelSeconds = 0;
     run.criticalFuelSeconds = 0;
     run.fuelOpportunitiesBySection = {};
+    run.gasCansSpawnedBySection = {};
+    run.gasCansCollectedBySection = {};
     run.simulatedFuelRestored = 0;
   }
 
@@ -9336,6 +9408,10 @@ class NeonRoadRally {
   updateFuelRunTelemetry(dt) {
     const run = this.run;
     if (!run || !isFuelRunRaceType(run.raceTypeId) || dt <= 0) return;
+    const progress = clamp(run.distance / Math.max(1, run.track?.distanceToFinish || 1), 0, 1);
+    if (progress >= 0.25 && run.fuelAt25Percent === null) run.fuelAt25Percent = run.fuel;
+    if (progress >= 0.5 && run.fuelAt50Percent === null) run.fuelAt50Percent = run.fuel;
+    if (progress >= 0.75 && run.fuelAt75Percent === null) run.fuelAt75Percent = run.fuel;
     run.lowestFuelReached = Math.min(
       Number.isFinite(run.lowestFuelReached) ? run.lowestFuelReached : run.fuelMax,
       Number.isFinite(run.fuel) ? run.fuel : run.fuelMax
@@ -9399,6 +9475,10 @@ class NeonRoadRally {
     run.fuel = clamp(run.fuel + restore, 0, run.fuelMax);
     run.gasCansCollected += 1;
     run.fuelCollected += 1;
+    if (run.gasCansCollectedBySection) {
+      const sectionId = obstacle.sectionId || run.currentSectionId || "";
+      if (sectionId) run.gasCansCollectedBySection[sectionId] = (run.gasCansCollectedBySection[sectionId] || 0) + 1;
+    }
     run.lowFuelActive = run.fuel <= run.lowFuelThreshold;
     run.criticalFuelActive = run.fuel <= run.criticalFuelThreshold;
     if (!run.lowFuelActive) run.fuelWarningState = "none";
@@ -9691,8 +9771,9 @@ class NeonRoadRally {
     const challenge = options.challenge ? getChallengeById(options.challenge.id || options.challenge) : getChallengeById(options.challengeId);
     const partyMode = Boolean(options.partyMode) && !challenge;
     const player = options.player ? snapshotPartyPlayer(options.player) : this.profiles.ensureDefaultPlayer();
-    const track = challenge ? getTrackById(challenge.trackId) : (options.track || TRACKS[0]);
     const speedClass = getSpeedClassConfig(challenge ? challenge.raceMode : (options.speedClassId ?? this.profiles.data.speedClassId));
+    const baseTrack = challenge ? getTrackById(challenge.trackId) : (options.track || TRACKS[0]);
+    const track = createRaceTrackForSpeedClass(baseTrack, speedClass.id);
     const raceType = getRaceTypeConfig(challenge
       ? (challenge.raceType || DEFAULT_RACE_TYPE_ID)
       : (partyMode ? DEFAULT_RACE_TYPE_ID : (options.raceTypeId || options.raceType || this.pendingRaceTypeId || DEFAULT_RACE_TYPE_ID)));
@@ -10069,6 +10150,11 @@ class NeonRoadRally {
       gasCansCollected: summary.gasCansCollected,
       fuelRemaining: summary.fuelRemaining,
       lowestFuelReached: isFuelRunRaceType(summary.raceTypeId) ? (run.lowestFuelReached || 0) : 0,
+      fuelAt25Percent: isFuelRunRaceType(summary.raceTypeId) ? run.fuelAt25Percent : null,
+      fuelAt50Percent: isFuelRunRaceType(summary.raceTypeId) ? run.fuelAt50Percent : null,
+      fuelAt75Percent: isFuelRunRaceType(summary.raceTypeId) ? run.fuelAt75Percent : null,
+      gasCansSpawnedBySection: isFuelRunRaceType(summary.raceTypeId) ? normalizeSectionCountMap(run.gasCansSpawnedBySection) : {},
+      gasCansCollectedBySection: isFuelRunRaceType(summary.raceTypeId) ? normalizeSectionCountMap(run.gasCansCollectedBySection) : {},
       longestNoFuelStretch: isFuelRunRaceType(summary.raceTypeId) ? (run.longestNoFuelStretchSeconds || 0) : 0,
       lowFuelTime: isFuelRunRaceType(summary.raceTypeId) ? (run.lowFuelSeconds || 0) : 0,
       criticalFuelTime: isFuelRunRaceType(summary.raceTypeId) ? (run.criticalFuelSeconds || 0) : 0,
@@ -10211,6 +10297,11 @@ class NeonRoadRally {
       gasCansCollected: run.gasCansCollected || 0,
       fuelCollected: run.gasCansCollected || 0,
       fuelRemaining: isFuelRunRaceType(run.raceTypeId) ? Math.max(0, Math.round(run.fuel || 0)) : 0,
+      fuelAt25Percent: isFuelRunRaceType(run.raceTypeId) ? run.fuelAt25Percent : null,
+      fuelAt50Percent: isFuelRunRaceType(run.raceTypeId) ? run.fuelAt50Percent : null,
+      fuelAt75Percent: isFuelRunRaceType(run.raceTypeId) ? run.fuelAt75Percent : null,
+      gasCansSpawnedBySection: isFuelRunRaceType(run.raceTypeId) ? normalizeSectionCountMap(run.gasCansSpawnedBySection) : {},
+      gasCansCollectedBySection: isFuelRunRaceType(run.raceTypeId) ? normalizeSectionCountMap(run.gasCansCollectedBySection) : {},
       fuelBonus: run.bonuses.fuelBonus || 0,
       fuelDrainPerSecond: run.fuelDrainPerSecond || 0,
       gasCanRestoreAmount: run.gasCanRestoreAmount || 0,
@@ -10346,8 +10437,8 @@ class NeonRoadRally {
   }
 
   captureRoadDirectorSequence(options = {}) {
-    const track = options.track || TRACKS[0];
     const speedClassId = normalizeSpeedClassId(options.speedClassId, DEFAULT_SPEED_CLASS_ID);
+    const track = createRaceTrackForSpeedClass(options.track || TRACKS[0], speedClassId);
     const speedClass = getSpeedClassConfig(speedClassId);
     const raceTypeId = normalizeRaceTypeId(options.raceTypeId || options.raceType, DEFAULT_RACE_TYPE_ID);
     const raceType = getRaceTypeConfig(raceTypeId);
@@ -10831,6 +10922,7 @@ class NeonRoadRally {
 
     for (const speedClassId of speedClassIds) {
       const speedClass = getSpeedClassConfig(speedClassId);
+      const runTrack = createRaceTrackForSpeedClass(track, speedClassId);
       perSpeedClass[speedClassId] = {
         label: speedClass.label,
         invalidWalls: 0,
@@ -10871,14 +10963,14 @@ class NeonRoadRally {
         const seed = `${baseSeed}:${raceTypeId}:${speedClassId}:${runIndex}`;
         const rng = createSeededRandom(seed);
         const simRun = {
-          track,
+          track: runTrack,
           speedClassId,
           speedClass,
           raceTypeId,
           raceType: getRaceTypeConfig(raceTypeId),
           distance: 0,
           elapsed: 0,
-          currentSpeed: getTrackCruiseSpeed(track, 0, speedClassId)
+          currentSpeed: getTrackCruiseSpeed(runTrack, 0, speedClassId)
         };
         this.configureFuelForRun(simRun);
         simRun.simulateFuelPickups = fuelRun;
@@ -10888,15 +10980,15 @@ class NeonRoadRally {
           randomFloat: rng
         };
         const manager = new ObstacleManager(simGame);
-        manager.reset(track);
+        manager.reset(runTrack);
         const countedRampIds = new Set();
         let tacticalSampleIndex = 0;
 
-        while (simRun.distance < track.distanceToFinish) {
-          const progress = clamp(simRun.distance / track.distanceToFinish, 0, 1);
-          const section = getTrackSection(track, progress);
+        while (simRun.distance < runTrack.distanceToFinish) {
+          const progress = clamp(simRun.distance / runTrack.distanceToFinish, 0, 1);
+          const section = getTrackSection(runTrack, progress);
           const sectionSafety = ensureSectionSafety(perSpeedClass[speedClassId].sectionSafety, section);
-          simRun.currentSpeed = getTrackCruiseSpeed(track, progress, speedClassId);
+          simRun.currentSpeed = getTrackCruiseSpeed(runTrack, progress, speedClassId);
           if (fuelRun) {
             this.updateFuelRunSimulationState(simRun, dt);
           }
