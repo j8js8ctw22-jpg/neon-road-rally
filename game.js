@@ -229,6 +229,7 @@ const FOUR_LANE_PRESSURE_COOLDOWN = 9000;
 const DEFAULT_SPEED_CLASS_ID = "arcade";
 const DEFAULT_RACE_TYPE_ID = "classic";
 const FUEL_RUN_RACE_TYPE_ID = "fuelRun";
+const DEFAULT_TRACK_ID = "sunset-highway";
 const ROAD_SEED_PREFIXES = ["SUNSET", "TURBO", "ROAD", "NEON", "RALLY", "LANE", "BOOST"];
 const DEFAULT_ROAD_SEED = "ROAD-52819";
 const CLASSIC_SEED_LABEL = "Classic";
@@ -247,8 +248,51 @@ const TRACKS = [
   {
     id: "sunset-highway",
     name: "Sunset Highway",
+    description: "Balanced arcade racing with traffic, boosts, ramps, and music-shaped pressure.",
     music: "audio/sunset-highway.mp3",
+    musicFallback: "audio/sunset-highway.mp3",
+    musicStatus: "Dedicated track music included.",
+    recommendedModes: ["Solo / Seeded Run", "Fuel Run", "Party Mode", "Challenge Mode"],
+    fuelRunSupport: true,
     targetDurationSeconds: 115,
+    speedScale: 1,
+    distanceMultiplierByMode: {},
+    visualTheme: {
+      skyTop: "#1f1548",
+      skyBottom: "#f07a45",
+      horizonGlow: "rgba(255, 172, 82, 0.36)",
+      roadOuter: "#111523",
+      roadInner: "#181d2d",
+      roadShoulder: "#2d1f32",
+      edgeColor: "#ffb347",
+      edgeAltColor: "#ff4f8b",
+      lanePrimary: "rgba(255, 238, 182, 0.82)",
+      laneSecondary: "rgba(255, 113, 145, 0.74)",
+      reflectorColor: "#ffe08a",
+      speedStreakColor: "rgba(255, 180, 82, 0.54)",
+      boostStreakColor: "rgba(70, 240, 255, 0.62)",
+      finishLabel: "SUNSET",
+      roadsidePrimaryLabel: "SUNSET",
+      roadsideSecondaryLabels: ["BOOST", "RALLY"],
+      sceneryDensity: 1,
+      roadDetailIntensity: 1,
+      speedStreakIntensity: 1
+    },
+    roadDirectorProfile: {},
+    allowedObjectMix: {
+      slowCar: 1,
+      fastCar: 1,
+      truck: 1,
+      barrier: 1,
+      cone: 1,
+      oil: 1,
+      branch: 1,
+      deer: 1,
+      boostPad: 1,
+      ramp: 1,
+      gasCan: 1,
+      minorHazardScale: 1
+    },
     sections: [
       {
         id: "launch",
@@ -401,6 +445,264 @@ const TRACKS = [
     difficultyCurve(progress) {
       return Math.min(1, Math.max(0, Math.pow(progress, 0.82)));
     }
+  },
+  {
+    id: "redline-run",
+    name: "Redline Run",
+    description: "Speed-first road challenge. Cleaner lanes, faster traffic, fewer distractions.",
+    music: "audio/redline-run.mp3",
+    musicFallback: "audio/sunset-highway.mp3",
+    musicOptional: true,
+    musicStatus: "Optional Redline theme; falls back safely to Sunset Highway music.",
+    recommendedModes: ["Solo / Seeded Run", "Fuel Run", "Party Mode", "Pro / Turbo"],
+    fuelRunSupport: true,
+    targetDurationSeconds: 78,
+    distanceToFinish: 165000,
+    distanceMultiplierByMode: {
+      sunday: 0.74,
+      rookie: 0.86,
+      arcade: 1,
+      pro: 1.25,
+      turbo: 1.08
+    },
+    speedScale: 1.15,
+    speedScaleByMode: {
+      sunday: 1.1,
+      rookie: 1.14,
+      arcade: 1.2,
+      pro: 1.15,
+      turbo: 1.18
+    },
+    baseSpeed: 1000,
+    maxSpeed: 5200,
+    speedCurveType: "smoothstep",
+    startSpeedMultiplier: 1,
+    earlySpeedMultiplier: 1.18,
+    midSpeedMultiplier: 1.48,
+    lateSpeedMultiplier: 1.82,
+    endSpeedMultiplier: 2.08,
+    visualTheme: {
+      skyTop: "#090816",
+      skyBottom: "#2b0618",
+      horizonGlow: "rgba(255, 45, 85, 0.42)",
+      roadOuter: "#090a12",
+      roadInner: "#11121b",
+      roadShoulder: "#190817",
+      edgeColor: "#ff2d55",
+      edgeAltColor: "#ff4fe1",
+      lanePrimary: "rgba(255, 244, 246, 0.88)",
+      laneSecondary: "rgba(255, 45, 85, 0.76)",
+      reflectorColor: "#27f2ff",
+      speedStreakColor: "rgba(255, 58, 98, 0.66)",
+      boostStreakColor: "rgba(39, 242, 255, 0.72)",
+      finishLabel: "REDLINE",
+      roadsidePrimaryLabel: "REDLINE",
+      roadsideSecondaryLabels: ["FLOW", "FAST"],
+      sceneryDensity: 0.62,
+      roadDetailIntensity: 0.42,
+      speedStreakIntensity: 1.24
+    },
+    roadDirectorProfile: {
+      cadenceScale: 1.1,
+      randomScale: 0.86,
+      spacingScale: 1.06,
+      recoveryScale: 1.18,
+      modeCadenceMultipliers: {
+        sunday: { cadenceScale: 1.18, spacingScale: 1.12, recoveryScale: 1.22 },
+        rookie: { cadenceScale: 1.14, spacingScale: 1.1, recoveryScale: 1.2 },
+        arcade: { cadenceScale: 1.1, spacingScale: 1.08, recoveryScale: 1.16 },
+        pro: { cadenceScale: 1.06, spacingScale: 1.06, recoveryScale: 1.12 },
+        turbo: { cadenceScale: 1.02, spacingScale: 1.05, recoveryScale: 1.08 }
+      },
+      waveWeightMultipliers: {
+        singleBlocker: 0.72,
+        doubleGate: 0.88,
+        offsetPair: 1.32,
+        centerBlock: 1.08,
+        leftRightSweep: 1.22,
+        constructionSqueeze: 0.1,
+        deerCrossing: 0,
+        rampEscape: 0.72,
+        boostTemptation: 1.42,
+        nearMissCorridor: 1.3,
+        fourLaneSpike: 0,
+        recoveryGap: 1.34
+      },
+      forcedMeaningfulWaveMultipliers: {
+        doubleGate: 0.86,
+        offsetPair: 1.28,
+        centerBlock: 1.02,
+        leftRightSweep: 1.2,
+        constructionSqueeze: 0.1,
+        deerCrossing: 0,
+        rampEscape: 0.78,
+        boostTemptation: 1.38,
+        nearMissCorridor: 1.28
+      },
+      fuelWaveWeightMultipliers: {
+        fuelSupport: 1.2,
+        fuelTrafficPressure: 1.12,
+        fuelAfterPressure: 0.86,
+        recoveryGap: 1.28
+      }
+    },
+    allowedObjectMix: {
+      slowCar: 1,
+      fastCar: 1.58,
+      truck: 1.08,
+      barrier: 0.12,
+      cone: 0.06,
+      oil: 0,
+      branch: 0,
+      deer: 0,
+      boostPad: 1.34,
+      ramp: 0.82,
+      gasCan: 1.12,
+      minorHazardScale: 0.08
+    },
+    sections: [
+      {
+        id: "launch",
+        label: "Launch",
+        startProgress: 0,
+        endProgress: 0.14,
+        pressureMultiplier: 0.72,
+        visualIntensity: 0.9,
+        cadenceMultiplier: 1.18,
+        recoveryGapMultiplier: 1.2,
+        forceMeaningfulMultiplier: 1.22,
+        waveWeightMultipliers: {
+          singleBlocker: 1.18,
+          doubleGate: 0.72,
+          offsetPair: 0.58,
+          centerBlock: 0.38,
+          leftRightSweep: 0.32,
+          constructionSqueeze: 0,
+          deerCrossing: 0,
+          rampEscape: 0.65,
+          boostTemptation: 1.35,
+          nearMissCorridor: 0,
+          fourLaneSpike: 0,
+          recoveryGap: 1.18
+        }
+      },
+      {
+        id: "groove",
+        label: "Lane Read",
+        startProgress: 0.14,
+        endProgress: 0.44,
+        pressureMultiplier: 0.88,
+        visualIntensity: 1,
+        cadenceMultiplier: 1.12,
+        recoveryGapMultiplier: 1.14,
+        forceMeaningfulMultiplier: 1.04,
+        waveWeightMultipliers: {
+          singleBlocker: 0.72,
+          doubleGate: 0.92,
+          offsetPair: 1.38,
+          centerBlock: 0.94,
+          leftRightSweep: 1.18,
+          constructionSqueeze: 0.06,
+          deerCrossing: 0,
+          rampEscape: 0.82,
+          boostTemptation: 1.42,
+          nearMissCorridor: 1.1,
+          fourLaneSpike: 0,
+          recoveryGap: 1.2
+        }
+      },
+      {
+        id: "pressure",
+        label: "Redline",
+        startProgress: 0.44,
+        endProgress: 0.64,
+        pressureMultiplier: 1.04,
+        visualIntensity: 1.15,
+        cadenceMultiplier: 1.04,
+        recoveryGapMultiplier: 1,
+        forceMeaningfulMultiplier: 0.9,
+        waveWeightMultipliers: {
+          singleBlocker: 0.54,
+          doubleGate: 0.9,
+          offsetPair: 1.42,
+          centerBlock: 1.12,
+          leftRightSweep: 1.28,
+          constructionSqueeze: 0.08,
+          deerCrossing: 0,
+          rampEscape: 0.7,
+          boostTemptation: 1.24,
+          nearMissCorridor: 1.42,
+          fourLaneSpike: 0,
+          recoveryGap: 1
+        }
+      },
+      {
+        id: "breather",
+        label: "Open Pull",
+        startProgress: 0.64,
+        endProgress: 0.76,
+        pressureMultiplier: 0.62,
+        visualIntensity: 1.02,
+        cadenceMultiplier: 1.22,
+        recoveryGapMultiplier: 1.3,
+        forceMeaningfulMultiplier: 1.16,
+        waveWeightMultipliers: {
+          singleBlocker: 0.72,
+          doubleGate: 0.58,
+          offsetPair: 0.62,
+          centerBlock: 0.34,
+          leftRightSweep: 0.48,
+          constructionSqueeze: 0,
+          deerCrossing: 0,
+          rampEscape: 1.18,
+          boostTemptation: 1.9,
+          nearMissCorridor: 0.28,
+          fourLaneSpike: 0,
+          recoveryGap: 1.82
+        }
+      },
+      {
+        id: "finalPush",
+        label: "Final Dare",
+        startProgress: 0.76,
+        endProgress: 1,
+        pressureMultiplier: 1.18,
+        visualIntensity: 1.34,
+        cadenceMultiplier: 0.96,
+        recoveryGapMultiplier: 0.92,
+        forceMeaningfulMultiplier: 0.82,
+        waveWeightMultipliers: {
+          singleBlocker: 0.42,
+          doubleGate: 0.8,
+          offsetPair: 1.34,
+          centerBlock: 1.12,
+          leftRightSweep: 1.36,
+          constructionSqueeze: 0.1,
+          deerCrossing: 0,
+          rampEscape: 0.72,
+          boostTemptation: 1.18,
+          nearMissCorridor: 1.58,
+          fourLaneSpike: 0,
+          recoveryGap: 0.9
+        }
+      }
+    ],
+    obstacleSettings: {
+      earlySpacing: 1120,
+      lateSpacing: 660,
+      earlySpacingSeconds: 3.25,
+      midSpacingSeconds: 2.08,
+      lateSpacingSeconds: 1.32,
+      spacingRandomSecondsEarly: 0.5,
+      spacingRandomSecondsLate: 0.18,
+      spawnLeadSeconds: 7.3,
+      firstObstacleAt: 2200,
+      warningLead: 560,
+      warningLeadSeconds: 2.8
+    },
+    difficultyCurve(progress) {
+      return Math.min(1, Math.max(0, Math.pow(progress, 0.78)));
+    }
   }
 ];
 
@@ -417,7 +719,7 @@ const RACE_TYPES = [
     id: DEFAULT_RACE_TYPE_ID,
     label: "Classic",
     shortLabel: "Classic",
-    description: "Full Sunset Highway Road Director mix."
+    description: "Full Road Director traffic, boosts, ramps, and finish-line scoring."
   },
   {
     id: FUEL_RUN_RACE_TYPE_ID,
@@ -903,9 +1205,59 @@ function isFuelRunRaceType(value) {
   return normalizeRaceTypeId(value) === FUEL_RUN_RACE_TYPE_ID;
 }
 
-function getTrackById(value) {
+function normalizeTrackId(value, fallback = DEFAULT_TRACK_ID) {
   const id = String(value || "").trim();
+  return TRACKS.some((track) => track.id === id) ? id : fallback;
+}
+
+function getTrackById(value) {
+  const id = normalizeTrackId(value);
   return TRACKS.find((track) => track.id === id) || TRACKS[0];
+}
+
+function getTrackVisualTheme(track = TRACKS[0]) {
+  return {
+    ...(TRACKS[0]?.visualTheme || {}),
+    ...(track?.visualTheme || {})
+  };
+}
+
+function getTrackMusicPath(track = TRACKS[0]) {
+  return String(track?.music || TRACKS[0]?.music || "");
+}
+
+function getTrackMusicFallbackPath(track = TRACKS[0]) {
+  return String(track?.musicFallback || TRACKS[0]?.music || "");
+}
+
+function getTrackMusicStatus(track = TRACKS[0]) {
+  return String(track?.musicStatus || (track?.music ? "Track music configured." : "No track music configured."));
+}
+
+function trackSupportsRaceType(track = TRACKS[0], raceTypeId = DEFAULT_RACE_TYPE_ID) {
+  const id = normalizeRaceTypeId(raceTypeId);
+  if (id === DEFAULT_RACE_TYPE_ID) return true;
+  if (id === FUEL_RUN_RACE_TYPE_ID) return track?.fuelRunSupport !== false;
+  return true;
+}
+
+function getRaceTypesForTrack(track = TRACKS[0]) {
+  return RACE_TYPES.filter((raceType) => trackSupportsRaceType(track, raceType.id));
+}
+
+function getTrackSpeedScale(track = TRACKS[0], speedClassId = DEFAULT_SPEED_CLASS_ID) {
+  const id = normalizeSpeedClassId(speedClassId);
+  const modeScale = Number(track?.speedScaleByMode?.[id]);
+  if (Number.isFinite(modeScale)) return clamp(modeScale, 0.5, 1.8);
+  const scale = Number(track?.speedScale);
+  return Number.isFinite(scale) ? clamp(scale, 0.5, 1.8) : 1;
+}
+
+function getTrackDistanceMultiplier(track = TRACKS[0], speedClassId = DEFAULT_SPEED_CLASS_ID) {
+  const id = normalizeSpeedClassId(speedClassId);
+  const trackMultiplier = Number(track?.distanceMultiplierByMode?.[id]);
+  if (Number.isFinite(trackMultiplier)) return clamp(trackMultiplier, 0.5, 1.8);
+  return getSpeedClassDistanceMultiplier(id);
 }
 
 function getChallengeById(value) {
@@ -935,7 +1287,7 @@ function getSpeedClassDistanceMultiplier(value) {
 
 function createRaceTrackForSpeedClass(track = TRACKS[0], speedClassId = DEFAULT_SPEED_CLASS_ID) {
   const sourceTrack = track || TRACKS[0];
-  const multiplier = getSpeedClassDistanceMultiplier(speedClassId);
+  const multiplier = getTrackDistanceMultiplier(sourceTrack, speedClassId);
   if (Math.abs(multiplier - 1) < 0.001) return sourceTrack;
   const baseDistance = Math.max(1, Math.round(sourceTrack.distanceToFinish || TRACKS[0].distanceToFinish || 1));
   return {
@@ -960,14 +1312,18 @@ function getTrackBaseSpeedCurveT(track, progress) {
 }
 
 function getTrackSpeedMultiplier(track, progress, speedClassId = DEFAULT_SPEED_CLASS_ID) {
-  const startSpeed = getSpeedClassStartSpeed(speedClassId);
-  const cruiseSpeed = getTrackRawCruiseSpeed(track, progress, speedClassId);
+  const safeTrack = track || TRACKS[0];
+  const startSpeed = getTrackRawCruiseSpeed(safeTrack, 0, speedClassId);
+  const cruiseSpeed = getTrackRawCruiseSpeed(safeTrack, progress, speedClassId);
   return cruiseSpeed / Math.max(1, startSpeed);
 }
 
 function getTrackRawCruiseSpeed(track, progress, speedClassId = DEFAULT_SPEED_CLASS_ID) {
-  const startSpeed = getSpeedClassStartSpeed(speedClassId);
-  return lerp(startSpeed, getSpeedClassEndSpeed(speedClassId, track), getTrackBaseSpeedCurveT(track, progress));
+  const safeTrack = track || TRACKS[0];
+  const speedScale = getTrackSpeedScale(safeTrack, speedClassId);
+  const startSpeed = getSpeedClassStartSpeed(speedClassId) * speedScale;
+  const endSpeed = getSpeedClassEndSpeed(speedClassId, safeTrack) * speedScale;
+  return lerp(startSpeed, endSpeed, getTrackBaseSpeedCurveT(safeTrack, progress));
 }
 
 function getTrackCruiseSpeed(track, progress, speedClassId = DEFAULT_SPEED_CLASS_ID) {
@@ -1286,11 +1642,13 @@ function normalizeLeaderboardEntry(entry) {
   const raceType = normalizeRaceTypeId(entry.raceType || entry.raceTypeId, DEFAULT_RACE_TYPE_ID);
   const challenge = getChallengeById(entry.challengeId);
   const challengeId = challenge ? challenge.id : "";
+  const track = getTrackById(entry.trackId);
   return {
     playerName: sanitizePlayerName(entry.playerName, "PLAYER"),
     playerId: normalizeStorageId(entry.playerId, ""),
     carName: sanitizeCarName(entry.carName, "CAR"),
-    trackName: sanitizeName(entry.trackName, "TRACK", DISPLAY_TEXT_MAX_LENGTH),
+    trackId: normalizeTrackId(entry.trackId || track?.id, track?.id || DEFAULT_TRACK_ID),
+    trackName: sanitizeName(entry.trackName || track?.name, track?.name || "TRACK", DISPLAY_TEXT_MAX_LENGTH),
     speedClass,
     raceMode: normalizeSpeedClassId(entry.raceMode || speedClass, speedClass),
     raceType,
@@ -1597,9 +1955,29 @@ function getSectionNumber(section, key, fallback = 1, min = 0.1, max = 3) {
   return clampNumber(section?.[key], min, max, fallback);
 }
 
-function getTrackDirectorCadence(speedClassId = DEFAULT_SPEED_CLASS_ID) {
-  return TRACK_DIRECTOR.modeCadence[normalizeSpeedClassId(speedClassId)]
-    || TRACK_DIRECTOR.modeCadence[DEFAULT_SPEED_CLASS_ID];
+function getTrackDirectorCadence(speedClassId = DEFAULT_SPEED_CLASS_ID, track = TRACKS[0]) {
+  const id = normalizeSpeedClassId(speedClassId);
+  const base = TRACK_DIRECTOR.modeCadence[id] || TRACK_DIRECTOR.modeCadence[DEFAULT_SPEED_CLASS_ID];
+  const profile = track?.roadDirectorProfile || {};
+  const mode = profile.modeCadenceMultipliers?.[id] || {};
+  const cadenceScale = clampNumber(mode.cadenceScale ?? profile.cadenceScale, 0.5, 1.8, 1);
+  const randomScale = clampNumber(mode.randomScale ?? profile.randomScale, 0.25, 1.8, 1);
+  const spacingScale = clampNumber(mode.spacingScale ?? profile.spacingScale, 0.4, 1.8, 1);
+  const recoveryScale = clampNumber(mode.recoveryScale ?? profile.recoveryScale, 0.4, 2.2, 1);
+  return {
+    ...base,
+    early: (base.early ?? 1) * cadenceScale,
+    mid: (base.mid ?? 1) * cadenceScale,
+    late: (base.late ?? 1) * cadenceScale,
+    randomEarly: (base.randomEarly ?? 0) * randomScale,
+    randomLate: (base.randomLate ?? 0) * randomScale,
+    spacingScale: (base.spacingScale ?? 1) * spacingScale,
+    recoveryScale: (base.recoveryScale ?? 1) * recoveryScale,
+    centerSafe: (base.centerSafe ?? TRACK_DIRECTOR.centerSafeSecondsLimit) * cadenceScale,
+    centerHold: (base.centerHold ?? TRACK_DIRECTOR.centerHoldSeconds) * cadenceScale,
+    laneStill: (base.laneStill ?? 3) * cadenceScale,
+    forceMeaningful: (base.forceMeaningful ?? 3) * cadenceScale
+  };
 }
 
 function contrastText(hex) {
@@ -2012,7 +2390,7 @@ class PartySession {
     this.selectedPlayers = players.slice(0, PARTY_MAX_PLAYERS).map(snapshotPartyPlayer);
     this.currentPlayerIndex = clampNumber(options.currentPlayerIndex, 0, Math.max(0, this.selectedPlayers.length - 1), 0);
     this.sharedSeed = normalizeRoadSeed(options.sharedSeed, DEFAULT_ROAD_SEED);
-    this.track = options.track || TRACKS[0];
+    this.track = getTrackById(options.track?.id || options.trackId || DEFAULT_TRACK_ID);
     this.raceMode = normalizeSpeedClassId(options.raceMode, DEFAULT_SPEED_CLASS_ID);
     this.raceType = normalizeRaceTypeId(options.raceType || options.raceTypeId, DEFAULT_RACE_TYPE_ID);
     this.results = Array.isArray(options.results) ? options.results.slice() : [];
@@ -2046,6 +2424,7 @@ class PartySession {
       raceMode: normalizeSpeedClassId(summary?.speedClass || this.raceMode, this.raceMode),
       raceType: normalizeRaceTypeId(summary?.raceTypeId || summary?.raceType || this.raceType, this.raceType),
       seed: normalizeStoredRoadSeed(summary?.seed || this.sharedSeed, this.sharedSeed),
+      trackId: normalizeTrackId(summary?.trackId || this.track?.id, this.track?.id || DEFAULT_TRACK_ID),
       trackName: sanitizeName(summary?.trackName || this.track?.name, "TRACK", DISPLAY_TEXT_MAX_LENGTH),
       fuelCollected: normalizeNonNegativeInteger(summary?.fuelCollected || 0, 0, 999),
       fuelRemaining: normalizeNonNegativeInteger(summary?.fuelRemaining || 0, 0, FUEL_RUN_CONFIG.fuelMax),
@@ -2108,6 +2487,9 @@ class AudioManager {
     this.sfxVolume = clampNumber(settings.sfxVolume, 0, 1, 0.82);
     this.musicKey = null;
     this.fadeId = null;
+    this.raceTrackId = DEFAULT_TRACK_ID;
+    this.optionalMusicAvailability = {};
+    this.optionalMusicProbes = {};
     this.sfxLastPlayed = {};
     this.sfxActiveCounts = {};
     this.lastPlayedSfx = "none";
@@ -2196,6 +2578,61 @@ class AudioManager {
         entry.loaded = "missing";
       }
     });
+  }
+
+  configureMusicEntry(key, path) {
+    const entry = this.tracks[key];
+    if (!entry || entry.path === path) return entry;
+    if (entry.audio) {
+      try {
+        entry.audio.pause();
+      } catch (error) {
+        // Ignore stale audio cleanup failures.
+      }
+    }
+    entry.path = path;
+    entry.audio = null;
+    entry.loaded = "untested";
+    if (this.musicKey === key) this.musicKey = null;
+    return entry;
+  }
+
+  probeOptionalMusic(path) {
+    const musicPath = String(path || "");
+    if (!musicPath || typeof fetch !== "function") return Promise.resolve(false);
+    if (Object.prototype.hasOwnProperty.call(this.optionalMusicAvailability, musicPath)) {
+      return Promise.resolve(Boolean(this.optionalMusicAvailability[musicPath]));
+    }
+    if (this.optionalMusicProbes[musicPath]) return this.optionalMusicProbes[musicPath];
+    this.optionalMusicProbes[musicPath] = fetch(musicPath, { method: "HEAD", cache: "no-store" })
+      .then((response) => response.ok)
+      .catch(() => false)
+      .then((available) => {
+        this.optionalMusicAvailability[musicPath] = Boolean(available);
+        delete this.optionalMusicProbes[musicPath];
+        return Boolean(available);
+      });
+    return this.optionalMusicProbes[musicPath];
+  }
+
+  setRaceMusicTrack(track = TRACKS[0]) {
+    const safeTrack = track || TRACKS[0];
+    const requestedPath = getTrackMusicPath(safeTrack);
+    const fallbackPath = getTrackMusicFallbackPath(safeTrack) || getTrackMusicPath(TRACKS[0]);
+    const optional = Boolean(safeTrack.musicOptional && requestedPath && requestedPath !== fallbackPath);
+    const requestedAvailable = optional
+      ? this.optionalMusicAvailability[requestedPath] === true
+      : Boolean(requestedPath);
+    const path = requestedAvailable ? requestedPath : fallbackPath;
+    this.raceTrackId = safeTrack.id || DEFAULT_TRACK_ID;
+    this.configureMusicEntry("race", path || getTrackMusicPath(TRACKS[0]));
+    if (optional && !Object.prototype.hasOwnProperty.call(this.optionalMusicAvailability, requestedPath)) {
+      this.probeOptionalMusic(requestedPath).then((available) => {
+        if (available && this.raceTrackId === safeTrack.id && this.tracks.race?.path !== requestedPath) {
+          this.configureMusicEntry("race", requestedPath);
+        }
+      });
+    }
   }
 
   playMusic(key, restart = false) {
@@ -3018,7 +3455,7 @@ class RoadDirector {
     const difficulty = track.difficultyCurve(progress);
     const speedClassId = this.manager.getSpeedClassId();
     const raceTypeId = this.manager.getRaceTypeId();
-    const cadence = getTrackDirectorCadence(speedClassId);
+    const cadence = getTrackDirectorCadence(speedClassId, track);
     const modeIntensity = TRACK_DIRECTOR.modeIntensity[speedClassId] || 1;
     const cruiseSpeed = getTrackCruiseSpeed(track, progress, speedClassId);
     const launchPacing = this.getLaunchPacingConfig(speedClassId, section);
@@ -3119,6 +3556,20 @@ class RoadDirector {
     return getSectionNumber({ value: multipliers[type] }, "value", 1, 0, 4);
   }
 
+  getTrackWaveWeight(type, context, key = "waveWeightMultipliers") {
+    const multipliers = context.track?.roadDirectorProfile?.[key] || {};
+    return getSectionNumber({ value: multipliers[type] }, "value", 1, 0, 4);
+  }
+
+  getTrackObjectWeight(type, context) {
+    const weight = Number(context.track?.allowedObjectMix?.[type]);
+    return Number.isFinite(weight) ? clamp(weight, 0, 4) : 1;
+  }
+
+  getTrackMinorFallback(type, context, fallback = "slowCar") {
+    return this.getTrackObjectWeight(type, context) > 0.2 ? type : fallback;
+  }
+
   chooseWaveType(context) {
     if (context.fuelRun) {
       return this.chooseFuelRunWaveType(context);
@@ -3135,6 +3586,7 @@ class RoadDirector {
       let weight = baseWeight;
       if (!this.isWaveAllowed(type, context)) return { value: type, weight: 0 };
       weight *= this.getSectionWaveWeight(type, context);
+      weight *= this.getTrackWaveWeight(type, context);
       if (!context.centerNeedsChallenge && type === "centerBlock") {
         weight *= context.centerSoftPressure;
       }
@@ -3266,6 +3718,8 @@ class RoadDirector {
     }
     weights.forEach((item) => {
       item.weight *= this.getSectionWaveWeight(item.value, context);
+      item.weight *= this.getTrackWaveWeight(item.value, context, "forcedMeaningfulWaveMultipliers");
+      if (!this.isWaveAllowed(item.value, context)) item.weight = 0;
     });
     return weightedChoice(weights, () => this.random()) || "doubleGate";
   }
@@ -3299,7 +3753,10 @@ class RoadDirector {
         { value: "fuelSideTemptation", weight: low ? 1.25 : 1.55 },
         { value: "fuelSplit", weight: context.progress > 0.28 ? 0.55 : 0.12 },
         { value: "fuelLowRescue", weight: critical ? 1.6 : 0.28 }
-      ], () => this.random()) || "fuelTrafficGate";
+      ].map((item) => ({
+        ...item,
+        weight: item.weight * this.getTrackWaveWeight(item.value, context, "fuelWaveWeightMultipliers")
+      })), () => this.random()) || "fuelTrafficGate";
     }
     if (due && canSpawnFuel && this.random() < 0.72) {
       return weightedChoice([
@@ -3307,7 +3764,10 @@ class RoadDirector {
         { value: "fuelTrafficGate", weight: 1.55 },
         { value: "fuelAfterPressure", weight: 1.1 },
         { value: "fuelSplit", weight: context.progress > 0.24 ? 0.48 : 0.08 }
-      ], () => this.random()) || "fuelSideTemptation";
+      ].map((item) => ({
+        ...item,
+        weight: item.weight * this.getTrackWaveWeight(item.value, context, "fuelWaveWeightMultipliers")
+      })), () => this.random()) || "fuelSideTemptation";
     }
 
     const supportWeight = context.progress > 0.18 && context.progress < 0.88 ? 1.7 : 0.72;
@@ -3317,10 +3777,15 @@ class RoadDirector {
       { value: "fuelSideTemptation", weight: canSpawnFuel ? 0.55 : 0 },
       { value: "fuelSupport", weight: supportWeight },
       { value: "fuelAfterPressure", weight: canSpawnFuel ? 0.36 : 0 }
-    ], () => this.random()) || "fuelTrafficPressure";
+    ].map((item) => ({
+      ...item,
+      weight: item.weight * this.getTrackWaveWeight(item.value, context, "fuelWaveWeightMultipliers")
+    })), () => this.random()) || "fuelTrafficPressure";
   }
 
   isWaveAllowed(type, context) {
+    if (this.getTrackWaveWeight(type, context) <= 0) return false;
+    if (type === "deerCrossing" && this.getTrackObjectWeight("deer", context) <= 0) return false;
     if (type === "fourLaneSpike") {
       if (context.progress < TRACK_DIRECTOR.fourLaneMinProgress) return false;
       if (context.speedClassId !== "pro" && context.speedClassId !== "turbo") return false;
@@ -3710,7 +4175,7 @@ class RoadDirector {
 
   getSpacingMultiplier(result) {
     if (!result) return 1;
-    const cadence = getTrackDirectorCadence(this.manager.getSpeedClassId());
+    const cadence = getTrackDirectorCadence(this.manager.getSpeedClassId(), this.manager.track);
     const turboFuelSpacing = this.manager.getSpeedClassId() === "turbo"
       && this.manager.getRaceTypeId() === FUEL_RUN_RACE_TYPE_ID
       && String(result.type || "").startsWith("fuel")
@@ -3754,7 +4219,7 @@ class RoadDirector {
 
   getRandomSecondsScale(result) {
     if (!result) return 1;
-    const cadence = getTrackDirectorCadence(this.manager.getSpeedClassId());
+    const cadence = getTrackDirectorCadence(this.manager.getSpeedClassId(), this.manager.track);
     const speedClassId = this.manager.getSpeedClassId();
     const sectionRandom = getSectionNumber(result.section, "cadenceMultiplier", 1, 0.5, 1.5);
     const launchPacing = this.getLaunchPacingConfig(speedClassId, result.section);
@@ -3939,6 +4404,7 @@ class RoadDirector {
   getMinorHazardScale(context, result = null) {
     if (context.fuelRun) return ROAD_READABILITY_CONFIG.fuelMinorHazardScale;
     let scale = ROAD_READABILITY_CONFIG.minorPressureSpawnScale[context.speedClassId] ?? 0.5;
+    scale *= this.getTrackObjectWeight("minorHazardScale", context);
     if (context.section?.id === "launch") {
       scale *= context.launchPacing?.minorScaleMultiplier ?? LAUNCH_PACING_CONFIG.default.minorScaleMultiplier;
     }
@@ -3960,11 +4426,11 @@ class RoadDirector {
     const includeBranch = options.includeBranch !== false && context.band.id !== "opening";
     const coneWeight = context.speedClassId === "turbo" ? 1.2 : 1.4;
     const choices = [
-      { value: "cone", weight: coneWeight },
-      { value: "oil", weight: context.band.id === "opening" ? 0.16 : 0.72 }
+      { value: "cone", weight: coneWeight * this.getTrackObjectWeight("cone", context) },
+      { value: "oil", weight: (context.band.id === "opening" ? 0.16 : 0.72) * this.getTrackObjectWeight("oil", context) }
     ];
-    if (includeBranch) choices.push({ value: "branch", weight: 0.42 });
-    return weightedChoice(choices, () => this.random()) || "cone";
+    if (includeBranch) choices.push({ value: "branch", weight: 0.42 * this.getTrackObjectWeight("branch", context) });
+    return weightedChoice(choices, () => this.random()) || this.getTrackMinorFallback("cone", context);
   }
 
   staggerDistance(context, factor, min, max) {
@@ -4099,12 +4565,12 @@ class RoadDirector {
   chooseBlockerType(context, heavyChance = 0.25) {
     const difficulty = context.difficulty;
     const options = [
-      { value: "slowCar", weight: 1.5 },
-      { value: "fastCar", weight: 0.55 + difficulty * 1.2 },
-      { value: "truck", weight: Math.max(0, heavyChance - 0.05) + difficulty * 0.35 },
-      { value: "barrier", weight: heavyChance * 0.65 + difficulty * 0.25 },
-      { value: "cone", weight: context.band.id === "opening" ? 0.9 : 0.2 },
-      { value: "oil", weight: context.band.id === "opening" ? 0.08 : 0.18 + difficulty * 0.12 }
+      { value: "slowCar", weight: 1.5 * this.getTrackObjectWeight("slowCar", context) },
+      { value: "fastCar", weight: (0.55 + difficulty * 1.2) * this.getTrackObjectWeight("fastCar", context) },
+      { value: "truck", weight: (Math.max(0, heavyChance - 0.05) + difficulty * 0.35) * this.getTrackObjectWeight("truck", context) },
+      { value: "barrier", weight: (heavyChance * 0.65 + difficulty * 0.25) * this.getTrackObjectWeight("barrier", context) },
+      { value: "cone", weight: (context.band.id === "opening" ? 0.9 : 0.2) * this.getTrackObjectWeight("cone", context) },
+      { value: "oil", weight: (context.band.id === "opening" ? 0.08 : 0.18 + difficulty * 0.12) * this.getTrackObjectWeight("oil", context) }
     ];
     if (context.speedClassId === "sunday") {
       options.find((item) => item.value === "truck").weight *= 0.35;
@@ -4124,7 +4590,7 @@ class RoadDirector {
   waveSingleBlocker(distance, context, result) {
     const lane = this.pickPressureLane(context, context.band.id === "opening" ? 0.24 : 0.38);
     const type = context.band.id === "opening" && this.random() < 0.35
-      ? "cone"
+      ? this.getTrackMinorFallback("cone", context)
       : this.chooseBlockerType(context, 0.12);
     this.spawn(type, lane, distance, result);
     if (context.section?.id === "launch") return;
@@ -4181,7 +4647,7 @@ class RoadDirector {
   }
 
   waveCenterBlock(distance, context, result) {
-    const type = context.progress < 0.3 ? (this.random() < 0.45 ? "cone" : "slowCar") : this.chooseBlockerType(context, 0.2);
+    const type = context.progress < 0.3 ? (this.random() < 0.45 ? this.getTrackMinorFallback("cone", context) : "slowCar") : this.chooseBlockerType(context, 0.2);
     this.spawn(type, TRACK_DIRECTOR.centerLane, distance, result);
     const launchOpening = context.section?.id === "launch";
     if (launchOpening && context.speedClassId === "turbo" && context.progress < 0.1) return;
@@ -4220,7 +4686,7 @@ class RoadDirector {
     for (let i = 0; i < count; i += 1) {
       const lane = start + i * direction;
       if (lane < 0 || lane >= LANES) continue;
-      const type = i === 0 ? "cone" : (this.random() < 0.42 ? "slowCar" : this.chooseBlockerType(context, 0.1));
+      const type = i === 0 ? this.getTrackMinorFallback("cone", context) : (this.random() < 0.42 ? "slowCar" : this.chooseBlockerType(context, 0.1));
       this.spawn(type, lane, distance + i * step, result);
     }
   }
@@ -4240,7 +4706,8 @@ class RoadDirector {
     const secondBarrier = context.difficulty > 0.68
       && !["launch", "groove"].includes(context.section?.id)
       && this.random() < (context.speedClassId === "turbo" ? 0.24 : 0.34);
-    const types = [primaryType, this.random() < 0.58 ? "cone" : "oil", secondBarrier ? "barrier" : "slowCar"];
+    const minorType = this.random() < 0.58 ? this.getTrackMinorFallback("cone", context) : this.getTrackMinorFallback("oil", context);
+    const types = [primaryType, minorType, secondBarrier ? "barrier" : "slowCar"];
     for (let i = 0; i < count; i += 1) {
       let type = types[i];
       if (MINOR_HAZARD_TYPES.has(type) && !this.shouldSpawnMinorHazard(context, 0.72, result)) {
@@ -4285,7 +4752,7 @@ class RoadDirector {
       centerSafeChance: context.centerRestChance * 0.36
     });
     const ramp = this.spawnRampSolution(rampLane, distance, context, result, {
-      targetType: this.random() < 0.68 ? "cone" : this.chooseMinorHazard(context, { includeBranch: true })
+      targetType: this.random() < 0.68 ? this.getTrackMinorFallback("cone", context) : this.chooseMinorHazard(context, { includeBranch: true })
     });
     const lanes = this.orderPressureLanes(context, shuffle(this.lanesExcept(rampLane), () => this.random()));
     const pressureDistance = distance + clamp(context.cruiseSpeed * 0.28, 380, 700);
@@ -4303,7 +4770,7 @@ class RoadDirector {
   waveBoostTemptation(distance, context, result) {
     const blockerLane = this.pickPressureLane(context, 0.46);
     const rewardLane = this.pickRewardLane(context, [blockerLane]);
-    this.spawn(this.random() < 0.72 ? "slowCar" : "cone", blockerLane, distance, result);
+    this.spawn(this.random() < 0.72 ? "slowCar" : this.getTrackMinorFallback("cone", context), blockerLane, distance, result);
     const launchOpening = context.section?.id === "launch";
     if (context.progress > 0.25 && this.canAddPressure(result, "cone", context)) {
       const secondLane = this.pickPressureLane(context, 0.18, [blockerLane, rewardLane]);
@@ -4369,10 +4836,10 @@ class RoadDirector {
   chooseFuelBlockerType(context, heavyChance = 0.22) {
     const difficulty = context.difficulty;
     const options = [
-      { value: "slowCar", weight: 1.65 },
-      { value: "fastCar", weight: 0.65 + difficulty * 1.25 },
-      { value: "truck", weight: heavyChance + difficulty * 0.48 },
-      { value: "barrier", weight: heavyChance * 0.85 + difficulty * 0.42 }
+      { value: "slowCar", weight: 1.65 * this.getTrackObjectWeight("slowCar", context) },
+      { value: "fastCar", weight: (0.65 + difficulty * 1.25) * this.getTrackObjectWeight("fastCar", context) },
+      { value: "truck", weight: (heavyChance + difficulty * 0.48) * this.getTrackObjectWeight("truck", context) },
+      { value: "barrier", weight: (heavyChance * 0.85 + difficulty * 0.42) * this.getTrackObjectWeight("barrier", context) }
     ];
     if (context.speedClassId === "sunday") {
       options.find((item) => item.value === "truck").weight *= 0.42;
@@ -4634,7 +5101,7 @@ class ObstacleManager {
     const baseSpacing = this.getPatternSpacing(spawnProgress, difficulty, cruiseSpeed);
     const spacingMultiplier = this.director.getSpacingMultiplier(wave);
     const randomScale = this.director.getRandomSecondsScale(wave);
-    const cadence = getTrackDirectorCadence(this.getSpeedClassId());
+    const cadence = getTrackDirectorCadence(this.getSpeedClassId(), this.track);
     const randomSeconds = lerp(
       cadence.randomEarly ?? this.track.obstacleSettings.spacingRandomSecondsEarly ?? 0.7,
       cadence.randomLate ?? this.track.obstacleSettings.spacingRandomSecondsLate ?? 0.25,
@@ -5010,7 +5477,7 @@ class ObstacleManager {
 
   getPatternSpacing(progress, difficulty, cruiseSpeed) {
     const settings = this.track.obstacleSettings;
-    const cadence = getTrackDirectorCadence(this.getSpeedClassId());
+    const cadence = getTrackDirectorCadence(this.getSpeedClassId(), this.track);
     const seconds = sampleProgressCurve([
       { progress: 0, value: cadence.early ?? settings.earlySpacingSeconds ?? 3 },
       { progress: 0.5, value: cadence.mid ?? settings.midSpacingSeconds ?? 1.9 },
@@ -6680,12 +7147,13 @@ class Renderer {
     const h = this.height;
     const w = this.width;
     const visualIntensity = this.getRaceVisualIntensity();
+    const theme = this.getCurrentTrackVisualTheme();
     const glowStrength = clamp(TRACK_VISUALS.horizonGlowStrength * clamp(visualIntensity, 0.78, 1.28), 0.45, 1);
     const sky = ctx.createLinearGradient(0, 0, 0, h);
-    sky.addColorStop(0, "#100c2b");
+    sky.addColorStop(0, theme.skyTop || "#100c2b");
     sky.addColorStop(0.26, "#2c0d46");
     sky.addColorStop(0.44, "#5a1943");
-    sky.addColorStop(0.58, "#171224");
+    sky.addColorStop(0.58, theme.skyBottom || "#171224");
     sky.addColorStop(1, "#05050a");
     ctx.fillStyle = sky;
     ctx.fillRect(0, 0, w, h);
@@ -6708,6 +7176,12 @@ class Renderer {
     horizonGlow.addColorStop(1, "rgba(40, 246, 255, 0)");
     ctx.fillStyle = horizonGlow;
     ctx.fillRect(0, horizonY - 180, w, 360);
+    if (theme.horizonGlow) {
+      ctx.globalAlpha = glowStrength;
+      ctx.fillStyle = theme.horizonGlow;
+      ctx.fillRect(0, horizonY - 132, w, 264);
+      ctx.globalAlpha = 1;
+    }
 
     this.drawHorizonSilhouettes(horizonY);
 
@@ -6777,6 +7251,14 @@ class Renderer {
     return clamp(run.currentSpeed / Math.max(1, run.track.maxSpeed), 0, 1.18);
   }
 
+  getCurrentTrackVisualTheme() {
+    const run = this.game.run;
+    const track = (this.game.screen === "game" || this.game.screen === "score")
+      ? run?.track
+      : getTrackById(this.game.pendingTrackId || DEFAULT_TRACK_ID);
+    return getTrackVisualTheme(track || TRACKS[0]);
+  }
+
   getFinalStretchIntensity() {
     const run = this.game.run;
     if (!run || !run.track || this.game.screen !== "game") return 0;
@@ -6800,7 +7282,9 @@ class Renderer {
     const scrollSource = this.getVisualDistance();
     const speedRatio = this.getVisualSpeedRatio();
     const visualIntensity = this.getRaceVisualIntensity();
-    const spacing = TRACK_VISUALS.scenerySpacing / Math.max(0.55, TRACK_VISUALS.sceneryDensity);
+    const theme = this.getCurrentTrackVisualTheme();
+    const sceneryDensity = (TRACK_VISUALS.sceneryDensity || 1) * clampNumber(theme.sceneryDensity, 0.3, 1.4, 1);
+    const spacing = TRACK_VISUALS.scenerySpacing / Math.max(0.55, sceneryDensity);
     const sceneryScrollScale = 0.22 + speedRatio * 0.12;
     const scroll = (scrollSource * sceneryScrollScale) % spacing;
     const count = Math.ceil(this.height / spacing) + 4;
@@ -6827,9 +7311,12 @@ class Renderer {
       if (typeRoll < 0.42) {
         this.drawPalmSilhouette(x, y, scale, side);
       } else if (typeRoll < 0.68) {
-        this.drawRoadsideBillboard(x, y, scale, side, signRoll < TRACK_VISUALS.roadsideSignFrequency ? "SUNSET HWY" : "");
+        this.drawRoadsideBillboard(x, y, scale, side, signRoll < TRACK_VISUALS.roadsideSignFrequency ? (theme.roadsidePrimaryLabel || "SUNSET") : "");
       } else if (typeRoll < 0.82) {
-        this.drawNeonMileSign(x, y, scale, side, signRoll < 0.5 ? "GAS" : "EAT");
+        const secondary = Array.isArray(theme.roadsideSecondaryLabels) && theme.roadsideSecondaryLabels.length
+          ? theme.roadsideSecondaryLabels
+          : ["GAS", "EAT"];
+        this.drawNeonMileSign(x, y, scale, side, secondary[signRoll < 0.5 ? 0 : Math.min(1, secondary.length - 1)]);
       } else {
         this.drawLowDesertRock(x, y, scale, warmth);
       }
@@ -7005,11 +7492,12 @@ class Renderer {
     const ctx = this.ctx;
     const road = this.road;
     const visualIntensity = this.getRaceVisualIntensity();
+    const theme = this.getCurrentTrackVisualTheme();
     ctx.save();
     ctx.globalAlpha = alpha;
-    ctx.fillStyle = "#161722";
+    ctx.fillStyle = theme.roadOuter || "#161722";
     ctx.fillRect(road.x, road.y, road.w, road.h);
-    ctx.fillStyle = "#10111a";
+    ctx.fillStyle = theme.roadInner || "#10111a";
     ctx.fillRect(road.x + 8, road.y, road.w - 16, road.h);
 
     ctx.fillStyle = "rgba(255, 255, 255, 0.04)";
@@ -7023,8 +7511,8 @@ class Renderer {
     this.drawRoadSurfaceDetails(scrollSource, alpha);
 
     ctx.shadowBlur = 14 * visualIntensity;
-    ctx.shadowColor = "#28f6ff";
-    ctx.strokeStyle = "#28f6ff";
+    ctx.shadowColor = theme.edgeColor || "#28f6ff";
+    ctx.strokeStyle = theme.edgeColor || "#28f6ff";
     ctx.lineWidth = 4 + Math.max(0, visualIntensity - 1) * 1.5;
     ctx.beginPath();
     ctx.moveTo(road.x, road.y);
@@ -7041,8 +7529,8 @@ class Renderer {
     ctx.globalAlpha = alpha * clamp(visualIntensity * lanePulse, 0.78, 1.24);
     for (let lane = 1; lane < LANES; lane += 1) {
       const x = road.x + lane * road.laneW;
-      ctx.shadowColor = lane % 2 ? "#ff3fd1" : "#ffe45e";
-      ctx.strokeStyle = lane % 2 ? "#ff3fd1" : "#ffe45e";
+      ctx.shadowColor = lane % 2 ? (theme.laneSecondary || "#ff3fd1") : (theme.lanePrimary || "#ffe45e");
+      ctx.strokeStyle = lane % 2 ? (theme.laneSecondary || "#ff3fd1") : (theme.lanePrimary || "#ffe45e");
       ctx.lineWidth = 3;
       for (let y = road.y - dashHeight + scroll; y < road.y + road.h + dashHeight; y += dashHeight + gap) {
         ctx.beginPath();
@@ -7068,7 +7556,8 @@ class Renderer {
     const ctx = this.ctx;
     const road = this.road;
     const visualIntensity = this.getRaceVisualIntensity();
-    const intensity = TRACK_VISUALS.roadDetailIntensity * alpha * clamp(visualIntensity, 0.78, 1.18);
+    const theme = this.getCurrentTrackVisualTheme();
+    const intensity = TRACK_VISUALS.roadDetailIntensity * clampNumber(theme.roadDetailIntensity, 0.2, 1.4, 1) * alpha * clamp(visualIntensity, 0.78, 1.18);
     const bandSpacing = TRACK_VISUALS.asphaltBandSpacing;
     const seamSpacing = TRACK_VISUALS.roadSeamSpacing;
     const bandScroll = (scrollSource * 0.28) % bandSpacing;
@@ -7100,7 +7589,7 @@ class Renderer {
       const x = road.x + lane * road.laneW;
       const laneGlow = ctx.createLinearGradient(x, 0, x + road.laneW, 0);
       laneGlow.addColorStop(0, "rgba(40, 246, 255, 0.02)");
-      laneGlow.addColorStop(0.5, lane % 2 ? "rgba(255, 63, 209, 0.035)" : "rgba(255, 228, 94, 0.025)");
+      laneGlow.addColorStop(0.5, lane % 2 ? (theme.laneSecondary || "rgba(255, 63, 209, 0.035)") : (theme.lanePrimary || "rgba(255, 228, 94, 0.025)"));
       laneGlow.addColorStop(1, "rgba(40, 246, 255, 0.02)");
       ctx.fillStyle = laneGlow;
       ctx.fillRect(x + 3, road.y, road.laneW - 6, road.h);
@@ -7113,6 +7602,7 @@ class Renderer {
     const road = this.road;
     const speedRatio = this.getVisualSpeedRatio();
     const visualIntensity = this.getRaceVisualIntensity();
+    const theme = this.getCurrentTrackVisualTheme();
     const lightSpacing = TRACK_VISUALS.edgeLightSpacing;
     const reflectorSpacing = TRACK_VISUALS.reflectorSpacing;
     const lightScroll = (scrollSource * (0.72 + speedRatio * 0.42) * clamp(visualIntensity, 0.92, 1.12)) % lightSpacing;
@@ -7123,7 +7613,7 @@ class Renderer {
     for (let y = road.y - lightSpacing + lightScroll; y < road.y + road.h + lightSpacing; y += lightSpacing) {
       const t = clamp((y - road.y) / Math.max(1, road.h), 0, 1);
       const size = lerp(3, 7, t);
-      const color = Math.floor(y / lightSpacing) % 2 ? "#ff3fd1" : "#28f6ff";
+      const color = Math.floor(y / lightSpacing) % 2 ? (theme.edgeAltColor || "#ff3fd1") : (theme.edgeColor || "#28f6ff");
       ctx.shadowBlur = 12 * visualIntensity;
       ctx.shadowColor = color;
       ctx.fillStyle = color;
@@ -7133,7 +7623,7 @@ class Renderer {
 
     ctx.shadowBlur = 0;
     ctx.globalAlpha = alpha * 0.42;
-    ctx.fillStyle = "#ffe45e";
+    ctx.fillStyle = theme.reflectorColor || "#ffe45e";
     for (let y = road.y - reflectorSpacing + reflectorScroll; y < road.y + road.h + reflectorSpacing; y += reflectorSpacing) {
       ctx.fillRect(road.x + 10, y, 5, 16);
       ctx.fillRect(road.x + road.w - 15, y, 5, 16);
@@ -7149,12 +7639,13 @@ class Renderer {
     if (glowIntensity <= 0) return;
     const ctx = this.ctx;
     const road = this.road;
+    const theme = this.getCurrentTrackVisualTheme();
     ctx.save();
     ctx.globalAlpha = alpha * glowIntensity * 0.22;
     const glow = ctx.createLinearGradient(0, road.y, 0, road.y + road.h);
     glow.addColorStop(0, "rgba(255, 228, 94, 0)");
-    glow.addColorStop(0.6, "rgba(255, 95, 68, 0.24)");
-    glow.addColorStop(1, "rgba(255, 63, 209, 0.12)");
+    glow.addColorStop(0.6, theme.speedStreakColor || "rgba(255, 95, 68, 0.24)");
+    glow.addColorStop(1, theme.edgeAltColor || "rgba(255, 63, 209, 0.12)");
     ctx.fillStyle = glow;
     ctx.fillRect(road.x, road.y, road.w, road.h);
     ctx.restore();
@@ -7193,6 +7684,7 @@ class Renderer {
     if (y < this.road.y - 110 || y > this.height + 140) return;
     const ctx = this.ctx;
     const road = this.road;
+    const theme = this.getCurrentTrackVisualTheme();
     const postH = 104 * scale;
     const topY = y - postH;
     const leftX = road.x - 38 * scale;
@@ -7200,8 +7692,8 @@ class Renderer {
     ctx.save();
     ctx.globalAlpha = 0.96;
     ctx.shadowBlur = 22;
-    ctx.shadowColor = "#ffe45e";
-    ctx.strokeStyle = "#ffe45e";
+    ctx.shadowColor = theme.edgeColor || "#ffe45e";
+    ctx.strokeStyle = theme.edgeColor || "#ffe45e";
     ctx.lineWidth = Math.max(3, 5 * scale);
     ctx.beginPath();
     ctx.moveTo(leftX, y + 30 * scale);
@@ -7212,17 +7704,17 @@ class Renderer {
     ctx.shadowBlur = 0;
     ctx.fillStyle = "rgba(5, 7, 18, 0.9)";
     ctx.fillRect(leftX + 12 * scale, topY - 20 * scale, rightX - leftX - 24 * scale, 36 * scale);
-    ctx.strokeStyle = "#28f6ff";
+    ctx.strokeStyle = theme.edgeAltColor || "#28f6ff";
     ctx.lineWidth = Math.max(2, 3 * scale);
     ctx.strokeRect(leftX + 12 * scale, topY - 20 * scale, rightX - leftX - 24 * scale, 36 * scale);
     ctx.fillStyle = "#f6fbff";
     ctx.font = `900 ${Math.max(12, 18 * scale)}px Trebuchet MS, Verdana, sans-serif`;
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
-    ctx.fillText("SUNSET HWY", road.x + road.w / 2, topY - 2 * scale);
+    ctx.fillText(theme.finishLabel || "SUNSET", road.x + road.w / 2, topY - 2 * scale);
     for (let i = 0; i < 6; i += 1) {
       const x = lerp(leftX + 38 * scale, rightX - 38 * scale, i / 5);
-      ctx.fillStyle = i % 2 ? "#ff3fd1" : "#44ff99";
+      ctx.fillStyle = i % 2 ? (theme.edgeAltColor || "#ff3fd1") : (theme.reflectorColor || "#44ff99");
       ctx.beginPath();
       ctx.arc(x, y + 38 * scale, 6 * scale, 0, Math.PI * 2);
       ctx.fill();
@@ -7407,14 +7899,16 @@ class Renderer {
     const ctx = this.ctx;
     const speedRatio = this.getVisualSpeedRatio();
     const finalStretch = this.getFinalStretchIntensity();
+    const theme = this.getCurrentTrackVisualTheme();
     const intensity = (run.boostTimer > 0 ? 0.42 : (run.padBoostTimer > 0 ? 0.32 : (sectionEnergy ? 0.14 : 0.18)))
       * TRACK_VISUALS.speedStreakIntensity
+      * clampNumber(theme.speedStreakIntensity, 0.4, 1.8, 1)
       * (1 + finalStretch * 0.25)
       * clamp(visualIntensity, 0.8, 1.35);
     const lineCount = Math.round((run.boostTimer > 0 ? 34 : (run.padBoostTimer > 0 ? 24 : (sectionEnergy ? 18 : 16))) * (0.85 + speedRatio * 0.35) * clamp(visualIntensity, 0.92, 1.18));
     ctx.save();
     ctx.globalAlpha = intensity;
-    ctx.strokeStyle = boosting ? "#28f6ff" : "#f6fbff";
+    ctx.strokeStyle = boosting ? (theme.boostStreakColor || "#28f6ff") : (theme.speedStreakColor || "#f6fbff");
     ctx.lineWidth = boosting ? 2.5 : 1.5;
     for (let i = 0; i < lineCount; i += 1) {
       const side = i % 2 === 0 ? -1 : 1;
@@ -9066,6 +9560,7 @@ class NeonRoadRally {
     this.attractDistance = 0;
     this.pendingRoadSeed = generateReadableRoadSeed();
     this.pendingRaceTypeId = DEFAULT_RACE_TYPE_ID;
+    this.pendingTrackId = DEFAULT_TRACK_ID;
     this.partySetup = null;
     this.partySession = null;
     this.playtestReportFilter = "all";
@@ -9630,6 +10125,7 @@ class NeonRoadRally {
     if (!run || this.audio.musicMuted) return;
     if (restart && run.raceMusicStarted) return;
     run.raceMusicStarted = true;
+    this.audio.setRaceMusicTrack(run.track || TRACKS[0]);
     this.audio.playMusic("race", restart);
   }
 
@@ -9772,11 +10268,13 @@ class NeonRoadRally {
     const partyMode = Boolean(options.partyMode) && !challenge;
     const player = options.player ? snapshotPartyPlayer(options.player) : this.profiles.ensureDefaultPlayer();
     const speedClass = getSpeedClassConfig(challenge ? challenge.raceMode : (options.speedClassId ?? this.profiles.data.speedClassId));
-    const baseTrack = challenge ? getTrackById(challenge.trackId) : (options.track || TRACKS[0]);
+    const baseTrack = challenge ? getTrackById(challenge.trackId) : getTrackById(options.track?.id || options.trackId || this.pendingTrackId || DEFAULT_TRACK_ID);
     const track = createRaceTrackForSpeedClass(baseTrack, speedClass.id);
-    const raceType = getRaceTypeConfig(challenge
+    const requestedRaceTypeId = challenge
       ? (challenge.raceType || DEFAULT_RACE_TYPE_ID)
-      : (partyMode ? DEFAULT_RACE_TYPE_ID : (options.raceTypeId || options.raceType || this.pendingRaceTypeId || DEFAULT_RACE_TYPE_ID)));
+      : (partyMode ? DEFAULT_RACE_TYPE_ID : (options.raceTypeId || options.raceType || this.pendingRaceTypeId || DEFAULT_RACE_TYPE_ID));
+    const safeRaceTypeId = trackSupportsRaceType(baseTrack, requestedRaceTypeId) ? requestedRaceTypeId : DEFAULT_RACE_TYPE_ID;
+    const raceType = getRaceTypeConfig(safeRaceTypeId);
     if (this.scoreTallyFrame) {
       cancelAnimationFrame(this.scoreTallyFrame);
       this.scoreTallyFrame = null;
@@ -9814,6 +10312,7 @@ class NeonRoadRally {
     this.updateRaceSection(false);
     this.configureRunSeed(challenge ? challenge.seed : (options.seed ?? this.pendingRoadSeed), track, speedClass.id, raceType.id);
     this.pendingRaceTypeId = raceType.id;
+    this.pendingTrackId = baseTrack.id;
     if (this.input) this.input.clearGameplayInput();
     this.obstacles.reset(track);
     this.setScreen("game");
@@ -10238,6 +10737,7 @@ class NeonRoadRally {
       playerId: player.id,
       playerName: player.name,
       carName: player.car.name,
+      trackId: run.track.id,
       trackName: run.track.name,
       seed: run.roadSeed,
       speedClass: run.speedClassId,
@@ -10266,6 +10766,7 @@ class NeonRoadRally {
       playerId: player.id,
       playerName: player.name,
       carName: player.car.name,
+      trackId: run.track.id,
       trackName: run.track.name,
       partyMode: Boolean(run.partyMode),
       challengeMode: Boolean(run.challengeMode),
@@ -10438,9 +10939,11 @@ class NeonRoadRally {
 
   captureRoadDirectorSequence(options = {}) {
     const speedClassId = normalizeSpeedClassId(options.speedClassId, DEFAULT_SPEED_CLASS_ID);
-    const track = createRaceTrackForSpeedClass(options.track || TRACKS[0], speedClassId);
+    const baseTrack = getTrackById(options.track?.id || options.trackId || DEFAULT_TRACK_ID);
+    const track = createRaceTrackForSpeedClass(baseTrack, speedClassId);
     const speedClass = getSpeedClassConfig(speedClassId);
-    const raceTypeId = normalizeRaceTypeId(options.raceTypeId || options.raceType, DEFAULT_RACE_TYPE_ID);
+    const requestedRaceTypeId = normalizeRaceTypeId(options.raceTypeId || options.raceType, DEFAULT_RACE_TYPE_ID);
+    const raceTypeId = trackSupportsRaceType(baseTrack, requestedRaceTypeId) ? requestedRaceTypeId : DEFAULT_RACE_TYPE_ID;
     const raceType = getRaceTypeConfig(raceTypeId);
     const seed = normalizeRoadSeed(options.seed, DEFAULT_ROAD_SEED);
     const waveLimit = Math.max(1, Math.round(options.waveLimit || 10));
@@ -10524,24 +11027,34 @@ class NeonRoadRally {
   runSeedDeterminismTest(options = {}) {
     const seed = normalizeRoadSeed(options.seed, "TEST-123");
     const speedClassId = normalizeSpeedClassId(options.speedClassId, DEFAULT_SPEED_CLASS_ID);
-    const raceTypeId = normalizeRaceTypeId(options.raceTypeId || options.raceType, DEFAULT_RACE_TYPE_ID);
+    const track = getTrackById(options.track?.id || options.trackId || this.pendingTrackId || DEFAULT_TRACK_ID);
+    const requestedRaceTypeId = normalizeRaceTypeId(options.raceTypeId || options.raceType, DEFAULT_RACE_TYPE_ID);
+    const raceTypeId = trackSupportsRaceType(track, requestedRaceTypeId) ? requestedRaceTypeId : DEFAULT_RACE_TYPE_ID;
     const alternateSeed = normalizeRoadSeed(options.alternateSeed, seed === "TEST-456" ? "TEST-789" : "TEST-456");
     const alternateMode = speedClassId === "turbo" ? "arcade" : "turbo";
     const alternateRaceType = raceTypeId === FUEL_RUN_RACE_TYPE_ID ? DEFAULT_RACE_TYPE_ID : FUEL_RUN_RACE_TYPE_ID;
+    const alternateTrack = getTrackById(options.alternateTrack?.id || options.alternateTrackId || TRACKS.find((item) => item.id !== track.id)?.id || track.id);
     const waveLimit = options.waveLimit || 10;
-    const first = this.captureRoadDirectorSequence({ seed, speedClassId, raceTypeId, waveLimit });
-    const repeat = this.captureRoadDirectorSequence({ seed, speedClassId, raceTypeId, waveLimit });
-    const changedSeed = this.captureRoadDirectorSequence({ seed: alternateSeed, speedClassId, raceTypeId, waveLimit });
-    const changedMode = this.captureRoadDirectorSequence({ seed, speedClassId: alternateMode, raceTypeId, waveLimit });
-    const changedRaceType = this.captureRoadDirectorSequence({ seed, speedClassId, raceTypeId: alternateRaceType, waveLimit });
+    const first = this.captureRoadDirectorSequence({ seed, speedClassId, raceTypeId, track, waveLimit });
+    const repeat = this.captureRoadDirectorSequence({ seed, speedClassId, raceTypeId, track, waveLimit });
+    const changedSeed = this.captureRoadDirectorSequence({ seed: alternateSeed, speedClassId, raceTypeId, track, waveLimit });
+    const changedMode = this.captureRoadDirectorSequence({ seed, speedClassId: alternateMode, raceTypeId, track, waveLimit });
+    const changedRaceType = this.captureRoadDirectorSequence({ seed, speedClassId, raceTypeId: alternateRaceType, track, waveLimit });
+    const changedTrack = this.captureRoadDirectorSequence({ seed, speedClassId, raceTypeId, track: alternateTrack, waveLimit });
     const firstFingerprint = this.getRoadDirectorSequenceFingerprint(first.sequence);
     const repeatFingerprint = this.getRoadDirectorSequenceFingerprint(repeat.sequence);
     const changedSeedFingerprint = this.getRoadDirectorSequenceFingerprint(changedSeed.sequence);
     const changedModeFingerprint = this.getRoadDirectorSequenceFingerprint(changedMode.sequence);
     const changedRaceTypeFingerprint = this.getRoadDirectorSequenceFingerprint(changedRaceType.sequence);
+    const changedTrackFingerprint = this.getRoadDirectorSequenceFingerprint(changedTrack.sequence);
+    const differentTrackChanges = alternateTrack.id === track.id || firstFingerprint !== changedTrackFingerprint;
     const summary = {
       seed,
       alternateSeed,
+      trackId: track.id,
+      trackName: track.name,
+      alternateTrackId: alternateTrack.id,
+      alternateTrackName: alternateTrack.name,
       speedClassId,
       raceTypeId,
       alternateMode,
@@ -10552,15 +11065,18 @@ class NeonRoadRally {
       differentSeedChanges: firstFingerprint !== changedSeedFingerprint,
       differentModeChanges: firstFingerprint !== changedModeFingerprint,
       differentRaceTypeChanges: firstFingerprint !== changedRaceTypeFingerprint,
+      differentTrackChanges,
       first,
       repeat,
       changedSeed,
       changedMode,
       changedRaceType,
+      changedTrack,
       pass: firstFingerprint === repeatFingerprint
         && firstFingerprint !== changedSeedFingerprint
         && firstFingerprint !== changedModeFingerprint
         && firstFingerprint !== changedRaceTypeFingerprint
+        && differentTrackChanges
     };
     this.seedDeterminismStatus = summary;
     if (options.show !== false) {
@@ -11313,6 +11829,7 @@ class NeonRoadRally {
     const seedDeterminism = this.runSeedDeterminismTest({
       seed: "SECTION-TEST",
       speedClassId: DEFAULT_SPEED_CLASS_ID,
+      trackId: track.id,
       raceTypeId,
       waveLimit: 18,
       show: false
@@ -11584,6 +12101,7 @@ class NeonRoadRally {
         <div class="score-grid">
           <div class="score-card"><strong>Result</strong><span>${summary.pass ? "PASS" : "FAIL"}</span></div>
           <div class="score-card"><strong>Seed</strong><span>${escapeHtml(summary.seed)}</span></div>
+          <div class="score-card"><strong>Track</strong><span>${escapeHtml(summary.trackName || getTrackById(summary.trackId).name)}</span></div>
           <div class="score-card"><strong>Race Type</strong><span>${escapeHtml(getRaceTypeLabel(summary.raceTypeId))}</span></div>
           <div class="score-card"><strong>Race Mode</strong><span>${escapeHtml(getSpeedClassLabel(summary.speedClassId))}</span></div>
           <div class="score-card"><strong>Seed Hash</strong><span>${summary.seedHash >>> 0}</span></div>
@@ -11591,12 +12109,14 @@ class NeonRoadRally {
           <div class="score-card"><strong>Different Seed</strong><span>${summary.differentSeedChanges ? "CHANGED" : "SAME"}</span></div>
           <div class="score-card"><strong>Different Mode</strong><span>${summary.differentModeChanges ? "CHANGED" : "SAME"}</span></div>
           <div class="score-card"><strong>Different Type</strong><span>${summary.differentRaceTypeChanges ? "CHANGED" : "SAME"}</span></div>
+          <div class="score-card"><strong>Different Track</strong><span>${summary.differentTrackChanges ? "CHANGED" : "SAME"}</span></div>
           <div class="score-card"><strong>Waves Checked</strong><span>${summary.waveLimit}</span></div>
         </div>
         <p class="hint">First sequence: ${escapeHtml(summary.first.sequence.slice(0, 8).map(sequenceLine).join(" | "))}</p>
         <p class="hint">Changed-seed sequence: ${escapeHtml(summary.changedSeed.sequence.slice(0, 8).map(sequenceLine).join(" | "))}</p>
         <p class="hint">Changed-mode sequence: ${escapeHtml(summary.changedMode.sequence.slice(0, 8).map(sequenceLine).join(" | "))}</p>
         <p class="hint">Changed-type sequence: ${escapeHtml(summary.changedRaceType.sequence.slice(0, 8).map(sequenceLine).join(" | "))}</p>
+        <p class="hint">Changed-track sequence: ${escapeHtml(summary.changedTrack.sequence.slice(0, 8).map(sequenceLine).join(" | "))}</p>
         <div class="row" style="margin-top:16px">
           <button class="small-button" data-action="runSeedTest">Run Again</button>
           <button class="small-button" data-action="title">Back to Title</button>
@@ -11883,7 +12403,7 @@ class NeonRoadRally {
     this.layer.innerHTML = `
       <section class="panel title-panel show-title-panel">
         <div class="title-block">
-          <div class="eyebrow">Sunset Highway Show Build</div>
+          <div class="eyebrow">Track Select Show Build</div>
           <h1 class="game-title"><span>Neon</span><span>Road</span><span>Rally</span></h1>
           <p class="subtitle title-tagline">Five lanes. One car. No brakes. Beat the room.</p>
           <div class="title-status-grid">
@@ -12103,6 +12623,7 @@ class NeonRoadRally {
       totalCombinedRouteFailures: runs.reduce((sum, run) => sum + (Number(run.combinedRouteFailures) || 0), 0),
       totalBarrierCount: runs.reduce((sum, run) => sum + (Number(run.barrierCount) || 0), 0),
       totalSupportObjectsSuppressedByDensity: runs.reduce((sum, run) => sum + (Number(run.supportObjectsSuppressedByDensity) || 0), 0),
+      trackRows: this.groupPlaytestRuns(runs, "trackId", "trackName"),
       modeRows: this.groupPlaytestRuns(runs, "raceModeId", "raceModeLabel"),
       typeRows: this.groupPlaytestRuns(runs, "raceTypeId", "raceTypeLabel"),
       crashRows,
@@ -12188,6 +12709,7 @@ class NeonRoadRally {
         totalBarrierCount: aggregate.totalBarrierCount,
         totalSupportObjectsSuppressedByDensity: aggregate.totalSupportObjectsSuppressedByDensity
       },
+      completionByTrack: aggregate.trackRows,
       completionByRaceMode: aggregate.modeRows,
       completionByRaceType: aggregate.typeRows,
       crashCountByObstacleType: aggregate.crashRows,
@@ -12207,6 +12729,12 @@ class NeonRoadRally {
     const filterButtons = PLAYTEST_REPORT_FILTERS.map((item) => `
       <button class="small-button ${item.id === filter ? "primary" : ""}" data-action="showPlaytestReport" data-filter="${escapeAttr(item.id)}">${escapeHtml(item.label)}</button>
     `).join("");
+    const trackList = this.renderPlaytestSummaryList(aggregate.trackRows, "No track data yet.", (row) => `
+      <li class="leaderboard-item playtest-report-row">
+        <span class="leaderboard-rank">${escapeHtml(row.label)}</span>
+        <span class="meta">${row.count} runs · ${this.formatPlaytestPercent(row.completionRate)} finished · Avg ${formatScore(row.averageScore)} · ${formatTime(row.averageDuration)}</span>
+      </li>
+    `);
     const modeList = this.renderPlaytestSummaryList(aggregate.modeRows, "No mode data yet.", (row) => `
       <li class="leaderboard-item playtest-report-row">
         <span class="leaderboard-rank">${escapeHtml(row.label)}</span>
@@ -12275,6 +12803,10 @@ class NeonRoadRally {
         </div>
         <div class="playtest-report-columns">
           <section>
+            <h3>Tracks</h3>
+            ${trackList}
+          </section>
+          <section>
             <h3>Race Modes</h3>
             ${modeList}
           </section>
@@ -12318,6 +12850,79 @@ class NeonRoadRally {
     }
   }
 
+  formatSpeedClassOptionForTrack(track, speedClass) {
+    const raceTrack = createRaceTrackForSpeedClass(track, speedClass.id);
+    const startSpeed = Math.round(getTrackCruiseSpeed(raceTrack, 0, speedClass.id));
+    const endSpeed = Math.round(getTrackCruiseSpeed(raceTrack, 1, speedClass.id));
+    return `${speedClass.label} · ${startSpeed}-${endSpeed} MPH · x${speedClass.scoreMultiplier.toFixed(2)}`;
+  }
+
+  renderRaceTypeOptionsForTrack(track, selectedRaceTypeId) {
+    const supported = getRaceTypesForTrack(track);
+    const selectedId = supported.some((item) => item.id === selectedRaceTypeId)
+      ? selectedRaceTypeId
+      : DEFAULT_RACE_TYPE_ID;
+    return supported.map((item) => (
+      `<option value="${escapeAttr(item.id)}" ${item.id === selectedId ? "selected" : ""}>${escapeHtml(item.label)} - ${escapeHtml(item.description)}</option>`
+    )).join("");
+  }
+
+  renderTrackSelect(name, selectedTrackId) {
+    const selectedId = normalizeTrackId(selectedTrackId, DEFAULT_TRACK_ID);
+    return `
+      <div class="track-select-grid" role="radiogroup" aria-label="Track Select">
+        ${TRACKS.map((track) => {
+          const selected = track.id === selectedId;
+          const modes = Array.isArray(track.recommendedModes) ? track.recommendedModes.join(" | ") : "Solo / Seeded Run";
+          const fuelLabel = trackSupportsRaceType(track, FUEL_RUN_RACE_TYPE_ID) ? "Fuel Run ready" : "Classic only";
+          return `
+            <label class="track-option ${selected ? "selected" : ""}" data-track-card="${escapeAttr(track.id)}">
+              <input type="radio" name="${escapeAttr(name)}" value="${escapeAttr(track.id)}" ${selected ? "checked" : ""}>
+              <span class="track-option-title">
+                <strong>${escapeHtml(track.name)}</strong>
+                <em>${escapeHtml(fuelLabel)}</em>
+              </span>
+              <span>${escapeHtml(track.description)}</span>
+              <small>Recommended: ${escapeHtml(modes)}</small>
+              <small>${escapeHtml(getTrackMusicStatus(track))}</small>
+            </label>
+          `;
+        }).join("")}
+      </div>
+    `;
+  }
+
+  getSelectedTrackFromInputs(name, fallback = this.pendingTrackId || DEFAULT_TRACK_ID) {
+    const checked = document.querySelector(`input[name="${name}"]:checked`);
+    return getTrackById(checked?.value || fallback);
+  }
+
+  syncTrackSelectCards(name, selectedTrackId) {
+    const selectedId = normalizeTrackId(selectedTrackId, DEFAULT_TRACK_ID);
+    document.querySelectorAll(`input[name="${name}"]`).forEach((input) => {
+      const card = input.closest(".track-option");
+      if (card) card.classList.toggle("selected", input.value === selectedId);
+    });
+  }
+
+  syncRaceTypeSelectForTrack(select, track) {
+    if (!select) return DEFAULT_RACE_TYPE_ID;
+    const selectedId = normalizeRaceTypeId(select.value || this.pendingRaceTypeId, DEFAULT_RACE_TYPE_ID);
+    const supported = getRaceTypesForTrack(track);
+    const safeId = supported.some((item) => item.id === selectedId) ? selectedId : DEFAULT_RACE_TYPE_ID;
+    select.innerHTML = this.renderRaceTypeOptionsForTrack(track, safeId);
+    select.value = safeId;
+    return safeId;
+  }
+
+  syncSpeedClassSelectForTrack(select, track) {
+    if (!select) return;
+    Array.from(select.options || []).forEach((option) => {
+      const speedClass = getSpeedClassConfig(option.value);
+      option.textContent = this.formatSpeedClassOptionForTrack(track, speedClass);
+    });
+  }
+
   showPreRaceScreen(message = "") {
     this.partySession = null;
     this.partySetup = null;
@@ -12329,10 +12934,13 @@ class NeonRoadRally {
     this.audio.playMusic("title", false);
     const player = this.profiles.getCurrentPlayer();
     const speedClass = getSpeedClassConfig(this.profiles.data.speedClassId);
-    const raceType = getRaceTypeConfig(this.pendingRaceTypeId || DEFAULT_RACE_TYPE_ID);
-    const track = TRACKS[0];
+    const track = getTrackById(this.pendingTrackId || DEFAULT_TRACK_ID);
+    const requestedRaceTypeId = normalizeRaceTypeId(this.pendingRaceTypeId || DEFAULT_RACE_TYPE_ID, DEFAULT_RACE_TYPE_ID);
+    const raceType = getRaceTypeConfig(trackSupportsRaceType(track, requestedRaceTypeId) ? requestedRaceTypeId : DEFAULT_RACE_TYPE_ID);
     const seed = this.resolveRoadSeed(this.pendingRoadSeed);
     this.pendingRoadSeed = seed;
+    this.pendingTrackId = track.id;
+    this.pendingRaceTypeId = raceType.id;
     const seedSource = getRunRandomSeedSource(seed, track, speedClass.id, raceType.id);
     const seedHash = hashSeed(seedSource) >>> 0;
     this.layer.classList.remove("is-empty");
@@ -12341,26 +12949,31 @@ class NeonRoadRally {
         <div class="form-stack">
           <div>
             <span class="eyebrow">Solo / Seeded Run</span>
-            <h2>Sunset Highway</h2>
-            <p class="hint">One driver, one seed, one clean run through the current show-build track.</p>
+            <h2>Track Select</h2>
+            <p class="hint">One driver, one seed, one clean run through the selected track.</p>
           </div>
           <div class="score-grid mode-context-grid">
             <div class="score-card"><strong>Driver</strong><span>${escapeHtml(player.name)}</span></div>
             <div class="score-card"><strong>Race Type</strong><span id="preRaceTypeSummary">${escapeHtml(raceType.label)}</span></div>
             <div class="score-card"><strong>Race Mode</strong><span id="preRaceModeSummary">${escapeHtml(speedClass.label)} · x${speedClass.scoreMultiplier.toFixed(2)}</span></div>
-            <div class="score-card"><strong>Track</strong><span>${escapeHtml(track.name)}</span></div>
+            <div class="score-card"><strong>Track</strong><span id="preRaceTrackSummary">${escapeHtml(track.name)}</span></div>
+            <div class="score-card"><strong>Music</strong><span id="preRaceMusicSummary">${escapeHtml(getTrackMusicStatus(track))}</span></div>
             <div class="score-card"><strong>Seed Hash</strong><span id="roadSeedHashValue">${seedHash}</span></div>
+          </div>
+          <div class="field">
+            <label>Track</label>
+            ${this.renderTrackSelect("preRaceTrack", track.id)}
           </div>
           <div class="field">
             <label for="preRaceType">Race Type</label>
             <select id="preRaceType">
-              ${RACE_TYPES.map((item) => `<option value="${escapeAttr(item.id)}" ${item.id === raceType.id ? "selected" : ""}>${escapeHtml(item.label)} - ${escapeHtml(item.description)}</option>`).join("")}
+              ${this.renderRaceTypeOptionsForTrack(track, raceType.id)}
             </select>
           </div>
           <div class="field">
             <label for="preRaceSpeedClass">Race Mode</label>
             <select id="preRaceSpeedClass">
-              ${SPEED_CLASSES.map((item) => `<option value="${escapeAttr(item.id)}" ${item.id === speedClass.id ? "selected" : ""}>${escapeHtml(item.label)} · ${Math.round(getSpeedClassStartSpeed(item.id))}-${Math.round(getSpeedClassEndSpeed(item.id, track))} MPH · x${item.scoreMultiplier.toFixed(2)}</option>`).join("")}
+              ${SPEED_CLASSES.map((item) => `<option value="${escapeAttr(item.id)}" ${item.id === speedClass.id ? "selected" : ""}>${escapeHtml(this.formatSpeedClassOptionForTrack(track, item))}</option>`).join("")}
             </select>
           </div>
           <div class="seed-display" aria-live="polite">
@@ -12395,13 +13008,17 @@ class NeonRoadRally {
     const raceTypeSummary = document.getElementById("preRaceTypeSummary");
     const modeSelect = document.getElementById("preRaceSpeedClass");
     const modeSummary = document.getElementById("preRaceModeSummary");
+    const trackSummary = document.getElementById("preRaceTrackSummary");
+    const musicSummary = document.getElementById("preRaceMusicSummary");
     if (!input || !display) return;
     const updateDisplay = () => {
       const normalized = normalizeRoadSeed(input.value, "");
       if (input.value !== normalized) input.value = normalized;
+      const track = this.getSelectedTrackFromInputs("preRaceTrack", this.pendingTrackId || DEFAULT_TRACK_ID);
       const speedClass = getSpeedClassConfig(modeSelect?.value || this.profiles.data.speedClassId);
-      const raceType = getRaceTypeConfig(raceTypeSelect?.value || this.pendingRaceTypeId || DEFAULT_RACE_TYPE_ID);
-      const hash = normalized ? (hashSeed(getRunRandomSeedSource(normalized, TRACKS[0], speedClass.id, raceType.id)) >>> 0) : "pending";
+      const raceTypeId = normalizeRaceTypeId(raceTypeSelect?.value || this.pendingRaceTypeId || DEFAULT_RACE_TYPE_ID, DEFAULT_RACE_TYPE_ID);
+      const raceType = getRaceTypeConfig(trackSupportsRaceType(track, raceTypeId) ? raceTypeId : DEFAULT_RACE_TYPE_ID);
+      const hash = normalized ? (hashSeed(getRunRandomSeedSource(normalized, track, speedClass.id, raceType.id)) >>> 0) : "pending";
       display.textContent = normalized || "Random seed on start";
       if (seedHash) {
         seedHash.textContent = `Seed hash: ${hash}`;
@@ -12415,7 +13032,35 @@ class NeonRoadRally {
       if (raceTypeSummary) {
         raceTypeSummary.textContent = raceType.label;
       }
+      if (trackSummary) {
+        trackSummary.textContent = track.name;
+      }
+      if (musicSummary) {
+        musicSummary.textContent = getTrackMusicStatus(track);
+      }
     };
+    const syncTrackDependentControls = () => {
+      const track = this.getSelectedTrackFromInputs("preRaceTrack", this.pendingTrackId || DEFAULT_TRACK_ID);
+      this.pendingTrackId = track.id;
+      this.audio.setRaceMusicTrack(track);
+      this.syncTrackSelectCards("preRaceTrack", track.id);
+      const safeRaceTypeId = this.syncRaceTypeSelectForTrack(raceTypeSelect, track);
+      this.pendingRaceTypeId = safeRaceTypeId;
+      this.syncSpeedClassSelectForTrack(modeSelect, track);
+      updateDisplay();
+    };
+    document.querySelectorAll('input[name="preRaceTrack"]').forEach((inputEl) => {
+      inputEl.addEventListener("change", syncTrackDependentControls);
+    });
+    document.querySelectorAll('[data-track-card]').forEach((card) => {
+      const inputEl = card.querySelector('input[name="preRaceTrack"]');
+      if (!inputEl) return;
+      card.addEventListener("click", () => {
+        if (inputEl.checked) return;
+        inputEl.checked = true;
+        inputEl.dispatchEvent(new Event("change", { bubbles: true }));
+      });
+    });
     input.addEventListener("input", updateDisplay);
     input.addEventListener("blur", () => {
       const normalized = normalizeRoadSeed(input.value, "");
@@ -12447,6 +13092,7 @@ class NeonRoadRally {
         updateDisplay();
       });
     }
+    syncTrackDependentControls();
     input.focus();
     input.select();
   }
@@ -12461,14 +13107,17 @@ class NeonRoadRally {
     const input = document.getElementById("roadSeedInput");
     const modeSelect = document.getElementById("preRaceSpeedClass");
     const raceTypeSelect = document.getElementById("preRaceType");
+    const track = this.getSelectedTrackFromInputs("preRaceTrack", this.pendingTrackId || DEFAULT_TRACK_ID);
     const seed = this.resolveRoadSeed(input?.value ?? this.pendingRoadSeed);
     const speedClassId = normalizeSpeedClassId(modeSelect?.value, this.profiles.data.speedClassId);
-    const raceTypeId = normalizeRaceTypeId(raceTypeSelect?.value, DEFAULT_RACE_TYPE_ID);
+    const requestedRaceTypeId = normalizeRaceTypeId(raceTypeSelect?.value, DEFAULT_RACE_TYPE_ID);
+    const raceTypeId = trackSupportsRaceType(track, requestedRaceTypeId) ? requestedRaceTypeId : DEFAULT_RACE_TYPE_ID;
     this.profiles.updateSpeedClass(speedClassId);
     this.pendingRoadSeed = seed;
     this.pendingRaceTypeId = raceTypeId;
+    this.pendingTrackId = track.id;
     if (input) input.value = seed;
-    this.startRace({ seed, speedClassId, raceTypeId });
+    this.startRace({ seed, speedClassId, raceTypeId, track });
   }
 
   createDefaultPartySetup() {
@@ -12479,7 +13128,7 @@ class NeonRoadRally {
       : players.slice();
     return {
       selectedPlayerIds: orderedPlayers.slice(0, Math.min(PARTY_MIN_PLAYERS, orderedPlayers.length)).map((player) => player.id),
-      trackId: TRACKS[0].id,
+      trackId: DEFAULT_TRACK_ID,
       raceMode: normalizeSpeedClassId(this.profiles.data.speedClassId, DEFAULT_SPEED_CLASS_ID),
       raceType: DEFAULT_RACE_TYPE_ID,
       sharedSeed: generateReadableRoadSeed(),
@@ -12498,7 +13147,7 @@ class NeonRoadRally {
     this.partySetup.raceMode = normalizeSpeedClassId(this.partySetup.raceMode, DEFAULT_SPEED_CLASS_ID);
     this.partySetup.raceType = DEFAULT_RACE_TYPE_ID;
     this.partySetup.sharedSeed = normalizeRoadSeed(this.partySetup.sharedSeed, "");
-    this.partySetup.trackId = TRACKS[0].id;
+    this.partySetup.trackId = normalizeTrackId(this.partySetup.trackId, DEFAULT_TRACK_ID);
     this.partySetup.roundType = PARTY_ROUND_TYPE_ONE_RUN;
     return this.partySetup;
   }
@@ -12515,6 +13164,8 @@ class NeonRoadRally {
     const setup = this.getPartySetup();
     const raceMode = document.getElementById("partyRaceMode");
     const seedInput = document.getElementById("partySeedInput");
+    const track = this.getSelectedTrackFromInputs("partyTrack", setup.trackId || DEFAULT_TRACK_ID);
+    setup.trackId = track.id;
     if (raceMode) setup.raceMode = normalizeSpeedClassId(raceMode.value, setup.raceMode);
     if (seedInput) setup.sharedSeed = normalizeRoadSeed(seedInput.value, "");
     return setup;
@@ -12543,19 +13194,22 @@ class NeonRoadRally {
     }
 
     const setup = this.getPartySetup();
+    const track = getTrackById(setup.trackId);
     const selectedPlayers = this.getPartySetupSelectedPlayers();
     const selectedIds = new Set(setup.selectedPlayerIds);
     const seed = setup.sharedSeed || "Random seed on start";
-    const seedHash = setup.sharedSeed ? (hashSeed(getRunRandomSeedSource(setup.sharedSeed, TRACKS[0], setup.raceMode)) >>> 0) : "pending";
+    const seedHash = setup.sharedSeed ? (hashSeed(getRunRandomSeedSource(setup.sharedSeed, track, setup.raceMode, DEFAULT_RACE_TYPE_ID)) >>> 0) : "pending";
     this.layer.classList.remove("is-empty");
     this.layer.innerHTML = `
       <section class="panel party-panel">
         <h2>Party Mode</h2>
-        <p class="hint">One Run Each. Everyone drives ${escapeHtml(TRACKS[0].name)} with the same race mode and shared Road Seed. Party Mode is Classic for this pass.</p>
+        <p class="hint">One Run Each. Everyone drives the same track, race mode, and shared Road Seed. Party Mode is Classic for this pass.</p>
         <div class="party-summary-strip">
           <div class="score-card"><strong>Selected Players</strong><span>${selectedPlayers.length}/${PARTY_MAX_PLAYERS}</span></div>
+          <div class="score-card"><strong>Track</strong><span id="partyTrackSummary">${escapeHtml(track.name)}</span></div>
           <div class="score-card"><strong>Race Type</strong><span>Classic</span></div>
           <div class="score-card"><strong>Race Mode</strong><span>${escapeHtml(getSpeedClassLabel(setup.raceMode))}</span></div>
+          <div class="score-card"><strong>Music</strong><span id="partyMusicSummary">${escapeHtml(getTrackMusicStatus(track))}</span></div>
           <div class="score-card"><strong>Shared Seed</strong><span class="is-compact">${escapeHtml(seed)}</span></div>
           <div class="score-card"><strong>Round</strong><span>One Run Each</span></div>
         </div>
@@ -12594,13 +13248,13 @@ class NeonRoadRally {
               </ol>
             </div>
             <div class="field">
-              <label for="partyTrack">Track</label>
-              <input id="partyTrack" type="text" value="${escapeAttr(TRACKS[0].name)}" readonly>
+              <label>Track</label>
+              ${this.renderTrackSelect("partyTrack", track.id)}
             </div>
             <div class="field">
               <label for="partyRaceMode">Race Mode</label>
               <select id="partyRaceMode">
-                ${SPEED_CLASSES.map((speedClass) => `<option value="${escapeAttr(speedClass.id)}" ${speedClass.id === setup.raceMode ? "selected" : ""}>${escapeHtml(speedClass.label)}</option>`).join("")}
+                ${SPEED_CLASSES.map((speedClass) => `<option value="${escapeAttr(speedClass.id)}" ${speedClass.id === setup.raceMode ? "selected" : ""}>${escapeHtml(this.formatSpeedClassOptionForTrack(track, speedClass))}</option>`).join("")}
               </select>
             </div>
             <div class="seed-display" aria-live="polite">
@@ -12631,18 +13285,43 @@ class NeonRoadRally {
     const display = document.getElementById("partySeedDisplay");
     const seedHash = document.getElementById("partySeedHash");
     const raceMode = document.getElementById("partyRaceMode");
+    const trackSummary = document.getElementById("partyTrackSummary");
+    const musicSummary = document.getElementById("partyMusicSummary");
     const updateSeedDisplay = () => {
       if (!input || !display) return;
       const normalized = normalizeRoadSeed(input.value, "");
       if (input.value !== normalized) input.value = normalized;
+      const track = this.getSelectedTrackFromInputs("partyTrack", this.getPartySetup().trackId || DEFAULT_TRACK_ID);
       const mode = normalizeSpeedClassId(raceMode?.value, DEFAULT_SPEED_CLASS_ID);
       display.textContent = normalized || "Random seed on start";
       if (seedHash) {
         seedHash.textContent = normalized
-          ? `Seed hash: ${hashSeed(getRunRandomSeedSource(normalized, TRACKS[0], mode)) >>> 0}`
+          ? `Seed hash: ${hashSeed(getRunRandomSeedSource(normalized, track, mode, DEFAULT_RACE_TYPE_ID)) >>> 0}`
           : "Seed hash: pending";
       }
+      if (trackSummary) trackSummary.textContent = track.name;
+      if (musicSummary) musicSummary.textContent = getTrackMusicStatus(track);
     };
+    const syncTrackDependentControls = () => {
+      const setup = this.readPartySetupForm();
+      const track = getTrackById(setup.trackId);
+      this.syncTrackSelectCards("partyTrack", track.id);
+      this.syncSpeedClassSelectForTrack(raceMode, track);
+      this.audio.setRaceMusicTrack(track);
+      updateSeedDisplay();
+    };
+    document.querySelectorAll('input[name="partyTrack"]').forEach((inputEl) => {
+      inputEl.addEventListener("change", syncTrackDependentControls);
+    });
+    document.querySelectorAll('[data-track-card]').forEach((card) => {
+      const inputEl = card.querySelector('input[name="partyTrack"]');
+      if (!inputEl) return;
+      card.addEventListener("click", () => {
+        if (inputEl.checked) return;
+        inputEl.checked = true;
+        inputEl.dispatchEvent(new Event("change", { bubbles: true }));
+      });
+    });
     if (input) {
       input.addEventListener("input", updateSeedDisplay);
       input.addEventListener("blur", () => {
@@ -12667,6 +13346,7 @@ class NeonRoadRally {
         updateSeedDisplay();
       });
     }
+    syncTrackDependentControls();
   }
 
   handlePartyTogglePlayer(id) {
@@ -12716,17 +13396,20 @@ class NeonRoadRally {
       return;
     }
     const sharedSeed = this.resolveRoadSeed(setup.sharedSeed);
+    const track = getTrackById(setup.trackId);
     setup.sharedSeed = sharedSeed;
     setup.selectedPlayerIds = selectedPlayers.map((player) => player.id);
+    setup.trackId = track.id;
     this.partySession = new PartySession({
       players: selectedPlayers,
       sharedSeed,
-      track: TRACKS[0],
+      track,
       raceMode: setup.raceMode,
       raceType: DEFAULT_RACE_TYPE_ID,
       roundType: PARTY_ROUND_TYPE_ONE_RUN
     });
     this.pendingRoadSeed = sharedSeed;
+    this.pendingTrackId = track.id;
     this.showPartyTurnScreen("Party round ready.");
   }
 
@@ -13111,7 +13794,8 @@ class NeonRoadRally {
     this.startRace({
       seed: summary?.seed || this.run?.roadSeed || this.pendingRoadSeed,
       speedClassId: summary?.speedClass || this.run?.speedClassId || this.profiles.data.speedClassId,
-      raceTypeId: summary?.raceTypeId || this.run?.raceTypeId || this.pendingRaceTypeId
+      raceTypeId: summary?.raceTypeId || this.run?.raceTypeId || this.pendingRaceTypeId,
+      track: getTrackById(summary?.trackId || this.run?.track?.id || this.pendingTrackId || DEFAULT_TRACK_ID)
     });
   }
 
@@ -13515,7 +14199,7 @@ class NeonRoadRally {
               <span class="leaderboard-rank">#${index + 1}</span>
               <span>
                 <strong>${escapeHtml(entry.playerName)}</strong>
-                <span class="meta">${entry.challengeId ? `Challenge: ${escapeHtml(entry.challengeName || entry.challengeId)} · ` : ""}${entry.partyMode ? "Party · " : ""}${escapeHtml(entry.carName)} · ${escapeHtml(getRaceTypeLabel(entry.raceType))} · ${escapeHtml(getSpeedClassLabel(entry.raceMode || entry.speedClass))} · Seed ${escapeHtml(formatRoadSeed(entry.seed))} · ${escapeHtml(getRunStatusLabel(entry.status))} · ${formatTime(entry.time)}</span>
+                <span class="meta">${entry.challengeId ? `Challenge: ${escapeHtml(entry.challengeName || entry.challengeId)} · ` : ""}${entry.partyMode ? "Party · " : ""}${escapeHtml(entry.carName)} · ${escapeHtml(entry.trackName)} · ${escapeHtml(getRaceTypeLabel(entry.raceType))} · ${escapeHtml(getSpeedClassLabel(entry.raceMode || entry.speedClass))} · Seed ${escapeHtml(formatRoadSeed(entry.seed))} · ${escapeHtml(getRunStatusLabel(entry.status))} · ${formatTime(entry.time)}</span>
               </span>
               <span class="leaderboard-score">${formatScore(entry.score)}</span>
             </li>

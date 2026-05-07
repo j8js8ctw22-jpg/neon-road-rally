@@ -571,6 +571,64 @@ button:disabled {
   background: rgba(5, 8, 20, 0.92);
 }
 
+.track-select-grid {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.track-option {
+  display: grid;
+  gap: 7px;
+  min-height: 132px;
+  border: 1px solid rgba(40, 246, 255, 0.32);
+  border-radius: 6px;
+  padding: 11px;
+  background: rgba(5, 8, 20, 0.74);
+  color: var(--text);
+  cursor: pointer;
+}
+
+.track-option input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.track-option.selected {
+  border-color: var(--yellow);
+  box-shadow: 0 0 14px rgba(255, 228, 94, 0.18);
+}
+
+.track-option-title {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.track-option-title strong {
+  color: var(--yellow);
+  font-size: 1rem;
+}
+
+.track-option-title em {
+  color: var(--cyan);
+  font-size: 0.72rem;
+  font-style: normal;
+  text-transform: uppercase;
+}
+
+.track-option span,
+.track-option small {
+  overflow-wrap: anywhere;
+}
+
+.track-option small {
+  color: var(--muted);
+  line-height: 1.35;
+}
+
 .hint,
 .status-line,
 .meta {
@@ -1137,6 +1195,7 @@ button:disabled {
   .party-drama-header,
   .party-last-run-card,
   .score-grid,
+  .track-select-grid,
   .audio-grid,
   .speed-class-grid {
     grid-template-columns: 1fr;
