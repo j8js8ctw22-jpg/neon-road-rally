@@ -249,6 +249,7 @@ const TRACKS = [
     id: "sunset-highway",
     name: "Sunset Highway",
     description: "Balanced arcade racing with traffic, boosts, ramps, and music-shaped pressure.",
+    cardIdentity: "Balanced arcade road with traffic, ramps, hazards, and music-shaped pressure.",
     music: "audio/sunset-highway.mp3",
     musicFallback: "audio/sunset-highway.mp3",
     musicStatus: "Dedicated track music included.",
@@ -449,11 +450,12 @@ const TRACKS = [
   {
     id: "redline-run",
     name: "Redline Run",
-    description: "Speed-first road challenge. Cleaner lanes, faster traffic, fewer distractions.",
+    description: "Speed-first neon expressway with fast traffic, boost gates, slaloms, and cleaner high-speed pressure.",
+    cardIdentity: "Speed-first neon expressway with fast traffic, boost gates, slaloms, and cleaner but more intense pressure.",
     music: "audio/redline-run.mp3",
     musicFallback: "audio/sunset-highway.mp3",
     musicOptional: true,
-    musicStatus: "Optional Redline theme; falls back safely to Sunset Highway music.",
+    musicStatus: "Optional Redline song; uses Sunset Highway music until it is added.",
     recommendedModes: ["Solo / Seeded Run", "Fuel Run", "Party Mode", "Pro / Turbo"],
     fuelRunSupport: true,
     targetDurationSeconds: 78,
@@ -482,25 +484,38 @@ const TRACKS = [
     lateSpeedMultiplier: 1.82,
     endSpeedMultiplier: 2.08,
     visualTheme: {
-      skyTop: "#090816",
-      skyBottom: "#2b0618",
-      horizonGlow: "rgba(255, 45, 85, 0.42)",
+      identity: "redline",
+      skyTop: "#03040b",
+      skyMid: "#12081c",
+      skyHorizon: "#330817",
+      skyBottom: "#08060f",
+      horizonGlow: "rgba(255, 45, 85, 0.54)",
+      sunAlpha: 0.22,
       roadOuter: "#090a12",
-      roadInner: "#11121b",
+      roadInner: "#0d0f19",
       roadShoulder: "#190817",
       edgeColor: "#ff2d55",
       edgeAltColor: "#ff4fe1",
-      lanePrimary: "rgba(255, 244, 246, 0.88)",
-      laneSecondary: "rgba(255, 45, 85, 0.76)",
+      lanePrimary: "rgba(255, 248, 250, 0.94)",
+      laneSecondary: "rgba(255, 45, 85, 0.9)",
       reflectorColor: "#27f2ff",
-      speedStreakColor: "rgba(255, 58, 98, 0.66)",
+      speedStreakColor: "rgba(255, 45, 85, 0.78)",
       boostStreakColor: "rgba(39, 242, 255, 0.72)",
       finishLabel: "REDLINE",
       roadsidePrimaryLabel: "REDLINE",
-      roadsideSecondaryLabels: ["FLOW", "FAST"],
-      sceneryDensity: 0.62,
-      roadDetailIntensity: 0.42,
-      speedStreakIntensity: 1.24
+      roadsideSecondaryLabels: ["GATE", "FAST"],
+      sceneryDensity: 0.98,
+      roadDetailIntensity: 0.32,
+      speedStreakIntensity: 1.46,
+      citySkyline: true,
+      urbanScenery: true,
+      tunnelPanels: true,
+      redlineChevrons: true,
+      sharpLaneMarkers: true,
+      skylineColor: "rgba(2, 4, 12, 0.96)",
+      cityWindowColor: "rgba(255, 45, 85, 0.48)",
+      guardrailColor: "rgba(255, 45, 85, 0.82)",
+      chevronColor: "#ff2d55"
     },
     roadDirectorProfile: {
       cadenceScale: 1.1,
@@ -537,28 +552,69 @@ const TRACKS = [
         deerCrossing: 0,
         rampEscape: 0.78,
         boostTemptation: 1.38,
-        nearMissCorridor: 1.28
+        nearMissCorridor: 1.28,
+        redlineSlalom: 1.45,
+        speedGateChain: 1.1,
+        expressConvoy: 1.2,
+        neonChicane: 0.85,
+        rampOverpass: 0.9,
+        needleThread: 1.35
       },
       fuelWaveWeightMultipliers: {
-        fuelSupport: 1.2,
-        fuelTrafficPressure: 1.12,
+        fuelSupport: 1.05,
+        fuelTrafficPressure: 1.16,
+        fuelTrafficGate: 1.28,
+        fuelSideTemptation: 1.24,
+        fuelSplit: 0.78,
         fuelAfterPressure: 0.86,
         recoveryGap: 1.28
+      },
+      extraWaveWeightsByBand: {
+        opening: {
+          redlineSlalom: 0.52,
+          speedGateChain: 0.82,
+          expressConvoy: 0.38,
+          rampOverpass: 0.08
+        },
+        earlyMid: {
+          redlineSlalom: 1.35,
+          speedGateChain: 1.16,
+          expressConvoy: 1.05,
+          neonChicane: 0.42,
+          rampOverpass: 0.58,
+          needleThread: 0.42
+        },
+        lateMid: {
+          redlineSlalom: 1.2,
+          speedGateChain: 0.92,
+          expressConvoy: 1.24,
+          neonChicane: 0.78,
+          rampOverpass: 0.68,
+          needleThread: 1.06
+        },
+        final: {
+          redlineSlalom: 1.46,
+          speedGateChain: 0.86,
+          expressConvoy: 1.08,
+          neonChicane: 0.58,
+          rampOverpass: 0.52,
+          needleThread: 1.42
+        }
       }
     },
     allowedObjectMix: {
       slowCar: 1,
-      fastCar: 1.58,
-      truck: 1.08,
-      barrier: 0.12,
-      cone: 0.06,
+      fastCar: 1.75,
+      truck: 0.96,
+      barrier: 0.26,
+      cone: 0.03,
       oil: 0,
       branch: 0,
       deer: 0,
-      boostPad: 1.34,
-      ramp: 0.82,
-      gasCan: 1.12,
-      minorHazardScale: 0.08
+      boostPad: 1.55,
+      ramp: 1,
+      gasCan: 1.18,
+      minorHazardScale: 0.04
     },
     sections: [
       {
@@ -583,7 +639,13 @@ const TRACKS = [
           boostTemptation: 1.35,
           nearMissCorridor: 0,
           fourLaneSpike: 0,
-          recoveryGap: 1.18
+          recoveryGap: 1.18,
+          redlineSlalom: 0.45,
+          speedGateChain: 0.7,
+          expressConvoy: 0.3,
+          neonChicane: 0,
+          rampOverpass: 0.1,
+          needleThread: 0
         }
       },
       {
@@ -608,7 +670,13 @@ const TRACKS = [
           boostTemptation: 1.42,
           nearMissCorridor: 1.1,
           fourLaneSpike: 0,
-          recoveryGap: 1.2
+          recoveryGap: 1.2,
+          redlineSlalom: 1.45,
+          speedGateChain: 1.35,
+          expressConvoy: 1.05,
+          neonChicane: 0.45,
+          rampOverpass: 0.75,
+          needleThread: 0.45
         }
       },
       {
@@ -633,7 +701,13 @@ const TRACKS = [
           boostTemptation: 1.24,
           nearMissCorridor: 1.42,
           fourLaneSpike: 0,
-          recoveryGap: 1
+          recoveryGap: 1,
+          redlineSlalom: 1.2,
+          speedGateChain: 0.95,
+          expressConvoy: 1.35,
+          neonChicane: 0.95,
+          rampOverpass: 0.8,
+          needleThread: 1.2
         }
       },
       {
@@ -658,7 +732,13 @@ const TRACKS = [
           boostTemptation: 1.9,
           nearMissCorridor: 0.28,
           fourLaneSpike: 0,
-          recoveryGap: 1.82
+          recoveryGap: 1.82,
+          redlineSlalom: 0.45,
+          speedGateChain: 1.7,
+          expressConvoy: 0.45,
+          neonChicane: 0.18,
+          rampOverpass: 0.5,
+          needleThread: 0.18
         }
       },
       {
@@ -683,7 +763,13 @@ const TRACKS = [
           boostTemptation: 1.18,
           nearMissCorridor: 1.58,
           fourLaneSpike: 0,
-          recoveryGap: 0.9
+          recoveryGap: 0.9,
+          redlineSlalom: 1.55,
+          speedGateChain: 1.1,
+          expressConvoy: 1.25,
+          neonChicane: 0.65,
+          rampOverpass: 0.6,
+          needleThread: 1.55
         }
       }
     ],
@@ -947,6 +1033,14 @@ const ROAD_DIRECTOR = {
 };
 
 const TRACK_DIRECTOR = ROAD_DIRECTOR;
+const REDLINE_TEMPLATE_WAVE_TYPES = new Set([
+  "redlineSlalom",
+  "speedGateChain",
+  "expressConvoy",
+  "neonChicane",
+  "rampOverpass",
+  "needleThread"
+]);
 
 const TRACK_DIRECTOR_BANDS = [
   {
@@ -3561,6 +3655,25 @@ class RoadDirector {
     return getSectionNumber({ value: multipliers[type] }, "value", 1, 0, 4);
   }
 
+  hasTrackSpecificWave(type, context) {
+    const extraByBand = context.track?.roadDirectorProfile?.extraWaveWeightsByBand || {};
+    return Object.values(extraByBand).some((weights) => Number(weights?.[type]) > 0);
+  }
+
+  getWaveEntriesForContext(context) {
+    const weights = { ...(context.band?.weights || {}) };
+    const extraByBand = context.track?.roadDirectorProfile?.extraWaveWeightsByBand || {};
+    [extraByBand.all, extraByBand[context.band?.id], context.section?.extraWaveWeights].forEach((extra) => {
+      if (!extra || typeof extra !== "object") return;
+      Object.entries(extra).forEach(([type, value]) => {
+        const extraWeight = Number(value);
+        if (!Number.isFinite(extraWeight) || extraWeight <= 0) return;
+        weights[type] = (Number(weights[type]) || 0) + extraWeight;
+      });
+    });
+    return Object.entries(weights);
+  }
+
   getTrackObjectWeight(type, context) {
     const weight = Number(context.track?.allowedObjectMix?.[type]);
     return Number.isFinite(weight) ? clamp(weight, 0, 4) : 1;
@@ -3582,7 +3695,7 @@ class RoadDirector {
       return this.chooseForcedMeaningfulWave(context);
     }
 
-    const entries = Object.entries(context.band.weights).map(([type, baseWeight]) => {
+    const entries = this.getWaveEntriesForContext(context).map(([type, baseWeight]) => {
       let weight = baseWeight;
       if (!this.isWaveAllowed(type, context)) return { value: type, weight: 0 };
       weight *= this.getSectionWaveWeight(type, context);
@@ -3594,11 +3707,14 @@ class RoadDirector {
       if (context.centerNeedsChallenge) {
         if (["centerBlock", "constructionSqueeze", "nearMissCorridor"].includes(type)) weight *= 3.1;
         if (["doubleGate", "offsetPair", "leftRightSweep", "boostTemptation", "rampEscape"].includes(type)) weight *= 1.7;
+        if (["redlineSlalom", "needleThread", "expressConvoy", "speedGateChain"].includes(type)) weight *= 1.55;
         if (type === "singleBlocker") weight *= 1.2;
       }
       if (context.needsMovementChallenge) {
         if (["offsetPair", "leftRightSweep", "constructionSqueeze", "nearMissCorridor", "rampEscape"].includes(type)) weight *= 1.85;
         if (["centerBlock", "doubleGate", "boostTemptation"].includes(type)) weight *= 1.35;
+        if (["redlineSlalom", "neonChicane", "needleThread", "rampOverpass"].includes(type)) weight *= 1.85;
+        if (["speedGateChain", "expressConvoy"].includes(type)) weight *= 1.35;
         if (type === "recoveryGap") weight *= 0.25;
       }
 
@@ -3611,19 +3727,27 @@ class RoadDirector {
         if (type === "doubleGate") weight *= 1.12;
         if (["offsetPair", "leftRightSweep", "rampEscape"].includes(type)) weight *= 0.72;
         if (["deerCrossing", "constructionSqueeze"].includes(type)) weight *= 0.38;
+        if (["redlineSlalom", "expressConvoy", "speedGateChain"].includes(type)) weight *= 0.54;
+        if (["needleThread", "neonChicane", "rampOverpass"].includes(type)) weight *= 0.18;
         if (type === "centerBlock") weight *= 0.62;
         if (type === "rampEscape") weight *= 0.75;
         if (type === "recoveryGap") weight *= 1.25;
       } else if (context.speedClassId === "rookie") {
         if (["nearMissCorridor", "deerCrossing"].includes(type)) weight *= 0.72;
+        if (["needleThread", "neonChicane", "rampOverpass"].includes(type)) weight *= 0.58;
+        if (["redlineSlalom", "expressConvoy", "speedGateChain"].includes(type)) weight *= 0.86;
         if (type === "fourLaneSpike") weight = 0;
       } else if (context.speedClassId === "arcade") {
         if (["offsetPair", "leftRightSweep", "constructionSqueeze", "nearMissCorridor"].includes(type)) weight *= 1.08;
+        if (["redlineSlalom", "speedGateChain", "expressConvoy"].includes(type)) weight *= 1.16;
+        if (["neonChicane", "rampOverpass", "needleThread"].includes(type)) weight *= 1.04;
         if (type === "centerBlock") weight *= 1.16;
         if (type === "singleBlocker") weight *= 0.86;
       } else if (context.speedClassId === "pro") {
         if (["offsetPair", "leftRightSweep", "constructionSqueeze", "nearMissCorridor", "rampEscape"].includes(type)) weight *= 1.36;
         if (["centerBlock", "boostTemptation"].includes(type)) weight *= 1.3;
+        if (["redlineSlalom", "expressConvoy", "needleThread"].includes(type)) weight *= 1.34;
+        if (["speedGateChain", "neonChicane", "rampOverpass"].includes(type)) weight *= 1.18;
         if (type === "singleBlocker") weight *= 0.64;
         if (type === "doubleGate") weight *= 0.78;
         if (type === "recoveryGap") weight *= 0.42;
@@ -3634,6 +3758,12 @@ class RoadDirector {
         if (type === "rampEscape") weight *= 2.15;
         if (type === "boostTemptation") weight *= 2.25;
         if (type === "fourLaneSpike") weight *= 5.2;
+        if (type === "redlineSlalom") weight *= 2.25;
+        if (type === "needleThread") weight *= 2.3;
+        if (type === "expressConvoy") weight *= 1.8;
+        if (type === "speedGateChain") weight *= 1.45;
+        if (type === "neonChicane") weight *= 1.35;
+        if (type === "rampOverpass") weight *= 1.2;
         if (type === "singleBlocker") weight *= 0.08;
         if (type === "doubleGate") weight *= 0.2;
         if (type === "recoveryGap") weight *= 0.1;
@@ -3652,7 +3782,13 @@ class RoadDirector {
           boostTemptation: context.launchPacing?.boostWeightMultiplier ?? 0.2,
           nearMissCorridor: 0,
           fourLaneSpike: 0,
-          recoveryGap: 5.8
+          recoveryGap: 5.8,
+          redlineSlalom: 0.4,
+          speedGateChain: 0.65,
+          expressConvoy: 0.26,
+          neonChicane: 0,
+          rampOverpass: 0.1,
+          needleThread: 0
         };
         weight *= launchMultipliers[type] ?? 1;
       } else if (context.section?.id === "launch") {
@@ -3695,7 +3831,13 @@ class RoadDirector {
       { value: "constructionSqueeze", weight: this.isWaveAllowed("constructionSqueeze", context) ? 1.5 : 0 },
       { value: "nearMissCorridor", weight: this.isWaveAllowed("nearMissCorridor", context) ? 1.35 : 0 },
       { value: "rampEscape", weight: this.isWaveAllowed("rampEscape", context) ? 0.95 : 0 },
-      { value: "boostTemptation", weight: context.band.id === "opening" ? 0 : 0.9 }
+      { value: "boostTemptation", weight: context.band.id === "opening" ? 0 : 0.9 },
+      { value: "redlineSlalom", weight: this.hasTrackSpecificWave("redlineSlalom", context) ? (context.band.id === "opening" ? 0.45 : 1.45) : 0 },
+      { value: "speedGateChain", weight: this.hasTrackSpecificWave("speedGateChain", context) ? (context.band.id === "opening" ? 0.72 : 1.1) : 0 },
+      { value: "expressConvoy", weight: this.hasTrackSpecificWave("expressConvoy", context) ? (context.band.id === "opening" ? 0.36 : 1.2) : 0 },
+      { value: "neonChicane", weight: this.hasTrackSpecificWave("neonChicane", context) && context.band.id !== "opening" ? 0.85 : 0 },
+      { value: "rampOverpass", weight: this.hasTrackSpecificWave("rampOverpass", context) && context.band.id !== "opening" ? 0.9 : 0 },
+      { value: "needleThread", weight: this.hasTrackSpecificWave("needleThread", context) && context.band.id !== "opening" ? 1.35 : 0 }
     ];
     if (context.speedClassId === "turbo") {
       weights.find((item) => item.value === "centerBlock").weight *= 1.9;
@@ -3705,16 +3847,26 @@ class RoadDirector {
       weights.find((item) => item.value === "rampEscape").weight *= 1.35;
       weights.find((item) => item.value === "boostTemptation").weight *= 1.45;
       weights.find((item) => item.value === "doubleGate").weight *= 0.58;
+      weights.find((item) => item.value === "redlineSlalom").weight *= 1.75;
+      weights.find((item) => item.value === "needleThread").weight *= 1.9;
+      weights.find((item) => item.value === "expressConvoy").weight *= 1.45;
+      weights.find((item) => item.value === "speedGateChain").weight *= 1.25;
     } else if (context.speedClassId === "pro") {
       weights.find((item) => item.value === "nearMissCorridor").weight *= 1.35;
       weights.find((item) => item.value === "leftRightSweep").weight *= 1.25;
       weights.find((item) => item.value === "doubleGate").weight *= 0.8;
+      weights.find((item) => item.value === "redlineSlalom").weight *= 1.25;
+      weights.find((item) => item.value === "needleThread").weight *= 1.28;
+      weights.find((item) => item.value === "expressConvoy").weight *= 1.18;
     } else if (context.speedClassId === "sunday") {
       weights.find((item) => item.value === "centerBlock").weight *= 0.52;
       weights.find((item) => item.value === "offsetPair").weight *= 0.75;
       weights.find((item) => item.value === "constructionSqueeze").weight = context.progress > 0.55 ? 0.42 : 0;
       weights.find((item) => item.value === "nearMissCorridor").weight = 0;
       weights.find((item) => item.value === "leftRightSweep").weight *= 0.4;
+      weights.find((item) => item.value === "neonChicane").weight = 0;
+      weights.find((item) => item.value === "needleThread").weight = 0;
+      weights.find((item) => item.value === "rampOverpass").weight *= 0.24;
     }
     weights.forEach((item) => {
       item.weight *= this.getSectionWaveWeight(item.value, context);
@@ -3784,6 +3936,7 @@ class RoadDirector {
   }
 
   isWaveAllowed(type, context) {
+    if (REDLINE_TEMPLATE_WAVE_TYPES.has(type) && !this.hasTrackSpecificWave(type, context)) return false;
     if (this.getTrackWaveWeight(type, context) <= 0) return false;
     if (type === "deerCrossing" && this.getTrackObjectWeight("deer", context) <= 0) return false;
     if (type === "fourLaneSpike") {
@@ -3801,6 +3954,7 @@ class RoadDirector {
       if (type === "deerCrossing" && context.progress < 0.35) return false;
     }
     if (type === "nearMissCorridor" && context.band.id === "opening") return false;
+    if (REDLINE_TEMPLATE_WAVE_TYPES.has(type) && context.band.id === "opening" && ["neonChicane", "needleThread"].includes(type)) return false;
     if (type === "deerCrossing" && context.progress < 0.22) return false;
     if (type === "constructionSqueeze" && context.progress < 0.18) return false;
     return true;
@@ -3820,7 +3974,13 @@ class RoadDirector {
       rampEscape: context.speedClassId === "sunday" ? 0.5 : 1.3,
       boostTemptation: 1.45,
       nearMissCorridor: context.speedClassId === "rookie" ? 2.2 : 3.45,
-      fourLaneSpike: 4.75
+      fourLaneSpike: 4.75,
+      redlineSlalom: context.speedClassId === "turbo" ? 3.05 : 2.45,
+      speedGateChain: 1.7,
+      expressConvoy: context.speedClassId === "turbo" ? 3.2 : 2.55,
+      neonChicane: 2.65,
+      rampOverpass: 1.85,
+      needleThread: context.speedClassId === "turbo" ? 3.65 : 3.15
     };
     return (estimates[type] ?? 2) + difficultyBonus;
   }
@@ -3862,6 +4022,12 @@ class RoadDirector {
       boostTemptation: "Boost Temptation",
       nearMissCorridor: "Near-Miss Corridor",
       fourLaneSpike: "Four-Lane Spike",
+      redlineSlalom: "Redline Slalom",
+      speedGateChain: "Speed Gate Chain",
+      expressConvoy: "Express Convoy",
+      neonChicane: "Neon Chicane",
+      rampOverpass: "Ramp Overpass",
+      needleThread: "Needle Thread",
       fuelTrafficPressure: "Fuel Traffic Pressure",
       fuelSideTemptation: "Gas Can Side Temptation",
       fuelTrafficGate: "Traffic Gate + Fuel",
@@ -3887,6 +4053,12 @@ class RoadDirector {
       boostTemptation: () => this.waveBoostTemptation(distance, context, result),
       nearMissCorridor: () => this.waveNearMissCorridor(distance, context, result),
       fourLaneSpike: () => this.waveFourLaneSpike(distance, context, result),
+      redlineSlalom: () => this.waveRedlineSlalom(distance, context, result),
+      speedGateChain: () => this.waveSpeedGateChain(distance, context, result),
+      expressConvoy: () => this.waveExpressConvoy(distance, context, result),
+      neonChicane: () => this.waveNeonChicane(distance, context, result),
+      rampOverpass: () => this.waveRampOverpass(distance, context, result),
+      needleThread: () => this.waveNeedleThread(distance, context, result),
       fuelTrafficPressure: () => this.waveFuelTrafficPressure(distance, context, result),
       fuelSideTemptation: () => this.waveFuelSideTemptation(distance, context, result),
       fuelTrafficGate: () => this.waveFuelTrafficGate(distance, context, result),
@@ -4199,6 +4371,12 @@ class RoadDirector {
       boostTemptation: 0.78,
       nearMissCorridor: 1,
       fourLaneSpike: 1.16,
+      redlineSlalom: 0.88,
+      speedGateChain: 0.78,
+      expressConvoy: 0.92,
+      neonChicane: 1,
+      rampOverpass: 0.94,
+      needleThread: 0.98,
       fuelTrafficPressure: 0.88,
       fuelSideTemptation: 0.9,
       fuelTrafficGate: 0.94,
@@ -4801,6 +4979,132 @@ class RoadDirector {
     for (let i = 0; i < count; i += 1) {
       const type = i === 0 ? "fastCar" : (i === 1 && context.difficulty > 0.6 ? "truck" : "slowCar");
       this.spawn(type, lanes[i], distance + i * step, result);
+    }
+  }
+
+  waveRedlineSlalom(distance, context, result) {
+    const safeLane = this.pickWaveSafeLane(context, {
+      centerSafeChance: context.centerRestChance * 0.38,
+      preferSide: ["pro", "turbo"].includes(context.speedClassId)
+    });
+    const lanes = this.orderPressureLanes(context, shuffle(this.lanesExcept(safeLane), () => this.random()));
+    const step = this.staggerDistance(context, 0.12, 145, 260);
+    const count = context.speedClassId === "sunday" ? 2 : (context.speedClassId === "rookie" ? 2 : 3);
+    for (let i = 0; i < count; i += 1) {
+      const lane = lanes[i];
+      if (!Number.isFinite(lane)) continue;
+      const type = i === 0 ? "fastCar" : (i === 1 && context.difficulty > 0.55 ? "slowCar" : "fastCar");
+      if (this.canAddPressure(result, type, context, 0.3)) {
+        this.spawn(type, lane, distance + i * step, result);
+      }
+    }
+    if (context.progress > 0.22 && this.random() < 0.42) {
+      this.spawn("boostPad", safeLane, distance + step * 2.6, result);
+    }
+  }
+
+  waveSpeedGateChain(distance, context, result) {
+    const firstLane = this.pickRewardLane(context);
+    const secondLane = this.pickRewardLane(context, [firstLane]);
+    const thirdLane = this.pickRewardLane(context, [firstLane, secondLane]);
+    const chain = [firstLane, secondLane];
+    if (["arcade", "pro", "turbo"].includes(context.speedClassId) && context.progress > 0.3) chain.push(thirdLane);
+    const step = this.staggerDistance(context, 0.14, 170, 290);
+    chain.forEach((lane, index) => {
+      this.spawn("boostPad", lane, distance + index * step, result);
+      const blockerLane = this.pickPressureLane(context, 0.22, chain.slice(0, index + 1));
+      const type = index === 0 ? "slowCar" : "fastCar";
+      if (Number.isFinite(blockerLane) && this.canAddPressure(result, type, context, 0.35)) {
+        this.spawn(type, blockerLane, distance + index * step + this.staggerDistance(context, 0.06, 70, 135), result);
+      }
+    });
+  }
+
+  waveExpressConvoy(distance, context, result) {
+    const corridorLane = this.pickWaveSafeLane(context, {
+      centerSafeChance: context.centerRestChance * 0.34,
+      preferSide: context.speedClassId === "turbo"
+    });
+    const lanes = this.orderPressureLanes(context, shuffle(this.lanesExcept(corridorLane), () => this.random()));
+    const step = this.staggerDistance(context, 0.1, 120, 230);
+    const count = context.speedClassId === "sunday" ? 2 : (context.progress > 0.48 || ["pro", "turbo"].includes(context.speedClassId) ? 3 : 2);
+    for (let i = 0; i < count; i += 1) {
+      const lane = lanes[i];
+      const type = i === 2 && context.difficulty > 0.58 ? "truck" : "fastCar";
+      if (Number.isFinite(lane) && this.canAddPressure(result, type, context, 0.3)) {
+        this.spawn(type, lane, distance + i * step, result);
+      }
+    }
+    if (context.progress > 0.38 && this.random() < 0.36) {
+      this.spawn("boostPad", corridorLane, distance + step * 2.2, result);
+    }
+  }
+
+  waveNeonChicane(distance, context, result) {
+    const pathLane = this.pickWaveSafeLane(context, {
+      preferSide: true,
+      centerSafeChance: context.centerRestChance * 0.22
+    });
+    const turnLane = this.pickSafeLane(context, true, [pathLane]);
+    const firstGate = this.orderPressureLanes(context, shuffle(this.lanesExcept(pathLane), () => this.random()));
+    const secondGate = this.orderPressureLanes(context, shuffle(this.lanesExcept(turnLane), () => this.random()));
+    const step = this.staggerDistance(context, 0.13, 155, 285);
+    const barrierType = this.getTrackObjectWeight("barrier", context) > 0.05 ? "barrier" : "slowCar";
+    if (this.canAddPressure(result, barrierType, context, 0.3)) {
+      this.spawn(barrierType, firstGate[0], distance, result);
+    }
+    if (this.canAddPressure(result, "slowCar", context, 0.3)) {
+      this.spawn("slowCar", firstGate[1], distance + step * 0.7, result);
+    }
+    if (this.canAddPressure(result, barrierType, context, 0.4)) {
+      this.spawn(barrierType, secondGate[0], distance + step * 1.65, result);
+    }
+    if (context.progress > 0.5 && this.random() < 0.34) {
+      this.spawn("boostPad", turnLane, distance + step * 2.15, result);
+    }
+  }
+
+  waveRampOverpass(distance, context, result) {
+    const rampLane = this.pickWaveSafeLane(context, {
+      preferSide: true,
+      centerSafeChance: context.centerRestChance * 0.25
+    });
+    const ramp = this.spawnRampSolution(rampLane, distance, context, result, {
+      targetType: "cone",
+      targetGap: this.staggerDistance(context, 0.2, 245, 390)
+    });
+    const lanes = this.orderPressureLanes(context, shuffle(this.lanesExcept(rampLane), () => this.random()));
+    const pressureDistance = distance + this.staggerDistance(context, 0.28, 390, 660);
+    const leadType = context.progress > 0.5 && this.random() < 0.44 ? "truck" : "fastCar";
+    if (this.canAddPressure(result, leadType, context, 0.35)) {
+      this.spawn(leadType, lanes[0], pressureDistance, result);
+    }
+    if (ramp && this.canAddPressure(result, "slowCar", context, 0.28)) {
+      this.spawn("slowCar", lanes[1], pressureDistance + this.staggerDistance(context, 0.08, 95, 175), result);
+    }
+  }
+
+  waveNeedleThread(distance, context, result) {
+    const threadLane = this.pickWaveSafeLane(context, {
+      centerSafeChance: context.centerRestChance * 0.18,
+      preferSide: context.speedClassId !== "arcade"
+    });
+    const lanes = this.orderPressureLanes(context, shuffle(this.lanesExcept(threadLane), () => this.random()));
+    const step = this.staggerDistance(context, 0.09, 115, 215);
+    const types = [
+      context.progress > 0.62 && this.random() < 0.34 ? "truck" : "fastCar",
+      "fastCar",
+      context.difficulty > 0.6 ? "slowCar" : "fastCar"
+    ];
+    for (let i = 0; i < types.length; i += 1) {
+      const lane = lanes[i];
+      const type = types[i];
+      if (Number.isFinite(lane) && this.canAddPressure(result, type, context, 0.42)) {
+        this.spawn(type, lane, distance + i * step, result);
+      }
+    }
+    if (context.progress > 0.58 && this.random() < 0.3) {
+      this.spawn("boostPad", threadLane, distance + step * 3, result);
     }
   }
 
@@ -7151,8 +7455,8 @@ class Renderer {
     const glowStrength = clamp(TRACK_VISUALS.horizonGlowStrength * clamp(visualIntensity, 0.78, 1.28), 0.45, 1);
     const sky = ctx.createLinearGradient(0, 0, 0, h);
     sky.addColorStop(0, theme.skyTop || "#100c2b");
-    sky.addColorStop(0.26, "#2c0d46");
-    sky.addColorStop(0.44, "#5a1943");
+    sky.addColorStop(0.26, theme.skyMid || "#2c0d46");
+    sky.addColorStop(0.44, theme.skyHorizon || "#5a1943");
     sky.addColorStop(0.58, theme.skyBottom || "#171224");
     sky.addColorStop(1, "#05050a");
     ctx.fillStyle = sky;
@@ -7161,14 +7465,17 @@ class Renderer {
     const horizonY = Math.max(235, Math.min(h * 0.46, this.road.y + this.road.h * 0.42));
     const sunY = Math.min(horizonY - 72, h * 0.27);
     const sunR = Math.min(132, w * 0.17);
-    const sun = ctx.createRadialGradient(w * 0.5, sunY, 10, w * 0.5, sunY, sunR);
-    sun.addColorStop(0, `rgba(255, 228, 94, ${0.95 * glowStrength})`);
-    sun.addColorStop(0.42, `rgba(255, 130, 75, ${0.66 * glowStrength})`);
-    sun.addColorStop(1, "rgba(255, 63, 209, 0)");
-    ctx.fillStyle = sun;
-    ctx.beginPath();
-    ctx.arc(w * 0.5, sunY, sunR, 0, Math.PI * 2);
-    ctx.fill();
+    const sunAlpha = clampNumber(theme.sunAlpha, 0, 1, 1);
+    if (sunAlpha > 0.01) {
+      const sun = ctx.createRadialGradient(w * 0.5, sunY, 10, w * 0.5, sunY, sunR);
+      sun.addColorStop(0, `rgba(255, 228, 94, ${0.95 * glowStrength * sunAlpha})`);
+      sun.addColorStop(0.42, `rgba(255, 130, 75, ${0.66 * glowStrength * sunAlpha})`);
+      sun.addColorStop(1, "rgba(255, 63, 209, 0)");
+      ctx.fillStyle = sun;
+      ctx.beginPath();
+      ctx.arc(w * 0.5, sunY, sunR, 0, Math.PI * 2);
+      ctx.fill();
+    }
 
     const horizonGlow = ctx.createRadialGradient(w * 0.5, horizonY, 4, w * 0.5, horizonY, Math.max(w * 0.28, 320));
     horizonGlow.addColorStop(0, `rgba(255, 148, 72, ${0.42 * glowStrength})`);
@@ -7184,6 +7491,7 @@ class Renderer {
     }
 
     this.drawHorizonSilhouettes(horizonY);
+    if (theme.citySkyline) this.drawTrackCitySkyline(horizonY, theme);
 
     ctx.save();
     ctx.globalAlpha = 0.24;
@@ -7200,6 +7508,44 @@ class Renderer {
       ctx.beginPath();
       ctx.moveTo(w * 0.5, gridY);
       ctx.lineTo(x, h);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  drawTrackCitySkyline(horizonY, theme) {
+    const ctx = this.ctx;
+    const w = this.width;
+    const baseY = horizonY + 38;
+    ctx.save();
+    ctx.fillStyle = theme.skylineColor || "rgba(4, 5, 12, 0.92)";
+    for (let i = 0; i < 34; i += 1) {
+      const segment = w / 34;
+      const x = i * segment - 4 + deterministicNoise(i, 41) * 8;
+      const buildingW = segment * lerp(0.52, 1.1, deterministicNoise(i, 42));
+      const height = lerp(36, 132, deterministicNoise(i, 43));
+      ctx.fillRect(x, baseY - height, buildingW, height);
+      if (deterministicNoise(i, 44) > 0.72) {
+        ctx.fillRect(x + buildingW * 0.45, baseY - height - 18, Math.max(2, buildingW * 0.1), 18);
+      }
+      if (deterministicNoise(i, 45) > 0.55) {
+        ctx.fillStyle = theme.cityWindowColor || "rgba(255, 45, 85, 0.42)";
+        const windowCount = Math.floor(2 + deterministicNoise(i, 46) * 5);
+        for (let j = 0; j < windowCount; j += 1) {
+          const wy = baseY - height + 14 + j * 16;
+          if (wy < baseY - 5) ctx.fillRect(x + buildingW * 0.36, wy, Math.max(2, buildingW * 0.08), 3);
+        }
+        ctx.fillStyle = theme.skylineColor || "rgba(4, 5, 12, 0.92)";
+      }
+    }
+    ctx.globalAlpha = 0.48;
+    ctx.strokeStyle = theme.edgeColor || "#ff2d55";
+    ctx.lineWidth = 1;
+    for (let i = 0; i < 5; i += 1) {
+      const y = baseY - 18 - i * 28;
+      ctx.beginPath();
+      ctx.moveTo(0, y);
+      ctx.lineTo(w, y + Math.sin(i) * 8);
       ctx.stroke();
     }
     ctx.restore();
@@ -7308,7 +7654,20 @@ class Renderer {
       const signRoll = deterministicNoise(worldIndex, 24);
       const warmth = clamp(this.getFinalStretchIntensity() + Math.max(0, visualIntensity - 1) * 0.42, 0, 1);
 
-      if (typeRoll < 0.42) {
+      if (theme.urbanScenery) {
+        if (typeRoll < 0.34) {
+          this.drawRedlineChevronSign(x, y, scale, side, signRoll);
+        } else if (typeRoll < 0.62) {
+          this.drawRoadsideBillboard(x, y, scale, side, signRoll < TRACK_VISUALS.roadsideSignFrequency * 1.8 ? (theme.roadsidePrimaryLabel || "REDLINE") : "");
+        } else if (typeRoll < 0.82) {
+          const secondary = Array.isArray(theme.roadsideSecondaryLabels) && theme.roadsideSecondaryLabels.length
+            ? theme.roadsideSecondaryLabels
+            : ["GATE", "FAST"];
+          this.drawNeonMileSign(x, y, scale, side, secondary[signRoll < 0.5 ? 0 : Math.min(1, secondary.length - 1)]);
+        } else {
+          this.drawUrbanBarrierBlock(x, y, scale, side, theme);
+        }
+      } else if (typeRoll < 0.42) {
         this.drawPalmSilhouette(x, y, scale, side);
       } else if (typeRoll < 0.68) {
         this.drawRoadsideBillboard(x, y, scale, side, signRoll < TRACK_VISUALS.roadsideSignFrequency ? (theme.roadsidePrimaryLabel || "SUNSET") : "");
@@ -7324,7 +7683,7 @@ class Renderer {
 
     const parallaxScroll = (scrollSource * (0.12 + speedRatio * 0.07)) % 120;
     ctx.globalAlpha = alpha * 0.16;
-    ctx.strokeStyle = "#28f6ff";
+    ctx.strokeStyle = theme.guardrailColor || "#28f6ff";
     ctx.lineWidth = 1;
     for (let y = this.road.y + parallaxScroll - 120; y < this.height + 120; y += 120) {
       ctx.beginPath();
@@ -7409,6 +7768,65 @@ class Renderer {
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
     ctx.fillText(label, 0, -h * 0.5);
+    ctx.restore();
+  }
+
+  drawRedlineChevronSign(x, y, scale, side, roll = 0) {
+    const ctx = this.ctx;
+    const w = 72 * scale;
+    const h = 32 * scale;
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.fillStyle = "rgba(3, 4, 12, 0.86)";
+    ctx.fillRect(-w / 2, -h, w, h);
+    ctx.strokeStyle = roll > 0.42 ? "#ff2d55" : "#ff7a2d";
+    ctx.shadowBlur = 14 * scale;
+    ctx.shadowColor = ctx.strokeStyle;
+    ctx.lineWidth = Math.max(1, 2 * scale);
+    ctx.strokeRect(-w / 2, -h, w, h);
+    ctx.beginPath();
+    for (let i = 0; i < 3; i += 1) {
+      const cx = -w * 0.28 + i * w * 0.25;
+      ctx.moveTo(cx - side * 7 * scale, -h * 0.72);
+      ctx.lineTo(cx + side * 7 * scale, -h * 0.5);
+      ctx.lineTo(cx - side * 7 * scale, -h * 0.28);
+    }
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+    if (roll > 0.72) {
+      ctx.fillStyle = "#f6fbff";
+      ctx.font = `800 ${Math.max(7, 8 * scale)}px Trebuchet MS, Verdana, sans-serif`;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText("REDLINE", 0, -h * 0.5);
+    }
+    ctx.restore();
+  }
+
+  drawUrbanBarrierBlock(x, y, scale, side, theme = {}) {
+    const ctx = this.ctx;
+    const w = 64 * scale;
+    const h = 34 * scale;
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.fillStyle = "rgba(4, 5, 12, 0.9)";
+    ctx.beginPath();
+    ctx.moveTo(-w * 0.5, 0);
+    ctx.lineTo(-w * 0.42, -h * 0.72);
+    ctx.lineTo(w * 0.36, -h);
+    ctx.lineTo(w * 0.5, -h * 0.18);
+    ctx.lineTo(w * 0.42, 0);
+    ctx.closePath();
+    ctx.fill();
+    ctx.globalAlpha = 0.74;
+    ctx.strokeStyle = theme.guardrailColor || "#ff2d55";
+    ctx.lineWidth = Math.max(1, 2 * scale);
+    ctx.beginPath();
+    ctx.moveTo(-w * 0.34, -h * 0.42);
+    ctx.lineTo(w * 0.24, -h * 0.64);
+    ctx.moveTo(-w * 0.22, -h * 0.16);
+    ctx.lineTo(w * 0.34, -h * 0.32);
+    ctx.stroke();
     ctx.restore();
   }
 
@@ -7521,6 +7939,7 @@ class Renderer {
     ctx.lineTo(road.x + road.w, road.y + road.h);
     ctx.stroke();
     this.drawRoadEdgeDetails(scrollSource, alpha);
+    if (theme.tunnelPanels) this.drawTrackTunnelPanels(scrollSource, alpha, theme);
 
     const dashHeight = 56;
     const gap = 46;
@@ -7531,7 +7950,7 @@ class Renderer {
       const x = road.x + lane * road.laneW;
       ctx.shadowColor = lane % 2 ? (theme.laneSecondary || "#ff3fd1") : (theme.lanePrimary || "#ffe45e");
       ctx.strokeStyle = lane % 2 ? (theme.laneSecondary || "#ff3fd1") : (theme.lanePrimary || "#ffe45e");
-      ctx.lineWidth = 3;
+      ctx.lineWidth = theme.sharpLaneMarkers ? 3.8 : 3;
       for (let y = road.y - dashHeight + scroll; y < road.y + road.h + dashHeight; y += dashHeight + gap) {
         ctx.beginPath();
         ctx.moveTo(x, y);
@@ -7627,6 +8046,43 @@ class Renderer {
     for (let y = road.y - reflectorSpacing + reflectorScroll; y < road.y + road.h + reflectorSpacing; y += reflectorSpacing) {
       ctx.fillRect(road.x + 10, y, 5, 16);
       ctx.fillRect(road.x + road.w - 15, y, 5, 16);
+    }
+    ctx.restore();
+  }
+
+  drawTrackTunnelPanels(scrollSource, alpha, theme = {}) {
+    const ctx = this.ctx;
+    const road = this.road;
+    const speedRatio = this.getVisualSpeedRatio();
+    const visualIntensity = this.getRaceVisualIntensity();
+    const panelSpacing = 118;
+    const scroll = (scrollSource * (0.82 + speedRatio * 0.58)) % panelSpacing;
+    const chevronColor = theme.chevronColor || "#ff2d55";
+    ctx.save();
+    ctx.globalAlpha = alpha * clamp(0.42 + speedRatio * 0.32, 0.42, 0.84);
+    ctx.strokeStyle = theme.guardrailColor || chevronColor;
+    ctx.shadowBlur = 14 * visualIntensity;
+    ctx.shadowColor = chevronColor;
+    ctx.lineWidth = 2;
+    for (let y = road.y - panelSpacing + scroll; y < road.y + road.h + panelSpacing; y += panelSpacing) {
+      const t = clamp((y - road.y) / Math.max(1, road.h), 0, 1);
+      const inset = lerp(44, 18, t);
+      const panelH = lerp(38, 70, t);
+      ctx.beginPath();
+      ctx.moveTo(road.x - inset, y);
+      ctx.lineTo(road.x - inset - 28, y + panelH * 0.5);
+      ctx.lineTo(road.x - inset, y + panelH);
+      ctx.moveTo(road.x + road.w + inset, y);
+      ctx.lineTo(road.x + road.w + inset + 28, y + panelH * 0.5);
+      ctx.lineTo(road.x + road.w + inset, y + panelH);
+      ctx.stroke();
+      if (theme.redlineChevrons) {
+        ctx.fillStyle = chevronColor;
+        ctx.globalAlpha = alpha * lerp(0.28, 0.7, t);
+        ctx.fillRect(road.x - inset - 5, y + panelH * 0.24, 5, panelH * 0.5);
+        ctx.fillRect(road.x + road.w + inset, y + panelH * 0.24, 5, panelH * 0.5);
+        ctx.globalAlpha = alpha * clamp(0.42 + speedRatio * 0.32, 0.42, 0.84);
+      }
     }
     ctx.restore();
   }
@@ -10190,6 +10646,7 @@ class NeonRoadRally {
         <div class="challenge-card-grid">
           ${CHALLENGES.map((challenge) => this.renderChallengeCard(challenge)).join("")}
         </div>
+        <p class="hint">Redline Challenges coming soon.</p>
         <div class="row" style="margin-top:16px">
           <button class="small-button" data-action="title">Back to Title</button>
           <button class="small-button" data-action="leaderboard">Top 20 Scores</button>
@@ -12882,7 +13339,7 @@ class NeonRoadRally {
                 <strong>${escapeHtml(track.name)}</strong>
                 <em>${escapeHtml(fuelLabel)}</em>
               </span>
-              <span>${escapeHtml(track.description)}</span>
+              <span>${escapeHtml(track.cardIdentity || track.description)}</span>
               <small>Recommended: ${escapeHtml(modes)}</small>
               <small>${escapeHtml(getTrackMusicStatus(track))}</small>
             </label>
