@@ -5817,6 +5817,7 @@ class ObstacleManager {
         maxBlocked: 0,
         reason: "visible spawn zone prevented pop-in"
       };
+      this.recordRejectedSpawnTelemetry(this.lastSafetySummary, candidate);
       return null;
     }
     if (this.violatesStartClearZone(candidate)) {
@@ -5828,6 +5829,7 @@ class ObstacleManager {
         maxBlocked: 0,
         reason: "start-clear zone prevented low initial spawn"
       };
+      this.recordRejectedSpawnTelemetry(this.lastSafetySummary, candidate);
       return null;
     }
     const spawnResult = this.canSpawnObstacle(candidate);
@@ -5854,7 +5856,7 @@ class ObstacleManager {
                 ? "post-spawn unreadable route prevented"
                 : (postSpawn.hardBlockerInvalid ? "post-spawn hard-blocker five-lane wall prevented" : "post-spawn five-lane wall prevented")))
         };
-        this.recordRejectedSpawnTelemetry(this.lastSafetySummary);
+        this.recordRejectedSpawnTelemetry(this.lastSafetySummary, candidate);
         return null;
       }
       this.recordSpawnTelemetry(candidate);
@@ -5885,7 +5887,7 @@ class ObstacleManager {
 
     this.preventedUnsafeSpawns += 1;
     this.lastSafetySummary = spawnResult;
-    this.recordRejectedSpawnTelemetry(spawnResult);
+    this.recordRejectedSpawnTelemetry(spawnResult, candidate);
     return null;
   }
 
@@ -5897,9 +5899,26 @@ class ObstacleManager {
     }
   }
 
-  recordRejectedSpawnTelemetry(result) {
+  recordRejectedSpawnTelemetry(result, candidate = null) {
     const run = this.game.run;
     if (!run || !result) return;
+    if (!Array.isArray(run.recentRoadDirectorRejections)) run.recentRoadDirectorRejections = [];
+    run.recentRoadDirectorRejections.push({
+      elapsed: Number.isFinite(run.elapsed) ? Number(run.elapsed.toFixed(2)) : 0,
+      distance: Math.round(Number.isFinite(candidate?.distance) ? candidate.distance : (run.distance || 0)),
+      type: candidate?.type || "unknown",
+      lane: Number.isFinite(candidate?.lane) ? candidate.lane : null,
+      waveType: candidate?.waveType || "unknown",
+      waveLabel: candidate?.waveLabel || candidate?.waveType || "unknown",
+      reason: result.reason || "rejected",
+      activeFieldInvalid: Boolean(result.activeFieldInvalid),
+      activeFieldRouteInvalid: Boolean(result.activeFieldRouteInvalid),
+      routeInvalid: Boolean(result.routeInvalid),
+      supportSuppressedByDensity: Boolean(result.supportSuppressedByDensity)
+    });
+    if (run.recentRoadDirectorRejections.length > 12) {
+      run.recentRoadDirectorRejections.splice(0, run.recentRoadDirectorRejections.length - 12);
+    }
     if (result.supportSuppressedByDensity) {
       run.supportObjectsSuppressedByDensity = (run.supportObjectsSuppressedByDensity || 0) + 1;
     }
@@ -10021,6 +10040,7 @@ class NeonRoadRally {
     this.partySession = null;
     this.playtestReportFilter = "all";
     this.playtestReportCopyText = "";
+    this.roadDirectorReportCopyText = "";
     this.roadRng = null;
     this.randomFloat = () => this.nextRoadRandom();
     this.simulationStatus = null;
@@ -10207,6 +10227,7 @@ class NeonRoadRally {
       combinedRouteFailures: 0,
       barrierCount: 0,
       supportObjectsSuppressedByDensity: 0,
+      recentRoadDirectorRejections: [],
       lastVisibleHardBlockers: 0,
       lastTacticalHardBlockers: 0,
       lastHardBlockersNext3Seconds: 0,
@@ -12903,6 +12924,7 @@ class NeonRoadRally {
               <button class="small-button" data-action="runSimulation">Classic Simulation</button>
               <button class="small-button" data-action="runFuelSimulation">Fuel Run Simulation</button>
               <button class="small-button" data-action="showPlaytestReport">Playtest Report</button>
+              <button class="small-button" data-action="roadDirectorLab">Road Director Lab</button>
               <button class="small-button" data-action="vehicleScaleDebug">Vehicle Scale Check</button>
             </div>
           ` : ""}
@@ -12959,6 +12981,7 @@ class NeonRoadRally {
             <button class="small-button" data-action="toggleSfx">SFX: ${this.audio.sfxMuted ? "Muted" : "On"}</button>
             <button class="small-button" data-action="fullscreen">Fullscreen</button>
             <button class="small-button" data-action="showPlaytestReport">Playtest Report</button>
+            ${this.debugMode ? `<button class="small-button" data-action="roadDirectorLab">Road Director Lab</button>` : ""}
             <button class="small-button primary" data-action="title">Back to Title</button>
           </div>
           <p class="keyboard-hints">F toggles fullscreen. In debug gameplay, F keeps the debug finish shortcut.</p>
@@ -13176,6 +13199,418 @@ class NeonRoadRally {
       runSummaries: aggregate.runs
     };
     return JSON.stringify(payload, null, 2);
+  }
+
+  hasRoadDirectorRunState(run = this.run) {
+    return Boolean(run && (
+      this.screen === "game"
+      || (run.elapsed || 0) > 0
+      || (run.roadDirectorSequence || []).length
+      || run.ended
+    ));
+  }
+
+  getRoadDirectorSnapshotSource() {
+    const run = this.run;
+    if (this.hasRoadDirectorRunState(run)) {
+      return { run, source: this.screen === "game" && !run.ended ? "active run" : "last run" };
+    }
+    const speedClass = getSpeedClassConfig(this.profiles.data.speedClassId);
+    const baseTrack = getTrackById(this.pendingTrackId || DEFAULT_TRACK_ID);
+    const track = createRaceTrackForSpeedClass(baseTrack, speedClass.id);
+    const requestedRaceTypeId = normalizeRaceTypeId(this.pendingRaceTypeId || DEFAULT_RACE_TYPE_ID, DEFAULT_RACE_TYPE_ID);
+    const raceTypeId = trackSupportsRaceType(baseTrack, requestedRaceTypeId) ? requestedRaceTypeId : DEFAULT_RACE_TYPE_ID;
+    const pendingSeed = normalizeRoadSeed(this.pendingRoadSeed, DEFAULT_ROAD_SEED);
+    return {
+      source: "pending solo setup",
+      run: {
+        track,
+        speedClassId: speedClass.id,
+        speedClass,
+        raceTypeId,
+        raceType: getRaceTypeConfig(raceTypeId),
+        roadSeed: pendingSeed,
+        roadSeedHash: hashSeed(getRunRandomSeedSource(pendingSeed, track, speedClass.id, raceTypeId)) >>> 0,
+        roadDirectorSequence: [],
+        recentRoadDirectorRejections: [],
+        distance: 0,
+        elapsed: 0,
+        currentSpeed: getTrackCruiseSpeed(track, 0, speedClass.id),
+        ended: false,
+        raceActive: false
+      }
+    };
+  }
+
+  formatDirectorNumber(value, digits = 0, fallback = "not tracked yet") {
+    const numeric = Number(value);
+    return Number.isFinite(numeric) ? numeric.toFixed(digits) : fallback;
+  }
+
+  formatDirectorSeconds(value, fallback = "not tracked yet") {
+    const numeric = Number(value);
+    return Number.isFinite(numeric) ? `${numeric.toFixed(1)}s` : fallback;
+  }
+
+  getVisibleDirectorObjects(run = this.run) {
+    const runDistance = Number.isFinite(run?.distance) ? run.distance : 0;
+    return (this.obstacles?.obstacles || [])
+      .filter((obstacle) => this.obstacles.isGameplaySpawnObject(obstacle))
+      .map((obstacle) => ({
+        obstacle,
+        ahead: obstacle.distance - runDistance
+      }))
+      .filter((item) => item.ahead > -120 && item.ahead <= VIEW_DISTANCE);
+  }
+
+  getRoadDirectorTimingSnapshot(run, track, section) {
+    const director = this.obstacles?.director;
+    if (!director || !this.obstacles?.track || !run) {
+      return {
+        timeSinceLastMeaningfulDecisionSeconds: null,
+        estimatedTimeUntilNextMeaningfulDecisionSeconds: null,
+        deadScreenSeconds: null,
+        underActivityWarning: "not tracked yet"
+      };
+    }
+    const distance = Number.isFinite(run.distance) ? run.distance : 0;
+    const context = director.getContext(distance);
+    const forceMeaningfulThreshold = (context.cadence?.forceMeaningful ?? 3)
+      * getSectionNumber(section, "forceMeaningfulMultiplier", 1, 0.45, 1.8)
+      * (context.launchPacing?.forceMeaningfulMultiplier ?? 1);
+    const timeSinceMeaningful = Number.isFinite(director.timeSinceMeaningfulWaveSeconds)
+      ? director.timeSinceMeaningfulWaveSeconds
+      : null;
+    const activeEmptySeconds = Number.isFinite(director.activeEmptySeconds)
+      ? director.activeEmptySeconds
+      : null;
+    const timeUntilMeaningful = Number.isFinite(timeSinceMeaningful)
+      ? Math.max(0, forceMeaningfulThreshold - timeSinceMeaningful)
+      : null;
+    const underActivityWarning = Number.isFinite(timeSinceMeaningful) && timeSinceMeaningful >= forceMeaningfulThreshold
+      ? "meaningful wave overdue"
+      : (Number.isFinite(activeEmptySeconds) && activeEmptySeconds >= forceMeaningfulThreshold
+        ? "active field has been empty"
+        : "none");
+    return {
+      timeSinceLastMeaningfulDecisionSeconds: timeSinceMeaningful,
+      estimatedTimeUntilNextMeaningfulDecisionSeconds: timeUntilMeaningful,
+      deadScreenSeconds: activeEmptySeconds,
+      forceMeaningfulThresholdSeconds: forceMeaningfulThreshold,
+      underActivityWarning
+    };
+  }
+
+  getRoadDirectorScheduleSnapshot(run, track) {
+    if (!run || !track || !this.obstacles) {
+      return {
+        nextScheduledWaveDistance: null,
+        nextScheduledWaveAhead: null,
+        nextScheduledWaveSeconds: null,
+        spawnHorizonAhead: null
+      };
+    }
+    const nextDistance = Number.isFinite(this.obstacles.nextSpawnDistance) ? this.obstacles.nextSpawnDistance : null;
+    const distance = Number.isFinite(run.distance) ? run.distance : 0;
+    const speed = Math.max(1, Number.isFinite(run.currentSpeed) ? run.currentSpeed : getTrackCruiseSpeed(track, 0, run.speedClassId));
+    const plan = this.obstacles.getSpawnSchedulePlan(run, this.obstacles.track || track);
+    const nextAhead = Number.isFinite(nextDistance) ? nextDistance - distance : null;
+    return {
+      nextScheduledWaveDistance: Number.isFinite(nextDistance) ? Math.round(nextDistance) : null,
+      nextScheduledWaveAhead: Number.isFinite(nextAhead) ? Math.round(nextAhead) : null,
+      nextScheduledWaveSeconds: Number.isFinite(nextAhead) ? Math.max(0, nextAhead / speed) : null,
+      spawnHorizonAhead: Number.isFinite(plan.spawnHorizon) ? Math.round(plan.spawnHorizon - distance) : null,
+      delayedForVisibility: Boolean(run.lastWaveDelayedForVisibleSafety),
+      transitionGuardActive: Boolean(plan.transitionGuardActive),
+      maxWavesPerFrame: plan.maxWavesPerFrame
+    };
+  }
+
+  buildRoadDirectorLabSnapshot() {
+    const { run, source } = this.getRoadDirectorSnapshotSource();
+    const track = run.track || getTrackById(DEFAULT_TRACK_ID);
+    const distance = Number.isFinite(run.distance) ? run.distance : 0;
+    const progress = clamp(distance / Math.max(1, track.distanceToFinish), 0, 1);
+    const section = getTrackSection(track, progress);
+    const sectionProgress = getTrackSectionProgress(section, progress);
+    const director = this.obstacles?.director;
+    const currentWave = director?.currentWave || null;
+    const visibleObjects = this.getVisibleDirectorObjects(run);
+    const meaningfulVisibleObjects = visibleObjects.filter((item) => (
+      this.obstacles.isFairnessBlocker(item.obstacle)
+      || ["boostPad", "ramp", "gasCan"].includes(item.obstacle.type)
+    ));
+    const density = this.obstacles?.getActiveFieldDensity(this.obstacles.obstacles, distance) || {};
+    const activeField = this.obstacles?.validateActiveFieldBudget(this.obstacles.obstacles, distance) || {};
+    const route = this.obstacles?.getRouteReadability(this.obstacles.obstacles, distance) || null;
+    const budget = activeField.budget || this.obstacles?.getActiveFieldBudget(run) || {};
+    const routeStatus = route
+      ? (route.invalid ? "blocked" : "readable")
+      : "not tracked yet";
+    const activeFieldStatus = activeField.invalid
+      ? `over budget: ${activeField.reason || "active-field budget prevented"}`
+      : "within budget";
+    const overDensityWarning = activeField.invalid
+      ? (activeField.reason || "active-field budget exceeded")
+      : ((density.visibleHardBlockers || 0) >= (budget.spawnDelayVisibleHardBlockers || Infinity)
+        ? "near spawn-delay threshold"
+        : "none");
+    const timing = this.getRoadDirectorTimingSnapshot(run, track, section);
+    const schedule = this.getRoadDirectorScheduleSnapshot(run, track);
+    const currentPressureBudget = Number.isFinite(currentWave?.pressureBudget)
+      ? currentWave.pressureBudget
+      : (this.obstacles?.track && director ? director.getContext(distance).pressureBudget : null);
+    const currentPressureAllowance = this.obstacles?.track && director
+      ? director.getContext(distance).pressureBudgetAllowance
+      : null;
+    const currentPressure = Number.isFinite(currentWave?.pressure) ? currentWave.pressure : null;
+    const recentWaveHistory = (run.roadDirectorSequence || [])
+      .slice(-12)
+      .map((wave) => ({
+        index: wave.index,
+        type: wave.type,
+        label: wave.label,
+        sectionId: wave.sectionId,
+        sectionLabel: wave.sectionLabel,
+        distance: wave.distance,
+        blockedLanes: wave.blockedLanes || [],
+        boostLanes: wave.boostLanes || [],
+        rampLanes: wave.rampLanes || [],
+        gasCanLanes: wave.gasCanLanes || [],
+        obstacleCount: (wave.obstacles || []).length,
+        obstacles: (wave.obstacles || []).map((obstacle) => ({
+          type: obstacle.type,
+          lane: obstacle.lane,
+          distance: obstacle.distance
+        }))
+      }));
+    const recentRejectedWaves = (run.recentRoadDirectorRejections || []).slice(-12);
+
+    return {
+      generatedAt: new Date().toISOString(),
+      debugMode: Boolean(this.debugMode),
+      source,
+      activeRace: this.screen === "game" && !run.ended,
+      track: {
+        id: track.id,
+        name: track.name
+      },
+      raceType: {
+        id: normalizeRaceTypeId(run.raceTypeId, DEFAULT_RACE_TYPE_ID),
+        label: getRaceTypeLabel(run.raceTypeId)
+      },
+      raceMode: {
+        id: normalizeSpeedClassId(run.speedClassId, DEFAULT_SPEED_CLASS_ID),
+        label: getSpeedClassLabel(run.speedClassId)
+      },
+      seed: formatRoadSeed(run.roadSeed),
+      seedHash: Number.isFinite(run.roadSeedHash) ? run.roadSeedHash >>> 0 : hashSeed(getRunRandomSeedSource(run.roadSeed, track, run.speedClassId, run.raceTypeId)) >>> 0,
+      distance: Math.round(distance),
+      elapsedSeconds: Number.isFinite(run.elapsed) ? Number(run.elapsed.toFixed(2)) : 0,
+      progress,
+      section: {
+        id: section.id,
+        label: section.label,
+        progress: sectionProgress,
+        pressureMultiplier: getSectionNumber(section, "pressureMultiplier", 1, 0.25, 2.4)
+      },
+      currentWave: {
+        name: currentWave?.label || "none",
+        type: currentWave?.type || "none",
+        family: "not tracked yet",
+        intent: "not tracked yet",
+        meaningful: currentWave ? Boolean(currentWave.meaningfulWave) : null,
+        support: currentWave ? Boolean(currentWave.supportWave) : null,
+        pressure: currentPressure,
+        pressureBudget: currentPressureBudget,
+        pressureBudgetAllowance: currentPressureAllowance,
+        pressureBudgetPassed: currentWave ? currentWave.pressureBudgetPassed !== false : null,
+        fairnessPassed: currentWave ? currentWave.fairnessPassed !== false : null
+      },
+      recentWaveHistory,
+      recentRejectedWaves,
+      activeField: {
+        status: activeFieldStatus,
+        reason: activeField.reason || "none",
+        visibleHardBlockers: density.visibleHardBlockers || 0,
+        visibleMeaningfulObjects: meaningfulVisibleObjects.length,
+        visibleGameplayObjects: visibleObjects.length,
+        activeVisibleWaveOverlap: density.visibleHardWaveOverlap || 0,
+        tacticalHardBlockers: density.tacticalHardBlockers || 0,
+        hardBlockersNext3Seconds: density.hardBlockersNext3Seconds || 0,
+        hardBlockersNext5Seconds: density.hardBlockersNext5Seconds || 0,
+        maxHardBlockersInTwoSeconds: density.maxHardBlockersInTwoSeconds || 0,
+        maxHardBlockersInThreeLaneNeighborhood: density.maxHardBlockersInThreeLaneNeighborhood || 0,
+        budget: {
+          maxVisibleHardBlockers: budget.maxVisibleHardBlockers ?? null,
+          spikeVisibleHardBlockers: budget.spikeVisibleHardBlockers ?? null,
+          spawnDelayVisibleHardBlockers: budget.spawnDelayVisibleHardBlockers ?? null,
+          maxTacticalHardBlockers: budget.maxTacticalHardBlockers ?? null,
+          maxHardBlockersNext3Seconds: budget.maxHardBlockersNext3Seconds ?? null,
+          maxVisibleHardWaveOverlap: budget.maxVisibleHardWaveOverlap ?? null
+        }
+      },
+      routeValidation: route ? {
+        status: routeStatus,
+        routeFailures: route.routeFailures || 0,
+        minorOnlyOpenLaneEvents: route.minorOnlyOpenLaneEvents || 0,
+        timingRouteFailures: route.timingRouteFailures || 0,
+        worstSlice: route.worstSlice ? {
+          ahead: Math.round(route.worstSlice.ahead || 0),
+          hardLanes: route.worstSlice.hardLanes || [],
+          minorLanes: route.worstSlice.minorLanes || [],
+          openLanes: route.worstSlice.openLanes || [],
+          clearLanes: route.worstSlice.clearLanes || [],
+          reachableClearLanes: route.worstSlice.reachableClearLanes || [],
+          timeToPlayerZone: Number.isFinite(route.worstSlice.timeToPlayerZone) ? Number(route.worstSlice.timeToPlayerZone.toFixed(2)) : null
+        } : null
+      } : {
+        status: "not tracked yet"
+      },
+      schedule,
+      timing: {
+        ...timing,
+        timeSinceLastWaveSeconds: director && Number.isFinite(director.timeSinceWaveSeconds) ? director.timeSinceWaveSeconds : null,
+        timeSinceMovementDecisionSeconds: director && Number.isFinite(director.decisionSafeSeconds) ? director.decisionSafeSeconds : null
+      },
+      warnings: {
+        underActivity: timing.underActivityWarning,
+        overDensity: overDensityWarning
+      },
+      counters: {
+        activeFieldBudgetDelays: run.activeFieldBudgetDelays || 0,
+        activeFieldRejectedSpawns: run.activeFieldRejectedSpawns || 0,
+        combinedRouteFailures: run.combinedRouteFailures || 0,
+        supportObjectsSuppressedByDensity: run.supportObjectsSuppressedByDensity || 0,
+        popInPreventedCount: run.popInPreventedCount || 0,
+        wavesSpawnedInsideVisibleCount: run.wavesSpawnedInsideVisibleCount || 0,
+        wavesSpawnedThisFrame: run.wavesSpawnedThisFrame || 0,
+        maxWavesSpawnedInSingleFrame: run.maxWavesSpawnedInSingleFrame || 0
+      },
+      notTrackedYet: [
+        "explicit wave family",
+        "explicit wave intent"
+      ]
+    };
+  }
+
+  renderRoadDirectorList(rows, emptyText, renderRow) {
+    return `
+      <ol class="leaderboard-list playtest-report-list director-lab-list">
+        ${rows.length ? rows.map((row) => renderRow(row)).join("") : `<li class="leaderboard-item"><span class="meta">${escapeHtml(emptyText)}</span></li>`}
+      </ol>
+    `;
+  }
+
+  buildRoadDirectorReportExportText() {
+    return JSON.stringify(this.buildRoadDirectorLabSnapshot(), null, 2);
+  }
+
+  showRoadDirectorLabScreen(message = "") {
+    if (!this.debugMode) {
+      this.showSettingsScreen("Enable debug mode to open Road Director Lab.");
+      return;
+    }
+    this.setScreen("roadDirectorLab");
+    this.audio.playMusic("title", false);
+    const snapshot = this.buildRoadDirectorLabSnapshot();
+    const card = (title, value, detail = "") => `
+      <div class="score-card"><strong>${escapeHtml(title)}</strong><span>${escapeHtml(value)}</span>${detail ? `<small>${escapeHtml(detail)}</small>` : ""}</div>
+    `;
+    const waveHistoryList = this.renderRoadDirectorList(snapshot.recentWaveHistory, "No waves recorded yet.", (wave) => {
+      const obstacleText = wave.obstacles.length
+        ? wave.obstacles.map((obstacle) => `${obstacle.type} L${Number(obstacle.lane) + 1}@${obstacle.distance}`).join("; ")
+        : "gap";
+      const lanes = wave.blockedLanes.length ? `blocked ${wave.blockedLanes.map((lane) => Number(lane) + 1).join(",")}` : "no hard lane block";
+      return `
+        <li class="leaderboard-item playtest-report-row">
+          <span class="leaderboard-rank">${escapeHtml(`${wave.index || "-"} ${wave.label || wave.type}`)}</span>
+          <span class="meta">${escapeHtml(`${wave.sectionLabel || wave.sectionId || "Section"} d${wave.distance} - ${lanes} - ${obstacleText}`)}</span>
+        </li>
+      `;
+    });
+    const rejectionList = this.renderRoadDirectorList(snapshot.recentRejectedWaves, "No rejected waves or spawn attempts tracked yet.", (item) => `
+      <li class="leaderboard-item playtest-report-row">
+        <span class="leaderboard-rank">${escapeHtml(item.waveLabel || item.waveType || item.type || "unknown")}</span>
+        <span class="meta">${escapeHtml(`${item.reason || "rejected"} - ${item.type || "unknown"} L${Number.isFinite(item.lane) ? item.lane + 1 : "?"} d${item.distance || 0} t${this.formatDirectorSeconds(item.elapsed, "0.0s")}`)}</span>
+      </li>
+    `);
+    const notTrackedText = snapshot.notTrackedYet.length ? snapshot.notTrackedYet.join(", ") : "none";
+    this.layer.classList.remove("is-empty");
+    this.layer.innerHTML = `
+      <section class="panel playtest-report-panel road-director-lab-panel">
+        <div class="playtest-report-header">
+          <div>
+            <span class="eyebrow">Local Development Only</span>
+            <h2>Road Director Lab</h2>
+            <p class="hint">${escapeHtml(snapshot.source)} - ${snapshot.activeRace ? "race is active" : "race is not active"}</p>
+          </div>
+          <div class="playtest-report-status">
+            <strong>${escapeHtml(snapshot.currentWave.name)}</strong>
+            <span>current wave</span>
+          </div>
+        </div>
+        <div class="score-grid playtest-summary-grid director-lab-summary-grid">
+          ${card("Track", snapshot.track.name, snapshot.track.id)}
+          ${card("Race Type", snapshot.raceType.label, snapshot.raceType.id)}
+          ${card("Race Mode", snapshot.raceMode.label, snapshot.raceMode.id)}
+          ${card("Seed", snapshot.seed, `hash ${snapshot.seedHash}`)}
+          ${card("Section", snapshot.section.label, `${snapshot.section.id} - ${Math.round(snapshot.section.progress * 100)}%`)}
+          ${card("Wave", snapshot.currentWave.name, snapshot.currentWave.type)}
+          ${card("Wave Family", snapshot.currentWave.family)}
+          ${card("Wave Intent", snapshot.currentWave.intent)}
+          ${card("Visible Hard", String(snapshot.activeField.visibleHardBlockers), `budget ${snapshot.activeField.budget.maxVisibleHardBlockers ?? "unknown"}`)}
+          ${card("Meaningful Objects", String(snapshot.activeField.visibleMeaningfulObjects), `${snapshot.activeField.visibleGameplayObjects} gameplay visible`)}
+          ${card("Wave Overlap", String(snapshot.activeField.activeVisibleWaveOverlap), `budget ${snapshot.activeField.budget.maxVisibleHardWaveOverlap ?? "unknown"}`)}
+          ${card("Active Field", snapshot.activeField.status, snapshot.activeField.reason)}
+          ${card("Route", snapshot.routeValidation.status, `${snapshot.routeValidation.routeFailures || 0} failures`)}
+          ${card("Next Wave", this.formatDirectorSeconds(snapshot.schedule.nextScheduledWaveSeconds), `${snapshot.schedule.nextScheduledWaveAhead ?? "unknown"} world ahead`)}
+          ${card("Last Meaningful", this.formatDirectorSeconds(snapshot.timing.timeSinceLastMeaningfulDecisionSeconds), `next in ${this.formatDirectorSeconds(snapshot.timing.estimatedTimeUntilNextMeaningfulDecisionSeconds)}`)}
+          ${card("Dead Screen", this.formatDirectorSeconds(snapshot.timing.deadScreenSeconds), snapshot.warnings.underActivity)}
+          ${card("Pressure Budget", this.formatDirectorNumber(snapshot.currentWave.pressureBudget, 2), `pressure ${this.formatDirectorNumber(snapshot.currentWave.pressure, 2)} allowance ${this.formatDirectorNumber(snapshot.currentWave.pressureBudgetAllowance, 2)}`)}
+          ${card("Section Pressure", this.formatDirectorNumber(snapshot.section.pressureMultiplier, 2), `over-density ${snapshot.warnings.overDensity}`)}
+        </div>
+        <div class="score-grid playtest-detail-grid director-lab-detail-grid">
+          ${card("Route Detail", `${snapshot.routeValidation.minorOnlyOpenLaneEvents || 0} minor-only events`, `${snapshot.routeValidation.timingRouteFailures || 0} timing failures`)}
+          ${card("Active Budget Counts", `${snapshot.activeField.tacticalHardBlockers} tactical hard`, `${snapshot.activeField.hardBlockersNext3Seconds} next 3s - ${snapshot.activeField.maxHardBlockersInTwoSeconds} in 2s`)}
+          ${card("Schedule Detail", `${snapshot.schedule.nextScheduledWaveDistance ?? "unknown"} world`, `horizon ${snapshot.schedule.spawnHorizonAhead ?? "unknown"} - max/frame ${snapshot.schedule.maxWavesPerFrame ?? "unknown"}`)}
+          ${card("Counters", `${snapshot.counters.activeFieldBudgetDelays} active-field delays`, `${snapshot.counters.activeFieldRejectedSpawns} active rejects - ${snapshot.counters.combinedRouteFailures} route blocks`)}
+        </div>
+        <div class="playtest-report-columns director-lab-columns">
+          <section>
+            <h3>Recent Wave History</h3>
+            ${waveHistoryList}
+          </section>
+          <section>
+            <h3>Recent Rejections</h3>
+            ${rejectionList}
+          </section>
+        </div>
+        <div class="score-grid playtest-detail-grid">
+          <div class="score-card"><strong>Route Worst Slice</strong><span class="is-compact">${escapeHtml(snapshot.routeValidation.worstSlice ? `hard ${snapshot.routeValidation.worstSlice.hardLanes.join(",") || "none"} clear ${snapshot.routeValidation.worstSlice.clearLanes.join(",") || "none"} reachable ${snapshot.routeValidation.worstSlice.reachableClearLanes.join(",") || "none"}` : "none")}</span></div>
+          <div class="score-card"><strong>Not Tracked Yet</strong><span class="is-compact">${escapeHtml(notTrackedText)}</span></div>
+        </div>
+        <div class="row playtest-action-row">
+          <button class="small-button primary" data-action="copyRoadDirectorReport">Copy Director Report</button>
+          <button class="small-button" data-action="roadDirectorLab">Refresh</button>
+          <button class="small-button" data-action="settings">Back to Settings</button>
+          <button class="small-button" data-action="title">Back to Title</button>
+        </div>
+        ${this.roadDirectorReportCopyText ? `
+          <div class="field playtest-copy-field">
+            <label for="roadDirectorReportCopyText">Manual Copy</label>
+            <textarea id="roadDirectorReportCopyText" readonly>${escapeHtml(this.roadDirectorReportCopyText)}</textarea>
+          </div>
+        ` : ""}
+        <p class="status-line">${escapeHtml(message)}</p>
+      </section>
+    `;
+    this.bindLayerButtons();
+    const copyText = document.getElementById("roadDirectorReportCopyText");
+    if (copyText) {
+      copyText.focus();
+      copyText.select();
+    }
   }
 
   showPlaytestReportScreen(message = "") {
@@ -14755,6 +15190,10 @@ class NeonRoadRally {
         else if (action === "runSimulation") this.runSpawnSafetySimulation();
         else if (action === "runFuelSimulation") this.runSpawnSafetySimulation({ raceTypeId: FUEL_RUN_RACE_TYPE_ID });
         else if (action === "runSeedTest") this.runSeedDeterminismTest();
+        else if (action === "roadDirectorLab") {
+          this.roadDirectorReportCopyText = "";
+          this.showRoadDirectorLabScreen();
+        }
         else if (action === "vehicleScaleDebug") this.showVehicleScaleDebugScreen();
         else if (action === "title") this.showTitle();
         else if (action === "restart") this.handleRestartRun();
@@ -14764,6 +15203,7 @@ class NeonRoadRally {
         else if (action === "saveCar") this.handleSaveCar();
         else if (action === "resetData") this.handleResetData();
         else if (action === "copyPlaytestReport") this.handleCopyPlaytestReport();
+        else if (action === "copyRoadDirectorReport") this.handleCopyRoadDirectorReport();
         else if (action === "clearPlaytestReports") this.handleClearPlaytestReports();
       });
     });
@@ -14837,6 +15277,21 @@ class NeonRoadRally {
     } catch (error) {
       this.playtestReportCopyText = text;
       this.showPlaytestReportScreen("Clipboard copy failed. Use the manual copy box below.");
+    }
+  }
+
+  async handleCopyRoadDirectorReport() {
+    const text = this.buildRoadDirectorReportExportText();
+    try {
+      if (!navigator.clipboard || typeof navigator.clipboard.writeText !== "function") {
+        throw new Error("Clipboard API unavailable");
+      }
+      await navigator.clipboard.writeText(text);
+      this.roadDirectorReportCopyText = "";
+      this.showRoadDirectorLabScreen("Director report copied to clipboard.");
+    } catch (error) {
+      this.roadDirectorReportCopyText = text;
+      this.showRoadDirectorLabScreen("Clipboard copy failed. Use the manual copy box below.");
     }
   }
 

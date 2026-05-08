@@ -800,6 +800,22 @@ button:disabled {
   grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
 }
 
+.road-director-lab-panel {
+  width: min(1120px, calc(100vw - 32px));
+}
+
+.director-lab-summary-grid {
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+}
+
+.director-lab-list .leaderboard-item {
+  align-items: start;
+}
+
+.director-lab-list .meta {
+  white-space: normal;
+}
+
 .playtest-copy-field {
   margin-top: 14px;
 }
