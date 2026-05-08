@@ -765,6 +765,11 @@ button:disabled {
   width: min(1040px, 100%);
 }
 
+.score-results-panel,
+.party-results-panel {
+  animation: result-panel-pop 180ms ease-out both;
+}
+
 .playtest-report-header {
   display: grid;
   gap: 16px;
@@ -884,7 +889,7 @@ button:disabled {
 .score-hero.is-high-score,
 .party-drama-header.is-final {
   border-color: var(--yellow);
-  box-shadow: 0 0 20px rgba(255, 228, 94, 0.28), inset 0 0 24px rgba(255, 63, 209, 0.12);
+  box-shadow: 0 0 26px rgba(255, 228, 94, 0.34), inset 0 0 28px rgba(255, 63, 209, 0.14);
 }
 
 .score-hero h2,
@@ -942,6 +947,39 @@ button:disabled {
   color: var(--muted);
 }
 
+.party-winner-banner {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  max-width: 100%;
+  margin: 6px 0 8px;
+  border: 1px solid rgba(255, 228, 94, 0.72);
+  border-radius: 7px;
+  padding: 8px 10px;
+  background:
+    linear-gradient(135deg, rgba(255, 228, 94, 0.24), rgba(40, 246, 255, 0.1)),
+    rgba(5, 8, 20, 0.9);
+  box-shadow: 0 0 18px rgba(255, 228, 94, 0.2);
+}
+
+.party-winner-banner strong,
+.party-winner-banner span {
+  overflow-wrap: anywhere;
+  text-transform: uppercase;
+}
+
+.party-winner-banner strong {
+  color: var(--yellow);
+  font-size: 0.88rem;
+}
+
+.party-winner-banner span {
+  color: var(--green);
+  font-size: 0.8rem;
+  font-weight: 800;
+}
+
 .score-callout-row,
 .medal-row {
   display: flex;
@@ -952,6 +990,13 @@ button:disabled {
 
 .score-callout-row {
   margin-top: 12px;
+}
+
+.party-callout-row .score-callout.is-hot {
+  border-width: 2px;
+  padding: 8px 12px;
+  color: #fff7b8;
+  font-weight: 900;
 }
 
 .score-callout,
@@ -969,7 +1014,7 @@ button:disabled {
 .medal-chip.is-hot {
   border-color: var(--yellow);
   background: rgba(255, 228, 94, 0.16);
-  box-shadow: 0 0 12px rgba(255, 228, 94, 0.18);
+  box-shadow: 0 0 16px rgba(255, 228, 94, 0.24);
 }
 
 .score-callout.is-muted {
@@ -995,6 +1040,12 @@ button:disabled {
   color: #ffe6fb;
   font-weight: 900;
   box-shadow: 0 0 18px rgba(255, 63, 209, 0.18);
+}
+
+.score-callout.is-hot,
+.score-callout.is-badge,
+.score-callout.is-title {
+  animation: callout-pop 170ms ease-out both;
 }
 
 .medal-row {
@@ -1562,6 +1613,26 @@ button:disabled {
     linear-gradient(180deg, rgba(255, 143, 63, 0.1), transparent 38%),
     repeating-linear-gradient(90deg, rgba(40, 246, 255, 0.08) 0 2px, transparent 2px 54px),
     rgba(5, 8, 20, 0.82);
+}
+
+@keyframes result-panel-pop {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes callout-pop {
+  from {
+    transform: translateY(3px) scale(0.96);
+  }
+  to {
+    transform: translateY(0) scale(1);
+  }
 }
 
 @media (max-width: 760px) {

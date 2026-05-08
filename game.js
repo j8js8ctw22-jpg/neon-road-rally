@@ -1676,14 +1676,29 @@ const ARCADE_FEEL = {
   enabled: true,
   countdownSeconds: 3.55,
   countdownGoSeconds: 0.55,
-  crashScoreDelayMs: 950,
-  finishScoreDelayMs: 760,
+  crashScoreDelayMs: 640,
+  finishScoreDelayMs: 720,
+  screenShakeIntensity: 0.82,
   screenShakeDecay: 2.6,
+  crashPauseMs: 110,
   crashShake: 1,
+  crashSparkMs: 420,
   bumpShake: 0.28,
   bumpFlashSeconds: 0.24,
   boostBurstSeconds: 0.36,
+  boostFlashMs: 260,
+  boostStreakPunchMs: 420,
+  boostTrailPunchMs: 520,
+  rampLaunchPulseMs: 220,
+  rampLandingPulseMs: 320,
+  rampClearSparkMs: 420,
   finishFlashSeconds: 0.9,
+  finishStripeMs: 760,
+  nearMissPopupCooldown: 0.38,
+  nearMissSparkMs: 260,
+  fuelWarningPulseMs: 620,
+  fuelSavedPulseMs: 520,
+  fuelSavedPopupCooldown: 1.1,
   floatingTextSeconds: 1.15,
   scoreTallyMs: 950,
   highSpeedLineStartRatio: 0.45
@@ -9476,7 +9491,7 @@ class CollisionSystem {
     run.lastCollision = info.label;
 
     if (info.crash) {
-      this.game.endRace("crashed", info.label);
+      this.game.queueCrashImpact(info.label);
       return;
     }
 
@@ -9484,7 +9499,11 @@ class CollisionSystem {
       run.rampsUsed += 1;
       this.game.launchJump(obstacle);
       this.game.addScoreEvent("ramp", 80);
-      this.game.audio.playSfx("ramp");
+      this.game.audio.playSfx("ramp", {
+        cooldownMs: 0,
+        maxInstances: 1,
+        volume: this.game.audio.sfxVolume * 0.92
+      });
       return;
     }
 
@@ -10263,7 +10282,7 @@ class Renderer {
   drawRace() {
     const ctx = this.ctx;
     const run = this.game.run;
-    const shake = Math.max(run.crashFlash || 0, run.screenShake || 0);
+    const shake = Math.max(run.crashFlash || 0, run.screenShake || 0) * ARCADE_FEEL.screenShakeIntensity;
     ctx.save();
     if (shake > 0) {
       ctx.translate((Math.random() - 0.5) * 18 * shake, (Math.random() - 0.5) * 14 * shake);
@@ -10282,10 +10301,16 @@ class Renderer {
     }
 
     this.drawBoostBurst();
+    this.drawRampLaunchPulse();
+    this.drawRampClearSpark();
+    this.drawRampLandingSpark();
+    this.drawNearMissSpark();
     this.drawPlayer();
+    this.drawCrashSparks();
     this.drawBumpFlash();
     if (this.game.debugMode) this.drawHitboxOverlay();
     ctx.restore();
+    this.drawBoostFlash();
     this.drawFinishFlash();
     this.drawFloatingTexts();
     this.drawCountdown();
@@ -10604,9 +10629,16 @@ class Renderer {
     const run = this.game.run;
     const x = this.laneCenter(run.renderLaneFloat);
     const y = this.getPlayerScreenY();
+    const landingDuration = ARCADE_FEEL.rampLandingPulseMs / 1000;
+    const boostTrailDuration = ARCADE_FEEL.boostTrailPunchMs / 1000;
+    const landingPulse = landingDuration > 0 ? clamp((run.rampLandingPulseTimer || 0) / landingDuration, 0, 1) : 0;
+    const boostTrailPunch = boostTrailDuration > 0 ? clamp((run.boostTrailPunchTimer || 0) / boostTrailDuration, 0, 1) : 0;
     drawPlayerCar(this.ctx, x, y, run.player.car, {
       boosting: run.boostTimer > 0 || run.padBoostTimer > 0,
       airborne: run.airborne,
+      airborneLift: run.jumpOffset || 0,
+      landingPulse,
+      boostTrailIntensity: run.boostTimer > 0 ? 0.74 + boostTrailPunch * 0.38 : (run.padBoostTimer > 0 ? 0.58 : 0),
       laneWidth: this.road.laneW,
       laneChanging: Math.abs(run.renderLaneFloat - run.targetLane) > 0.02,
       laneDelta: run.targetLane - run.renderLaneFloat,
@@ -10746,16 +10778,19 @@ class Renderer {
     const speedRatio = this.getVisualSpeedRatio();
     const finalStretch = this.getFinalStretchIntensity();
     const theme = this.getCurrentTrackVisualTheme();
+    const boostPunchDuration = ARCADE_FEEL.boostStreakPunchMs / 1000;
+    const boostPunch = boostPunchDuration > 0 ? clamp((run.boostStreakPunchTimer || 0) / boostPunchDuration, 0, 1) : 0;
     const intensity = (run.boostTimer > 0 ? 0.42 : (run.padBoostTimer > 0 ? 0.32 : (sectionEnergy ? 0.14 : 0.18)))
       * TRACK_VISUALS.speedStreakIntensity
       * clampNumber(theme.speedStreakIntensity, 0.4, 1.8, 1)
       * (1 + finalStretch * 0.25)
-      * clamp(visualIntensity, 0.8, 1.35);
-    const lineCount = Math.round((run.boostTimer > 0 ? 34 : (run.padBoostTimer > 0 ? 24 : (sectionEnergy ? 18 : 16))) * (0.85 + speedRatio * 0.35) * clamp(visualIntensity, 0.92, 1.18));
+      * clamp(visualIntensity, 0.8, 1.35)
+      * (1 + boostPunch * 0.55);
+    const lineCount = Math.round((run.boostTimer > 0 ? 34 : (run.padBoostTimer > 0 ? 24 : (sectionEnergy ? 18 : 16))) * (0.85 + speedRatio * 0.35) * clamp(visualIntensity, 0.92, 1.18) * (1 + boostPunch * 0.38));
     ctx.save();
     ctx.globalAlpha = intensity;
     ctx.strokeStyle = boosting ? (theme.boostStreakColor || "#28f6ff") : (theme.speedStreakColor || "#f6fbff");
-    ctx.lineWidth = boosting ? 2.5 : 1.5;
+    ctx.lineWidth = boosting ? 2.5 + boostPunch * 1.2 : 1.5;
     for (let i = 0; i < lineCount; i += 1) {
       const side = i % 2 === 0 ? -1 : 1;
       const edgeInset = this.road.laneW * (i % 4 === 0 ? 0.16 : 0.34);
@@ -10806,6 +10841,159 @@ class Renderer {
     ctx.restore();
   }
 
+  drawBoostFlash() {
+    const run = this.game.run;
+    const duration = ARCADE_FEEL.boostFlashMs / 1000;
+    if (!ARCADE_FEEL.enabled || duration <= 0 || run.boostFlashTimer <= 0) return;
+    const progress = 1 - run.boostFlashTimer / duration;
+    const alpha = (1 - progress) * 0.2;
+    const { x, y } = this.getPlayerFloatingAnchor();
+    const ctx = this.ctx;
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.strokeStyle = "#28f6ff";
+    ctx.lineWidth = 4;
+    ctx.shadowBlur = 24;
+    ctx.shadowColor = "#28f6ff";
+    ctx.beginPath();
+    ctx.ellipse(x, y, this.road.laneW * lerp(0.48, 1.05, progress), 44 + progress * 26, 0, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.globalAlpha = alpha * 0.42;
+    ctx.fillStyle = "#28f6ff";
+    ctx.fillRect(0, 0, this.width, this.height);
+    ctx.restore();
+  }
+
+  drawRampClearSpark() {
+    const run = this.game.run;
+    const duration = ARCADE_FEEL.rampClearSparkMs / 1000;
+    if (!ARCADE_FEEL.enabled || duration <= 0 || run.rampClearSparkTimer <= 0) return;
+    const progress = 1 - run.rampClearSparkTimer / duration;
+    const alpha = (1 - progress) * 0.76;
+    const { x, y } = this.getPlayerFloatingAnchor();
+    const ctx = this.ctx;
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.strokeStyle = "#f6fbff";
+    ctx.fillStyle = "#ffe45e";
+    ctx.shadowBlur = 16;
+    ctx.shadowColor = "#ffe45e";
+    for (let i = 0; i < 8; i += 1) {
+      const angle = (Math.PI * 2 * i) / 8 + progress * 0.7;
+      const radius = 24 + progress * 36;
+      const sx = x + Math.cos(angle) * radius;
+      const sy = y - 18 + Math.sin(angle) * radius * 0.55;
+      ctx.beginPath();
+      ctx.arc(sx, sy, 2.2 + (i % 2) * 1.1, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  drawRampLaunchPulse() {
+    const run = this.game.run;
+    const duration = ARCADE_FEEL.rampLaunchPulseMs / 1000;
+    if (!ARCADE_FEEL.enabled || duration <= 0 || run.rampLaunchPulseTimer <= 0) return;
+    const progress = 1 - run.rampLaunchPulseTimer / duration;
+    const alpha = (1 - progress) * 0.52;
+    const { x, y } = this.getPlayerFloatingAnchor();
+    const ctx = this.ctx;
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.strokeStyle = "#ffe45e";
+    ctx.shadowBlur = 16;
+    ctx.shadowColor = "#ffe45e";
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.ellipse(x, y + 26, this.road.laneW * lerp(0.18, 0.48, progress), lerp(8, 24, progress), 0, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  drawRampLandingSpark() {
+    const run = this.game.run;
+    const duration = ARCADE_FEEL.rampLandingPulseMs / 1000;
+    if (!ARCADE_FEEL.enabled || duration <= 0 || run.rampLandingPulseTimer <= 0) return;
+    const progress = 1 - run.rampLandingPulseTimer / duration;
+    const alpha = (1 - progress) * 0.58;
+    const { x, y } = this.getPlayerFloatingAnchor();
+    const ctx = this.ctx;
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.strokeStyle = "#ffe45e";
+    ctx.shadowBlur = 14;
+    ctx.shadowColor = "#ffe45e";
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.ellipse(x, y + 34, this.road.laneW * lerp(0.26, 0.58, progress), lerp(8, 18, progress), 0, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.fillStyle = "#f6fbff";
+    for (let i = 0; i < 5; i += 1) {
+      const side = i % 2 === 0 ? -1 : 1;
+      const sx = x + side * (18 + i * 5) + (Math.random() - 0.5) * 5;
+      const sy = y + 36 + Math.random() * 9;
+      ctx.fillRect(sx, sy, 3, 3);
+    }
+    ctx.restore();
+  }
+
+  drawNearMissSpark() {
+    const run = this.game.run;
+    const duration = ARCADE_FEEL.nearMissSparkMs / 1000;
+    if (!ARCADE_FEEL.enabled || duration <= 0 || run.nearMissSparkTimer <= 0) return;
+    const progress = 1 - run.nearMissSparkTimer / duration;
+    const alpha = (1 - progress) * 0.62;
+    const { x, y } = this.getPlayerFloatingAnchor();
+    const ctx = this.ctx;
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.strokeStyle = "#28f6ff";
+    ctx.shadowBlur = 13;
+    ctx.shadowColor = "#28f6ff";
+    ctx.lineWidth = 2;
+    const side = Math.sin((run.nearMisses || 1) * 2.4) >= 0 ? 1 : -1;
+    for (let i = 0; i < 4; i += 1) {
+      const sx = x + side * (this.road.laneW * 0.38 + i * 7);
+      const sy = y - 42 + i * 18 + progress * 18;
+      ctx.beginPath();
+      ctx.moveTo(sx, sy);
+      ctx.lineTo(sx + side * (20 + progress * 12), sy - 8);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  drawCrashSparks() {
+    const run = this.game.run;
+    const duration = ARCADE_FEEL.crashSparkMs / 1000;
+    if (!ARCADE_FEEL.enabled || duration <= 0 || run.crashSparkTimer <= 0) return;
+    const progress = 1 - run.crashSparkTimer / duration;
+    const alpha = (1 - progress) * 0.88;
+    const { x, y } = this.getPlayerFloatingAnchor();
+    const ctx = this.ctx;
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.strokeStyle = "#ff3b58";
+    ctx.fillStyle = "#ffe45e";
+    ctx.shadowBlur = 16;
+    ctx.shadowColor = "#ff3b58";
+    for (let i = 0; i < 12; i += 1) {
+      const angle = (Math.PI * 2 * i) / 12;
+      const start = 18 + (i % 3) * 5;
+      const end = start + 24 + progress * 34;
+      const sx = x + Math.cos(angle) * start;
+      const sy = y + Math.sin(angle) * start * 0.65;
+      const ex = x + Math.cos(angle) * end;
+      const ey = y + Math.sin(angle) * end * 0.65;
+      ctx.beginPath();
+      ctx.moveTo(sx, sy);
+      ctx.lineTo(ex, ey);
+      ctx.stroke();
+      if (i % 2 === 0) ctx.fillRect(ex - 2, ey - 2, 4, 4);
+    }
+    ctx.restore();
+  }
+
   drawBumpFlash() {
     const run = this.game.run;
     if (!ARCADE_FEEL.enabled || run.bumpFlashTimer <= 0) return;
@@ -10827,22 +11015,35 @@ class Renderer {
 
   drawFinishFlash() {
     const run = this.game.run;
-    if (!ARCADE_FEEL.enabled || run.finishFlashTimer <= 0) return;
+    if (!ARCADE_FEEL.enabled || (run.finishFlashTimer <= 0 && run.finishStripeTimer <= 0)) return;
     const progress = 1 - run.finishFlashTimer / ARCADE_FEEL.finishFlashSeconds;
     const alpha = (1 - progress) * 0.34;
     const ctx = this.ctx;
     ctx.save();
-    ctx.globalAlpha = alpha;
-    ctx.fillStyle = "#f6fbff";
-    ctx.fillRect(0, 0, this.width, this.height);
-    ctx.globalAlpha = (1 - progress) * 0.9;
-    ctx.fillStyle = "#ffe45e";
-    ctx.font = `800 ${Math.max(36, Math.min(72, this.width * 0.07))}px Trebuchet MS, Verdana, sans-serif`;
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-    ctx.shadowBlur = 24;
-    ctx.shadowColor = "#ffe45e";
-    ctx.fillText("FINISH!", this.width / 2, this.height * 0.32);
+    if (run.finishFlashTimer > 0) {
+      ctx.globalAlpha = alpha;
+      ctx.fillStyle = "#f6fbff";
+      ctx.fillRect(0, 0, this.width, this.height);
+      ctx.globalAlpha = (1 - progress) * 0.9;
+      ctx.fillStyle = "#ffe45e";
+      ctx.font = `800 ${Math.max(36, Math.min(72, this.width * 0.07))}px Trebuchet MS, Verdana, sans-serif`;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.shadowBlur = 24;
+      ctx.shadowColor = "#ffe45e";
+      ctx.fillText("FINISH!", this.width / 2, this.height * 0.32);
+    }
+    if (run.finishStripeTimer > 0) {
+      const stripeDuration = ARCADE_FEEL.finishStripeMs / 1000;
+      const stripeProgress = stripeDuration > 0 ? 1 - run.finishStripeTimer / stripeDuration : 1;
+      const bandY = lerp(this.height * 0.18, this.height * 0.82, stripeProgress);
+      const cell = Math.max(18, this.width / 34);
+      ctx.globalAlpha = (1 - stripeProgress) * 0.54;
+      for (let i = -1; i < this.width / cell + 2; i += 1) {
+        ctx.fillStyle = i % 2 ? "#f6fbff" : "#08080d";
+        ctx.fillRect(i * cell + (stripeProgress * cell * 3) % (cell * 2), bandY - 12, cell, 24);
+      }
+    }
     ctx.restore();
   }
 
@@ -11060,18 +11261,35 @@ class Renderer {
     const low = run.lowFuelActive;
     const color = critical ? "#ff334c" : (low ? "#ffe45e" : (percent <= 0.55 ? "#44ff99" : "#28f6ff"));
     const pulse = critical ? 0.55 + Math.sin((run.elapsed || 0) * 12) * 0.28 : (low ? 0.42 + Math.sin((run.elapsed || 0) * 7) * 0.16 : 0.18);
+    const warningPulse = ARCADE_FEEL.fuelWarningPulseMs > 0
+      ? clamp((run.fuelWarningPulseTimer || 0) / (ARCADE_FEEL.fuelWarningPulseMs / 1000), 0, 1)
+      : 0;
+    const savedPulse = ARCADE_FEEL.fuelSavedPulseMs > 0
+      ? clamp((run.fuelSavedPulseTimer || 0) / (ARCADE_FEEL.fuelSavedPulseMs / 1000), 0, 1)
+      : 0;
     ctx.save();
     ctx.fillStyle = "rgba(5, 7, 18, 0.92)";
     ctx.fillRect(x, y, width, height);
     ctx.strokeStyle = color;
-    ctx.lineWidth = 2;
-    ctx.shadowBlur = critical || low ? 14 : 8;
+    ctx.lineWidth = 2 + warningPulse * 1.2;
+    ctx.shadowBlur = (critical || low ? 14 : 8) + warningPulse * 8;
     ctx.shadowColor = color;
     ctx.strokeRect(x, y, width, height);
     ctx.shadowBlur = 0;
     ctx.fillStyle = color;
     ctx.globalAlpha = critical || low ? clamp(pulse + 0.45, 0.45, 1) : 0.9;
     ctx.fillRect(x + 3, y + 3, Math.max(0, (width - 6) * percent), Math.max(1, height - 6));
+    if (savedPulse > 0) {
+      const shimmerX = x + 3 + (width - 6) * clamp(1 - savedPulse, 0, 1);
+      const shimmerW = Math.max(7, width * 0.16);
+      ctx.globalAlpha = savedPulse * 0.68;
+      ctx.fillStyle = "#f6fbff";
+      ctx.fillRect(Math.min(x + width - 4, shimmerX), y + 3, shimmerW, Math.max(1, height - 6));
+      ctx.globalAlpha = savedPulse * 0.5;
+      ctx.strokeStyle = "#44ff99";
+      ctx.lineWidth = 2;
+      ctx.strokeRect(x - 2, y - 2, width + 4, height + 4);
+    }
     ctx.globalAlpha = 1;
     ctx.fillStyle = critical ? "#f6fbff" : "#07101b";
     ctx.font = `900 ${Math.max(9, Math.min(12, height - 2))}px Trebuchet MS, Verdana, sans-serif`;
@@ -11658,22 +11876,29 @@ function drawSpritePlayerCar(ctx, x, y, carConfig, state, sprite) {
   const targetWidth = getPlayerSpriteTargetWidth(carConfig, state);
   const spriteBox = getScaledSpriteBox(sprite, targetWidth);
   const laneTilt = clamp(state.laneDelta || 0, -1, 1) * 0.06;
+  const landingPulse = clampNumber(state.landingPulse, 0, 1, 0);
+  const airborneLift = Math.max(0, state.airborneLift || 0);
 
   ctx.save();
   ctx.translate(x, y);
   ctx.rotate(laneTilt);
 
   if (state.airborne) {
-    ctx.globalAlpha = 0.24;
+    const shadowOffset = spriteBox.h * 0.32 + Math.min(spriteBox.h * 0.72, airborneLift * 0.82);
+    ctx.globalAlpha = 0.2;
     ctx.fillStyle = "#000";
     ctx.beginPath();
-    ctx.ellipse(0, spriteBox.h * 0.38, spriteBox.w * 0.34, spriteBox.h * 0.07, 0, 0, Math.PI * 2);
+    ctx.ellipse(0, shadowOffset, spriteBox.w * 0.3, spriteBox.h * 0.055, 0, 0, Math.PI * 2);
     ctx.fill();
     ctx.globalAlpha = 1;
   }
 
+  if (landingPulse > 0) {
+    ctx.scale(1 + landingPulse * 0.035, 1 - landingPulse * 0.045);
+  }
+
   if (state.boosting) {
-    drawSpriteBoostTrail(ctx, spriteBox.w, spriteBox.h, stripe);
+    drawSpriteBoostTrail(ctx, spriteBox.w, spriteBox.h, stripe, state.boostTrailIntensity || 0.7);
   }
 
   if (state.laneChanging) {
@@ -11706,29 +11931,30 @@ function drawSpritePlayerCar(ctx, x, y, carConfig, state, sprite) {
   ctx.restore();
 }
 
-function drawSpriteBoostTrail(ctx, w, h, stripe) {
+function drawSpriteBoostTrail(ctx, w, h, stripe, intensity = 1) {
+  const strength = clampNumber(intensity, 0.45, 1.2, 1);
   ctx.save();
-  ctx.globalAlpha = 0.92;
-  ctx.shadowBlur = 24;
+  ctx.globalAlpha = 0.52 + strength * 0.34;
+  ctx.shadowBlur = 18 + strength * 10;
   ctx.shadowColor = stripe;
   ctx.fillStyle = "rgba(40, 246, 255, 0.82)";
   ctx.beginPath();
   ctx.moveTo(-w * 0.22, h * 0.48);
-  ctx.lineTo(-w * 0.08, h * 0.88 + Math.random() * 18);
+  ctx.lineTo(-w * 0.08, h * (0.74 + strength * 0.16) + Math.random() * (10 + strength * 10));
   ctx.lineTo(w * 0.02, h * 0.48);
   ctx.closePath();
   ctx.fill();
   ctx.fillStyle = "#ffe45e";
   ctx.beginPath();
   ctx.moveTo(w * 0.05, h * 0.48);
-  ctx.lineTo(w * 0.2, h * 0.84 + Math.random() * 16);
+  ctx.lineTo(w * 0.2, h * (0.72 + strength * 0.13) + Math.random() * (8 + strength * 9));
   ctx.lineTo(w * 0.3, h * 0.48);
   ctx.closePath();
   ctx.fill();
   ctx.fillStyle = stripe;
   ctx.beginPath();
   ctx.moveTo(-w * 0.06, h * 0.5);
-  ctx.lineTo(w * 0.06, h * 0.98 + Math.random() * 12);
+  ctx.lineTo(w * 0.06, h * (0.82 + strength * 0.14) + Math.random() * (7 + strength * 8));
   ctx.lineTo(w * 0.16, h * 0.5);
   ctx.closePath();
   ctx.fill();
@@ -11742,42 +11968,50 @@ function drawCanvasPlayerCar(ctx, x, y, carConfig, state) {
   const style = CAR_BODY_STYLES.some((item) => item.id === carConfig.bodyStyle) ? carConfig.bodyStyle : DEFAULT_CAR.bodyStyle;
   const { scale, w, h } = getCanvasPlayerCarRenderSize(state);
   const laneTilt = clamp(state.laneDelta || 0, -1, 1) * 0.06;
+  const landingPulse = clampNumber(state.landingPulse, 0, 1, 0);
+  const airborneLift = Math.max(0, state.airborneLift || 0);
+  const boostTrailStrength = clampNumber(state.boostTrailIntensity, 0.45, 1.2, 0.72);
   ctx.save();
   ctx.translate(x, y);
   ctx.rotate(laneTilt);
 
   if (state.airborne) {
-    ctx.globalAlpha = 0.26;
+    const shadowOffset = h * 0.3 + Math.min(h * 0.72, airborneLift * 0.82);
+    ctx.globalAlpha = 0.2;
     ctx.fillStyle = "#000";
     ctx.beginPath();
-    ctx.ellipse(0, h * 0.34, w * 0.38, h * 0.1, 0, 0, Math.PI * 2);
+    ctx.ellipse(0, shadowOffset, w * 0.32, h * 0.07, 0, 0, Math.PI * 2);
     ctx.fill();
     ctx.globalAlpha = 1;
   }
 
+  if (landingPulse > 0) {
+    ctx.scale(1 + landingPulse * 0.035, 1 - landingPulse * 0.045);
+  }
+
   if (state.boosting) {
     ctx.save();
-    ctx.globalAlpha = 0.95;
-    ctx.shadowBlur = 26;
+    ctx.globalAlpha = 0.52 + boostTrailStrength * 0.34;
+    ctx.shadowBlur = 18 + boostTrailStrength * 10;
     ctx.shadowColor = stripe;
     ctx.fillStyle = "rgba(40, 246, 255, 0.82)";
     ctx.beginPath();
     ctx.moveTo(-w * 0.22, h * 0.42);
-    ctx.lineTo(-w * 0.08, h * 0.78 + Math.random() * 18);
+    ctx.lineTo(-w * 0.08, h * (0.68 + boostTrailStrength * 0.12) + Math.random() * (10 + boostTrailStrength * 10));
     ctx.lineTo(w * 0.02, h * 0.42);
     ctx.closePath();
     ctx.fill();
     ctx.fillStyle = "#ffe45e";
     ctx.beginPath();
     ctx.moveTo(w * 0.05, h * 0.42);
-    ctx.lineTo(w * 0.2, h * 0.74 + Math.random() * 16);
+    ctx.lineTo(w * 0.2, h * (0.64 + boostTrailStrength * 0.12) + Math.random() * (8 + boostTrailStrength * 9));
     ctx.lineTo(w * 0.3, h * 0.42);
     ctx.closePath();
     ctx.fill();
     ctx.fillStyle = stripe;
     ctx.beginPath();
     ctx.moveTo(-w * 0.06, h * 0.44);
-    ctx.lineTo(w * 0.06, h * 0.92 + Math.random() * 12);
+    ctx.lineTo(w * 0.06, h * (0.78 + boostTrailStrength * 0.12) + Math.random() * (7 + boostTrailStrength * 8));
     ctx.lineTo(w * 0.16, h * 0.44);
     ctx.closePath();
     ctx.fill();
@@ -12654,13 +12888,30 @@ class NeonRoadRally {
       lastWaveDelayedForVisibleSafety: false,
       lastSectionTransitionElapsed: 0,
       lastSectionTransitionId: section.id,
+      hitPauseTimer: 0,
+      pendingEndStatus: "",
+      pendingEndReason: "",
+      crashSfxPlayed: false,
       crashFlash: 0,
       screenShake: 0,
       bumpFlashTimer: 0,
       boostBurstTimer: 0,
+      boostFlashTimer: 0,
+      boostStreakPunchTimer: 0,
+      boostTrailPunchTimer: 0,
       finishFlashTimer: 0,
+      finishStripeTimer: 0,
       crashBeatTimer: 0,
+      crashSparkTimer: 0,
       fuelOutBeatTimer: 0,
+      rampLaunchPulseTimer: 0,
+      rampLandingPulseTimer: 0,
+      rampClearSparkTimer: 0,
+      nearMissSparkTimer: 0,
+      nearMissPopupCooldown: 0,
+      fuelWarningPulseTimer: 0,
+      fuelSavedPulseTimer: 0,
+      fuelSavedPopupCooldown: 0,
       inputFlashTimer: 0,
       inputFlashKey: "none",
       lastInputKey: "none",
@@ -12683,7 +12934,7 @@ class NeonRoadRally {
     const debugFrozen = this.screen === "game" && this.run?.debugFrozen;
     this.lastDt = debugFrozen ? 0 : dt;
     if (this.screen === "game" && !this.run.paused && !this.run.ended && !debugFrozen) {
-      this.input.update(dt);
+      if (!this.run.pendingEndStatus) this.input.update(dt);
       this.updateRun(dt);
     } else if (this.screen !== "game") {
       this.attractDistance = (this.attractDistance + dt * 210) % 100000;
@@ -12702,9 +12953,22 @@ class NeonRoadRally {
     run.screenShake = Math.max(0, (run.screenShake || 0) - dt * ARCADE_FEEL.screenShakeDecay);
     run.bumpFlashTimer = Math.max(0, (run.bumpFlashTimer || 0) - dt);
     run.boostBurstTimer = Math.max(0, (run.boostBurstTimer || 0) - dt);
+    run.boostFlashTimer = Math.max(0, (run.boostFlashTimer || 0) - dt);
+    run.boostStreakPunchTimer = Math.max(0, (run.boostStreakPunchTimer || 0) - dt);
+    run.boostTrailPunchTimer = Math.max(0, (run.boostTrailPunchTimer || 0) - dt);
     run.finishFlashTimer = Math.max(0, (run.finishFlashTimer || 0) - dt);
+    run.finishStripeTimer = Math.max(0, (run.finishStripeTimer || 0) - dt);
     run.crashBeatTimer = Math.max(0, (run.crashBeatTimer || 0) - dt);
+    run.crashSparkTimer = Math.max(0, (run.crashSparkTimer || 0) - dt);
     run.fuelOutBeatTimer = Math.max(0, (run.fuelOutBeatTimer || 0) - dt);
+    run.rampLaunchPulseTimer = Math.max(0, (run.rampLaunchPulseTimer || 0) - dt);
+    run.rampLandingPulseTimer = Math.max(0, (run.rampLandingPulseTimer || 0) - dt);
+    run.rampClearSparkTimer = Math.max(0, (run.rampClearSparkTimer || 0) - dt);
+    run.nearMissSparkTimer = Math.max(0, (run.nearMissSparkTimer || 0) - dt);
+    run.nearMissPopupCooldown = Math.max(0, (run.nearMissPopupCooldown || 0) - dt);
+    run.fuelWarningPulseTimer = Math.max(0, (run.fuelWarningPulseTimer || 0) - dt);
+    run.fuelSavedPulseTimer = Math.max(0, (run.fuelSavedPulseTimer || 0) - dt);
+    run.fuelSavedPopupCooldown = Math.max(0, (run.fuelSavedPopupCooldown || 0) - dt);
     run.inputFlashTimer = Math.max(0, (run.inputFlashTimer || 0) - dt);
     run.sectionNoticeTimer = Math.max(0, (run.sectionNoticeTimer || 0) - dt);
     if (Array.isArray(run.floatingTexts)) {
@@ -12826,6 +13090,7 @@ class NeonRoadRally {
     if (manualBoostSavingFuel && drainThisFrame < baseDrainThisFrame) {
       run.fuelSavedByBoost = Math.max(0, (run.fuelSavedByBoost || 0) + (baseDrainThisFrame - drainThisFrame));
       run.fuelDrainPausedTime = Math.max(0, (run.fuelDrainPausedTime || 0) + dt);
+      run.fuelSavedPulseTimer = Math.max(run.fuelSavedPulseTimer || 0, ARCADE_FEEL.fuelSavedPulseMs / 1000);
     }
     run.fuel = clamp(run.fuel - drainThisFrame, 0, run.fuelMax);
     run.lowFuelActive = run.fuel <= run.lowFuelThreshold;
@@ -12850,6 +13115,7 @@ class NeonRoadRally {
       run.fuelWarningCooldown = nextState === "critical"
         ? FUEL_RUN_CONFIG.criticalWarningCooldownSeconds
         : FUEL_RUN_CONFIG.warningCooldownSeconds;
+      run.fuelWarningPulseTimer = Math.max(run.fuelWarningPulseTimer || 0, ARCADE_FEEL.fuelWarningPulseMs / 1000);
       this.audio.playSfx("warning", {
         cooldownMs: nextState === "critical" ? 2400 : 3800,
         maxInstances: 1,
@@ -12893,8 +13159,41 @@ class NeonRoadRally {
     });
   }
 
+  updatePendingEnd(dt) {
+    const run = this.run;
+    if (!run?.pendingEndStatus) return false;
+    run.hitPauseTimer = Math.max(0, (run.hitPauseTimer || 0) - dt);
+    if (run.hitPauseTimer <= 0) {
+      const status = run.pendingEndStatus;
+      const reason = run.pendingEndReason;
+      run.pendingEndStatus = "";
+      run.pendingEndReason = "";
+      this.endRace(status, reason);
+    }
+    return true;
+  }
+
+  queueCrashImpact(reason) {
+    const run = this.run;
+    if (!run || run.ended || run.pendingEndStatus) return;
+    run.pendingEndStatus = "crashed";
+    run.pendingEndReason = reason || run.lastCollision || "Crash";
+    run.hitPauseTimer = ARCADE_FEEL.crashPauseMs / 1000;
+    run.crashCollisionType = sanitizeName(run.pendingEndReason, "Unknown", DISPLAY_TEXT_MAX_LENGTH);
+    run.crashFlash = Math.max(run.crashFlash || 0, 1);
+    run.crashBeatTimer = Math.max(run.crashBeatTimer || 0, 0.72);
+    run.crashSparkTimer = Math.max(run.crashSparkTimer || 0, ARCADE_FEEL.crashSparkMs / 1000);
+    run.screenShake = Math.max(run.screenShake || 0, ARCADE_FEEL.crashShake);
+    run.crashSfxPlayed = this.audio.playSfx("crash", {
+      cooldownMs: 0,
+      maxInstances: 1,
+      volume: this.audio.sfxVolume
+    });
+  }
+
   updateRun(dt) {
     const run = this.run;
+    if (this.updatePendingEnd(dt)) return;
     if (run.countdownTimer > 0) {
       run.countdownTimer = Math.max(0, run.countdownTimer - dt);
       this.playCountdownSfx();
@@ -12928,9 +13227,15 @@ class NeonRoadRally {
       const progress = 1 - run.jumpTimer / run.jumpDuration;
       run.jumpOffset = Math.sin(progress * Math.PI) * 56;
       run.airborne = run.jumpTimer > ROAD_READABILITY_CONFIG.rampLandingGraceSeconds;
-      if (wasAirborne && !run.airborne) this.finishRampLanding();
+      if (wasAirborne && !run.airborne) {
+        this.finishRampLanding();
+        this.triggerRampLandingEffect();
+      }
     } else {
-      if (run.airborne) this.finishRampLanding();
+      if (run.airborne) {
+        this.finishRampLanding();
+        this.triggerRampLandingEffect();
+      }
       run.jumpOffset = 0;
       run.airborne = false;
     }
@@ -13301,8 +13606,35 @@ class NeonRoadRally {
     if (isFuelRunRaceType(run.raceTypeId)) run.boostsUsedInFuelRun = Math.max(0, (run.boostsUsedInFuelRun || 0) + 1);
     run.boostTimer = Math.max(run.boostTimer, SPEED_TUNING.manualBoostDuration);
     run.boostBurstTimer = Math.max(run.boostBurstTimer || 0, ARCADE_FEEL.boostBurstSeconds);
-    run.screenShake = Math.max(run.screenShake || 0, 0.18);
-    this.audio.playSfx("boost");
+    run.boostFlashTimer = Math.max(run.boostFlashTimer || 0, ARCADE_FEEL.boostFlashMs / 1000);
+    run.boostStreakPunchTimer = Math.max(run.boostStreakPunchTimer || 0, ARCADE_FEEL.boostStreakPunchMs / 1000);
+    run.boostTrailPunchTimer = Math.max(run.boostTrailPunchTimer || 0, ARCADE_FEEL.boostTrailPunchMs / 1000);
+    run.screenShake = Math.max(run.screenShake || 0, 0.24);
+    this.addFloatingScoreText("BOOST!", {
+      color: "#28f6ff",
+      size: 21,
+      life: 0.58,
+      yOffset: -96,
+      vy: -42
+    });
+    if (isFuelRunRaceType(run.raceTypeId)) {
+      run.fuelSavedPulseTimer = Math.max(run.fuelSavedPulseTimer || 0, ARCADE_FEEL.fuelSavedPulseMs / 1000);
+      if ((run.fuelSavedPopupCooldown || 0) <= 0) {
+        this.addFloatingScoreText("FUEL SAVED", {
+          color: "#44ff99",
+          size: 17,
+          life: 0.74,
+          yOffset: -118,
+          vy: -38
+        });
+        run.fuelSavedPopupCooldown = ARCADE_FEEL.fuelSavedPopupCooldown;
+      }
+    }
+    this.audio.playSfx("boost", {
+      cooldownMs: 0,
+      maxInstances: 2,
+      volume: this.audio.sfxVolume * 0.96
+    });
   }
 
   launchJump(obstacle = null) {
@@ -13317,6 +13649,8 @@ class NeonRoadRally {
     run.jumpDuration = airborneDuration + ROAD_READABILITY_CONFIG.rampLandingGraceSeconds;
     run.jumpTimer = run.jumpDuration;
     run.airborne = true;
+    run.rampLaunchPulseTimer = Math.max(run.rampLaunchPulseTimer || 0, ARCADE_FEEL.rampLaunchPulseMs / 1000);
+    run.screenShake = Math.max(run.screenShake || 0, 0.12);
     if (obstacle?.solutionTargetDistance) {
       run.activeRampTarget = {
         id: obstacle.solutionTargetId || "",
@@ -13352,6 +13686,14 @@ class NeonRoadRally {
     target.cleared = true;
     run.rampTargetsCleared = (run.rampTargetsCleared || 0) + 1;
     run.lastRampTargetStatus = `cleared ${label}`;
+    run.rampClearSparkTimer = Math.max(run.rampClearSparkTimer || 0, ARCADE_FEEL.rampClearSparkMs / 1000);
+    this.addFloatingScoreText("CLEAR!", {
+      color: "#f6fbff",
+      size: 18,
+      life: 0.58,
+      yOffset: -108,
+      vy: -46
+    });
   }
 
   finishRampLanding() {
@@ -13369,6 +13711,13 @@ class NeonRoadRally {
       }
     }
     run.activeRampTarget = null;
+  }
+
+  triggerRampLandingEffect() {
+    const run = this.run;
+    if (!run) return;
+    run.rampLandingPulseTimer = Math.max(run.rampLandingPulseTimer || 0, ARCADE_FEEL.rampLandingPulseMs / 1000);
+    run.screenShake = Math.max(run.screenShake || 0, 0.11);
   }
 
   focusControls() {
@@ -13439,6 +13788,13 @@ class NeonRoadRally {
     if (run.scoreBreakdown && run.scoreBreakdown[type] !== undefined) {
       run.scoreBreakdown[type] += points;
     }
+    let showPopup = true;
+    if (type === "nearMiss") {
+      showPopup = (run.nearMissPopupCooldown || 0) <= 0;
+      if (showPopup) run.nearMissPopupCooldown = ARCADE_FEEL.nearMissPopupCooldown;
+      run.nearMissSparkTimer = Math.max(run.nearMissSparkTimer || 0, ARCADE_FEEL.nearMissSparkMs / 1000);
+    }
+    if (!showPopup) return;
     this.addFloatingScoreText(getScoreEventLabel(type, points), {
       color: getScoreEventColor(type),
       size: type === "nearMiss" ? 17 : 18,
@@ -13735,19 +14091,24 @@ class NeonRoadRally {
     const run = this.run;
     if (run.ended) return;
     status = normalizeRunStatus(status);
+    run.pendingEndStatus = "";
+    run.pendingEndReason = "";
+    run.hitPauseTimer = 0;
     run.ended = true;
     run.finished = status === "finished";
     run.endReason = reason;
     run.crashCollisionType = status === "crashed"
       ? sanitizeName(reason || run.lastCollision, "Unknown", DISPLAY_TEXT_MAX_LENGTH)
       : "";
-    run.crashFlash = status === "crashed" ? 1 : 0;
+    run.crashFlash = status === "crashed" ? Math.max(run.crashFlash || 0, 1) : 0;
     run.screenShake = status === "crashed" ? Math.max(run.screenShake || 0, ARCADE_FEEL.crashShake) : run.screenShake;
-    run.crashBeatTimer = status === "crashed" ? 0.72 : 0;
+    run.crashBeatTimer = status === "crashed" ? Math.max(run.crashBeatTimer || 0, 0.72) : 0;
+    run.crashSparkTimer = status === "crashed" ? Math.max(run.crashSparkTimer || 0, ARCADE_FEEL.crashSparkMs / 1000) : run.crashSparkTimer;
     run.fuelOutBeatTimer = status === "outOfFuel" ? 0.78 : 0;
 
     if (status === "finished") {
       run.finishFlashTimer = ARCADE_FEEL.finishFlashSeconds;
+      run.finishStripeTimer = ARCADE_FEEL.finishStripeMs / 1000;
       run.bonuses.finish = 5000;
       run.scoreBreakdown.finish = run.bonuses.finish;
       this.addBaseScore(run.bonuses.finish);
@@ -13777,7 +14138,13 @@ class NeonRoadRally {
       run.screenShake = Math.max(run.screenShake || 0, 0.42);
       this.audio.playSfx("warning", { cooldownMs: 1200, maxInstances: 1, volume: this.audio.sfxVolume * 0.72 });
     } else {
-      this.audio.playSfx("crash");
+      if (!run.crashSfxPlayed) {
+        this.audio.playSfx("crash", {
+          cooldownMs: 0,
+          maxInstances: 1,
+          volume: this.audio.sfxVolume
+        });
+      }
     }
 
     run.bonuses.unusedBoosts = run.manualBoosts * 750;
@@ -17857,6 +18224,7 @@ class NeonRoadRally {
           <div>
             <span class="eyebrow">${final ? "Final Party Result" : "Current Party Race"}</span>
             <h2>${final && leader ? `${escapeHtml(leader.playerName)} Wins` : "Party Standings"}</h2>
+            ${final && leader ? `<div class="party-winner-banner"><strong>${escapeHtml(leader.playerName)}</strong><span>${escapeHtml(session.scoringLabel)} ${formatScore(leader.rankScore)}</span></div>` : ""}
             <p class="hint">${escapeHtml(getPartyRoundTypeLabel(session.roundType))} · ${escapeHtml(session.track.name)} · ${escapeHtml(getRaceTypeLabel(session.raceType))} · ${escapeHtml(getSpeedClassLabel(session.raceMode))} · ${final ? "Final seed" : `Round ${session.roundNumber} seed`} ${escapeHtml(roundSeed)}</p>
             <p class="hint">${escapeHtml(getPartySeedModeLabel(session.seedMode))} · ${session.completedRuns}/${session.totalRuns} runs complete</p>
             ${partyCallouts}
