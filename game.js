@@ -155,6 +155,11 @@ const ACTIVE_FIELD_BUDGET_CONFIG = {
   routeScanMinHardBlockers: 3,
   supportSuppressVisibleRatio: 0.78,
   default: {
+    minVisibleMeaningful: 2,
+    targetVisibleMeaningful: 3,
+    maxUpcomingDecisionGapSeconds: 2,
+    deadScreenLimitSeconds: 2,
+    lonelyObjectLimitSeconds: 1.35,
     maxVisibleHardBlockers: 5,
     maxTacticalHardBlockers: 5,
     maxHardBlockersNext3Seconds: 4,
@@ -165,6 +170,11 @@ const ACTIVE_FIELD_BUDGET_CONFIG = {
     spikeVisibleHardBlockers: 5
   },
   sunday: {
+    minVisibleMeaningful: 1,
+    targetVisibleMeaningful: 2,
+    maxUpcomingDecisionGapSeconds: 3.8,
+    deadScreenLimitSeconds: 3.8,
+    lonelyObjectLimitSeconds: 2.2,
     maxVisibleHardBlockers: 4,
     maxTacticalHardBlockers: 3,
     maxHardBlockersNext3Seconds: 3,
@@ -175,6 +185,11 @@ const ACTIVE_FIELD_BUDGET_CONFIG = {
     spikeVisibleHardBlockers: 4
   },
   rookie: {
+    minVisibleMeaningful: 1,
+    targetVisibleMeaningful: 2,
+    maxUpcomingDecisionGapSeconds: 3,
+    deadScreenLimitSeconds: 3,
+    lonelyObjectLimitSeconds: 1.8,
     maxVisibleHardBlockers: 4,
     maxTacticalHardBlockers: 4,
     maxHardBlockersNext3Seconds: 4,
@@ -185,6 +200,11 @@ const ACTIVE_FIELD_BUDGET_CONFIG = {
     spikeVisibleHardBlockers: 4
   },
   arcade: {
+    minVisibleMeaningful: 2,
+    targetVisibleMeaningful: 3,
+    maxUpcomingDecisionGapSeconds: 2,
+    deadScreenLimitSeconds: 2,
+    lonelyObjectLimitSeconds: 1.35,
     maxVisibleHardBlockers: 5,
     maxTacticalHardBlockers: 5,
     maxHardBlockersNext3Seconds: 4,
@@ -195,6 +215,11 @@ const ACTIVE_FIELD_BUDGET_CONFIG = {
     spikeVisibleHardBlockers: 5
   },
   pro: {
+    minVisibleMeaningful: 3,
+    targetVisibleMeaningful: 4,
+    maxUpcomingDecisionGapSeconds: 1.5,
+    deadScreenLimitSeconds: 1.5,
+    lonelyObjectLimitSeconds: 1.05,
     maxVisibleHardBlockers: 6,
     maxTacticalHardBlockers: 6,
     maxHardBlockersNext3Seconds: 5,
@@ -205,6 +230,11 @@ const ACTIVE_FIELD_BUDGET_CONFIG = {
     spikeVisibleHardBlockers: 6
   },
   turbo: {
+    minVisibleMeaningful: 3,
+    targetVisibleMeaningful: 4,
+    maxUpcomingDecisionGapSeconds: 1.2,
+    deadScreenLimitSeconds: 1.2,
+    lonelyObjectLimitSeconds: 0.9,
     maxVisibleHardBlockers: 6,
     maxTacticalHardBlockers: 6,
     maxHardBlockersNext3Seconds: 5,
@@ -215,6 +245,8 @@ const ACTIVE_FIELD_BUDGET_CONFIG = {
     spikeVisibleHardBlockers: 7
   },
   fuelRun: {
+    minVisibleMeaningful: 2,
+    targetVisibleMeaningful: 3,
     maxVisibleHardBlockers: 6,
     maxTacticalHardBlockers: 5,
     maxHardBlockersNext3Seconds: 5,
@@ -223,6 +255,421 @@ const ACTIVE_FIELD_BUDGET_CONFIG = {
     maxVisibleHardWaveOverlap: 2,
     spawnDelayVisibleHardBlockers: 5,
     spikeVisibleHardBlockers: 6
+  }
+};
+const ROAD_DIRECTOR_ACTIVITY_CONFIG = {
+  upcomingWindowSeconds: 3.2,
+  correctionLeadSeconds: 0.15,
+  correctionCooldownSeconds: 0.65,
+  noActivityWeightThreshold: 0.85,
+  lonelyDistantAheadRatio: 0.68,
+  sectionMultipliers: {
+    launch: { min: 1, target: 0.9, maxUpcomingDecisionGap: 0.95 },
+    groove: { min: 1, target: 1, maxUpcomingDecisionGap: 1 },
+    pressure: { min: 1.12, target: 1.14, maxUpcomingDecisionGap: 0.86 },
+    breather: { min: 1, target: 0.82, maxUpcomingDecisionGap: 1.08 },
+    finalPush: { min: 1.18, target: 1.22, maxUpcomingDecisionGap: 0.78 }
+  },
+  rewardRoles: ["boostPad", "ramp", "gasCan"]
+};
+const ROAD_DIRECTOR_WAVE_METADATA = {
+  singleBlocker: {
+    id: "singleBlocker",
+    displayName: "Single Blocker",
+    family: "light-gate",
+    intent: "keep the road awake",
+    requiredAction: "read one lane",
+    routeType: "single lane avoid",
+    rewardType: "",
+    pressureRating: 1,
+    trackAffinity: ["sunset-highway", "redline-run"],
+    sectionAffinity: ["launch", "groove"]
+  },
+  doubleGate: {
+    id: "doubleGate",
+    displayName: "Double Gate",
+    family: "lane-change",
+    intent: "create a readable two-lane gate",
+    requiredAction: "choose the open route",
+    routeType: "side escape",
+    rewardType: "",
+    pressureRating: 2,
+    trackAffinity: ["sunset-highway", "redline-run"],
+    sectionAffinity: ["launch", "groove", "pressure"]
+  },
+  offsetPair: {
+    id: "offsetPair",
+    displayName: "Offset Pair",
+    family: "lane-change",
+    intent: "stagger a lane-read decision",
+    requiredAction: "time a lane change",
+    routeType: "staggered escape",
+    rewardType: "",
+    pressureRating: 2,
+    trackAffinity: ["sunset-highway", "redline-run"],
+    sectionAffinity: ["groove", "pressure"]
+  },
+  centerBlock: {
+    id: "centerBlock",
+    displayName: "Center Block",
+    family: "lane-change",
+    intent: "challenge center camping",
+    requiredAction: "leave center lane",
+    routeType: "side escape",
+    rewardType: "boost",
+    pressureRating: 2,
+    trackAffinity: ["sunset-highway", "redline-run"],
+    sectionAffinity: ["groove", "pressure", "finalPush"]
+  },
+  leftRightSweep: {
+    id: "leftRightSweep",
+    displayName: "Left-Right Sweep",
+    family: "lane-change",
+    intent: "sweep pressure across the road",
+    requiredAction: "read staggered lane changes",
+    routeType: "moving gap",
+    rewardType: "",
+    pressureRating: 3,
+    trackAffinity: ["sunset-highway", "redline-run"],
+    sectionAffinity: ["pressure", "finalPush"]
+  },
+  constructionSqueeze: {
+    id: "constructionSqueeze",
+    displayName: "Construction Squeeze",
+    family: "squeeze",
+    intent: "narrow the route with warning",
+    requiredAction: "commit to the signed lane",
+    routeType: "announced side escape",
+    rewardType: "",
+    pressureRating: 3,
+    trackAffinity: ["sunset-highway"],
+    sectionAffinity: ["pressure", "finalPush"]
+  },
+  deerCrossing: {
+    id: "deerCrossing",
+    displayName: "Deer Crossing",
+    family: "hazard-read",
+    intent: "add a purposeful crossing hazard",
+    requiredAction: "anticipate crossing movement",
+    routeType: "timed center read",
+    rewardType: "",
+    pressureRating: 2,
+    trackAffinity: ["sunset-highway"],
+    sectionAffinity: ["groove", "pressure"]
+  },
+  rampEscape: {
+    id: "rampEscape",
+    displayName: "Ramp Escape",
+    family: "solution",
+    intent: "offer jump solution",
+    requiredAction: "align with ramp",
+    routeType: "jump route",
+    rewardType: "safe jump",
+    pressureRating: 2,
+    trackAffinity: ["sunset-highway", "redline-run"],
+    sectionAffinity: ["breather", "pressure"]
+  },
+  boostTemptation: {
+    id: "boostTemptation",
+    displayName: "Boost Temptation",
+    family: "reward",
+    intent: "tempt risky lane choice",
+    requiredAction: "optional side route",
+    routeType: "reward side route",
+    rewardType: "boost",
+    pressureRating: 2,
+    trackAffinity: ["sunset-highway", "redline-run"],
+    sectionAffinity: ["groove", "breather", "pressure"]
+  },
+  nearMissCorridor: {
+    id: "nearMissCorridor",
+    displayName: "Near-Miss Corridor",
+    family: "near-miss",
+    intent: "create a close readable traffic corridor",
+    requiredAction: "hold or shift into the corridor",
+    routeType: "corridor",
+    rewardType: "near miss",
+    pressureRating: 4,
+    trackAffinity: ["sunset-highway", "redline-run"],
+    sectionAffinity: ["pressure", "finalPush"]
+  },
+  fourLaneSpike: {
+    id: "fourLaneSpike",
+    displayName: "Four-Lane Spike",
+    family: "spike",
+    intent: "brief peak pressure with one readable lane",
+    requiredAction: "commit to the escape lane",
+    routeType: "single escape",
+    rewardType: "",
+    pressureRating: 5,
+    trackAffinity: ["sunset-highway", "redline-run"],
+    sectionAffinity: ["finalPush"]
+  },
+  redlineSlalom: {
+    id: "redlineSlalom",
+    displayName: "Redline Slalom",
+    family: "speed-skill",
+    intent: "high-speed lane reading",
+    requiredAction: "staggered lane changes",
+    routeType: "slalom",
+    rewardType: "boost",
+    pressureRating: 3,
+    trackAffinity: ["redline-run"],
+    sectionAffinity: ["groove", "pressure", "finalPush"]
+  },
+  speedGateChain: {
+    id: "speedGateChain",
+    displayName: "Speed Gate Chain",
+    family: "reward",
+    intent: "chain boost choices through traffic",
+    requiredAction: "follow the boost route",
+    routeType: "reward chain",
+    rewardType: "boost",
+    pressureRating: 2,
+    trackAffinity: ["redline-run"],
+    sectionAffinity: ["groove", "pressure"]
+  },
+  expressConvoy: {
+    id: "expressConvoy",
+    displayName: "Express Convoy",
+    family: "speed-skill",
+    intent: "build a fast traffic corridor",
+    requiredAction: "read fast staggered traffic",
+    routeType: "fast corridor",
+    rewardType: "boost",
+    pressureRating: 3,
+    trackAffinity: ["redline-run"],
+    sectionAffinity: ["pressure", "finalPush"]
+  },
+  neonChicane: {
+    id: "neonChicane",
+    displayName: "Neon Chicane",
+    family: "speed-skill",
+    intent: "force a clean high-speed chicane",
+    requiredAction: "change lanes through gates",
+    routeType: "chicane",
+    rewardType: "boost",
+    pressureRating: 3,
+    trackAffinity: ["redline-run"],
+    sectionAffinity: ["pressure", "finalPush"]
+  },
+  rampOverpass: {
+    id: "rampOverpass",
+    displayName: "Ramp Overpass",
+    family: "solution",
+    intent: "make the ramp the authored solution",
+    requiredAction: "align with ramp",
+    routeType: "jump route",
+    rewardType: "safe jump",
+    pressureRating: 2,
+    trackAffinity: ["redline-run"],
+    sectionAffinity: ["pressure", "breather"]
+  },
+  needleThread: {
+    id: "needleThread",
+    displayName: "Needle Thread",
+    family: "precision",
+    intent: "ask for a narrow committed read",
+    requiredAction: "thread the clear lane",
+    routeType: "narrow route",
+    rewardType: "boost",
+    pressureRating: 4,
+    trackAffinity: ["redline-run"],
+    sectionAffinity: ["pressure", "finalPush"]
+  },
+  fuelTrafficPressure: {
+    id: "fuelTrafficPressure",
+    displayName: "Fuel Traffic Pressure",
+    family: "fuel-pressure",
+    intent: "keep traffic pressure between fuel choices",
+    requiredAction: "read traffic",
+    routeType: "traffic gate",
+    rewardType: "",
+    pressureRating: 3,
+    trackAffinity: ["sunset-highway"],
+    sectionAffinity: ["groove", "pressure"]
+  },
+  fuelSideTemptation: {
+    id: "fuelSideTemptation",
+    displayName: "Gas Can Side Temptation",
+    family: "fuel-route",
+    intent: "place fuel as a side-lane choice",
+    requiredAction: "leave the easy lane for gas",
+    routeType: "fuel side route",
+    rewardType: "gas",
+    pressureRating: 2,
+    trackAffinity: ["sunset-highway"],
+    sectionAffinity: ["groove", "breather", "pressure"]
+  },
+  fuelTrafficGate: {
+    id: "fuelTrafficGate",
+    displayName: "Traffic Gate + Fuel",
+    family: "fuel-route",
+    intent: "route fuel through a readable traffic gate",
+    requiredAction: "choose the fuel lane",
+    routeType: "fuel gate",
+    rewardType: "gas",
+    pressureRating: 3,
+    trackAffinity: ["sunset-highway"],
+    sectionAffinity: ["pressure", "finalPush"]
+  },
+  fuelAfterPressure: {
+    id: "fuelAfterPressure",
+    displayName: "Fuel After Pressure",
+    family: "fuel-route",
+    intent: "reward a safe route after pressure",
+    requiredAction: "recover toward gas",
+    routeType: "recovery fuel route",
+    rewardType: "gas",
+    pressureRating: 3,
+    trackAffinity: ["sunset-highway"],
+    sectionAffinity: ["breather", "pressure"]
+  },
+  fuelSplit: {
+    id: "fuelSplit",
+    displayName: "Fuel Split",
+    family: "fuel-route",
+    intent: "offer two fuel choices around traffic",
+    requiredAction: "pick a gas lane",
+    routeType: "split fuel route",
+    rewardType: "gas",
+    pressureRating: 2,
+    trackAffinity: ["sunset-highway"],
+    sectionAffinity: ["groove", "breather"]
+  },
+  fuelLowRescue: {
+    id: "fuelLowRescue",
+    displayName: "Low Fuel Rescue",
+    family: "fuel-route",
+    intent: "surface an urgent gas route",
+    requiredAction: "reach the gas can",
+    routeType: "rescue route",
+    rewardType: "gas",
+    pressureRating: 2,
+    trackAffinity: ["sunset-highway"],
+    sectionAffinity: ["groove", "pressure", "finalPush"]
+  },
+  fuelSupport: {
+    id: "fuelSupport",
+    displayName: "Fuel Support",
+    family: "reward",
+    intent: "add light reward pressure",
+    requiredAction: "optional reward route",
+    routeType: "light reward route",
+    rewardType: "boost",
+    pressureRating: 1,
+    trackAffinity: ["sunset-highway"],
+    sectionAffinity: ["breather", "groove"]
+  },
+  recoveryGap: {
+    id: "recoveryGap",
+    displayName: "Recovery Gap",
+    family: "recovery",
+    intent: "short breathing room",
+    requiredAction: "none/light",
+    routeType: "open road",
+    rewardType: "boost/gas",
+    pressureRating: 0,
+    trackAffinity: ["sunset-highway", "redline-run"],
+    sectionAffinity: ["breather", "launch"]
+  }
+};
+const ROAD_DIRECTOR_INTENT_LABELS = {
+  maintainPressure: "Maintain Pressure",
+  forceLaneChange: "Force Lane Change",
+  challengeCenterLane: "Challenge Center Lane",
+  rewardTemptation: "Create Reward Temptation",
+  rampSolution: "Create Ramp Solution",
+  gasRoute: "Create Gas Route",
+  nearMissOpportunity: "Create Near-Miss Opportunity",
+  recovery: "Provide Short Recovery",
+  escalateSection: "Escalate Section",
+  finalPushPressure: "Final Push Pressure"
+};
+const ROAD_DIRECTOR_INTENT_WAVE_WEIGHTS = {
+  maintainPressure: {
+    singleBlocker: 1.25,
+    doubleGate: 1.35,
+    offsetPair: 1.25,
+    redlineSlalom: 1.25,
+    fuelTrafficPressure: 1.5,
+    recoveryGap: 0.25
+  },
+  forceLaneChange: {
+    doubleGate: 1.65,
+    offsetPair: 1.75,
+    leftRightSweep: 1.7,
+    rampEscape: 1.25,
+    redlineSlalom: 1.55,
+    neonChicane: 1.45,
+    recoveryGap: 0.18
+  },
+  challengeCenterLane: {
+    centerBlock: 2.35,
+    constructionSqueeze: 1.35,
+    nearMissCorridor: 1.45,
+    doubleGate: 1.2,
+    fuelTrafficGate: 1.35,
+    recoveryGap: 0.12
+  },
+  rewardTemptation: {
+    boostTemptation: 2.25,
+    speedGateChain: 1.9,
+    rampEscape: 1.3,
+    fuelSideTemptation: 1.75,
+    fuelSupport: 1.4,
+    recoveryGap: 0.55
+  },
+  rampSolution: {
+    rampEscape: 2.35,
+    rampOverpass: 2.05,
+    boostTemptation: 0.85,
+    recoveryGap: 0.3
+  },
+  gasRoute: {
+    fuelTrafficGate: 2.35,
+    fuelSideTemptation: 2.15,
+    fuelAfterPressure: 1.7,
+    fuelSplit: 1.45,
+    fuelLowRescue: 2.6,
+    fuelTrafficPressure: 0.75,
+    recoveryGap: 0.25
+  },
+  nearMissOpportunity: {
+    nearMissCorridor: 2.2,
+    expressConvoy: 1.8,
+    needleThread: 1.55,
+    redlineSlalom: 1.45,
+    recoveryGap: 0.1
+  },
+  recovery: {
+    recoveryGap: 2.6,
+    boostTemptation: 0.85,
+    rampEscape: 0.85,
+    speedGateChain: 0.75,
+    fuelSupport: 1.1,
+    fourLaneSpike: 0,
+    needleThread: 0.25,
+    nearMissCorridor: 0.35
+  },
+  escalateSection: {
+    leftRightSweep: 1.55,
+    constructionSqueeze: 1.35,
+    nearMissCorridor: 1.45,
+    redlineSlalom: 1.45,
+    neonChicane: 1.25,
+    fuelTrafficPressure: 1.3,
+    recoveryGap: 0.22
+  },
+  finalPushPressure: {
+    centerBlock: 1.5,
+    leftRightSweep: 1.65,
+    nearMissCorridor: 1.75,
+    redlineSlalom: 1.6,
+    expressConvoy: 1.55,
+    needleThread: 1.45,
+    fuelTrafficGate: 1.45,
+    recoveryGap: 0.12
   }
 };
 const FOUR_LANE_PRESSURE_COOLDOWN = 9000;
@@ -1524,6 +1971,16 @@ function normalizeSectionCountMap(value) {
   return result;
 }
 
+function normalizeCountMap(value, limit = 24) {
+  const source = value && typeof value === "object" ? value : {};
+  const result = {};
+  Object.entries(source).slice(0, limit).forEach(([key, count]) => {
+    const id = normalizeStorageId(key, "");
+    if (id) result[id] = normalizeNonNegativeInteger(count, 0, 99999);
+  });
+  return result;
+}
+
 function normalizeDateString(value, fallback = "") {
   const clean = sanitizeDisplayText(value, "", 40);
   const time = clean ? Date.parse(clean) : NaN;
@@ -1847,6 +2304,18 @@ function normalizePlaytestRunSummary(entry) {
     combinedRouteFailures: normalizeNonNegativeInteger(entry.combinedRouteFailures, 0, 99999),
     barrierCount: normalizeNonNegativeInteger(entry.barrierCount, 0, 99999),
     supportObjectsSuppressedByDensity: normalizeNonNegativeInteger(entry.supportObjectsSuppressedByDensity, 0, 99999),
+    deadScreenTime: normalizeNonNegativeNumber(entry.deadScreenTime, 0, 24 * 60 * 60),
+    longestDeadScreenSeconds: normalizeNonNegativeNumber(entry.longestDeadScreenSeconds, 0, 24 * 60 * 60),
+    timeSinceLastMeaningfulDecisionMax: normalizeNonNegativeNumber(entry.timeSinceLastMeaningfulDecisionMax, 0, 24 * 60 * 60),
+    visibleMeaningfulMin: normalizeNonNegativeInteger(entry.visibleMeaningfulMin, 0, 999),
+    visibleMeaningfulAverage: normalizeNonNegativeNumber(entry.visibleMeaningfulAverage, 0, 999),
+    upcomingDecisionGapMax: normalizeNonNegativeNumber(entry.upcomingDecisionGapMax, 0, 24 * 60 * 60),
+    underActivityCorrections: normalizeNonNegativeInteger(entry.underActivityCorrections, 0, 99999),
+    overActivityDelays: normalizeNonNegativeInteger(entry.overActivityDelays, 0, 99999),
+    directorIntentCounts: normalizeCountMap(entry.directorIntentCounts),
+    waveFamilyCounts: normalizeCountMap(entry.waveFamilyCounts),
+    rewardLaneDistribution: normalizeCountMap(entry.rewardLaneDistribution || entry.rewardLaneCounts, 8),
+    rampUseRate: normalizeNonNegativeNumber(entry.rampUseRate, 0, 1),
     hardestPressureObserved: normalizeNonNegativeNumber(entry.hardestPressureObserved, 0, 999),
     gasCansSpawned: normalizeNonNegativeInteger(entry.gasCansSpawned, 0, 9999),
     gasCansCollected: normalizeNonNegativeInteger(entry.gasCansCollected || entry.fuelCollected, 0, 9999),
@@ -3380,6 +3849,9 @@ class RoadDirector {
     this.timeSinceWaveSeconds = 0;
     this.timeSinceMeaningfulWaveSeconds = 0;
     this.activeEmptySeconds = 0;
+    this.deadScreenSeconds = 0;
+    this.lastActivitySnapshot = null;
+    this.currentDirectorIntent = null;
     this.laneStillSeconds = 0;
     this.lastObservedLane = TRACK_DIRECTOR.centerLane;
     this.laneSafeSeconds = Array(LANES).fill(0);
@@ -3406,6 +3878,25 @@ class RoadDirector {
       pressureBudgetFailures: 0,
       pressureCounts: { 0: 0, 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 },
       waveCounts: {},
+      waveFamilyCounts: {},
+      directorIntentCounts: {},
+      rewardLaneCounts: {
+        center: 0,
+        side: 0,
+        left: 0,
+        right: 0
+      },
+      sideLaneRewardCount: 0,
+      centerRewardCount: 0,
+      visibleMeaningfulMin: Infinity,
+      visibleMeaningfulSampleSum: 0,
+      visibleMeaningfulSampleCount: 0,
+      upcomingDecisionGapMax: 0,
+      deadScreenTime: 0,
+      longestDeadScreenSeconds: 0,
+      timeSinceLastMeaningfulDecisionMax: 0,
+      underActivityCorrections: 0,
+      overActivityDelays: 0,
       boostLaneCounts: Array(LANES).fill(0),
       rampLaneCounts: Array(LANES).fill(0),
       gasCanLaneCounts: Array(LANES).fill(0),
@@ -3464,7 +3955,9 @@ class RoadDirector {
       minorHazardCount: 0,
       supportWaveCount: 0,
       pressureCounts: { 0: 0, 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 },
-      waveCounts: {}
+      waveCounts: {},
+      waveFamilyCounts: {},
+      directorIntentCounts: {}
     };
   }
 
@@ -3517,15 +4010,47 @@ class RoadDirector {
     this.decisionSafeSeconds += dt;
     this.timeSinceWaveSeconds += dt;
     this.timeSinceMeaningfulWaveSeconds += dt;
+    const activitySnapshot = this.manager.getRoadActivitySnapshot
+      ? this.manager.getRoadActivitySnapshot(run, this.manager.obstacles, run.distance || 0)
+      : null;
+    this.lastActivitySnapshot = activitySnapshot;
     if (this.hasActivePressureAhead()) {
       this.activeEmptySeconds = 0;
     } else {
       this.activeEmptySeconds += dt;
     }
+    if (activitySnapshot?.deadScreen) {
+      this.deadScreenSeconds += dt;
+      this.stats.deadScreenTime += dt;
+      this.stats.longestDeadScreenSeconds = Math.max(this.stats.longestDeadScreenSeconds, this.deadScreenSeconds);
+      if (run && !run.ended) {
+        run.deadScreenTime = (run.deadScreenTime || 0) + dt;
+        run.longestDeadScreenSeconds = Math.max(run.longestDeadScreenSeconds || 0, this.deadScreenSeconds);
+      }
+    } else {
+      this.deadScreenSeconds = 0;
+    }
+    if (activitySnapshot && run && !run.ended) {
+      const visibleMeaningful = Math.max(0, activitySnapshot.visibleMeaningfulObjects || 0);
+      this.stats.visibleMeaningfulMin = Math.min(this.stats.visibleMeaningfulMin, visibleMeaningful);
+      this.stats.visibleMeaningfulSampleSum += visibleMeaningful;
+      this.stats.visibleMeaningfulSampleCount += 1;
+      if (!Number.isFinite(run.visibleMeaningfulMin)) run.visibleMeaningfulMin = visibleMeaningful;
+      else run.visibleMeaningfulMin = Math.min(run.visibleMeaningfulMin, visibleMeaningful);
+      run.visibleMeaningfulSampleSum = (run.visibleMeaningfulSampleSum || 0) + visibleMeaningful;
+      run.visibleMeaningfulSampleCount = (run.visibleMeaningfulSampleCount || 0) + 1;
+      if (Number.isFinite(activitySnapshot.nextMeaningfulDecisionSeconds)) {
+        this.stats.upcomingDecisionGapMax = Math.max(this.stats.upcomingDecisionGapMax, activitySnapshot.nextMeaningfulDecisionSeconds);
+        run.upcomingDecisionGapMax = Math.max(run.upcomingDecisionGapMax || 0, activitySnapshot.nextMeaningfulDecisionSeconds);
+      }
+      this.stats.timeSinceLastMeaningfulDecisionMax = Math.max(this.stats.timeSinceLastMeaningfulDecisionMax, this.timeSinceMeaningfulWaveSeconds);
+      run.timeSinceLastMeaningfulDecisionMax = Math.max(run.timeSinceLastMeaningfulDecisionMax || 0, this.timeSinceMeaningfulWaveSeconds);
+    }
     this.stats.longestCenterSafeSeconds = Math.max(this.stats.longestCenterSafeSeconds, this.centerSafeSeconds);
     this.stats.longestWaveGapSeconds = Math.max(this.stats.longestWaveGapSeconds, this.timeSinceWaveSeconds);
     this.stats.longestMeaningfulWaveGapSeconds = Math.max(this.stats.longestMeaningfulWaveGapSeconds, this.timeSinceMeaningfulWaveSeconds);
     this.stats.longestActiveEmptySeconds = Math.max(this.stats.longestActiveEmptySeconds, this.activeEmptySeconds);
+    this.stats.longestDeadScreenSeconds = Math.max(this.stats.longestDeadScreenSeconds, this.deadScreenSeconds);
     const track = this.track || this.manager.track;
     if (track) {
       const progress = clamp((run.distance || 0) / Math.max(1, track.distanceToFinish), 0, 1);
@@ -3597,6 +4122,12 @@ class RoadDirector {
     const forceMeaningful = meaningfulGapSeconds >= (cadence.forceMeaningful ?? 3)
       * getSectionNumber(section, "forceMeaningfulMultiplier", 1, 0.45, 1.8)
       * (launchPacing?.forceMeaningfulMultiplier ?? 1);
+    const activity = this.manager.getRoadActivitySnapshot
+      ? this.manager.getRoadActivitySnapshot(run, this.manager.obstacles, this.manager.game.run?.distance || 0)
+      : null;
+    const activityBudget = this.manager.getActivityFloorBudget
+      ? this.manager.getActivityFloorBudget(run, section)
+      : {};
 
     return {
       track,
@@ -3626,12 +4157,18 @@ class RoadDirector {
       centerRestChance,
       needsMovementChallenge,
       forceMeaningful,
-      cruiseSpeed
+      cruiseSpeed,
+      activity,
+      activityBudget,
+      forcedDirectorIntent: run.forceRoadDirectorIntent || "",
+      forcedDirectorIntentReason: run.forceRoadDirectorIntentReason || ""
     };
   }
 
   spawnWave(distance) {
     const context = this.getContext(distance);
+    context.directorIntent = this.chooseDirectorIntent(context);
+    this.currentDirectorIntent = context.directorIntent;
     const waveType = this.chooseWaveType(context) || "singleBlocker";
     const result = this.createWaveResult(waveType, context);
     this.applyWave(waveType, distance, context, result);
@@ -3642,6 +4179,10 @@ class RoadDirector {
     }
 
     this.recordWave(result, context);
+    if (context.run) {
+      context.run.forceRoadDirectorIntent = "";
+      context.run.forceRoadDirectorIntentReason = "";
+    }
     return result;
   }
 
@@ -3683,6 +4224,154 @@ class RoadDirector {
     return this.getTrackObjectWeight(type, context) > 0.2 ? type : fallback;
   }
 
+  getWaveMetadata(type) {
+    const metadata = ROAD_DIRECTOR_WAVE_METADATA[type];
+    if (metadata) return metadata;
+    return {
+      id: type,
+      displayName: this.getWaveLabel(type),
+      family: "unknown",
+      intent: "not tracked yet",
+      requiredAction: "not tracked yet",
+      routeType: "not tracked yet",
+      rewardType: "",
+      pressureRating: 0,
+      trackAffinity: [],
+      sectionAffinity: []
+    };
+  }
+
+  getIntentLabel(intentId) {
+    return ROAD_DIRECTOR_INTENT_LABELS[intentId] || intentId || "Unknown";
+  }
+
+  makeDirectorIntent(id, reason = "") {
+    return {
+      id,
+      label: this.getIntentLabel(id),
+      reason
+    };
+  }
+
+  chooseDirectorIntent(context) {
+    const forced = context.forcedDirectorIntent;
+    if (forced && ROAD_DIRECTOR_INTENT_LABELS[forced]) {
+      return this.makeDirectorIntent(forced, context.forcedDirectorIntentReason || "activity floor correction");
+    }
+    const activity = context.activity || {};
+    const budget = context.activityBudget || {};
+    const visibleHard = activity.visibleHardBlockers || 0;
+    const maxHard = budget.maxVisibleHardBlockers ?? context.pressureBudget + context.pressureBudgetAllowance;
+    const overDensity = Boolean(activity.overDensity) || visibleHard >= maxHard;
+    const underActivity = Boolean(activity.underActivity);
+    const sectionId = context.section?.id || "";
+    const trackId = context.track?.id || DEFAULT_TRACK_ID;
+
+    if (overDensity) {
+      return this.makeDirectorIntent("recovery", "active field near ceiling");
+    }
+    if (context.fuelRun) {
+      const fuel = context.fuel || {};
+      const gasDue = fuel.low || fuel.critical || (fuel.timeSinceLastGasCan || 0) >= (fuel.targetGasGapSeconds || 16);
+      if (underActivity && gasDue) return this.makeDirectorIntent("gasRoute", "fuel route can carry activity");
+      if (gasDue && this.random() < 0.76) return this.makeDirectorIntent("gasRoute", "fuel route due");
+    }
+    if (underActivity) {
+      if (sectionId === "breather") {
+        return weightedChoice([
+          { value: this.makeDirectorIntent("rewardTemptation", "breather activity floor"), weight: 1.5 },
+          { value: this.makeDirectorIntent("rampSolution", "breather activity floor"), weight: 1.1 },
+          { value: this.makeDirectorIntent("maintainPressure", "breather activity floor"), weight: 0.9 }
+        ], () => this.random()) || this.makeDirectorIntent("maintainPressure", "activity floor");
+      }
+      if (trackId === "redline-run") {
+        return weightedChoice([
+          { value: this.makeDirectorIntent("forceLaneChange", "redline activity floor"), weight: 1.25 },
+          { value: this.makeDirectorIntent("nearMissOpportunity", "redline activity floor"), weight: 1.15 },
+          { value: this.makeDirectorIntent("rewardTemptation", "redline activity floor"), weight: 0.95 },
+          { value: this.makeDirectorIntent("maintainPressure", "redline activity floor"), weight: 0.9 }
+        ], () => this.random()) || this.makeDirectorIntent("maintainPressure", "activity floor");
+      }
+      return weightedChoice([
+        { value: this.makeDirectorIntent("maintainPressure", "activity floor"), weight: 1.4 },
+        { value: this.makeDirectorIntent("rewardTemptation", "activity floor"), weight: 1.05 },
+        { value: this.makeDirectorIntent("forceLaneChange", "activity floor"), weight: 0.9 },
+        { value: this.makeDirectorIntent("rampSolution", "activity floor"), weight: sectionId === "launch" ? 0.25 : 0.65 }
+      ], () => this.random()) || this.makeDirectorIntent("maintainPressure", "activity floor");
+    }
+    if (context.centerNeedsChallenge) {
+      return this.makeDirectorIntent("challengeCenterLane", "center lane held too long");
+    }
+    if (context.needsMovementChallenge) {
+      return this.makeDirectorIntent("forceLaneChange", "player has stayed in one lane");
+    }
+    if (sectionId === "finalPush") {
+      return this.makeDirectorIntent("finalPushPressure", "final section");
+    }
+    if (sectionId === "pressure") {
+      return this.makeDirectorIntent("escalateSection", "pressure section");
+    }
+    if (sectionId === "breather") {
+      return weightedChoice([
+        { value: this.makeDirectorIntent("rewardTemptation", "breather reward"), weight: 1.15 },
+        { value: this.makeDirectorIntent("rampSolution", "breather solution"), weight: 0.9 },
+        { value: this.makeDirectorIntent("recovery", "breather recovery"), weight: 0.65 },
+        { value: this.makeDirectorIntent("maintainPressure", "breather floor"), weight: 0.75 }
+      ], () => this.random()) || this.makeDirectorIntent("rewardTemptation", "breather");
+    }
+    if (trackId === "redline-run" && this.random() < 0.44) {
+      return weightedChoice([
+        { value: this.makeDirectorIntent("forceLaneChange", "redline speedway"), weight: 1.1 },
+        { value: this.makeDirectorIntent("nearMissOpportunity", "redline speedway"), weight: 1 },
+        { value: this.makeDirectorIntent("rewardTemptation", "redline speedway"), weight: 0.85 }
+      ], () => this.random()) || this.makeDirectorIntent("forceLaneChange", "redline speedway");
+    }
+    return weightedChoice([
+      { value: this.makeDirectorIntent("maintainPressure", "default road rhythm"), weight: 1.25 },
+      { value: this.makeDirectorIntent("forceLaneChange", "default road rhythm"), weight: 0.9 },
+      { value: this.makeDirectorIntent("rewardTemptation", "default road rhythm"), weight: 0.72 },
+      { value: this.makeDirectorIntent("nearMissOpportunity", "default road rhythm"), weight: context.progress > 0.35 ? 0.44 : 0.12 }
+    ], () => this.random()) || this.makeDirectorIntent("maintainPressure", "default");
+  }
+
+  getDirectorIntentWeight(type, context) {
+    const intentId = context.directorIntent?.id || "";
+    const intentWeights = ROAD_DIRECTOR_INTENT_WAVE_WEIGHTS[intentId] || {};
+    let weight = Number.isFinite(intentWeights[type]) ? intentWeights[type] : 1;
+    const metadata = this.getWaveMetadata(type);
+    if (context.activity?.underActivity && metadata.family === "recovery") weight *= 0.08;
+    if (context.activity?.overDensity && metadata.pressureRating >= 3) weight *= 0.18;
+    if (context.fuelRun && intentId === "gasRoute" && metadata.rewardType !== "gas") weight *= 0.45;
+    if (context.track?.id === "redline-run" && Array.isArray(metadata.trackAffinity) && metadata.trackAffinity.includes("redline-run")) {
+      weight *= 1.12;
+    }
+    if (context.section?.id && Array.isArray(metadata.sectionAffinity) && metadata.sectionAffinity.includes(context.section.id)) {
+      weight *= 1.08;
+    }
+    return weight;
+  }
+
+  getVarietyWeight(type, context) {
+    const metadata = this.getWaveMetadata(type);
+    let weight = 1;
+    const recent = this.recentWaves.slice(-5);
+    const familyRepeats = recent.filter((wave) => wave.family === metadata.family).length;
+    const intentRepeats = recent.filter((wave) => wave.directorIntentId === context.directorIntent?.id).length;
+    const typeRepeats = recent.filter((wave) => wave.type === type).length;
+    if (familyRepeats >= 3) weight *= 0.22;
+    else if (familyRepeats >= 2) weight *= 0.48;
+    if (intentRepeats >= 3) weight *= 0.55;
+    if (typeRepeats >= 2) weight *= 0.18;
+    else if (typeRepeats >= 1) weight *= 0.62;
+    if (type === "centerBlock" && recent.slice(-3).some((wave) => wave.type === "centerBlock")) weight *= 0.28;
+    if (metadata.family === "recovery" && recent.slice(-2).some((wave) => wave.family === "recovery")) weight *= 0.18;
+    if (metadata.family === "reward") {
+      const rewardRepeats = recent.filter((wave) => wave.rewardType).length;
+      if (rewardRepeats >= 3) weight *= 0.46;
+    }
+    return weight;
+  }
+
   chooseWaveType(context) {
     if (context.fuelRun) {
       return this.chooseFuelRunWaveType(context);
@@ -3690,6 +4379,9 @@ class RoadDirector {
     if (this.forceRecoveryNext) {
       this.forceRecoveryNext = false;
       return "recoveryGap";
+    }
+    if (context.activity?.underActivity && !context.activity?.overDensity) {
+      return this.chooseActivityFloorWave(context);
     }
     if (context.forceMeaningful) {
       return this.chooseForcedMeaningfulWave(context);
@@ -3700,6 +4392,8 @@ class RoadDirector {
       if (!this.isWaveAllowed(type, context)) return { value: type, weight: 0 };
       weight *= this.getSectionWaveWeight(type, context);
       weight *= this.getTrackWaveWeight(type, context);
+      weight *= this.getDirectorIntentWeight(type, context);
+      weight *= this.getVarietyWeight(type, context);
       if (!context.centerNeedsChallenge && type === "centerBlock") {
         weight *= context.centerSoftPressure;
       }
@@ -3813,6 +4507,54 @@ class RoadDirector {
     return weightedChoice(entries, () => this.random());
   }
 
+  chooseActivityFloorWave(context) {
+    const trackId = context.track?.id || DEFAULT_TRACK_ID;
+    const opening = context.band?.id === "opening" || context.section?.id === "launch";
+    const breather = context.section?.id === "breather";
+    const weights = [
+      { value: "doubleGate", weight: opening ? 1.55 : 1.15 },
+      { value: "offsetPair", weight: opening ? 0.88 : 1.35 },
+      { value: "centerBlock", weight: context.centerNeedsChallenge ? 1.45 : (opening ? 0.28 : 0.85) },
+      { value: "leftRightSweep", weight: opening ? 0 : 0.95 },
+      { value: "boostTemptation", weight: opening ? 0.42 : (breather ? 1.45 : 0.9) },
+      { value: "rampEscape", weight: opening ? 0.32 : (breather ? 1.15 : 0.72) },
+      { value: "nearMissCorridor", weight: opening || context.speedClassId === "sunday" || context.speedClassId === "rookie" ? 0 : 0.58 },
+      { value: "redlineSlalom", weight: trackId === "redline-run" ? (opening ? 0.92 : 1.45) : 0 },
+      { value: "speedGateChain", weight: trackId === "redline-run" ? (opening ? 1.5 : (breather ? 1.65 : 1.18)) : 0 },
+      { value: "expressConvoy", weight: trackId === "redline-run" && !opening && !breather ? 0.92 : 0 },
+      { value: "rampOverpass", weight: trackId === "redline-run" && !opening ? (breather ? 1.1 : 0.58) : 0 },
+      { value: "needleThread", weight: trackId === "redline-run" && !opening && !breather && context.speedClassId !== "arcade" ? 0.72 : 0 }
+    ];
+    if (context.speedClassId === "sunday") {
+      weights.find((item) => item.value === "doubleGate").weight *= 1.05;
+      weights.find((item) => item.value === "offsetPair").weight *= 0.6;
+      weights.find((item) => item.value === "centerBlock").weight *= 0.35;
+      weights.find((item) => item.value === "leftRightSweep").weight *= 0.25;
+      weights.find((item) => item.value === "rampEscape").weight *= 0.55;
+    } else if (context.speedClassId === "rookie") {
+      weights.find((item) => item.value === "doubleGate").weight *= 1.15;
+      weights.find((item) => item.value === "leftRightSweep").weight *= 0.58;
+      weights.find((item) => item.value === "nearMissCorridor").weight = 0;
+    } else if (context.speedClassId === "turbo") {
+      weights.find((item) => item.value === "redlineSlalom").weight *= 1.35;
+      weights.find((item) => item.value === "speedGateChain").weight *= 1.25;
+      weights.find((item) => item.value === "nearMissCorridor").weight *= 1.35;
+      weights.find((item) => item.value === "leftRightSweep").weight *= 1.2;
+    }
+    weights.forEach((item) => {
+      item.weight *= this.getSectionWaveWeight(item.value, context);
+      item.weight *= this.getTrackWaveWeight(item.value, context);
+      item.weight *= this.getDirectorIntentWeight(item.value, context);
+      item.weight *= this.getVarietyWeight(item.value, context);
+      if (!this.isWaveAllowed(item.value, context)) item.weight = 0;
+      const expectedPressure = this.getExpectedWavePressure(item.value, context);
+      if (expectedPressure > context.pressureBudget + context.pressureBudgetAllowance) {
+        item.weight *= 0.45;
+      }
+    });
+    return weightedChoice(weights, () => this.random()) || "doubleGate";
+  }
+
   chooseForcedMeaningfulWave(context) {
     if (context.section?.id === "launch" && context.speedClassId === "turbo") {
       return weightedChoice([
@@ -3871,6 +4613,8 @@ class RoadDirector {
     weights.forEach((item) => {
       item.weight *= this.getSectionWaveWeight(item.value, context);
       item.weight *= this.getTrackWaveWeight(item.value, context, "forcedMeaningfulWaveMultipliers");
+      item.weight *= this.getDirectorIntentWeight(item.value, context);
+      item.weight *= this.getVarietyWeight(item.value, context);
       if (!this.isWaveAllowed(item.value, context)) item.weight = 0;
     });
     return weightedChoice(weights, () => this.random()) || "doubleGate";
@@ -3898,6 +4642,21 @@ class RoadDirector {
     if (critical && canSpawnFuel && (overdue || this.random() < 0.82)) {
       return "fuelLowRescue";
     }
+    if (context.directorIntent?.id === "gasRoute" && canSpawnFuel) {
+      return weightedChoice([
+        { value: "fuelTrafficGate", weight: low || critical ? 2.25 : 1.65 },
+        { value: "fuelSideTemptation", weight: 1.65 },
+        { value: "fuelAfterPressure", weight: 1.25 },
+        { value: "fuelSplit", weight: context.progress > 0.26 ? 0.85 : 0.18 },
+        { value: "fuelLowRescue", weight: critical ? 2.2 : 0.35 }
+      ].map((item) => ({
+        ...item,
+        weight: item.weight
+          * this.getTrackWaveWeight(item.value, context, "fuelWaveWeightMultipliers")
+          * this.getDirectorIntentWeight(item.value, context)
+          * this.getVarietyWeight(item.value, context)
+      })), () => this.random()) || "fuelTrafficGate";
+    }
     if ((low || overdue) && canSpawnFuel) {
       return weightedChoice([
         { value: "fuelTrafficGate", weight: 2.4 },
@@ -3907,7 +4666,10 @@ class RoadDirector {
         { value: "fuelLowRescue", weight: critical ? 1.6 : 0.28 }
       ].map((item) => ({
         ...item,
-        weight: item.weight * this.getTrackWaveWeight(item.value, context, "fuelWaveWeightMultipliers")
+        weight: item.weight
+          * this.getTrackWaveWeight(item.value, context, "fuelWaveWeightMultipliers")
+          * this.getDirectorIntentWeight(item.value, context)
+          * this.getVarietyWeight(item.value, context)
       })), () => this.random()) || "fuelTrafficGate";
     }
     if (due && canSpawnFuel && this.random() < 0.72) {
@@ -3918,7 +4680,10 @@ class RoadDirector {
         { value: "fuelSplit", weight: context.progress > 0.24 ? 0.48 : 0.08 }
       ].map((item) => ({
         ...item,
-        weight: item.weight * this.getTrackWaveWeight(item.value, context, "fuelWaveWeightMultipliers")
+        weight: item.weight
+          * this.getTrackWaveWeight(item.value, context, "fuelWaveWeightMultipliers")
+          * this.getDirectorIntentWeight(item.value, context)
+          * this.getVarietyWeight(item.value, context)
       })), () => this.random()) || "fuelSideTemptation";
     }
 
@@ -3931,7 +4696,10 @@ class RoadDirector {
       { value: "fuelAfterPressure", weight: canSpawnFuel ? 0.36 : 0 }
     ].map((item) => ({
       ...item,
-      weight: item.weight * this.getTrackWaveWeight(item.value, context, "fuelWaveWeightMultipliers")
+      weight: item.weight
+        * this.getTrackWaveWeight(item.value, context, "fuelWaveWeightMultipliers")
+        * this.getDirectorIntentWeight(item.value, context)
+        * this.getVarietyWeight(item.value, context)
     })), () => this.random()) || "fuelTrafficPressure";
   }
 
@@ -3986,10 +4754,13 @@ class RoadDirector {
   }
 
   createWaveResult(type, context) {
+    const metadata = this.getWaveMetadata(type);
     return {
       waveId: `wave-${this.nextWaveId++}`,
       type,
-      label: this.getWaveLabel(type),
+      label: metadata.displayName || this.getWaveLabel(type),
+      metadata,
+      directorIntent: context.directorIntent || this.makeDirectorIntent("maintainPressure", "fallback"),
       band: context.band,
       section: context.section,
       sectionProgress: context.sectionProgress,
@@ -4000,6 +4771,8 @@ class RoadDirector {
       rampLanes: [],
       rampSolutions: [],
       gasCanLanes: [],
+      routeLanes: [],
+      rewardLanes: [],
       obstacleTypes: {},
       pressure: 0,
       centerBlocked: false,
@@ -4010,34 +4783,7 @@ class RoadDirector {
   }
 
   getWaveLabel(type) {
-    const labels = {
-      singleBlocker: "Single Blocker",
-      doubleGate: "Double Gate",
-      offsetPair: "Offset Pair",
-      centerBlock: "Center Block",
-      leftRightSweep: "Left-Right Sweep",
-      constructionSqueeze: "Construction Squeeze",
-      deerCrossing: "Deer Crossing",
-      rampEscape: "Ramp Escape",
-      boostTemptation: "Boost Temptation",
-      nearMissCorridor: "Near-Miss Corridor",
-      fourLaneSpike: "Four-Lane Spike",
-      redlineSlalom: "Redline Slalom",
-      speedGateChain: "Speed Gate Chain",
-      expressConvoy: "Express Convoy",
-      neonChicane: "Neon Chicane",
-      rampOverpass: "Ramp Overpass",
-      needleThread: "Needle Thread",
-      fuelTrafficPressure: "Fuel Traffic Pressure",
-      fuelSideTemptation: "Gas Can Side Temptation",
-      fuelTrafficGate: "Traffic Gate + Fuel",
-      fuelAfterPressure: "Fuel After Pressure",
-      fuelSplit: "Fuel Split",
-      fuelLowRescue: "Low Fuel Rescue",
-      fuelSupport: "Fuel Support",
-      recoveryGap: "Recovery Gap"
-    };
-    return labels[type] || type;
+    return ROAD_DIRECTOR_WAVE_METADATA[type]?.displayName || type;
   }
 
   applyWave(type, distance, context, result) {
@@ -4103,10 +4849,13 @@ class RoadDirector {
     const lane = Math.round(clamp(Number.isFinite(obstacle.laneFloat) ? obstacle.laneFloat : obstacle.lane, 0, LANES - 1));
     if (obstacle.type === "boostPad") {
       result.boostLanes.push(lane);
+      result.rewardLanes.push(lane);
     } else if (obstacle.type === "ramp") {
       result.rampLanes.push(lane);
+      result.rewardLanes.push(lane);
     } else if (obstacle.type === "gasCan") {
       result.gasCanLanes.push(lane);
+      result.rewardLanes.push(lane);
     }
 
     if (this.manager.isFairnessBlocker(obstacle)) {
@@ -4149,8 +4898,22 @@ class RoadDirector {
     }
   }
 
+  recordIntendedRoute(result, lanes, routeType = "") {
+    if (!result) return;
+    const routeLanes = (Array.isArray(lanes) ? lanes : [lanes])
+      .map((lane) => Math.round(clamp(lane, 0, LANES - 1)))
+      .filter((lane, index, list) => Number.isFinite(lane) && list.indexOf(lane) === index);
+    if (routeLanes.length) {
+      result.routeLanes = routeLanes;
+      if (routeType) result.routeType = routeType;
+    }
+  }
+
   recordWave(result, context) {
     const blockedCount = clamp(result.blockedLanes.size, 0, 5);
+    const metadata = result.metadata || this.getWaveMetadata(result.type);
+    const family = metadata.family || "unknown";
+    const directorIntent = result.directorIntent || context.directorIntent || this.makeDirectorIntent("maintainPressure", "fallback");
     const safety = this.manager.validateObstaclePattern(
       this.manager.getSpawnValidationObstacles(context.distance),
       this.manager.getSafetyRunDistance(context.distance)
@@ -4178,12 +4941,16 @@ class RoadDirector {
     stats.blockedLaneSum += blockedCount;
     stats.pressureCounts[blockedCount] = (stats.pressureCounts[blockedCount] || 0) + 1;
     stats.waveCounts[result.type] = (stats.waveCounts[result.type] || 0) + 1;
+    stats.waveFamilyCounts[family] = (stats.waveFamilyCounts[family] || 0) + 1;
+    stats.directorIntentCounts[directorIntent.id] = (stats.directorIntentCounts[directorIntent.id] || 0) + 1;
     stats.pressureBudgetSum += context.pressureBudget;
     stats.pressureSum += result.pressure;
     sectionStats.totalWaves += 1;
     sectionStats.blockedLaneSum += blockedCount;
     sectionStats.pressureCounts[blockedCount] = (sectionStats.pressureCounts[blockedCount] || 0) + 1;
     sectionStats.waveCounts[result.type] = (sectionStats.waveCounts[result.type] || 0) + 1;
+    sectionStats.waveFamilyCounts[family] = (sectionStats.waveFamilyCounts[family] || 0) + 1;
+    sectionStats.directorIntentCounts[directorIntent.id] = (sectionStats.directorIntentCounts[directorIntent.id] || 0) + 1;
     sectionStats.pressureBudgetSum += context.pressureBudget;
     sectionStats.pressureSum += result.pressure;
     if (result.hard) stats.hardWaveCount += 1;
@@ -4222,7 +4989,17 @@ class RoadDirector {
     }
     const activePressureRunDistance = context.seedLocked ? this.manager.getSafetyRunDistance(context.distance) : undefined;
     const activePressureObstacles = context.seedLocked ? this.manager.getSpawnValidationObstacles(context.distance) : undefined;
-    const meaningfulWave = result.type !== "recoveryGap" && (blockedCount > 0 || this.hasActivePressureAhead(activePressureRunDistance, activePressureObstacles));
+    const rewardCount = result.boostLanes.length + result.rampLanes.length + result.gasCanLanes.length;
+    const solutionWave = metadata.family === "solution" && (result.rampSolutions.length || result.rampLanes.length);
+    const fuelRouteWave = context.fuelRun && metadata.rewardType === "gas" && result.gasCanLanes.length > 0;
+    const rewardTemptationWave = metadata.family === "reward" && rewardCount > 0;
+    const meaningfulWave = result.type !== "recoveryGap" && (
+      blockedCount > 0
+      || solutionWave
+      || fuelRouteWave
+      || rewardTemptationWave
+      || this.hasActivePressureAhead(activePressureRunDistance, activePressureObstacles)
+    );
     if (meaningfulWave) {
       stats.meaningfulWaveCount += 1;
       stats.meaningfulWaveGapSeconds.push(meaningfulGapSeconds);
@@ -4272,6 +5049,15 @@ class RoadDirector {
     for (const lane of result.rampLanes) {
       stats.rampLaneCounts[lane] += 1;
     }
+    for (const lane of result.rewardLanes) {
+      const side = lane < TRACK_DIRECTOR.centerLane ? "left" : (lane > TRACK_DIRECTOR.centerLane ? "right" : "center");
+      stats.rewardLaneCounts[side] = (stats.rewardLaneCounts[side] || 0) + 1;
+      if (lane === TRACK_DIRECTOR.centerLane) stats.centerRewardCount += 1;
+      else {
+        stats.sideLaneRewardCount += 1;
+        stats.rewardLaneCounts.side = (stats.rewardLaneCounts.side || 0) + 1;
+      }
+    }
     Object.entries(result.obstacleTypes).forEach(([type, count]) => {
       stats.obstacleTypeCounts[type] = (stats.obstacleTypeCounts[type] || 0) + count;
     });
@@ -4279,6 +5065,15 @@ class RoadDirector {
     this.currentWave = {
       type: result.type,
       label: result.label,
+      family,
+      intent: metadata.intent || "not tracked yet",
+      requiredAction: metadata.requiredAction || "not tracked yet",
+      routeType: result.routeType || metadata.routeType || "not tracked yet",
+      rewardType: metadata.rewardType || "",
+      pressureRating: metadata.pressureRating || 0,
+      directorIntentId: directorIntent.id,
+      directorIntentLabel: directorIntent.label,
+      directorIntentReason: directorIntent.reason || "",
       band: context.band.label,
       sectionId: context.section?.id || FALLBACK_TRACK_SECTION.id,
       sectionLabel: context.section?.label || FALLBACK_TRACK_SECTION.label,
@@ -4293,6 +5088,8 @@ class RoadDirector {
       rampLanes: result.rampLanes.slice(),
       rampSolutions: result.rampSolutions.map((solution) => ({ ...solution })),
       gasCanLanes: result.gasCanLanes.slice(),
+      routeLanes: result.routeLanes.slice(),
+      rewardLanes: result.rewardLanes.slice(),
       obstacles: result.spawned.map((obstacle) => ({
         type: obstacle.type,
         variant: obstacle.variant || "",
@@ -4315,10 +5112,21 @@ class RoadDirector {
         sectionLabel: this.currentWave.sectionLabel,
         sectionProgress: this.currentWave.sectionProgress,
         distance: this.currentWave.distance,
+        family: this.currentWave.family,
+        intent: this.currentWave.intent,
+        requiredAction: this.currentWave.requiredAction,
+        routeType: this.currentWave.routeType,
+        rewardType: this.currentWave.rewardType,
+        pressureRating: this.currentWave.pressureRating,
+        directorIntentId: this.currentWave.directorIntentId,
+        directorIntentLabel: this.currentWave.directorIntentLabel,
+        directorIntentReason: this.currentWave.directorIntentReason,
         blockedLanes: this.currentWave.blockedLanes.slice(),
         boostLanes: this.currentWave.boostLanes.slice(),
         rampLanes: this.currentWave.rampLanes.slice(),
         gasCanLanes: this.currentWave.gasCanLanes.slice(),
+        routeLanes: this.currentWave.routeLanes.slice(),
+        rewardLanes: this.currentWave.rewardLanes.slice(),
         obstacles: this.currentWave.obstacles.map((obstacle) => ({ ...obstacle }))
       });
       if (context.run.roadDirectorSequence.length > 40) {
@@ -4328,7 +5136,7 @@ class RoadDirector {
     this.lastFairnessPassed = result.fairnessPassed;
     this.lastWaveType = result.type;
     this.recentWaves.push(this.currentWave);
-    if (this.recentWaves.length > 6) this.recentWaves.shift();
+    if (this.recentWaves.length > 10) this.recentWaves.shift();
 
     const modeRecoveryScale = context.cadence.recoveryScale ?? 1;
     const needsRecovery = result.type === "fourLaneSpike" || result.pressure >= context.pressureBudget + 1.25;
@@ -4441,6 +5249,9 @@ class RoadDirector {
       sectionVisualIntensity: Number.isFinite(current.sectionVisualIntensity) ? current.sectionVisualIntensity : getSectionNumber(section, "visualIntensity", 1, 0.5, 1.8),
       wave: current.label || "none",
       lastWave: this.lastWaveType ? this.getWaveLabel(this.lastWaveType) : "none",
+      waveFamily: current.family || "none",
+      waveIntent: current.intent || "none",
+      directorIntent: current.directorIntentLabel || this.currentDirectorIntent?.label || "none",
       currentWaveMeaningful: Boolean(current.meaningfulWave),
       budget: Number.isFinite(current.pressureBudget) ? current.pressureBudget : 0,
       pressure: Number.isFinite(current.pressure) ? current.pressure : 0,
@@ -4483,6 +5294,8 @@ class RoadDirector {
       fuelPatternCounts: { ...(section.fuelPatternCounts || {}) },
       pressureCounts: { ...section.pressureCounts },
       waveCounts: { ...section.waveCounts },
+      waveFamilyCounts: { ...(section.waveFamilyCounts || {}) },
+      directorIntentCounts: { ...(section.directorIntentCounts || {}) },
       averagePressure: section.totalWaves ? section.pressureSum / section.totalWaves : 0,
       averagePressureBudget: section.totalWaves ? section.pressureBudgetSum / section.totalWaves : 0,
       averageBlockedLanesPerWave: section.totalWaves ? section.blockedLaneSum / section.totalWaves : 0,
@@ -4498,8 +5311,12 @@ class RoadDirector {
 
   getSimulationStats() {
     const stats = this.stats;
+    const run = this.manager.game.run || {};
     const averageGap = (items) => items.length ? items.reduce((sum, value) => sum + value, 0) / items.length : null;
     const gapSum = (items) => items.reduce((sum, value) => sum + value, 0);
+    const visibleSamples = stats.visibleMeaningfulSampleCount || 0;
+    const rampSpawned = stats.rampLaneCounts.reduce((sum, count) => sum + count, 0);
+    const rampUseRate = rampSpawned ? Math.min(1, Math.max(0, (run.rampsUsed || 0) / rampSpawned)) : 0;
     return {
       totalWaves: stats.totalWaves,
       nonOpeningWaves: stats.nonOpeningWaves,
@@ -4547,9 +5364,24 @@ class RoadDirector {
       longestActiveEmptySeconds: Math.max(stats.longestActiveEmptySeconds, this.activeEmptySeconds),
       pressureCounts: { ...stats.pressureCounts },
       waveCounts: { ...stats.waveCounts },
+      waveFamilyCounts: { ...stats.waveFamilyCounts },
+      directorIntentCounts: { ...stats.directorIntentCounts },
       boostLaneCounts: stats.boostLaneCounts.slice(),
       rampLaneCounts: stats.rampLaneCounts.slice(),
       gasCanLaneCounts: stats.gasCanLaneCounts.slice(),
+      rewardLaneCounts: { ...stats.rewardLaneCounts },
+      sideLaneRewardCount: stats.sideLaneRewardCount || 0,
+      centerRewardCount: stats.centerRewardCount || 0,
+      visibleMeaningfulMin: Number.isFinite(stats.visibleMeaningfulMin) ? stats.visibleMeaningfulMin : 0,
+      visibleMeaningfulAverage: visibleSamples ? stats.visibleMeaningfulSampleSum / visibleSamples : 0,
+      visibleMeaningfulSampleCount: visibleSamples,
+      upcomingDecisionGapMax: stats.upcomingDecisionGapMax || 0,
+      deadScreenTime: stats.deadScreenTime || 0,
+      longestDeadScreenSeconds: Math.max(stats.longestDeadScreenSeconds || 0, this.deadScreenSeconds || 0),
+      timeSinceLastMeaningfulDecisionMax: Math.max(stats.timeSinceLastMeaningfulDecisionMax || 0, this.timeSinceMeaningfulWaveSeconds || 0),
+      underActivityCorrections: stats.underActivityCorrections || run.underActivityCorrections || 0,
+      overActivityDelays: stats.overActivityDelays || run.overActivityDelays || run.activeFieldBudgetDelays || 0,
+      rampUseRate,
       gasCanGapCount: stats.gasCanGapSeconds.length,
       gasCanGapSum: gapSum(stats.gasCanGapSeconds),
       averageGasCanGapSeconds: averageGap(stats.gasCanGapSeconds),
@@ -4687,11 +5519,32 @@ class RoadDirector {
         ? options.centerSafeChance
         : context.centerRestChance;
       const movementPenalty = context.needsMovementChallenge && context.allowSoftCenterPressure ? 0.68 : 1;
-      if (this.random() < centerSafeChance * movementPenalty) return centerLane;
+      if (this.random() < centerSafeChance * movementPenalty) {
+        return this.avoidRecentRouteLane(centerLane, context, excluded);
+      }
     }
     const highModeCenterPressure = ["pro", "turbo"].includes(context.speedClassId)
       && (context.allowSoftCenterPressure || context.progress > 0.22);
-    return this.pickSafeLane(context, Boolean(options.preferSide) || context.centerNeedsChallenge || highModeCenterPressure, excluded);
+    return this.avoidRecentRouteLane(
+      this.pickSafeLane(context, Boolean(options.preferSide) || context.centerNeedsChallenge || highModeCenterPressure, excluded),
+      context,
+      excluded
+    );
+  }
+
+  avoidRecentRouteLane(lane, context, excluded = []) {
+    const recentLanes = this.recentWaves.slice(-4).flatMap((wave) => wave.routeLanes || []);
+    const repeats = recentLanes.filter((item) => item === lane).length;
+    if (repeats < 2 || this.random() > 0.62) return lane;
+    const blocked = Array.isArray(excluded) ? excluded : [excluded];
+    let alternatives = this.lanesExcept(blocked).filter((candidate) => candidate !== lane);
+    if (context.centerNeedsChallenge || context.speedClassId === "turbo") {
+      const sideAlternatives = alternatives.filter((candidate) => candidate !== TRACK_DIRECTOR.centerLane);
+      if (sideAlternatives.length) alternatives = sideAlternatives;
+    }
+    return alternatives.length
+      ? randomChoice(shuffle(alternatives, () => this.random()), () => this.random())
+      : lane;
   }
 
   orderPressureLanes(context, lanes) {
@@ -4737,7 +5590,13 @@ class RoadDirector {
     if (context.playerLane !== TRACK_DIRECTOR.centerLane && candidates.includes(TRACK_DIRECTOR.centerLane) && this.random() < 0.14) {
       return TRACK_DIRECTOR.centerLane;
     }
-    return randomChoice(shuffle(lanes, () => this.random()), () => this.random());
+    const picked = randomChoice(shuffle(lanes, () => this.random()), () => this.random());
+    const recentRewards = this.recentWaves.slice(-4).flatMap((wave) => wave.rewardLanes || []);
+    const repeats = recentRewards.filter((lane) => lane === picked).length;
+    if (repeats >= 2 && lanes.length > 1 && this.random() < 0.7) {
+      return randomChoice(shuffle(lanes.filter((lane) => lane !== picked), () => this.random()), () => this.random()) ?? picked;
+    }
+    return picked;
   }
 
   chooseBlockerType(context, heavyChance = 0.25) {
@@ -4788,6 +5647,7 @@ class RoadDirector {
 
   waveDoubleGate(distance, context, result) {
     const safeLane = this.pickWaveSafeLane(context, { centerSafeChance: context.centerRestChance });
+    this.recordIntendedRoute(result, safeLane, "side escape");
     const lanes = this.orderPressureLanes(context, shuffle(this.lanesExcept(safeLane), () => this.random()));
     this.spawn(this.chooseBlockerType(context, 0.12), lanes[0], distance, result);
     this.spawn(this.random() < 0.78 ? "slowCar" : this.chooseBlockerType(context, 0.08), lanes[1], distance + this.staggerDistance(context, 0.07, 70, 145), result);
@@ -4804,8 +5664,11 @@ class RoadDirector {
   }
 
   waveOffsetPair(distance, context, result) {
-    const firstLane = this.pickPressureLane(context, 0.35);
-    const secondLane = randomChoice(shuffle(this.lanesExcept(firstLane), () => this.random()), () => this.random());
+    const safeLane = this.pickWaveSafeLane(context, { centerSafeChance: context.centerRestChance * 0.86 });
+    this.recordIntendedRoute(result, safeLane, "staggered escape");
+    const lanes = this.orderPressureLanes(context, shuffle(this.lanesExcept(safeLane), () => this.random()));
+    const firstLane = lanes[0];
+    const secondLane = lanes[1];
     const stagger = lerp(170, 285, this.random());
     this.spawn(this.chooseBlockerType(context, 0.18), firstLane, distance, result);
     const secondType = this.shouldSpawnMinorHazard(context, 0.36, result)
@@ -4816,7 +5679,7 @@ class RoadDirector {
     const thirdChance = context.speedClassId === "rookie" ? 0.18 : (context.speedClassId === "arcade" ? 0.66 : (context.speedClassId === "pro" ? 0.88 : 0.99));
     const thirdMinProgress = context.speedClassId === "turbo" ? 0.06 : (context.speedClassId === "pro" ? 0.16 : 0.28);
     if (context.progress > thirdMinProgress && context.speedClassId !== "sunday" && this.canAddPressure(result, "cone", context) && this.random() < thirdChance) {
-      const thirdLane = randomChoice(shuffle(this.lanesExcept([firstLane, secondLane]), () => this.random()), () => this.random());
+      const thirdLane = randomChoice(shuffle(this.lanesExcept([safeLane, firstLane, secondLane]), () => this.random()), () => this.random());
       const thirdType = this.shouldSpawnMinorHazard(context, 0.28, result) ? this.chooseMinorHazard(context) : "slowCar";
       if (this.canAddPressure(result, thirdType, context, 0.2)) {
         this.spawn(thirdType, thirdLane, distance + stagger + this.staggerDistance(context, 0.08, 95, 180), result);
@@ -4825,6 +5688,7 @@ class RoadDirector {
   }
 
   waveCenterBlock(distance, context, result) {
+    this.recordIntendedRoute(result, [0, 1, 3, 4], "side escape");
     const type = context.progress < 0.3 ? (this.random() < 0.45 ? this.getTrackMinorFallback("cone", context) : "slowCar") : this.chooseBlockerType(context, 0.2);
     this.spawn(type, TRACK_DIRECTOR.centerLane, distance, result);
     const launchOpening = context.section?.id === "launch";
@@ -4874,6 +5738,7 @@ class RoadDirector {
       preferSide: true,
       centerSafeChance: context.centerRestChance * 0.42
     });
+    this.recordIntendedRoute(result, safeLane, "announced side escape");
     this.manager.addWarning(distance, safeLane, "work");
     const lanes = this.orderPressureLanes(context, shuffle(this.lanesExcept(safeLane), () => this.random()));
     const count = context.speedClassId === "sunday"
@@ -4929,6 +5794,7 @@ class RoadDirector {
       preferSide: true,
       centerSafeChance: context.centerRestChance * 0.36
     });
+    this.recordIntendedRoute(result, rampLane, "jump route");
     const ramp = this.spawnRampSolution(rampLane, distance, context, result, {
       targetType: this.random() < 0.68 ? this.getTrackMinorFallback("cone", context) : this.chooseMinorHazard(context, { includeBranch: true })
     });
@@ -4948,6 +5814,7 @@ class RoadDirector {
   waveBoostTemptation(distance, context, result) {
     const blockerLane = this.pickPressureLane(context, 0.46);
     const rewardLane = this.pickRewardLane(context, [blockerLane]);
+    this.recordIntendedRoute(result, rewardLane, "reward side route");
     this.spawn(this.random() < 0.72 ? "slowCar" : this.getTrackMinorFallback("cone", context), blockerLane, distance, result);
     const launchOpening = context.section?.id === "launch";
     if (context.progress > 0.25 && this.canAddPressure(result, "cone", context)) {
@@ -4973,6 +5840,7 @@ class RoadDirector {
     const safeLane = this.pickWaveSafeLane(context, {
       centerSafeChance: context.centerRestChance * 0.48
     });
+    this.recordIntendedRoute(result, safeLane, "corridor");
     const lanes = this.orderPressureLanes(context, shuffle(this.lanesExcept(safeLane), () => this.random()));
     const count = context.band.id === "final" || context.speedClassId === "arcade" || context.speedClassId === "pro" || context.speedClassId === "turbo" ? 3 : 2;
     const step = this.staggerDistance(context, 0.13, 150, 280);
@@ -4987,6 +5855,7 @@ class RoadDirector {
       centerSafeChance: context.centerRestChance * 0.38,
       preferSide: ["pro", "turbo"].includes(context.speedClassId)
     });
+    this.recordIntendedRoute(result, safeLane, "slalom");
     const lanes = this.orderPressureLanes(context, shuffle(this.lanesExcept(safeLane), () => this.random()));
     const step = this.staggerDistance(context, 0.12, 145, 260);
     const count = context.speedClassId === "sunday" ? 2 : (context.speedClassId === "rookie" ? 2 : 3);
@@ -5009,6 +5878,7 @@ class RoadDirector {
     const thirdLane = this.pickRewardLane(context, [firstLane, secondLane]);
     const chain = [firstLane, secondLane];
     if (["arcade", "pro", "turbo"].includes(context.speedClassId) && context.progress > 0.3) chain.push(thirdLane);
+    this.recordIntendedRoute(result, chain, "reward chain");
     const step = this.staggerDistance(context, 0.14, 170, 290);
     chain.forEach((lane, index) => {
       this.spawn("boostPad", lane, distance + index * step, result);
@@ -5089,6 +5959,7 @@ class RoadDirector {
       centerSafeChance: context.centerRestChance * 0.18,
       preferSide: context.speedClassId !== "arcade"
     });
+    this.recordIntendedRoute(result, threadLane, "narrow route");
     const lanes = this.orderPressureLanes(context, shuffle(this.lanesExcept(threadLane), () => this.random()));
     const step = this.staggerDistance(context, 0.09, 115, 215);
     const types = [
@@ -5191,6 +6062,7 @@ class RoadDirector {
 
   waveFuelTrafficPressure(distance, context, result) {
     const safeLane = this.pickWaveSafeLane(context, { centerSafeChance: context.centerRestChance * 0.7 });
+    this.recordIntendedRoute(result, safeLane, "traffic gate");
     const lanes = this.orderPressureLanes(context, shuffle(this.lanesExcept(safeLane), () => this.random()));
     const count = context.speedClassId === "sunday" ? 1 : (context.progress > 0.55 || ["pro", "turbo"].includes(context.speedClassId) ? 3 : 2);
     const step = this.staggerDistance(context, 0.11, 125, 230);
@@ -5204,6 +6076,7 @@ class RoadDirector {
 
   waveFuelSideTemptation(distance, context, result) {
     const gasLane = this.pickFuelCanLane(context, [], { preferSide: true });
+    this.recordIntendedRoute(result, gasLane, "fuel side route");
     const lanes = this.orderPressureLanes(context, shuffle(this.lanesExcept(gasLane), () => this.random()));
     this.spawn(this.chooseFuelBlockerType(context, 0.16), lanes[0], distance, result);
     if (lanes.includes(TRACK_DIRECTOR.centerLane) && this.random() < 0.72) {
@@ -5219,6 +6092,7 @@ class RoadDirector {
       preferSide: context.centerNeedsChallenge,
       centerSafeChance: context.centerRestChance * 0.62
     });
+    this.recordIntendedRoute(result, safeLane, "fuel gate");
     const lanes = this.orderPressureLanes(context, shuffle(this.lanesExcept(safeLane), () => this.random()));
     this.spawn(this.chooseFuelBlockerType(context, 0.18), lanes[0], distance, result);
     this.spawn(this.chooseFuelBlockerType(context, 0.22), lanes[1], distance + this.staggerDistance(context, 0.09, 105, 190), result);
@@ -5230,6 +6104,7 @@ class RoadDirector {
 
   waveFuelAfterPressure(distance, context, result) {
     const safeLane = this.pickWaveSafeLane(context, { preferSide: true, centerSafeChance: context.centerRestChance * 0.48 });
+    this.recordIntendedRoute(result, safeLane, "recovery fuel route");
     const lanes = this.orderPressureLanes(context, shuffle(this.lanesExcept(safeLane), () => this.random()));
     const count = context.speedClassId === "sunday" ? 2 : 3;
     const step = this.staggerDistance(context, 0.1, 120, 220);
@@ -5243,6 +6118,7 @@ class RoadDirector {
     const candidates = shuffle(this.lanesExcept(TRACK_DIRECTOR.centerLane), () => this.random());
     const gasA = candidates[0] ?? 0;
     const gasB = candidates.find((lane) => Math.abs(lane - gasA) >= 2) ?? candidates[1] ?? 4;
+    this.recordIntendedRoute(result, [gasA, gasB], "split fuel route");
     const blockerLane = this.pickPressureLane(context, 0.42, [gasA, gasB]);
     this.spawn(this.chooseFuelBlockerType(context, 0.22), blockerLane, distance, result);
     const extraLane = this.pickPressureLane(context, 0.35, [gasA, gasB, blockerLane]);
@@ -5260,6 +6136,7 @@ class RoadDirector {
       preferSide: context.playerLane === TRACK_DIRECTOR.centerLane && this.random() < 0.42,
       allowFreeCenter: this.random() < 0.34
     });
+    this.recordIntendedRoute(result, fuelLane, "rescue route");
     const lanes = this.orderPressureLanes(context, shuffle(this.lanesExcept(fuelLane), () => this.random()));
     const blockerCount = context.speedClassId === "sunday" ? 1 : 2;
     for (let i = 0; i < blockerCount; i += 1) {
@@ -5270,6 +6147,7 @@ class RoadDirector {
 
   waveFuelSupport(distance, context, result) {
     const rewardLane = this.pickRewardLane(context);
+    this.recordIntendedRoute(result, rewardLane, "light reward route");
     this.spawn("boostPad", rewardLane, distance + clamp(context.cruiseSpeed * 0.22, 240, 390), result);
     const blockerLane = this.pickPressureLane(context, 0.3, [rewardLane]);
     this.spawn(this.chooseFuelBlockerType(context, 0.12), blockerLane, distance, result);
@@ -5422,6 +6300,52 @@ class ObstacleManager {
     return gameplayAhead.length ? Math.min(...gameplayAhead) : null;
   }
 
+  chooseUnderActivityIntent(run, activity) {
+    const sectionId = run?.currentSectionId || "";
+    if (isFuelRunRaceType(run?.raceTypeId)) {
+      const fuelLow = Boolean(run.lowFuelActive || run.criticalFuelActive);
+      const gasDue = (run.timeSinceLastGasCan || 0) >= (run.targetGasGapSeconds || getFuelRunTuning(run.speedClassId).targetGasGapSeconds);
+      if (fuelLow || gasDue) return "gasRoute";
+    }
+    if (activity?.visibleRewards + activity?.upcomingRewards <= 0 && sectionId === "breather") return "rewardTemptation";
+    if ((this.track?.id || "") === "redline-run") return "forceLaneChange";
+    if (sectionId === "finalPush") return "finalPushPressure";
+    if (sectionId === "pressure") return "escalateSection";
+    return "maintainPressure";
+  }
+
+  applyUnderActivityCorrection(run, plan, activity) {
+    if (!run || !activity?.underActivity || activity.overDensity) return false;
+    const elapsed = Number.isFinite(run.elapsed) ? run.elapsed : 0;
+    const last = Number.isFinite(run.lastUnderActivityCorrectionElapsed)
+      ? run.lastUnderActivityCorrectionElapsed
+      : -Infinity;
+    if (elapsed - last < ROAD_DIRECTOR_ACTIVITY_CONFIG.correctionCooldownSeconds) return false;
+    const finishLimit = (this.track?.distanceToFinish || 0) - 650;
+    const speed = Math.max(1, Number.isFinite(run.currentSpeed)
+      ? run.currentSpeed
+      : getTrackCruiseSpeed(this.track || TRACKS[0], 0, this.getSpeedClassId()));
+    const targetDistance = Math.min(
+      plan.spawnHorizon,
+      Math.max(
+        plan.minimumSpawnDistance,
+        (run.distance || 0) + plan.minimumSpawnAhead + speed * ROAD_DIRECTOR_ACTIVITY_CONFIG.correctionLeadSeconds
+      )
+    );
+    if (!Number.isFinite(targetDistance) || targetDistance >= finishLimit) return false;
+    if (this.nextSpawnDistance <= targetDistance + 1) return false;
+    this.nextSpawnDistance = targetDistance;
+    run.underActivityCorrections = (run.underActivityCorrections || 0) + 1;
+    run.lastUnderActivityCorrectionElapsed = elapsed;
+    run.lastUnderActivityCorrectionReason = activity.status || "below activity floor";
+    run.forceRoadDirectorIntent = this.chooseUnderActivityIntent(run, activity);
+    run.forceRoadDirectorIntentReason = activity.status || "below activity floor";
+    if (this.director?.stats) {
+      this.director.stats.underActivityCorrections = (this.director.stats.underActivityCorrections || 0) + 1;
+    }
+    return true;
+  }
+
   spawnScheduledWave(run = this.game.run, track = this.track) {
     if (!run || !track) return null;
     const plan = this.getSpawnSchedulePlan(run, track);
@@ -5441,12 +6365,19 @@ class ObstacleManager {
     if (fieldDelay.delay && this.nextSpawnDistance <= plan.spawnHorizon + 1 && this.nextSpawnDistance < finishLimit) {
       this.nextSpawnDistance += this.getActiveFieldDelayDistance(run);
       run.activeFieldBudgetDelays = (run.activeFieldBudgetDelays || 0) + 1;
+      run.overActivityDelays = (run.overActivityDelays || 0) + 1;
       run.lastActiveFieldBudgetReason = fieldDelay.reason;
+      if (this.director?.stats) {
+        this.director.stats.overActivityDelays = (this.director.stats.overActivityDelays || 0) + 1;
+      }
       run.wavesSpawnedThisFrame = 0;
       run.maxWavesSpawnedInSingleFrame = Math.max(run.maxWavesSpawnedInSingleFrame || 0, 0);
       run.lastWaveDelayedForVisibleSafety = delayedForVisibility;
       return { ...plan, wavesSpawned: 0, delayedForVisibility, activeFieldDelayed: true };
     }
+
+    const activity = this.getRoadActivitySnapshot(run, this.obstacles, run.distance || 0);
+    const underActivityCorrected = this.applyUnderActivityCorrection(run, plan, activity);
 
     if (this.nextSpawnDistance <= plan.spawnHorizon + 1 && this.nextSpawnDistance < finishLimit) {
       const spawnDistance = this.nextSpawnDistance;
@@ -5471,7 +6402,7 @@ class ObstacleManager {
     run.wavesSpawnedThisFrame = wavesSpawned;
     run.maxWavesSpawnedInSingleFrame = Math.max(run.maxWavesSpawnedInSingleFrame || 0, wavesSpawned);
     run.lastWaveDelayedForVisibleSafety = delayedForVisibility;
-    return { ...plan, wavesSpawned, delayedForVisibility };
+    return { ...plan, wavesSpawned, delayedForVisibility, underActivityCorrected };
   }
 
   maybePlayWarningSfx(obstacle, ahead) {
@@ -5578,6 +6509,183 @@ class ObstacleManager {
       ...ACTIVE_FIELD_BUDGET_CONFIG.default,
       ...modeBudget,
       ...fuelBudget
+    };
+  }
+
+  getActivityFloorBudget(run = this.game.run, section = null) {
+    const base = this.getActiveFieldBudget(run);
+    const track = this.track || run?.track || TRACKS[0];
+    const progress = clamp((run?.distance || 0) / Math.max(1, track?.distanceToFinish || 1), 0, 1);
+    const activeSection = section || getTrackSection(track, progress);
+    const sectionActivity = ROAD_DIRECTOR_ACTIVITY_CONFIG.sectionMultipliers[activeSection?.id] || {};
+    const minVisibleMeaningful = Math.max(
+      1,
+      Math.round((base.minVisibleMeaningful ?? 1) * (sectionActivity.min ?? 1))
+    );
+    const targetVisibleMeaningful = Math.max(
+      minVisibleMeaningful,
+      Math.round((base.targetVisibleMeaningful ?? minVisibleMeaningful) * (sectionActivity.target ?? 1))
+    );
+    const maxUpcomingDecisionGapSeconds = Math.max(
+      0.8,
+      (base.maxUpcomingDecisionGapSeconds ?? 2) * (sectionActivity.maxUpcomingDecisionGap ?? 1)
+    );
+    return {
+      ...base,
+      minVisibleMeaningful,
+      targetVisibleMeaningful,
+      maxUpcomingDecisionGapSeconds,
+      deadScreenLimitSeconds: base.deadScreenLimitSeconds ?? maxUpcomingDecisionGapSeconds,
+      lonelyObjectLimitSeconds: base.lonelyObjectLimitSeconds ?? Math.max(0.8, maxUpcomingDecisionGapSeconds * 0.65)
+    };
+  }
+
+  canReachRoadObject(obstacle, run = this.game.run, runDistance = run?.distance || 0) {
+    if (!obstacle || !run) return true;
+    const ahead = obstacle.distance - runDistance;
+    const speed = Math.max(1, Number.isFinite(run.currentSpeed)
+      ? run.currentSpeed
+      : getTrackCruiseSpeed(this.track || TRACKS[0], 0, this.getSpeedClassId()));
+    const currentLane = Math.round(clamp(Number.isFinite(run.targetLane) ? run.targetLane : TRACK_DIRECTOR.centerLane, 0, LANES - 1));
+    const lane = Math.round(clamp(Number.isFinite(obstacle.laneFloat) ? obstacle.laneFloat : obstacle.lane, 0, LANES - 1));
+    const playerAhead = this.getPlayerZoneAhead(runDistance);
+    const timeToDecision = (ahead - playerAhead) / speed;
+    const requiredSeconds = Math.abs(lane - currentLane) * INPUT_CONFIG.laneChangeDurationSeconds + 0.12;
+    return timeToDecision >= requiredSeconds;
+  }
+
+  getMeaningfulRoadObjectInfo(obstacle, run = this.game.run, runDistance = run?.distance || 0) {
+    if (!this.isGameplaySpawnObject(obstacle)) return null;
+    const lane = Math.round(clamp(Number.isFinite(obstacle.laneFloat) ? obstacle.laneFloat : obstacle.lane, 0, LANES - 1));
+    if (HARD_VEHICLE_TYPES.has(obstacle.type)) {
+      return { role: "hard blocker", weight: 1, lane };
+    }
+    if (MINOR_HAZARD_TYPES.has(obstacle.type)) {
+      const intentional = Boolean(obstacle.waveType && obstacle.waveType !== "recoveryGap");
+      return intentional ? { role: "intentional minor hazard", weight: 0.8, lane } : null;
+    }
+    if (obstacle.type === "gasCan" && isFuelRunRaceType(run?.raceTypeId)) {
+      const freeCenter = lane === TRACK_DIRECTOR.centerLane && !(run?.lastVisibleHardBlockers > 0);
+      return { role: freeCenter ? "free center gas" : "gas route", weight: freeCenter ? 0.35 : 1, lane };
+    }
+    if (obstacle.type === "boostPad") {
+      if (!this.canReachRoadObject(obstacle, run, runDistance)) return null;
+      return { role: "boost temptation", weight: 1, lane };
+    }
+    if (obstacle.type === "ramp") {
+      const useful = obstacle.rampSolution || Boolean(this.getRampSolutionTarget(obstacle, this.obstacles));
+      if (!useful || !this.canReachRoadObject(obstacle, run, runDistance)) return null;
+      return { role: "ramp solution", weight: 1, lane };
+    }
+    return null;
+  }
+
+  getRoadActivitySnapshot(run = this.game.run, obstacles = this.obstacles, runDistance = run?.distance || 0) {
+    const track = this.track || run?.track || TRACKS[0];
+    const progress = clamp(runDistance / Math.max(1, track?.distanceToFinish || 1), 0, 1);
+    const section = getTrackSection(track, progress);
+    const budget = this.getActivityFloorBudget(run, section);
+    const speed = Math.max(1, Number.isFinite(run?.currentSpeed)
+      ? run.currentSpeed
+      : getTrackCruiseSpeed(track, progress, this.getSpeedClassId()));
+    const upcomingWindow = VIEW_DISTANCE + speed * ROAD_DIRECTOR_ACTIVITY_CONFIG.upcomingWindowSeconds;
+    const density = this.getActiveFieldDensity(obstacles, runDistance);
+    const records = [];
+    let visibleMeaningfulObjects = 0;
+    let upcomingMeaningfulObjects = 0;
+    let visibleMeaningfulWeight = 0;
+    let upcomingMeaningfulWeight = 0;
+    let visibleRewards = 0;
+    let upcomingRewards = 0;
+    let visibleFreeCenterGas = 0;
+    let firstMeaningfulAhead = null;
+    const rewardLaneCounts = { center: 0, side: 0, left: 0, right: 0 };
+
+    for (const obstacle of obstacles) {
+      const ahead = obstacle.distance - runDistance;
+      if (ahead <= -120 || ahead > upcomingWindow || obstacle.hit || obstacle.remove) continue;
+      const info = this.getMeaningfulRoadObjectInfo(obstacle, run, runDistance);
+      if (!info) continue;
+      const visible = ahead <= VIEW_DISTANCE;
+      const record = {
+        type: obstacle.type,
+        lane: info.lane,
+        ahead,
+        visible,
+        role: info.role,
+        weight: info.weight,
+        waveType: obstacle.waveType || ""
+      };
+      records.push(record);
+      if (firstMeaningfulAhead === null || ahead < firstMeaningfulAhead) firstMeaningfulAhead = ahead;
+      if (visible) {
+        visibleMeaningfulObjects += 1;
+        visibleMeaningfulWeight += info.weight;
+      } else {
+        upcomingMeaningfulObjects += 1;
+        upcomingMeaningfulWeight += info.weight;
+      }
+      if (ROAD_DIRECTOR_ACTIVITY_CONFIG.rewardRoles.includes(obstacle.type)) {
+        const side = info.lane < TRACK_DIRECTOR.centerLane ? "left" : (info.lane > TRACK_DIRECTOR.centerLane ? "right" : "center");
+        rewardLaneCounts[side] = (rewardLaneCounts[side] || 0) + 1;
+        if (info.lane !== TRACK_DIRECTOR.centerLane) rewardLaneCounts.side = (rewardLaneCounts.side || 0) + 1;
+        if (visible) visibleRewards += 1;
+        else upcomingRewards += 1;
+      }
+      if (info.role === "free center gas" && visible) visibleFreeCenterGas += 1;
+    }
+
+    const nextMeaningfulDecisionSeconds = firstMeaningfulAhead === null
+      ? null
+      : Math.max(0, firstMeaningfulAhead / speed);
+    const meaningfulTotal = visibleMeaningfulObjects + upcomingMeaningfulObjects;
+    const activityWeight = visibleMeaningfulWeight + upcomingMeaningfulWeight * 0.72;
+    const noMeaningfulActivity = activityWeight < ROAD_DIRECTOR_ACTIVITY_CONFIG.noActivityWeightThreshold;
+    const lonelyDistantObject = visibleMeaningfulObjects === 1
+      && upcomingMeaningfulObjects === 0
+      && records.some((record) => record.visible && record.ahead >= VIEW_DISTANCE * ROAD_DIRECTOR_ACTIVITY_CONFIG.lonelyDistantAheadRatio);
+    const lateDecision = nextMeaningfulDecisionSeconds === null
+      || nextMeaningfulDecisionSeconds > budget.maxUpcomingDecisionGapSeconds;
+    const underActivity = (
+      visibleMeaningfulObjects < budget.minVisibleMeaningful
+      || meaningfulTotal < budget.targetVisibleMeaningful
+      || noMeaningfulActivity
+      || lonelyDistantObject
+      || lateDecision
+    );
+    const deadScreen = noMeaningfulActivity || (visibleMeaningfulObjects <= 1 && upcomingMeaningfulObjects === 0 && lateDecision);
+    const overDensity = density.visibleHardBlockers >= budget.spawnDelayVisibleHardBlockers
+      || density.tacticalHardBlockers >= budget.maxTacticalHardBlockers
+      || density.hardBlockersNext3Seconds >= budget.maxHardBlockersNext3Seconds
+      || density.visibleHardWaveOverlap > budget.maxVisibleHardWaveOverlap;
+    const status = underActivity
+      ? (deadScreen ? "dead-screen risk" : "below activity floor")
+      : (overDensity ? "over-density risk" : "within activity floor");
+
+    return {
+      status,
+      underActivity,
+      deadScreen,
+      overDensity,
+      visibleMeaningfulObjects,
+      upcomingMeaningfulObjects,
+      targetVisibleMeaningful: budget.targetVisibleMeaningful,
+      minVisibleMeaningful: budget.minVisibleMeaningful,
+      activityWeight,
+      visibleMeaningfulWeight,
+      upcomingMeaningfulWeight,
+      meaningfulTotal,
+      visibleHardBlockers: density.visibleHardBlockers || 0,
+      visibleRewards,
+      upcomingRewards,
+      visibleFreeCenterGas,
+      activeFieldDensity: density,
+      nextMeaningfulDecisionSeconds,
+      maxUpcomingDecisionGapSeconds: budget.maxUpcomingDecisionGapSeconds,
+      deadScreenLimitSeconds: budget.deadScreenLimitSeconds,
+      lonelyObjectLimitSeconds: budget.lonelyObjectLimitSeconds,
+      records,
+      rewardLaneCounts
     };
   }
 
@@ -5726,6 +6834,7 @@ class ObstacleManager {
   updateActiveFieldTelemetry(run = this.game.run) {
     if (!run) return;
     const density = this.getActiveFieldDensity(this.obstacles, run.distance || 0);
+    const activity = this.getRoadActivitySnapshot(run, this.obstacles, run.distance || 0);
     run.lastVisibleHardBlockers = density.visibleHardBlockers;
     run.lastTacticalHardBlockers = density.tacticalHardBlockers;
     run.lastHardBlockersNext3Seconds = density.hardBlockersNext3Seconds;
@@ -5738,6 +6847,14 @@ class ObstacleManager {
     run.maxHardBlockersInTwoSeconds = Math.max(run.maxHardBlockersInTwoSeconds || 0, density.maxHardBlockersInTwoSeconds);
     run.maxHardBlockersInThreeLaneNeighborhood = Math.max(run.maxHardBlockersInThreeLaneNeighborhood || 0, density.maxHardBlockersInThreeLaneNeighborhood);
     run.visibleWaveOverlapMax = Math.max(run.visibleWaveOverlapMax || 0, density.visibleHardWaveOverlap);
+    run.lastVisibleMeaningfulObjects = activity.visibleMeaningfulObjects || 0;
+    run.lastUpcomingMeaningfulObjects = activity.upcomingMeaningfulObjects || 0;
+    run.lastVisibleMeaningfulTarget = activity.targetVisibleMeaningful || 0;
+    run.lastRoadActivityFloorStatus = activity.status || "";
+    run.lastDeadScreenRisk = Boolean(activity.deadScreen);
+    run.lastUpcomingDecisionSeconds = Number.isFinite(activity.nextMeaningfulDecisionSeconds)
+      ? activity.nextMeaningfulDecisionSeconds
+      : null;
   }
 
   shouldSuppressSupportForDensity(candidate, existingObstacles = this.getSpawnValidationObstacles(candidate.distance)) {
@@ -10228,10 +11345,29 @@ class NeonRoadRally {
       barrierCount: 0,
       supportObjectsSuppressedByDensity: 0,
       recentRoadDirectorRejections: [],
+      deadScreenTime: 0,
+      longestDeadScreenSeconds: 0,
+      timeSinceLastMeaningfulDecisionMax: 0,
+      visibleMeaningfulMin: Infinity,
+      visibleMeaningfulSampleSum: 0,
+      visibleMeaningfulSampleCount: 0,
+      upcomingDecisionGapMax: 0,
+      underActivityCorrections: 0,
+      lastUnderActivityCorrectionElapsed: -Infinity,
+      lastUnderActivityCorrectionReason: "",
+      overActivityDelays: 0,
+      forceRoadDirectorIntent: "",
+      forceRoadDirectorIntentReason: "",
       lastVisibleHardBlockers: 0,
       lastTacticalHardBlockers: 0,
       lastHardBlockersNext3Seconds: 0,
       lastVisibleWaveOverlap: 0,
+      lastVisibleMeaningfulObjects: 0,
+      lastUpcomingMeaningfulObjects: 0,
+      lastVisibleMeaningfulTarget: 0,
+      lastRoadActivityFloorStatus: "",
+      lastDeadScreenRisk: false,
+      lastUpcomingDecisionSeconds: null,
       lastActiveFieldBudgetReason: "",
       wavesSpawnedThisFrame: 0,
       lastWaveSpawnDistance: 0,
@@ -11056,6 +12192,13 @@ class NeonRoadRally {
     const averageSpeed = run.speedSampleSeconds > 0
       ? run.speedWeightedSum / run.speedSampleSeconds
       : (summary.time > 0 ? summary.distance / summary.time : 0);
+    const visibleMeaningfulAverage = run.visibleMeaningfulSampleCount > 0
+      ? run.visibleMeaningfulSampleSum / run.visibleMeaningfulSampleCount
+      : (directorStats.visibleMeaningfulAverage || 0);
+    const visibleMeaningfulMin = Number.isFinite(run.visibleMeaningfulMin)
+      ? run.visibleMeaningfulMin
+      : (directorStats.visibleMeaningfulMin || 0);
+    const rewardLaneDistribution = normalizeCountMap(directorStats.rewardLaneCounts || {}, 8);
     return {
       runId: run.runId,
       timestamp: new Date().toISOString(),
@@ -11122,6 +12265,18 @@ class NeonRoadRally {
       combinedRouteFailures: run.combinedRouteFailures || 0,
       barrierCount: run.barrierCount || 0,
       supportObjectsSuppressedByDensity: run.supportObjectsSuppressedByDensity || 0,
+      deadScreenTime: run.deadScreenTime || directorStats.deadScreenTime || 0,
+      longestDeadScreenSeconds: run.longestDeadScreenSeconds || directorStats.longestDeadScreenSeconds || 0,
+      timeSinceLastMeaningfulDecisionMax: run.timeSinceLastMeaningfulDecisionMax || directorStats.timeSinceLastMeaningfulDecisionMax || 0,
+      visibleMeaningfulMin,
+      visibleMeaningfulAverage,
+      upcomingDecisionGapMax: run.upcomingDecisionGapMax || directorStats.upcomingDecisionGapMax || 0,
+      underActivityCorrections: run.underActivityCorrections || directorStats.underActivityCorrections || 0,
+      overActivityDelays: run.overActivityDelays || directorStats.overActivityDelays || 0,
+      directorIntentCounts: normalizeCountMap(directorStats.directorIntentCounts || {}),
+      waveFamilyCounts: normalizeCountMap(directorStats.waveFamilyCounts || {}),
+      rewardLaneDistribution,
+      rampUseRate: directorStats.rampUseRate || 0,
       hardestPressureObserved: run.hardestPressureObserved || 0,
       gasCansSpawned: summary.gasCansSpawned,
       gasCansCollected: summary.gasCansCollected,
@@ -11405,6 +12560,135 @@ class NeonRoadRally {
     this.showSimulationReport(summary);
   }
 
+  async runTargetedDirectorChecks() {
+    if (this.simulationRunning) return;
+    this.simulationRunning = true;
+    this.showSimulationRunning();
+    const targets = [
+      { trackId: "sunset-highway", raceTypeId: DEFAULT_RACE_TYPE_ID, speedClassId: "arcade" },
+      { trackId: "sunset-highway", raceTypeId: DEFAULT_RACE_TYPE_ID, speedClassId: "turbo" },
+      { trackId: "redline-run", raceTypeId: DEFAULT_RACE_TYPE_ID, speedClassId: "arcade" },
+      { trackId: "redline-run", raceTypeId: DEFAULT_RACE_TYPE_ID, speedClassId: "turbo" },
+      { trackId: "sunset-highway", raceTypeId: FUEL_RUN_RACE_TYPE_ID, speedClassId: "arcade" },
+      { trackId: "sunset-highway", raceTypeId: FUEL_RUN_RACE_TYPE_ID, speedClassId: "turbo" }
+    ];
+    const results = [];
+    for (let index = 0; index < targets.length; index += 1) {
+      const target = targets[index];
+      this.updateSimulationProgress(index, targets.length);
+      const track = getTrackById(target.trackId);
+      const summary = await this.runSpawnSafetySimulationCore({
+        seed: `targeted-director-${target.trackId}-${target.raceTypeId}-${target.speedClassId}`,
+        runs: 1,
+        speedClassIds: [target.speedClassId],
+        raceTypeId: target.raceTypeId,
+        trackId: target.trackId,
+        dt: 0.4
+      });
+      const budget = {
+        ...ACTIVE_FIELD_BUDGET_CONFIG.default,
+        ...(ACTIVE_FIELD_BUDGET_CONFIG[target.speedClassId] || {}),
+        ...(isFuelRunRaceType(target.raceTypeId) ? ACTIVE_FIELD_BUDGET_CONFIG.fuelRun : {})
+      };
+      const passDetails = {
+        noVisibleSpawnViolations: summary.visibleSpawnViolations === 0,
+        maxWavesPerFrameOne: summary.maxWavesSpawnedInSingleFrame <= 1,
+        activeFieldCapsRespected: summary.activeFieldCapsRespected,
+        noEightCarClusters: summary.maxVisibleHardBlockers < 8,
+        noDeadScreenLongerThanMode: summary.longestDeadScreenSeconds <= (budget.deadScreenLimitSeconds || 2) + 0.8,
+        meaningfulActivityReported: (summary.visibleMeaningfulAverage || 0) > 0,
+        noCheapStart: (summary.director?.sectionStats?.launch?.totalWaves || 0) > 0
+          && (summary.director?.sectionStats?.launch?.meaningfulWavePercent || 0) > 0,
+        routeReadable: summary.routeReadabilityFailures === 0 && summary.minorOnlyOpenLaneEvents === 0,
+        noConsoleOnly: true
+      };
+      const pass = Object.values(passDetails).every(Boolean);
+      results.push({
+        ...target,
+        trackName: track.name,
+        raceTypeLabel: getRaceTypeLabel(target.raceTypeId),
+        raceModeLabel: getSpeedClassLabel(target.speedClassId),
+        pass,
+        passDetails,
+        metrics: {
+          visibleSpawnViolations: summary.visibleSpawnViolations,
+          maxWavesSpawnedInSingleFrame: summary.maxWavesSpawnedInSingleFrame,
+          maxVisibleHardBlockers: summary.maxVisibleHardBlockers,
+          maxTacticalHardBlockers: summary.maxTacticalHardBlockers,
+          maxHardBlockersNext3Seconds: summary.maxHardBlockersNext3Seconds,
+          maxVisibleWaveOverlap: summary.maxVisibleWaveOverlap,
+          longestDeadScreenSeconds: summary.longestDeadScreenSeconds,
+          visibleMeaningfulMin: summary.visibleMeaningfulMin,
+          visibleMeaningfulAverage: summary.visibleMeaningfulAverage,
+          upcomingDecisionGapMax: summary.upcomingDecisionGapMax,
+          underActivityCorrections: summary.underActivityCorrections,
+          overActivityDelays: summary.overActivityDelays,
+          routeReadabilityFailures: summary.routeReadabilityFailures,
+          minorOnlyOpenLaneEvents: summary.minorOnlyOpenLaneEvents,
+          sameLaneOverlaps: summary.sameLaneOverlaps,
+          boostObjectOverlaps: summary.boostObjectOverlaps,
+          rampObjectOverlaps: summary.rampObjectOverlaps,
+          gasCanOverlaps: summary.gasCanOverlaps
+        },
+        director: {
+          intentCounts: summary.director?.directorIntentCounts || {},
+          familyCounts: summary.director?.waveFamilyCounts || {},
+          rewardLaneCounts: summary.director?.rewardLaneCounts || {}
+        }
+      });
+    }
+    this.updateSimulationProgress(targets.length, targets.length);
+    const report = {
+      generatedAt: new Date().toISOString(),
+      totalRuns: targets.length,
+      pass: results.every((result) => result.pass),
+      results
+    };
+    this.targetedDirectorCheckStatus = report;
+    this.simulationRunning = false;
+    this.showTargetedDirectorCheckReport(report);
+  }
+
+  showTargetedDirectorCheckReport(report) {
+    this.setScreen("targetedDirectorChecks");
+    this.audio.playMusic("title", false);
+    const row = (item) => {
+      const checks = Object.entries(item.passDetails || {})
+        .map(([key, value]) => `${key}: ${value ? "yes" : "no"}`)
+        .join(" - ");
+      return `
+        <li class="leaderboard-item playtest-report-row">
+          <span class="leaderboard-rank">${escapeHtml(item.pass ? "PASS" : "FAIL")}</span>
+          <span class="meta">${escapeHtml(`${item.trackName} - ${item.raceTypeLabel} - ${item.raceModeLabel} - dead ${item.metrics.longestDeadScreenSeconds.toFixed(1)}s - visible avg ${item.metrics.visibleMeaningfulAverage.toFixed(2)} - max hard ${item.metrics.maxVisibleHardBlockers} - ${checks}`)}</span>
+        </li>
+      `;
+    };
+    this.layer.classList.remove("is-empty");
+    this.layer.innerHTML = `
+      <section class="panel playtest-report-panel">
+        <div class="playtest-report-header">
+          <div>
+            <span class="eyebrow">Local Development Only</span>
+            <h2>Targeted Director Checks</h2>
+            <p class="hint">${report.totalRuns} deterministic targeted runs. No broad simulation.</p>
+          </div>
+          <div class="playtest-report-status">
+            <strong>${report.pass ? "PASS" : "FAIL"}</strong>
+            <span>targeted matrix</span>
+          </div>
+        </div>
+        <ol class="leaderboard-list playtest-report-list">
+          ${(report.results || []).map(row).join("")}
+        </ol>
+        <div class="row playtest-action-row">
+          <button class="small-button" data-action="title">Back to Title</button>
+          <button class="small-button" data-action="roadDirectorLab">Road Director Lab</button>
+        </div>
+      </section>
+    `;
+    this.bindLayerButtons();
+  }
+
   updateFuelRunSimulationState(simRun, dt) {
     if (!simRun || !isFuelRunRaceType(simRun.raceTypeId)) return;
     simRun.timeSinceLastGasCan = Math.max(0, (simRun.timeSinceLastGasCan || 0) + dt);
@@ -11572,7 +12856,7 @@ class NeonRoadRally {
     const baseSeed = options.seed || "sunset-highway-spawn-safety-v1";
     const raceTypeId = normalizeRaceTypeId(options.raceTypeId || options.raceType, DEFAULT_RACE_TYPE_ID);
     const fuelRun = isFuelRunRaceType(raceTypeId);
-    const track = TRACKS[0];
+    const track = getTrackById(options.track?.id || options.trackId || DEFAULT_TRACK_ID);
     const dt = options.dt || 0.4;
     const pressureCounts = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
     const hardBlockerPressureCounts = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
@@ -11608,6 +12892,19 @@ class NeonRoadRally {
     let longestNoFuelStretch = 0;
     let simulatedOutOfFuelRuns = 0;
     let ignoringGasOutOfFuelRuns = 0;
+    let visibleSpawnViolations = 0;
+    let maxWavesSpawnedInSingleFrame = 0;
+    let maxVisibleHardBlockers = 0;
+    let maxTacticalHardBlockers = 0;
+    let maxHardBlockersNext3Seconds = 0;
+    let maxVisibleWaveOverlap = 0;
+    let underActivityCorrections = 0;
+    let overActivityDelays = 0;
+    let longestDeadScreenSeconds = 0;
+    let visibleMeaningfulMin = Infinity;
+    let visibleMeaningfulAverageSum = 0;
+    let visibleMeaningfulAverageSamples = 0;
+    let upcomingDecisionGapMax = 0;
     const fuelOpportunitiesBySection = {};
     const invalidExamples = [];
     const hardBlockerExamples = [];
@@ -11654,6 +12951,27 @@ class NeonRoadRally {
         pressureSum: 0,
         pressureCounts: { 0: 0, 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 },
         waveCounts: {},
+        waveFamilyCounts: {},
+        directorIntentCounts: {},
+        rewardLaneCounts: {
+          center: 0,
+          side: 0,
+          left: 0,
+          right: 0
+        },
+        sideLaneRewardCount: 0,
+        centerRewardCount: 0,
+        visibleMeaningfulMin: Infinity,
+        visibleMeaningfulSampleSum: 0,
+        visibleMeaningfulSampleCount: 0,
+        upcomingDecisionGapMax: 0,
+        deadScreenTime: 0,
+        longestDeadScreenSeconds: 0,
+        timeSinceLastMeaningfulDecisionMax: 0,
+        underActivityCorrections: 0,
+        overActivityDelays: 0,
+        rampUseRateSum: 0,
+        rampUseRateCount: 0,
         boostLaneCounts: Array(LANES).fill(0),
         rampLaneCounts: Array(LANES).fill(0),
         gasCanLaneCounts: Array(LANES).fill(0),
@@ -11700,7 +13018,9 @@ class NeonRoadRally {
         minorHazardCount: 0,
         fuelPatternCounts: {},
         pressureCounts: { 0: 0, 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 },
-        waveCounts: {}
+        waveCounts: {},
+        waveFamilyCounts: {},
+        directorIntentCounts: {}
       };
     }
 
@@ -11731,6 +13051,8 @@ class NeonRoadRally {
       target.minorHazardCount += source.minorHazardCount || 0;
       mergeCountMap(target.pressureCounts, source.pressureCounts);
       mergeCountMap(target.waveCounts, source.waveCounts);
+      mergeCountMap(target.waveFamilyCounts, source.waveFamilyCounts);
+      mergeCountMap(target.directorIntentCounts, source.directorIntentCounts);
       mergeCountMap(target.fuelPatternCounts, source.fuelPatternCounts);
     }
 
@@ -11769,6 +13091,8 @@ class NeonRoadRally {
           averageMeaningfulWaveGapSeconds: stats.meaningfulWaveGapCount ? stats.meaningfulWaveGapSum / stats.meaningfulWaveGapCount : null,
           pressureCounts: { ...stats.pressureCounts },
           waveCounts: { ...stats.waveCounts },
+          waveFamilyCounts: { ...(stats.waveFamilyCounts || {}) },
+          directorIntentCounts: { ...(stats.directorIntentCounts || {}) },
           topWaveCounts: topCountList(stats.waveCounts, 5)
         }];
       }));
@@ -11844,8 +13168,26 @@ class NeonRoadRally {
       target.pressureSum += stats.pressureSum || 0;
       mergeCountMap(target.pressureCounts, stats.pressureCounts);
       mergeCountMap(target.waveCounts, stats.waveCounts);
+      mergeCountMap(target.waveFamilyCounts, stats.waveFamilyCounts);
+      mergeCountMap(target.directorIntentCounts, stats.directorIntentCounts);
+      mergeCountMap(target.rewardLaneCounts, stats.rewardLaneCounts);
       mergeCountMap(target.obstacleTypeCounts, stats.obstacleTypeCounts);
       mergeCountMap(target.fuelPatternCounts, stats.fuelPatternCounts);
+      target.sideLaneRewardCount += stats.sideLaneRewardCount || 0;
+      target.centerRewardCount += stats.centerRewardCount || 0;
+      target.visibleMeaningfulMin = Math.min(target.visibleMeaningfulMin, Number.isFinite(stats.visibleMeaningfulMin) ? stats.visibleMeaningfulMin : Infinity);
+      target.visibleMeaningfulSampleSum += (stats.visibleMeaningfulAverage || 0) * (stats.visibleMeaningfulSampleCount || 0);
+      target.visibleMeaningfulSampleCount += stats.visibleMeaningfulSampleCount || 0;
+      target.upcomingDecisionGapMax = Math.max(target.upcomingDecisionGapMax, stats.upcomingDecisionGapMax || 0);
+      target.deadScreenTime += stats.deadScreenTime || 0;
+      target.longestDeadScreenSeconds = Math.max(target.longestDeadScreenSeconds, stats.longestDeadScreenSeconds || 0);
+      target.timeSinceLastMeaningfulDecisionMax = Math.max(target.timeSinceLastMeaningfulDecisionMax, stats.timeSinceLastMeaningfulDecisionMax || 0);
+      target.underActivityCorrections += stats.underActivityCorrections || 0;
+      target.overActivityDelays += stats.overActivityDelays || 0;
+      if (Number.isFinite(stats.rampUseRate)) {
+        target.rampUseRateSum += stats.rampUseRate;
+        target.rampUseRateCount += 1;
+      }
       mergeLaneCounts(target.boostLaneCounts, stats.boostLaneCounts);
       mergeLaneCounts(target.rampLaneCounts, stats.rampLaneCounts);
       mergeLaneCounts(target.gasCanLaneCounts, stats.gasCanLaneCounts);
@@ -11896,6 +13238,20 @@ class NeonRoadRally {
         pressureBudgetFailures: aggregate.pressureBudgetFailures,
         pressureCounts: { ...aggregate.pressureCounts },
         waveCounts: { ...aggregate.waveCounts },
+        waveFamilyCounts: { ...aggregate.waveFamilyCounts },
+        directorIntentCounts: { ...aggregate.directorIntentCounts },
+        rewardLaneCounts: { ...aggregate.rewardLaneCounts },
+        sideLaneRewardCount: aggregate.sideLaneRewardCount || 0,
+        centerRewardCount: aggregate.centerRewardCount || 0,
+        visibleMeaningfulMin: Number.isFinite(aggregate.visibleMeaningfulMin) ? aggregate.visibleMeaningfulMin : 0,
+        visibleMeaningfulAverage: aggregate.visibleMeaningfulSampleCount ? aggregate.visibleMeaningfulSampleSum / aggregate.visibleMeaningfulSampleCount : 0,
+        upcomingDecisionGapMax: aggregate.upcomingDecisionGapMax || 0,
+        deadScreenTime: aggregate.deadScreenTime || 0,
+        longestDeadScreenSeconds: aggregate.longestDeadScreenSeconds || 0,
+        timeSinceLastMeaningfulDecisionMax: aggregate.timeSinceLastMeaningfulDecisionMax || 0,
+        underActivityCorrections: aggregate.underActivityCorrections || 0,
+        overActivityDelays: aggregate.overActivityDelays || 0,
+        rampUseRate: aggregate.rampUseRateCount ? aggregate.rampUseRateSum / aggregate.rampUseRateCount : 0,
         boostLaneCounts: aggregate.boostLaneCounts.slice(),
         rampLaneCounts: aggregate.rampLaneCounts.slice(),
         gasCanLaneCounts: aggregate.gasCanLaneCounts.slice(),
@@ -12141,6 +13497,23 @@ class NeonRoadRally {
           }
         }
         preventedUnsafeSpawns += manager.preventedUnsafeSpawns;
+        visibleSpawnViolations += simRun.wavesSpawnedInsideVisibleCount || 0;
+        maxWavesSpawnedInSingleFrame = Math.max(maxWavesSpawnedInSingleFrame, simRun.maxWavesSpawnedInSingleFrame || 0);
+        maxVisibleHardBlockers = Math.max(maxVisibleHardBlockers, simRun.maxVisibleHardBlockers || 0);
+        maxTacticalHardBlockers = Math.max(maxTacticalHardBlockers, simRun.maxTacticalHardBlockers || 0);
+        maxHardBlockersNext3Seconds = Math.max(maxHardBlockersNext3Seconds, simRun.maxHardBlockersNext3Seconds || 0);
+        maxVisibleWaveOverlap = Math.max(maxVisibleWaveOverlap, simRun.visibleWaveOverlapMax || 0);
+        underActivityCorrections += simRun.underActivityCorrections || 0;
+        overActivityDelays += simRun.overActivityDelays || 0;
+        longestDeadScreenSeconds = Math.max(longestDeadScreenSeconds, simRun.longestDeadScreenSeconds || 0);
+        if (Number.isFinite(simRun.visibleMeaningfulMin)) {
+          visibleMeaningfulMin = Math.min(visibleMeaningfulMin, simRun.visibleMeaningfulMin);
+        }
+        if (simRun.visibleMeaningfulSampleCount > 0) {
+          visibleMeaningfulAverageSum += simRun.visibleMeaningfulSampleSum / simRun.visibleMeaningfulSampleCount;
+          visibleMeaningfulAverageSamples += 1;
+        }
+        upcomingDecisionGapMax = Math.max(upcomingDecisionGapMax, simRun.upcomingDecisionGapMax || 0);
         const directorStats = manager.director.getSimulationStats();
         mergeDirectorStats(directorTotals, directorStats);
         mergeDirectorStats(perSpeedClass[speedClassId].director, directorStats);
@@ -12262,7 +13635,8 @@ class NeonRoadRally {
         modeIntensityChecks.arcadeTwoThreeCommon = twoThreePressurePercent >= 0.62
           && highPressurePercent >= 0.28;
         modeIntensityChecks.arcadeNoDeadAir = (stats.averageMeaningfulWaveGapSeconds || Infinity) <= 2.15
-          && stats.longestActiveEmptySeconds <= 4.8;
+          && stats.longestActiveEmptySeconds <= 4.8
+          && stats.longestDeadScreenSeconds <= ACTIVE_FIELD_BUDGET_CONFIG.arcade.deadScreenLimitSeconds + 0.5;
       }
       if (id === "pro" || id === "turbo") {
         const target = id === "turbo" ? 0.28 : 0.22;
@@ -12357,6 +13731,19 @@ class NeonRoadRally {
       && effectiveSectionShapeChecks.breatherCalmerThanPressure
       && effectiveSectionShapeChecks.breatherNotEmpty
       && seedDeterminism.pass;
+    const activeBudgetForSummary = {
+      ...ACTIVE_FIELD_BUDGET_CONFIG.default,
+      ...(ACTIVE_FIELD_BUDGET_CONFIG[speedClassIds[0]] || {}),
+      ...(fuelRun ? ACTIVE_FIELD_BUDGET_CONFIG.fuelRun : {})
+    };
+    const activeFieldCapsRespected = speedClassIds.length > 1 || (
+      maxVisibleHardBlockers <= activeBudgetForSummary.maxVisibleHardBlockers
+      && maxTacticalHardBlockers <= activeBudgetForSummary.maxTacticalHardBlockers
+      && maxHardBlockersNext3Seconds <= activeBudgetForSummary.maxHardBlockersNext3Seconds
+      && maxVisibleWaveOverlap <= activeBudgetForSummary.maxVisibleHardWaveOverlap
+    );
+    const deadScreenWithinModeLimit = speedClassIds.length > 1
+      || longestDeadScreenSeconds <= (activeBudgetForSummary.deadScreenLimitSeconds || ACTIVE_FIELD_BUDGET_CONFIG.default.deadScreenLimitSeconds) + 0.8;
 
     return {
       runs,
@@ -12399,6 +13786,19 @@ class NeonRoadRally {
       rampSafetyExamples,
 	      overlapExamples,
       preventedUnsafeSpawns,
+      visibleSpawnViolations,
+      maxWavesSpawnedInSingleFrame,
+      maxVisibleHardBlockers,
+      maxTacticalHardBlockers,
+      maxHardBlockersNext3Seconds,
+      maxVisibleWaveOverlap,
+      activeFieldCapsRespected,
+      underActivityCorrections,
+      overActivityDelays,
+      longestDeadScreenSeconds,
+      visibleMeaningfulMin: Number.isFinite(visibleMeaningfulMin) ? visibleMeaningfulMin : 0,
+      visibleMeaningfulAverage: visibleMeaningfulAverageSamples ? visibleMeaningfulAverageSum / visibleMeaningfulAverageSamples : 0,
+      upcomingDecisionGapMax,
       averageObjectSpacing: spacingSamples ? spacingSum / spacingSamples : null,
       minSameLaneSpacing: Number.isFinite(minSameLaneSpacing) ? minSameLaneSpacing : null,
       averageGasCansSpawned,
@@ -12424,6 +13824,12 @@ class NeonRoadRally {
         zeroBoostOverlaps: boostObjectOverlaps === 0,
         zeroRampOverlaps: rampObjectOverlaps === 0,
         zeroGasCanOverlaps: gasCanOverlaps === 0,
+        zeroVisibleSpawnViolations: visibleSpawnViolations === 0,
+        maxWavesPerFrameOne: maxWavesSpawnedInSingleFrame <= 1,
+        activeFieldCapsRespected,
+        deadScreenWithinModeLimit,
+        meaningfulActivityReported: director.visibleMeaningfulAverage > 0 || visibleMeaningfulAverage > 0,
+        underActivityCorrectionsReported: underActivityCorrections >= 0,
         maxAtMostFour: maxBlocked <= 4,
         hardBlockerMaxAtMostFour: maxHardBlocked <= 4,
         hardBlockerFourLaneRare,
@@ -12923,6 +14329,7 @@ class NeonRoadRally {
               <button class="small-button" data-action="runSeedTest">Seed Determinism</button>
               <button class="small-button" data-action="runSimulation">Classic Simulation</button>
               <button class="small-button" data-action="runFuelSimulation">Fuel Run Simulation</button>
+              <button class="small-button" data-action="runTargetedDirectorChecks">Targeted Director Checks</button>
               <button class="small-button" data-action="showPlaytestReport">Playtest Report</button>
               <button class="small-button" data-action="roadDirectorLab">Road Director Lab</button>
               <button class="small-button" data-action="vehicleScaleDebug">Vehicle Scale Check</button>
@@ -13103,6 +14510,14 @@ class NeonRoadRally {
       totalCombinedRouteFailures: runs.reduce((sum, run) => sum + (Number(run.combinedRouteFailures) || 0), 0),
       totalBarrierCount: runs.reduce((sum, run) => sum + (Number(run.barrierCount) || 0), 0),
       totalSupportObjectsSuppressedByDensity: runs.reduce((sum, run) => sum + (Number(run.supportObjectsSuppressedByDensity) || 0), 0),
+      totalDeadScreenTime: runs.reduce((sum, run) => sum + (Number(run.deadScreenTime) || 0), 0),
+      longestDeadScreenSeconds: runs.reduce((max, run) => Math.max(max, Number(run.longestDeadScreenSeconds) || 0), 0),
+      maxTimeSinceLastMeaningfulDecision: runs.reduce((max, run) => Math.max(max, Number(run.timeSinceLastMeaningfulDecisionMax) || 0), 0),
+      visibleMeaningfulMin: runs.length ? runs.reduce((min, run) => Math.min(min, Number(run.visibleMeaningfulMin) || 0), Infinity) : 0,
+      averageVisibleMeaningful: this.averagePlaytestField(runs, "visibleMeaningfulAverage"),
+      upcomingDecisionGapMax: runs.reduce((max, run) => Math.max(max, Number(run.upcomingDecisionGapMax) || 0), 0),
+      totalUnderActivityCorrections: runs.reduce((sum, run) => sum + (Number(run.underActivityCorrections) || 0), 0),
+      totalOverActivityDelays: runs.reduce((sum, run) => sum + (Number(run.overActivityDelays) || 0), 0),
       trackRows: this.groupPlaytestRuns(runs, "trackId", "trackName"),
       modeRows: this.groupPlaytestRuns(runs, "raceModeId", "raceModeLabel"),
       typeRows: this.groupPlaytestRuns(runs, "raceTypeId", "raceTypeLabel"),
@@ -13187,7 +14602,15 @@ class NeonRoadRally {
         totalActiveFieldBudgetDelays: aggregate.totalActiveFieldBudgetDelays,
         totalCombinedRouteFailures: aggregate.totalCombinedRouteFailures,
         totalBarrierCount: aggregate.totalBarrierCount,
-        totalSupportObjectsSuppressedByDensity: aggregate.totalSupportObjectsSuppressedByDensity
+        totalSupportObjectsSuppressedByDensity: aggregate.totalSupportObjectsSuppressedByDensity,
+        totalDeadScreenTime: Number(aggregate.totalDeadScreenTime.toFixed(2)),
+        longestDeadScreenSeconds: Number(aggregate.longestDeadScreenSeconds.toFixed(2)),
+        maxTimeSinceLastMeaningfulDecision: Number(aggregate.maxTimeSinceLastMeaningfulDecision.toFixed(2)),
+        visibleMeaningfulMin: Number.isFinite(aggregate.visibleMeaningfulMin) ? aggregate.visibleMeaningfulMin : 0,
+        averageVisibleMeaningful: Number(aggregate.averageVisibleMeaningful.toFixed(2)),
+        upcomingDecisionGapMax: Number(aggregate.upcomingDecisionGapMax.toFixed(2)),
+        totalUnderActivityCorrections: aggregate.totalUnderActivityCorrections,
+        totalOverActivityDelays: aggregate.totalOverActivityDelays
       },
       completionByTrack: aggregate.trackRows,
       completionByRaceMode: aggregate.modeRows,
@@ -13284,18 +14707,29 @@ class NeonRoadRally {
     const activeEmptySeconds = Number.isFinite(director.activeEmptySeconds)
       ? director.activeEmptySeconds
       : null;
+    const deadScreenSeconds = Number.isFinite(director.deadScreenSeconds)
+      ? director.deadScreenSeconds
+      : null;
+    const activity = this.obstacles?.getRoadActivitySnapshot
+      ? this.obstacles.getRoadActivitySnapshot(run, this.obstacles.obstacles, distance)
+      : null;
     const timeUntilMeaningful = Number.isFinite(timeSinceMeaningful)
       ? Math.max(0, forceMeaningfulThreshold - timeSinceMeaningful)
       : null;
-    const underActivityWarning = Number.isFinite(timeSinceMeaningful) && timeSinceMeaningful >= forceMeaningfulThreshold
+    const underActivityWarning = activity?.underActivity
+      ? (activity.status || "below activity floor")
+      : (Number.isFinite(timeSinceMeaningful) && timeSinceMeaningful >= forceMeaningfulThreshold
       ? "meaningful wave overdue"
       : (Number.isFinite(activeEmptySeconds) && activeEmptySeconds >= forceMeaningfulThreshold
         ? "active field has been empty"
-        : "none");
+        : "none"));
     return {
       timeSinceLastMeaningfulDecisionSeconds: timeSinceMeaningful,
-      estimatedTimeUntilNextMeaningfulDecisionSeconds: timeUntilMeaningful,
-      deadScreenSeconds: activeEmptySeconds,
+      estimatedTimeUntilNextMeaningfulDecisionSeconds: Number.isFinite(activity?.nextMeaningfulDecisionSeconds)
+        ? activity.nextMeaningfulDecisionSeconds
+        : timeUntilMeaningful,
+      deadScreenSeconds,
+      activeEmptySeconds,
       forceMeaningfulThresholdSeconds: forceMeaningfulThreshold,
       underActivityWarning
     };
@@ -13336,14 +14770,14 @@ class NeonRoadRally {
     const director = this.obstacles?.director;
     const currentWave = director?.currentWave || null;
     const visibleObjects = this.getVisibleDirectorObjects(run);
-    const meaningfulVisibleObjects = visibleObjects.filter((item) => (
-      this.obstacles.isFairnessBlocker(item.obstacle)
-      || ["boostPad", "ramp", "gasCan"].includes(item.obstacle.type)
-    ));
     const density = this.obstacles?.getActiveFieldDensity(this.obstacles.obstacles, distance) || {};
     const activeField = this.obstacles?.validateActiveFieldBudget(this.obstacles.obstacles, distance) || {};
     const route = this.obstacles?.getRouteReadability(this.obstacles.obstacles, distance) || null;
-    const budget = activeField.budget || this.obstacles?.getActiveFieldBudget(run) || {};
+    const activity = this.obstacles?.getRoadActivitySnapshot
+      ? this.obstacles.getRoadActivitySnapshot(run, this.obstacles.obstacles, distance)
+      : {};
+    const budget = activeField.budget || this.obstacles?.getActivityFloorBudget(run, section) || this.obstacles?.getActiveFieldBudget(run) || {};
+    const activityBudget = this.obstacles?.getActivityFloorBudget(run, section) || budget || {};
     const routeStatus = route
       ? (route.invalid ? "blocked" : "readable")
       : "not tracked yet";
@@ -13370,6 +14804,13 @@ class NeonRoadRally {
         index: wave.index,
         type: wave.type,
         label: wave.label,
+        family: wave.family || "unknown",
+        intent: wave.intent || "unknown",
+        requiredAction: wave.requiredAction || "",
+        routeType: wave.routeType || "",
+        rewardType: wave.rewardType || "",
+        directorIntentLabel: wave.directorIntentLabel || "",
+        directorIntentReason: wave.directorIntentReason || "",
         sectionId: wave.sectionId,
         sectionLabel: wave.sectionLabel,
         distance: wave.distance,
@@ -13377,6 +14818,8 @@ class NeonRoadRally {
         boostLanes: wave.boostLanes || [],
         rampLanes: wave.rampLanes || [],
         gasCanLanes: wave.gasCanLanes || [],
+        routeLanes: wave.routeLanes || [],
+        rewardLanes: wave.rewardLanes || [],
         obstacleCount: (wave.obstacles || []).length,
         obstacles: (wave.obstacles || []).map((obstacle) => ({
           type: obstacle.type,
@@ -13390,6 +14833,18 @@ class NeonRoadRally {
       generatedAt: new Date().toISOString(),
       debugMode: Boolean(this.debugMode),
       source,
+      state: {
+        screen: this.screen,
+        source,
+        debugMode: Boolean(this.debugMode),
+        activeRace: this.screen === "game" && !run.ended,
+        raceActive: Boolean(run.raceActive),
+        ended: Boolean(run.ended),
+        paused: Boolean(run.paused),
+        elapsedSeconds: Number.isFinite(run.elapsed) ? Number(run.elapsed.toFixed(2)) : 0,
+        distance: Math.round(distance),
+        progress: Number(progress.toFixed(4))
+      },
       activeRace: this.screen === "game" && !run.ended,
       track: {
         id: track.id,
@@ -13417,8 +14872,14 @@ class NeonRoadRally {
       currentWave: {
         name: currentWave?.label || "none",
         type: currentWave?.type || "none",
-        family: "not tracked yet",
-        intent: "not tracked yet",
+        family: currentWave?.family || "none",
+        intent: currentWave?.intent || "none",
+        directorIntent: currentWave?.directorIntentLabel || director?.currentDirectorIntent?.label || "none",
+        directorIntentReason: currentWave?.directorIntentReason || director?.currentDirectorIntent?.reason || "",
+        requiredAction: currentWave?.requiredAction || "none",
+        routeType: currentWave?.routeType || "none",
+        rewardType: currentWave?.rewardType || "none",
+        pressureRating: currentWave?.pressureRating ?? null,
         meaningful: currentWave ? Boolean(currentWave.meaningfulWave) : null,
         support: currentWave ? Boolean(currentWave.supportWave) : null,
         pressure: currentPressure,
@@ -13433,7 +14894,15 @@ class NeonRoadRally {
         status: activeFieldStatus,
         reason: activeField.reason || "none",
         visibleHardBlockers: density.visibleHardBlockers || 0,
-        visibleMeaningfulObjects: meaningfulVisibleObjects.length,
+        visibleMeaningfulObjects: activity.visibleMeaningfulObjects || 0,
+        upcomingMeaningfulObjects: activity.upcomingMeaningfulObjects || 0,
+        targetMeaningfulObjects: activity.targetVisibleMeaningful ?? activityBudget.targetVisibleMeaningful ?? null,
+        minMeaningfulObjects: activity.minVisibleMeaningful ?? activityBudget.minVisibleMeaningful ?? null,
+        activityFloorStatus: activity.status || "not tracked yet",
+        activityWeight: Number.isFinite(activity.activityWeight) ? Number(activity.activityWeight.toFixed(2)) : null,
+        visibleRewards: activity.visibleRewards || 0,
+        upcomingRewards: activity.upcomingRewards || 0,
+        visibleFreeCenterGas: activity.visibleFreeCenterGas || 0,
         visibleGameplayObjects: visibleObjects.length,
         activeVisibleWaveOverlap: density.visibleHardWaveOverlap || 0,
         tacticalHardBlockers: density.tacticalHardBlockers || 0,
@@ -13447,7 +14916,11 @@ class NeonRoadRally {
           spawnDelayVisibleHardBlockers: budget.spawnDelayVisibleHardBlockers ?? null,
           maxTacticalHardBlockers: budget.maxTacticalHardBlockers ?? null,
           maxHardBlockersNext3Seconds: budget.maxHardBlockersNext3Seconds ?? null,
-          maxVisibleHardWaveOverlap: budget.maxVisibleHardWaveOverlap ?? null
+          maxVisibleHardWaveOverlap: budget.maxVisibleHardWaveOverlap ?? null,
+          minVisibleMeaningful: activityBudget.minVisibleMeaningful ?? null,
+          targetVisibleMeaningful: activityBudget.targetVisibleMeaningful ?? null,
+          maxUpcomingDecisionGapSeconds: activityBudget.maxUpcomingDecisionGapSeconds ?? null,
+          deadScreenLimitSeconds: activityBudget.deadScreenLimitSeconds ?? null
         }
       },
       routeValidation: route ? {
@@ -13477,9 +14950,29 @@ class NeonRoadRally {
         underActivity: timing.underActivityWarning,
         overDensity: overDensityWarning
       },
+      recentFamilyIntentHistory: recentWaveHistory.map((wave) => ({
+        index: wave.index,
+        family: wave.family,
+        intent: wave.intent,
+        directorIntent: wave.directorIntentLabel
+      })),
+      rewardLaneDistribution: {
+        currentActiveField: activity.rewardLaneCounts || {},
+        runTotals: director?.stats?.rewardLaneCounts || {},
+        sideLaneRewards: director?.stats?.sideLaneRewardCount || 0,
+        centerRewards: director?.stats?.centerRewardCount || 0,
+        rampsSpawned: director?.stats?.rampLaneCounts?.reduce((sum, count) => sum + count, 0) || 0,
+        rampsUsed: run.rampsUsed || 0,
+        boostPadsSpawned: director?.stats?.boostLaneCounts?.reduce((sum, count) => sum + count, 0) || 0,
+        boostPadsCollected: run.boostPadsCollected || 0,
+        gasCansSpawned: run.gasCansSpawned || 0,
+        gasCansCollected: run.gasCansCollected || 0
+      },
       counters: {
         activeFieldBudgetDelays: run.activeFieldBudgetDelays || 0,
         activeFieldRejectedSpawns: run.activeFieldRejectedSpawns || 0,
+        underActivityCorrections: run.underActivityCorrections || 0,
+        overActivityDelays: run.overActivityDelays || 0,
         combinedRouteFailures: run.combinedRouteFailures || 0,
         supportObjectsSuppressedByDensity: run.supportObjectsSuppressedByDensity || 0,
         popInPreventedCount: run.popInPreventedCount || 0,
@@ -13487,10 +14980,7 @@ class NeonRoadRally {
         wavesSpawnedThisFrame: run.wavesSpawnedThisFrame || 0,
         maxWavesSpawnedInSingleFrame: run.maxWavesSpawnedInSingleFrame || 0
       },
-      notTrackedYet: [
-        "explicit wave family",
-        "explicit wave intent"
-      ]
+      notTrackedYet: []
     };
   }
 
@@ -13522,10 +15012,11 @@ class NeonRoadRally {
         ? wave.obstacles.map((obstacle) => `${obstacle.type} L${Number(obstacle.lane) + 1}@${obstacle.distance}`).join("; ")
         : "gap";
       const lanes = wave.blockedLanes.length ? `blocked ${wave.blockedLanes.map((lane) => Number(lane) + 1).join(",")}` : "no hard lane block";
+      const familyIntent = `${wave.family || "unknown"} / ${wave.intent || "unknown"}`;
       return `
         <li class="leaderboard-item playtest-report-row">
           <span class="leaderboard-rank">${escapeHtml(`${wave.index || "-"} ${wave.label || wave.type}`)}</span>
-          <span class="meta">${escapeHtml(`${wave.sectionLabel || wave.sectionId || "Section"} d${wave.distance} - ${lanes} - ${obstacleText}`)}</span>
+          <span class="meta">${escapeHtml(`${familyIntent} - ${wave.sectionLabel || wave.sectionId || "Section"} d${wave.distance} - ${lanes} - route ${wave.routeLanes.map((lane) => Number(lane) + 1).join(",") || "n/a"} - ${obstacleText}`)}</span>
         </li>
       `;
     });
@@ -13559,8 +15050,12 @@ class NeonRoadRally {
           ${card("Wave", snapshot.currentWave.name, snapshot.currentWave.type)}
           ${card("Wave Family", snapshot.currentWave.family)}
           ${card("Wave Intent", snapshot.currentWave.intent)}
+          ${card("Director Intent", snapshot.currentWave.directorIntent, snapshot.currentWave.directorIntentReason || snapshot.currentWave.requiredAction)}
+          ${card("Required Action", snapshot.currentWave.requiredAction, snapshot.currentWave.routeType)}
           ${card("Visible Hard", String(snapshot.activeField.visibleHardBlockers), `budget ${snapshot.activeField.budget.maxVisibleHardBlockers ?? "unknown"}`)}
-          ${card("Meaningful Objects", String(snapshot.activeField.visibleMeaningfulObjects), `${snapshot.activeField.visibleGameplayObjects} gameplay visible`)}
+          ${card("Meaningful Objects", String(snapshot.activeField.visibleMeaningfulObjects), `${snapshot.activeField.upcomingMeaningfulObjects} upcoming - ${snapshot.activeField.visibleGameplayObjects} gameplay visible`)}
+          ${card("Activity Floor", snapshot.activeField.activityFloorStatus, `target ${snapshot.activeField.targetMeaningfulObjects ?? "unknown"} min ${snapshot.activeField.minMeaningfulObjects ?? "unknown"}`)}
+          ${card("Rewards Visible", `${snapshot.activeField.visibleRewards} visible`, `${snapshot.activeField.upcomingRewards} upcoming - free center gas ${snapshot.activeField.visibleFreeCenterGas}`)}
           ${card("Wave Overlap", String(snapshot.activeField.activeVisibleWaveOverlap), `budget ${snapshot.activeField.budget.maxVisibleHardWaveOverlap ?? "unknown"}`)}
           ${card("Active Field", snapshot.activeField.status, snapshot.activeField.reason)}
           ${card("Route", snapshot.routeValidation.status, `${snapshot.routeValidation.routeFailures || 0} failures`)}
@@ -13573,7 +15068,10 @@ class NeonRoadRally {
         <div class="score-grid playtest-detail-grid director-lab-detail-grid">
           ${card("Route Detail", `${snapshot.routeValidation.minorOnlyOpenLaneEvents || 0} minor-only events`, `${snapshot.routeValidation.timingRouteFailures || 0} timing failures`)}
           ${card("Active Budget Counts", `${snapshot.activeField.tacticalHardBlockers} tactical hard`, `${snapshot.activeField.hardBlockersNext3Seconds} next 3s - ${snapshot.activeField.maxHardBlockersInTwoSeconds} in 2s`)}
+          ${card("Floor Budget", `min ${snapshot.activeField.budget.minVisibleMeaningful ?? "unknown"} target ${snapshot.activeField.budget.targetVisibleMeaningful ?? "unknown"}`, `decision gap ${this.formatDirectorSeconds(snapshot.activeField.budget.maxUpcomingDecisionGapSeconds)}`)}
           ${card("Schedule Detail", `${snapshot.schedule.nextScheduledWaveDistance ?? "unknown"} world`, `horizon ${snapshot.schedule.spawnHorizonAhead ?? "unknown"} - max/frame ${snapshot.schedule.maxWavesPerFrame ?? "unknown"}`)}
+          ${card("Corrections", `${snapshot.counters.underActivityCorrections} underactivity`, `${snapshot.counters.overActivityDelays} over-density delays`)}
+          ${card("Reward Counts", `${snapshot.rewardLaneDistribution.boostPadsCollected}/${snapshot.rewardLaneDistribution.boostPadsSpawned} boosts`, `${snapshot.rewardLaneDistribution.rampsUsed}/${snapshot.rewardLaneDistribution.rampsSpawned} ramps - ${snapshot.rewardLaneDistribution.gasCansCollected}/${snapshot.rewardLaneDistribution.gasCansSpawned} gas`)}
           ${card("Counters", `${snapshot.counters.activeFieldBudgetDelays} active-field delays`, `${snapshot.counters.activeFieldRejectedSpawns} active rejects - ${snapshot.counters.combinedRouteFailures} route blocks`)}
         </div>
         <div class="playtest-report-columns director-lab-columns">
@@ -13588,6 +15086,8 @@ class NeonRoadRally {
         </div>
         <div class="score-grid playtest-detail-grid">
           <div class="score-card"><strong>Route Worst Slice</strong><span class="is-compact">${escapeHtml(snapshot.routeValidation.worstSlice ? `hard ${snapshot.routeValidation.worstSlice.hardLanes.join(",") || "none"} clear ${snapshot.routeValidation.worstSlice.clearLanes.join(",") || "none"} reachable ${snapshot.routeValidation.worstSlice.reachableClearLanes.join(",") || "none"}` : "none")}</span></div>
+          <div class="score-card"><strong>Family / Intent History</strong><span class="is-compact">${escapeHtml(snapshot.recentFamilyIntentHistory.map((item) => `${item.family}/${item.directorIntent || item.intent}`).slice(-6).join(" > ") || "none")}</span></div>
+          <div class="score-card"><strong>Reward Lanes</strong><span class="is-compact">${escapeHtml(`side ${snapshot.rewardLaneDistribution.sideLaneRewards || 0} center ${snapshot.rewardLaneDistribution.centerRewards || 0}`)}</span></div>
           <div class="score-card"><strong>Not Tracked Yet</strong><span class="is-compact">${escapeHtml(notTrackedText)}</span></div>
         </div>
         <div class="row playtest-action-row">
@@ -13688,6 +15188,13 @@ class NeonRoadRally {
           <div class="score-card"><strong>Active Field Delays</strong><span>${aggregate.totalActiveFieldBudgetDelays}</span></div>
           <div class="score-card"><strong>Combined Route Blocks</strong><span>${aggregate.totalCombinedRouteFailures}</span></div>
           <div class="score-card"><strong>Support Suppressed</strong><span>${aggregate.totalSupportObjectsSuppressedByDensity}</span></div>
+          <div class="score-card"><strong>Dead Screen Time</strong><span>${formatTime(aggregate.totalDeadScreenTime)}</span></div>
+          <div class="score-card"><strong>Longest Dead Screen</strong><span>${this.formatPlaytestDecimal(aggregate.longestDeadScreenSeconds, 1)}s</span></div>
+          <div class="score-card"><strong>Visible Meaningful Min</strong><span>${Number.isFinite(aggregate.visibleMeaningfulMin) ? aggregate.visibleMeaningfulMin : 0}</span></div>
+          <div class="score-card"><strong>Avg Visible Meaningful</strong><span>${this.formatPlaytestDecimal(aggregate.averageVisibleMeaningful, 2)}</span></div>
+          <div class="score-card"><strong>Upcoming Gap Max</strong><span>${this.formatPlaytestDecimal(aggregate.upcomingDecisionGapMax, 1)}s</span></div>
+          <div class="score-card"><strong>Underactivity Fixes</strong><span>${aggregate.totalUnderActivityCorrections}</span></div>
+          <div class="score-card"><strong>Over-Density Delays</strong><span>${aggregate.totalOverActivityDelays}</span></div>
           <div class="score-card"><strong>Fuel Gas Collected</strong><span>${this.formatPlaytestDecimal(aggregate.fuelSummary.averageGasCansCollected)}</span></div>
           <div class="score-card"><strong>Fuel Left On Finishes</strong><span>${this.formatPlaytestDecimal(aggregate.fuelSummary.averageFuelRemainingOnFinishes)}</span></div>
           <div class="score-card"><strong>Challenge Runs</strong><span>${aggregate.challengeSummary.completed}/${aggregate.challengeSummary.runs}</span></div>
@@ -15189,6 +16696,7 @@ class NeonRoadRally {
         else if (action === "toggleSfx") this.toggleSfx(true);
         else if (action === "runSimulation") this.runSpawnSafetySimulation();
         else if (action === "runFuelSimulation") this.runSpawnSafetySimulation({ raceTypeId: FUEL_RUN_RACE_TYPE_ID });
+        else if (action === "runTargetedDirectorChecks") this.runTargetedDirectorChecks();
         else if (action === "runSeedTest") this.runSeedDeterminismTest();
         else if (action === "roadDirectorLab") {
           this.roadDirectorReportCopyText = "";
