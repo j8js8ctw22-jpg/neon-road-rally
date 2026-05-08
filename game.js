@@ -875,6 +875,81 @@ const PARTY_SEED_MODES = [
   { id: PARTY_SEED_MODE_SAME_ROUND, label: "Same Seed for Round" },
   { id: PARTY_SEED_MODE_NEW_ROUND, label: "New Seed Each Round" }
 ];
+const WEEKEND_PLAYTEST_PICKS = [
+  {
+    id: "kids-first-race",
+    title: "Kids First Race",
+    trackId: DEFAULT_TRACK_ID,
+    trackLabel: "Sunset Highway",
+    raceTypeId: DEFAULT_RACE_TYPE_ID,
+    speedClassId: "rookie",
+    suggestedUse: "younger/new players"
+  },
+  {
+    id: "family-arcade",
+    title: "Family Arcade",
+    trackId: DEFAULT_TRACK_ID,
+    trackLabel: "Sunset Highway",
+    raceTypeId: DEFAULT_RACE_TYPE_ID,
+    speedClassId: "arcade",
+    suggestedUse: "normal family play"
+  },
+  {
+    id: "parent-challenge",
+    title: "Parent Challenge",
+    trackId: DEFAULT_TRACK_ID,
+    trackLabel: "Sunset Highway",
+    raceTypeId: DEFAULT_RACE_TYPE_ID,
+    speedClassId: "pro",
+    suggestedUse: "adults / older kids"
+  },
+  {
+    id: "redline-dare",
+    title: "Redline Dare",
+    trackId: "redline-run",
+    trackLabel: "Redline Run",
+    raceTypeId: DEFAULT_RACE_TYPE_ID,
+    speedClassId: "turbo",
+    suggestedUse: "intense short runs"
+  },
+  {
+    id: "fuel-panic",
+    title: "Fuel Panic",
+    trackId: DEFAULT_TRACK_ID,
+    trackLabel: "Sunset Highway",
+    raceTypeId: FUEL_RUN_RACE_TYPE_ID,
+    speedClassId: "pro",
+    suggestedUse: "gas-routing test",
+    note: "Redline Run is a good second Fuel Run test."
+  },
+  {
+    id: "party-starter",
+    title: "Party Starter",
+    trackId: DEFAULT_TRACK_ID,
+    trackLabel: "Sunset Highway",
+    raceTypeId: DEFAULT_RACE_TYPE_ID,
+    speedClassId: "pro",
+    partyRoundType: PARTY_ROUND_TYPE_BEST_OF_3,
+    partySeedMode: PARTY_SEED_MODE_SAME_ROUND,
+    suggestedUse: "first family party set"
+  }
+];
+const WEEKEND_PLAYTEST_CHECKLIST = [
+  "Try Kids First Race",
+  "Try Family Arcade",
+  "Try Redline Dare",
+  "Try Fuel Run",
+  "Try Party Best of 3",
+  "Check badges/title callouts",
+  "Check if ramps feel useful",
+  "After playing, copy Playtest Report"
+];
+const PARTY_SETUP_HELP_ITEMS = [
+  { title: "Best of 3", text: "each player gets 3 tries; best score wins." },
+  { title: "Total Score", text: "all runs add together." },
+  { title: "Same Seed", text: "everyone races the same road." },
+  { title: "New Seed Each Round", text: "fresh road each round." }
+];
 const PLAYTEST_REPORT_FILTERS = [
   { id: "all", label: "All Runs" },
   { id: "classic", label: "Classic Only" },
@@ -16631,12 +16706,116 @@ class NeonRoadRally {
     `;
   }
 
+  getWeekendPlaytestPick(id) {
+    return WEEKEND_PLAYTEST_PICKS.find((pick) => pick.id === id) || null;
+  }
+
+  renderWeekendPlaytestPicks({
+    context = "default",
+    heading = "Playtest Picks",
+    hint = "Use these to pick a weekend test without changing game rules.",
+    filter = "all",
+    includeActions = true
+  } = {}) {
+    const picks = WEEKEND_PLAYTEST_PICKS.filter((pick) => {
+      const isPartyPick = Boolean(pick.partyRoundType);
+      if (filter === "party") return isPartyPick;
+      if (filter === "solo") return !isPartyPick;
+      return true;
+    });
+    if (!picks.length) return "";
+    return `
+      <section class="weekend-prep-panel is-${escapeAttr(context)}">
+        <div class="weekend-prep-header">
+          <div>
+            <span class="eyebrow">Weekend Prep</span>
+            <h3>${escapeHtml(heading)}</h3>
+          </div>
+          ${hint ? `<p class="hint">${escapeHtml(hint)}</p>` : ""}
+        </div>
+        <div class="playtest-pick-grid">
+          ${picks.map((pick) => this.renderWeekendPlaytestPickCard(pick, includeActions)).join("")}
+        </div>
+      </section>
+    `;
+  }
+
+  renderWeekendPlaytestPickCard(pick, includeActions = true) {
+    const isPartyPick = Boolean(pick.partyRoundType);
+    const raceTypeLabel = getRaceTypeLabel(pick.raceTypeId);
+    const speedLabel = getSpeedClassLabel(pick.speedClassId);
+    const partyRoundLabel = isPartyPick ? getPartyRoundTypeLabel(pick.partyRoundType) : "";
+    const partySeedLabel = isPartyPick ? getPartySeedModeLabel(pick.partySeedMode) : "";
+    return `
+      <article class="playtest-pick-card ${isPartyPick ? "is-party" : "is-solo"}">
+        <div>
+          <h4>${escapeHtml(pick.title)}</h4>
+          <p>${escapeHtml(pick.suggestedUse)}</p>
+        </div>
+        <div class="playtest-pick-lines">
+          <span><strong>Track</strong>${escapeHtml(pick.trackLabel)}</span>
+          <span><strong>Race Type</strong>${escapeHtml(raceTypeLabel)}</span>
+          <span><strong>Race Mode</strong>${escapeHtml(speedLabel)}</span>
+          ${isPartyPick ? `<span><strong>Party Type</strong>${escapeHtml(partyRoundLabel)}</span>` : ""}
+          ${isPartyPick ? `<span><strong>Seed</strong>${escapeHtml(partySeedLabel)}</span>` : ""}
+        </div>
+        ${pick.note ? `<p class="playtest-pick-note">${escapeHtml(pick.note)}</p>` : ""}
+        ${includeActions ? `
+          <button class="small-button ${isPartyPick ? "" : "primary"}" data-action="applyPlaytestPick" data-id="${escapeAttr(pick.id)}">
+            ${isPartyPick ? "Apply Party Setup" : "Apply Solo Setup"}
+          </button>
+        ` : ""}
+      </article>
+    `;
+  }
+
+  renderWeekendPlaytestChecklist({ compact = false } = {}) {
+    return `
+      <section class="weekend-checklist-card ${compact ? "is-compact" : ""}">
+        <div>
+          <span class="eyebrow">Weekend Test Route</span>
+          <h3>Weekend Playtest Checklist</h3>
+        </div>
+        <ul class="weekend-checklist">
+          ${WEEKEND_PLAYTEST_CHECKLIST.map((item) => `
+            <li><span aria-hidden="true"></span>${escapeHtml(item)}</li>
+          `).join("")}
+        </ul>
+      </section>
+    `;
+  }
+
+  renderPartySetupHelp() {
+    return `
+      <div class="party-help-grid" aria-label="Party setup help">
+        ${PARTY_SETUP_HELP_ITEMS.map((item) => `
+          <div class="party-help-card">
+            <strong>${escapeHtml(item.title)}:</strong>
+            <span>${escapeHtml(item.text)}</span>
+          </div>
+        `).join("")}
+      </div>
+    `;
+  }
+
+  renderResetCleanupReminder() {
+    return `
+      <div class="reset-cleanup-reminder">
+        <strong>Reset / cleanup reminder</strong>
+        <span>Clear Playtest Reports only clears tuning reports.</span>
+        <span>Reset Local Data clears profiles, scores, badges, titles, settings, and car choices.</span>
+        <span>Use carefully before a real play session.</span>
+      </div>
+    `;
+  }
+
   getHowToPlayTabs() {
     return [
       { id: "basics", label: "Basics" },
       { id: "modes", label: "Modes" },
       { id: "party", label: "Party" },
-      { id: "rewards", label: "Rewards" }
+      { id: "rewards", label: "Rewards" },
+      { id: "playtest", label: "Playtest" }
     ];
   }
 
@@ -16740,6 +16919,17 @@ class NeonRoadRally {
             "There is no online leaderboard yet."
           ]
         }
+      ],
+      playtest: [
+        {
+          title: "Weekend Flow",
+          chips: ["Picks", "Checklist", "Report"],
+          points: [
+            "Start with Kids First Race or Family Arcade before jumping to Redline Dare.",
+            "Use Party Starter when the room wants pass-the-keyboard competition.",
+            "After the session, open Playtest Report, copy it, and paste it into ChatGPT for tuning notes."
+          ]
+        }
       ]
     };
   }
@@ -16803,6 +16993,10 @@ class NeonRoadRally {
         <div class="how-to-grid">
           ${sectionsByTab[safeTab].map((section) => this.renderGuideCard(section)).join("")}
         </div>
+        ${safeTab === "playtest" ? `
+          ${this.renderWeekendPlaytestPicks({ context: "guide", heading: "Recommended Setups", hint: "Apply one, then review the setup before starting." })}
+          ${this.renderWeekendPlaytestChecklist()}
+        ` : ""}
         <div class="row how-to-actions">
           <button class="small-button primary" data-action="guideBack">Back to ${escapeHtml(this.getGuideReturnLabel())}</button>
           <button class="small-button" data-action="title">Title</button>
@@ -16861,6 +17055,7 @@ class NeonRoadRally {
           </div>
           <p class="keyboard-hints">Enter starts Solo. Arrows/WASD drive. Space boosts. F fullscreen. Backtick opens debug tools.</p>
           ${this.renderNewDriverHint()}
+          ${this.renderWeekendPlaytestPicks({ context: "title", heading: "Recommended Setups", hint: "Pick one setup for quick weekend testing." })}
         </div>
         <div class="title-menu-card">
           <div class="menu-stack main-menu">
@@ -16937,6 +17132,7 @@ class NeonRoadRally {
               <input id="sfxVolume" type="range" min="0" max="1" step="0.05" value="${this.audio.sfxVolume}">
             </div>
           </div>
+          ${this.renderResetCleanupReminder()}
           <div class="row">
             <button class="small-button" data-action="toggleMusic">Music: ${this.audio.musicMuted ? "Muted" : "On"}</button>
             <button class="small-button" data-action="toggleSfx">SFX: ${this.audio.sfxMuted ? "Muted" : "On"}</button>
@@ -17743,6 +17939,13 @@ class NeonRoadRally {
             <span>total stored</span>
           </div>
         </div>
+        <div class="playtest-session-cta">
+          <strong>After a family play session</strong>
+          <span>Tap Copy Playtest Report and paste it into ChatGPT for tuning.</span>
+          <small>Local only: the report is generated from runs saved in this browser.</small>
+        </div>
+        ${this.renderWeekendPlaytestChecklist({ compact: true })}
+        ${this.renderResetCleanupReminder()}
         <div class="row playtest-filter-row">${filterButtons}</div>
         <div class="score-grid playtest-summary-grid">
           <div class="score-card"><strong>Filtered Runs</strong><span>${aggregate.filteredCount}</span></div>
@@ -18200,6 +18403,8 @@ class NeonRoadRally {
       <section class="panel party-panel">
         <h2>Party Mode</h2>
         <p class="hint">Pass the keyboard on one local machine. Best of 3 and Total Score use three runs per player. Party Mode stays Classic for this pass.</p>
+        ${this.renderPartySetupHelp()}
+        ${this.renderWeekendPlaytestPicks({ context: "party", heading: "Party Playtest Pick", hint: "Use this for the first room-friendly pass.", filter: "party" })}
         <div class="party-summary-strip">
           <div class="score-card"><strong>Selected Players</strong><span>${selectedPlayers.length}/${PARTY_MAX_PLAYERS}</span></div>
           <div class="score-card"><strong>Track</strong><span id="partyTrackSummary">${escapeHtml(track.name)}</span></div>
@@ -19560,6 +19765,7 @@ class NeonRoadRally {
         else if (action === "howToPlay") this.openHowToPlayFromCurrentScreen();
         else if (action === "guideTab") this.showHowToPlayScreen(button.dataset.tab);
         else if (action === "guideBack") this.handleGuideBack();
+        else if (action === "applyPlaytestPick") this.handleApplyPlaytestPick(button.dataset.id);
         else if (action === "players") this.showPlayerScreen();
         else if (action === "customize") this.showCustomizeScreen();
         else if (action === "leaderboard") this.showLeaderboard();
@@ -19669,6 +19875,36 @@ class NeonRoadRally {
     });
     const player = this.profiles.getCurrentPlayer();
     this.showCustomizeScreen(`${player?.car.name || "Car"} reset to original paint.`);
+  }
+
+  handleApplyPlaytestPick(id) {
+    const pick = this.getWeekendPlaytestPick(id);
+    if (!pick) {
+      this.showTitle();
+      return;
+    }
+    if (pick.partyRoundType) {
+      const setup = this.getPartySetup();
+      setup.trackId = normalizeTrackId(pick.trackId, DEFAULT_TRACK_ID);
+      setup.raceMode = normalizeSpeedClassId(pick.speedClassId, DEFAULT_SPEED_CLASS_ID);
+      setup.raceType = DEFAULT_RACE_TYPE_ID;
+      setup.roundType = normalizePartyRoundType(pick.partyRoundType, PARTY_ROUND_TYPE_BEST_OF_3);
+      setup.seedMode = normalizePartySeedMode(pick.partySeedMode, PARTY_SEED_MODE_SAME_ROUND);
+      if (!setup.sharedSeed) setup.sharedSeed = generateReadableRoadSeed();
+      this.showPartySetupScreen(`${pick.title} applied. Review players, then start the party round.`);
+      return;
+    }
+
+    const track = getTrackById(pick.trackId);
+    const speedClassId = normalizeSpeedClassId(pick.speedClassId, DEFAULT_SPEED_CLASS_ID);
+    const raceTypeId = trackSupportsRaceType(track, pick.raceTypeId)
+      ? normalizeRaceTypeId(pick.raceTypeId, DEFAULT_RACE_TYPE_ID)
+      : DEFAULT_RACE_TYPE_ID;
+    this.profiles.updateSpeedClass(speedClassId);
+    this.pendingTrackId = track.id;
+    this.pendingRaceTypeId = raceTypeId;
+    this.pendingRoadSeed = this.resolveRoadSeed(this.pendingRoadSeed);
+    this.showPreRaceScreen(`${pick.title} applied. Review the seed, then start the run.`);
   }
 
   handleSetSpeedClass(id) {
