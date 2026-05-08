@@ -683,6 +683,19 @@ const CLASSIC_SEED_LABEL = "Classic";
 const PARTY_MIN_PLAYERS = 2;
 const PARTY_MAX_PLAYERS = 8;
 const PARTY_ROUND_TYPE_ONE_RUN = "oneRunEach";
+const PARTY_ROUND_TYPE_BEST_OF_3 = "bestOf3";
+const PARTY_ROUND_TYPE_TOTAL_SCORE = "totalScore";
+const PARTY_SEED_MODE_SAME_ROUND = "sameSeedForRound";
+const PARTY_SEED_MODE_NEW_ROUND = "newSeedEachRound";
+const PARTY_ROUND_TYPES = [
+  { id: PARTY_ROUND_TYPE_ONE_RUN, label: "One Run Each", totalRounds: 1, scoringLabel: "Best Score" },
+  { id: PARTY_ROUND_TYPE_BEST_OF_3, label: "Best of 3", totalRounds: 3, scoringLabel: "Best Score" },
+  { id: PARTY_ROUND_TYPE_TOTAL_SCORE, label: "Total Score", totalRounds: 3, scoringLabel: "Total Score" }
+];
+const PARTY_SEED_MODES = [
+  { id: PARTY_SEED_MODE_SAME_ROUND, label: "Same Seed for Round" },
+  { id: PARTY_SEED_MODE_NEW_ROUND, label: "New Seed Each Round" }
+];
 const PLAYTEST_REPORT_FILTERS = [
   { id: "all", label: "All Runs" },
   { id: "classic", label: "Classic Only" },
@@ -1746,6 +1759,45 @@ function isFuelRunRaceType(value) {
   return normalizeRaceTypeId(value) === FUEL_RUN_RACE_TYPE_ID;
 }
 
+function normalizePartyRoundType(value, fallback = PARTY_ROUND_TYPE_ONE_RUN) {
+  const id = String(value || "").trim();
+  return PARTY_ROUND_TYPES.some((item) => item.id === id) ? id : fallback;
+}
+
+function getPartyRoundTypeConfig(value) {
+  const id = normalizePartyRoundType(value);
+  return PARTY_ROUND_TYPES.find((item) => item.id === id) || PARTY_ROUND_TYPES[0];
+}
+
+function getPartyRoundTypeLabel(value) {
+  return getPartyRoundTypeConfig(value).label;
+}
+
+function getPartyRoundTotal(value) {
+  return getPartyRoundTypeConfig(value).totalRounds || 1;
+}
+
+function getPartyScoringLabel(value) {
+  return getPartyRoundTypeConfig(value).scoringLabel || "Best Score";
+}
+
+function normalizePartySeedMode(value, fallback = PARTY_SEED_MODE_SAME_ROUND) {
+  const id = String(value || "").trim();
+  return PARTY_SEED_MODES.some((item) => item.id === id) ? id : fallback;
+}
+
+function getPartySeedModeLabel(value) {
+  const id = normalizePartySeedMode(value);
+  return PARTY_SEED_MODES.find((item) => item.id === id)?.label || PARTY_SEED_MODES[0].label;
+}
+
+function isPartyCloseRaceMargin(leaderScore, margin) {
+  const score = normalizeNonNegativeInteger(leaderScore);
+  const gap = normalizeNonNegativeInteger(margin);
+  if (score <= 0 || gap <= 0) return false;
+  return gap <= Math.max(1200, Math.round(score * 0.05));
+}
+
 function normalizeTrackId(value, fallback = DEFAULT_TRACK_ID) {
   const id = String(value || "").trim();
   return TRACKS.some((track) => track.id === id) ? id : fallback;
@@ -2212,6 +2264,10 @@ function normalizeLeaderboardEntry(entry) {
     fuelBonus: normalizeNonNegativeInteger(entry.fuelBonus),
     date: normalizeDateString(entry.date, ""),
     partyMode: Boolean(entry.partyMode),
+    partySessionId: normalizeStorageId(entry.partySessionId, ""),
+    partyRoundType: normalizePartyRoundType(entry.partyRoundType, PARTY_ROUND_TYPE_ONE_RUN),
+    partyRoundIndex: normalizeNonNegativeInteger(entry.partyRoundIndex || entry.partyRoundNumber, 0, 99),
+    partySeed: normalizeStoredRoadSeed(entry.partySeed || entry.partySharedSeed || entry.sharedSeed, ""),
     challengeId,
     challengeName: challengeId ? sanitizeName(entry.challengeName || challenge?.name, challenge?.name || "Challenge", DISPLAY_TEXT_MAX_LENGTH) : ""
   };
@@ -2256,9 +2312,17 @@ function normalizePlaytestRunSummary(entry) {
     challengeNewBest: Boolean(entry.challengeNewBest || entry.newBest),
     partyMode: Boolean(entry.partyMode),
     partySessionId: normalizeStorageId(entry.partySessionId, ""),
+    partyRoundType: normalizePartyRoundType(entry.partyRoundType, PARTY_ROUND_TYPE_ONE_RUN),
+    partyRoundIndex: normalizeNonNegativeInteger(entry.partyRoundIndex || entry.partyRoundNumber, 0, 99),
+    partyTotalRounds: normalizeNonNegativeInteger(entry.partyTotalRounds, 0, 99),
+    partySeedMode: normalizePartySeedMode(entry.partySeedMode, PARTY_SEED_MODE_SAME_ROUND),
+    partySeed: normalizeStoredRoadSeed(entry.partySeed || entry.partySharedSeed || entry.sharedSeed, ""),
+    partyTotalScore: normalizeNonNegativeInteger(entry.partyTotalScore, 0, MAX_DISPLAY_SCORE),
+    partyBestScore: normalizeNonNegativeInteger(entry.partyBestScore, 0, MAX_DISPLAY_SCORE),
+    partyLeaderChanges: normalizeNonNegativeInteger(entry.partyLeaderChanges, 0, 99),
     partyTurnIndex: normalizeNonNegativeInteger(entry.partyTurnIndex, 0, PARTY_MAX_PLAYERS),
     partyPlayerCount: normalizeNonNegativeInteger(entry.partyPlayerCount, 0, PARTY_MAX_PLAYERS),
-    partySharedSeed: normalizeStoredRoadSeed(entry.partySharedSeed || entry.sharedSeed, ""),
+    partySharedSeed: normalizeStoredRoadSeed(entry.partySharedSeed || entry.partySeed || entry.sharedSeed, ""),
     partyRankAfterRun: normalizeNonNegativeInteger(entry.partyRankAfterRun || entry.partyRank, 0, PARTY_MAX_PLAYERS),
     partyStandingGap: normalizeNonNegativeInteger(entry.partyStandingGap || entry.leaderMargin),
     roadSeed: normalizeStoredRoadSeed(entry.roadSeed || entry.seed, CLASSIC_SEED_LABEL),
@@ -2949,17 +3013,36 @@ class PartySession {
     const players = Array.isArray(options.players) ? options.players : [];
     this.sessionId = normalizeStorageId(options.sessionId, uid());
     this.isPartyMode = true;
-    this.roundType = options.roundType || PARTY_ROUND_TYPE_ONE_RUN;
+    this.roundType = normalizePartyRoundType(options.roundType, PARTY_ROUND_TYPE_ONE_RUN);
+    this.seedMode = normalizePartySeedMode(options.seedMode, PARTY_SEED_MODE_SAME_ROUND);
+    this.totalRounds = getPartyRoundTotal(this.roundType);
     this.selectedPlayers = players.slice(0, PARTY_MAX_PLAYERS).map(snapshotPartyPlayer);
-    this.currentPlayerIndex = clampNumber(options.currentPlayerIndex, 0, Math.max(0, this.selectedPlayers.length - 1), 0);
     this.sharedSeed = normalizeRoadSeed(options.sharedSeed, DEFAULT_ROAD_SEED);
     this.track = getTrackById(options.track?.id || options.trackId || DEFAULT_TRACK_ID);
     this.raceMode = normalizeSpeedClassId(options.raceMode, DEFAULT_SPEED_CLASS_ID);
     this.raceType = normalizeRaceTypeId(options.raceType || options.raceTypeId, DEFAULT_RACE_TYPE_ID);
     this.results = Array.isArray(options.results) ? options.results.slice() : [];
-    this.roundNumber = Math.max(1, Math.round(options.roundNumber || 1));
-    this.completed = Boolean(options.completed) || this.results.length >= this.selectedPlayers.length;
+    const nextRunIndex = Math.max(0, Math.min(this.results.length, this.totalPlayers * this.totalRounds));
+    this.currentRoundIndex = clampNumber(options.currentRoundIndex ?? Math.floor(nextRunIndex / Math.max(1, this.totalPlayers)), 0, Math.max(0, this.totalRounds - 1), 0);
+    this.currentPlayerIndex = clampNumber(options.currentPlayerIndex ?? (nextRunIndex % Math.max(1, this.totalPlayers)), 0, Math.max(0, this.selectedPlayers.length - 1), 0);
+    this.roundSeeds = this.createRoundSeeds(options.roundSeeds);
+    this.leaderChanges = normalizeNonNegativeInteger(options.leaderChanges || 0, 0, 99);
+    this.completed = Boolean(options.completed) || this.results.length >= this.totalRuns;
     this.finalSfxPlayed = false;
+  }
+
+  createRoundSeeds(sourceSeeds = []) {
+    const source = Array.isArray(sourceSeeds) ? sourceSeeds : [];
+    const seeds = [];
+    for (let index = 0; index < this.totalRounds; index += 1) {
+      if (this.seedMode === PARTY_SEED_MODE_SAME_ROUND) {
+        seeds.push(this.sharedSeed);
+      } else {
+        const sourceSeed = normalizeRoadSeed(source[index], "");
+        seeds.push(sourceSeed || (index === 0 ? this.sharedSeed : generateReadableRoadSeed()));
+      }
+    }
+    return seeds;
   }
 
   get currentPlayer() {
@@ -2970,13 +3053,37 @@ class PartySession {
     return this.selectedPlayers.length;
   }
 
+  get totalRuns() {
+    return this.totalPlayers * this.totalRounds;
+  }
+
+  get completedRuns() {
+    return this.results.length;
+  }
+
+  get roundNumber() {
+    return clamp(this.currentRoundIndex + 1, 1, Math.max(1, this.totalRounds));
+  }
+
   get currentTurnNumber() {
     return clamp(this.currentPlayerIndex + 1, 1, Math.max(1, this.totalPlayers));
   }
 
+  get currentSeed() {
+    return normalizeRoadSeed(this.roundSeeds[this.currentRoundIndex], this.sharedSeed);
+  }
+
+  get scoringLabel() {
+    return getPartyScoringLabel(this.roundType);
+  }
+
   addResult(summary) {
     const player = this.currentPlayer || snapshotPartyPlayer(summary?.player || {});
+    const previousStandings = this.standings();
+    const previousLeader = previousStandings[0]?.completedRuns > 0 ? previousStandings[0] : null;
+    const previousPlayerStanding = previousStandings.find((standing) => standing.playerId === player.id) || null;
     const result = {
+      resultId: uid(),
       playerId: player.id,
       playerName: sanitizePlayerName(player.name, "PLAYER"),
       carName: sanitizeCarName(player.car?.name, DEFAULT_CAR.name),
@@ -2986,9 +3093,16 @@ class PartySession {
       time: normalizeNonNegativeNumber(summary?.time, 0, 24 * 60 * 60),
       raceMode: normalizeSpeedClassId(summary?.speedClass || this.raceMode, this.raceMode),
       raceType: normalizeRaceTypeId(summary?.raceTypeId || summary?.raceType || this.raceType, this.raceType),
-      seed: normalizeStoredRoadSeed(summary?.seed || this.sharedSeed, this.sharedSeed),
+      seed: normalizeStoredRoadSeed(summary?.seed || this.currentSeed, this.currentSeed),
       trackId: normalizeTrackId(summary?.trackId || this.track?.id, this.track?.id || DEFAULT_TRACK_ID),
       trackName: sanitizeName(summary?.trackName || this.track?.name, "TRACK", DISPLAY_TEXT_MAX_LENGTH),
+      roundType: this.roundType,
+      seedMode: this.seedMode,
+      roundIndex: this.roundNumber,
+      roundNumber: this.roundNumber,
+      totalRounds: this.totalRounds,
+      turnNumber: this.currentTurnNumber,
+      totalPlayers: this.totalPlayers,
       fuelCollected: normalizeNonNegativeInteger(summary?.fuelCollected || 0, 0, 999),
       fuelRemaining: normalizeNonNegativeInteger(summary?.fuelRemaining || 0, 0, FUEL_RUN_CONFIG.fuelMax),
       fuelBonus: normalizeNonNegativeInteger(summary?.fuelBonus || 0),
@@ -2998,22 +3112,83 @@ class PartySession {
       date: new Date().toISOString()
     };
     this.results.push(result);
+    const standings = this.standings();
+    const leader = standings[0] || null;
+    const standing = standings.find((item) => item.resultId === result.resultId || item.playerId === result.playerId) || null;
+    const leaderChanged = Boolean(previousLeader && leader && leader.playerId !== previousLeader.playerId);
+    if (leaderChanged) this.leaderChanges += 1;
+    result.rank = standing?.rank || 0;
+    result.leaderMargin = standing?.leaderMargin || 0;
+    result.bestScore = standing?.bestScore || result.score;
+    result.totalScore = standing?.totalScore || result.score;
+    result.latestScore = standing?.latestScore || result.score;
+    result.completedRuns = standing?.completedRuns || 1;
+    result.partyLeaderChanged = leaderChanged && leader?.playerId === result.playerId;
+    result.partyComebackPlaces = previousPlayerStanding?.completedRuns > 0
+      ? Math.max(0, (previousPlayerStanding.rank || 0) - (standing?.rank || 0))
+      : 0;
     this.currentPlayerIndex += 1;
     if (this.currentPlayerIndex >= this.selectedPlayers.length) {
-      this.completed = true;
+      this.currentPlayerIndex = 0;
+      if (this.currentRoundIndex + 1 >= this.totalRounds) {
+        this.completed = true;
+      } else {
+        this.currentRoundIndex += 1;
+      }
     }
+    result.roundCompleted = this.currentPlayerIndex === 0;
+    result.partyLeaderChanges = this.leaderChanges;
     return result;
   }
 
   standings() {
-    const sorted = this.results
-      .slice()
-      .sort((a, b) => b.score - a.score || a.time - b.time || a.playerName.localeCompare(b.playerName));
-    const leaderScore = sorted[0]?.score || 0;
+    const rows = this.selectedPlayers.map((player, order) => {
+      const playerResults = this.results.filter((result) => result.playerId === player.id);
+      const latest = playerResults[playerResults.length - 1] || null;
+      const best = playerResults
+        .slice()
+        .sort((a, b) => b.score - a.score || a.time - b.time || String(a.date || "").localeCompare(String(b.date || "")))[0] || null;
+      const totalScore = playerResults.reduce((sum, result) => sum + normalizeNonNegativeInteger(result.score), 0);
+      const bestScore = best?.score || 0;
+      const latestScore = latest?.score || 0;
+      const rankScore = this.roundType === PARTY_ROUND_TYPE_TOTAL_SCORE ? totalScore : bestScore;
+      return {
+        resultId: latest?.resultId || "",
+        playerId: player.id,
+        playerName: player.name,
+        carName: sanitizeCarName(player.car?.name, DEFAULT_CAR.name),
+        score: rankScore,
+        rankScore,
+        latestScore,
+        bestScore,
+        totalScore,
+        completedRuns: playerResults.length,
+        totalRounds: this.totalRounds,
+        latestRoundNumber: latest?.roundNumber || 0,
+        latestStatus: latest?.status || "",
+        latestReason: latest?.reason || "",
+        latestTime: latest?.time || 0,
+        raceMode: latest?.raceMode || this.raceMode,
+        raceType: latest?.raceType || this.raceType,
+        seed: latest?.seed || this.currentSeed,
+        medals: (latest?.medals?.length ? latest.medals : best?.medals) || [],
+        leaderboardRank: latest?.leaderboardRank || null,
+        order
+      };
+    });
+    const sorted = rows.sort((a, b) => (
+      b.rankScore - a.rankScore
+      || b.bestScore - a.bestScore
+      || b.totalScore - a.totalScore
+      || b.latestScore - a.latestScore
+      || b.completedRuns - a.completedRuns
+      || a.order - b.order
+    ));
+    const leaderScore = sorted[0]?.rankScore || 0;
     return sorted.map((result, index) => ({
       ...result,
       rank: index + 1,
-      leaderMargin: index === 0 ? 0 : Math.max(0, leaderScore - result.score)
+      leaderMargin: index === 0 ? 0 : Math.max(0, leaderScore - result.rankScore)
     }));
   }
 
@@ -3023,15 +3198,17 @@ class PartySession {
     return Math.max(0, standings[0].score - standings[1].score);
   }
 
-  createRematch(sharedSeed) {
+  createRematch(sharedSeed, options = {}) {
+    const reuseRoundSeeds = Boolean(options.reuseRoundSeeds);
     return new PartySession({
       players: this.selectedPlayers,
       sharedSeed,
+      roundSeeds: reuseRoundSeeds ? this.roundSeeds : [],
       track: this.track,
       raceMode: this.raceMode,
       raceType: this.raceType,
-      roundNumber: this.roundNumber + 1,
-      roundType: this.roundType
+      roundType: this.roundType,
+      seedMode: this.seedMode
     });
   }
 }
@@ -9888,7 +10065,9 @@ class Renderer {
       "party mode: active",
       `party player: ${partyDebug.currentPlayer}`,
       `party turn: ${partyDebug.currentTurn}/${partyDebug.totalPlayers}`,
+      `party round: ${partyDebug.round}/${partyDebug.totalRounds}`,
       `party seed: ${partyDebug.sharedSeed}`,
+      `party current seed: ${partyDebug.currentSeed}`,
       `party results: ${partyDebug.resultsCount}`
     ] : [];
     const challengeLines = challengeDebug.active ? [
@@ -11254,9 +11433,15 @@ class NeonRoadRally {
       partyMode: false,
       partySessionId: "",
       partySeedLocked: false,
+      partyRoundType: PARTY_ROUND_TYPE_ONE_RUN,
+      partySeedMode: PARTY_SEED_MODE_SAME_ROUND,
       partyRoundNumber: 0,
+      partyRoundIndex: 0,
+      partyTotalRounds: 0,
+      partySeed: "",
       partyTurnNumber: 0,
       partyTotalPlayers: 0,
+      partyLeaderChanges: 0,
       challengeMode: false,
       challengeId: "",
       challengeName: "",
@@ -11908,9 +12093,15 @@ class NeonRoadRally {
     this.run.partyMode = partyMode;
     this.run.partySessionId = partyMode ? (this.partySession?.sessionId || "") : "";
     this.run.partySeedLocked = Boolean(options.partySeedLocked ?? partyMode);
+    this.run.partyRoundType = partyMode ? (this.partySession?.roundType || PARTY_ROUND_TYPE_ONE_RUN) : PARTY_ROUND_TYPE_ONE_RUN;
+    this.run.partySeedMode = partyMode ? (this.partySession?.seedMode || PARTY_SEED_MODE_SAME_ROUND) : PARTY_SEED_MODE_SAME_ROUND;
     this.run.partyRoundNumber = partyMode ? (this.partySession?.roundNumber || 1) : 0;
+    this.run.partyRoundIndex = this.run.partyRoundNumber;
+    this.run.partyTotalRounds = partyMode ? (this.partySession?.totalRounds || 1) : 0;
+    this.run.partySeed = partyMode ? (this.partySession?.currentSeed || "") : "";
     this.run.partyTurnNumber = partyMode ? (this.partySession?.currentTurnNumber || 1) : 0;
     this.run.partyTotalPlayers = partyMode ? (this.partySession?.totalPlayers || 0) : 0;
+    this.run.partyLeaderChanges = partyMode ? (this.partySession?.leaderChanges || 0) : 0;
     this.run.challengeMode = Boolean(challenge);
     this.run.challengeId = challenge?.id || "";
     this.run.challengeName = challenge?.name || "";
@@ -11924,7 +12115,8 @@ class NeonRoadRally {
     this.run.debugSpeedScale = this.debugSpeedScale || 1;
     this.configureFuelForRun(this.run);
     this.updateRaceSection(false);
-    this.configureRunSeed(challenge ? challenge.seed : (options.seed ?? this.pendingRoadSeed), track, speedClass.id, raceType.id);
+    const configuredSeed = this.configureRunSeed(challenge ? challenge.seed : (options.seed ?? this.pendingRoadSeed), track, speedClass.id, raceType.id);
+    if (partyMode) this.run.partySeed = configuredSeed;
     this.pendingRaceTypeId = raceType.id;
     this.pendingTrackId = baseTrack.id;
     if (this.input) this.input.clearGameplayInput();
@@ -12177,8 +12369,7 @@ class NeonRoadRally {
     const result = summary.partyResult;
     const standings = this.partySession.standings();
     return standings.find((standing) => (
-      standing.playerId === result?.playerId
-      && standing.date === result?.date
+      standing.resultId && standing.resultId === result?.resultId
     )) || standings.find((standing) => standing.playerId === summary.playerId) || null;
   }
 
@@ -12218,6 +12409,14 @@ class NeonRoadRally {
       challengeNewBest: Boolean(challengeResult.newBest || challengeResult.newlyCompleted),
       partyMode: Boolean(summary.partyMode),
       partySessionId: summary.partyMode ? (run.partySessionId || this.partySession?.sessionId || "") : "",
+      partyRoundType: summary.partyMode ? (summary.partyRoundType || run.partyRoundType || PARTY_ROUND_TYPE_ONE_RUN) : PARTY_ROUND_TYPE_ONE_RUN,
+      partyRoundIndex: summary.partyMode ? (summary.partyRoundIndex || run.partyRoundNumber || 0) : 0,
+      partyTotalRounds: summary.partyMode ? (summary.partyTotalRounds || run.partyTotalRounds || 0) : 0,
+      partySeedMode: summary.partyMode ? (summary.partySeedMode || run.partySeedMode || PARTY_SEED_MODE_SAME_ROUND) : PARTY_SEED_MODE_SAME_ROUND,
+      partySeed: summary.partyMode ? (summary.partySeed || run.partySeed || run.roadSeed || "") : "",
+      partyTotalScore: summary.partyMode ? (summary.partyTotalScore || 0) : 0,
+      partyBestScore: summary.partyMode ? (summary.partyBestScore || 0) : 0,
+      partyLeaderChanges: summary.partyMode ? (summary.partyLeaderChanges || run.partyLeaderChanges || 0) : 0,
       partyTurnIndex: summary.partyMode ? (run.partyTurnNumber || 0) : 0,
       partyPlayerCount: summary.partyMode ? (run.partyTotalPlayers || 0) : 0,
       partySharedSeed: summary.partyMode ? (this.partySession?.sharedSeed || run.roadSeed || "") : "",
@@ -12383,6 +12582,10 @@ class NeonRoadRally {
       fuelRemaining: isFuelRunRaceType(run.raceTypeId) ? Math.max(0, Math.round(run.fuel || 0)) : 0,
       fuelBonus: run.bonuses.fuelBonus || 0,
       partyMode: Boolean(run.partyMode),
+      partySessionId: run.partyMode ? run.partySessionId : "",
+      partyRoundType: run.partyMode ? run.partyRoundType : PARTY_ROUND_TYPE_ONE_RUN,
+      partyRoundIndex: run.partyMode ? run.partyRoundNumber : 0,
+      partySeed: run.partyMode ? (run.partySeed || run.roadSeed) : "",
       challengeId: run.challengeMode ? run.challengeId : "",
       challengeName: run.challengeMode ? run.challengeName : ""
     });
@@ -12402,6 +12605,17 @@ class NeonRoadRally {
       trackId: run.track.id,
       trackName: run.track.name,
       partyMode: Boolean(run.partyMode),
+      partySessionId: run.partyMode ? run.partySessionId : "",
+      partyRoundType: run.partyMode ? run.partyRoundType : PARTY_ROUND_TYPE_ONE_RUN,
+      partyRoundTypeLabel: run.partyMode ? getPartyRoundTypeLabel(run.partyRoundType) : "",
+      partyRoundIndex: run.partyMode ? run.partyRoundNumber : 0,
+      partyTotalRounds: run.partyMode ? run.partyTotalRounds : 0,
+      partySeedMode: run.partyMode ? run.partySeedMode : PARTY_SEED_MODE_SAME_ROUND,
+      partySeedModeLabel: run.partyMode ? getPartySeedModeLabel(run.partySeedMode) : "",
+      partySeed: run.partyMode ? (run.partySeed || run.roadSeed) : "",
+      partyTurnIndex: run.partyMode ? run.partyTurnNumber : 0,
+      partyTotalPlayers: run.partyMode ? run.partyTotalPlayers : 0,
+      partyLeaderChanges: run.partyMode ? run.partyLeaderChanges : 0,
       challengeMode: Boolean(run.challengeMode),
       challengeId: run.challengeId || "",
       challengeName: run.challengeName || "",
@@ -12472,7 +12686,14 @@ class NeonRoadRally {
       if (partyStanding && this.lastSummary.partyResult) {
         this.lastSummary.partyResult.rank = partyStanding.rank;
         this.lastSummary.partyResult.leaderMargin = partyStanding.leaderMargin;
+        this.lastSummary.partyRankAfterRun = partyStanding.rank;
+        this.lastSummary.partyStandingGap = partyStanding.leaderMargin;
+        this.lastSummary.partyLatestScore = partyStanding.latestScore;
+        this.lastSummary.partyBestScore = partyStanding.bestScore;
+        this.lastSummary.partyTotalScore = partyStanding.totalScore;
+        this.lastSummary.partyCompletedRuns = partyStanding.completedRuns;
       }
+      this.lastSummary.partyLeaderChanges = this.partySession.leaderChanges || 0;
     }
     this.recordPlaytestRunSummary(this.lastSummary);
 
@@ -12497,6 +12718,9 @@ class NeonRoadRally {
         currentTurn: 0,
         totalPlayers: 0,
         sharedSeed: "none",
+        currentSeed: "none",
+        round: 0,
+        totalRounds: 0,
         resultsCount: 0
       };
     }
@@ -12506,6 +12730,9 @@ class NeonRoadRally {
       currentTurn: run?.partyMode ? (run.partyTurnNumber || session?.currentTurnNumber || 1) : (session?.currentTurnNumber || 0),
       totalPlayers: run?.partyMode ? (run.partyTotalPlayers || session?.totalPlayers || 0) : (session?.totalPlayers || 0),
       sharedSeed: session?.sharedSeed || run?.roadSeed || "none",
+      currentSeed: session?.currentSeed || run?.partySeed || run?.roadSeed || "none",
+      round: run?.partyMode ? (run.partyRoundNumber || session?.roundNumber || 1) : (session?.roundNumber || 0),
+      totalRounds: run?.partyMode ? (run.partyTotalRounds || session?.totalRounds || 0) : (session?.totalRounds || 0),
       resultsCount: session?.results?.length || 0
     };
   }
@@ -14313,7 +14540,7 @@ class NeonRoadRally {
           <div class="menu-stack main-menu">
             <button class="menu-button primary" data-action="start"><strong>Solo / Seeded Run</strong><span>Set a road seed and chase the finish.</span></button>
             <button class="menu-button" data-action="challengeMode"><strong>Challenge Mode</strong><span>Fixed seeds, clear objectives, saved bests.</span></button>
-            <button class="menu-button" data-action="partyMode"><strong>Party Mode</strong><span>Pass the keyboard, same seed, fastest run wins.</span></button>
+            <button class="menu-button" data-action="partyMode"><strong>Party Mode</strong><span>Pass the keyboard with one-run, best-of-3, or total-score rounds.</span></button>
             <button class="menu-button" data-action="customize"><strong>Customize Car</strong><span>Pick the local driver car.</span></button>
             <button class="menu-button" data-action="leaderboard"><strong>Leaderboard</strong><span>Top 20 local scores.</span></button>
             <button class="menu-button" data-action="settings"><strong>Settings</strong><span>Audio, race mode, fullscreen.</span></button>
@@ -14544,7 +14771,12 @@ class NeonRoadRally {
         sessions: partySessionIds.size,
         averageRank: this.averagePlaytestField(partyRuns.filter((run) => run.partyRankAfterRun > 0), "partyRankAfterRun"),
         averageLeaderGap: this.averagePlaytestField(partyRuns, "partyStandingGap"),
-        playerCountAverage: this.averagePlaytestField(partyRuns, "partyPlayerCount")
+        playerCountAverage: this.averagePlaytestField(partyRuns, "partyPlayerCount"),
+        averageBestScore: this.averagePlaytestField(partyRuns, "partyBestScore"),
+        averageTotalScore: this.averagePlaytestField(partyRuns, "partyTotalScore"),
+        leaderChanges: partyRuns.reduce((max, run) => Math.max(max, Number(run.partyLeaderChanges) || 0), 0),
+        roundTypes: this.countPlaytestRuns(partyRuns, (run) => getPartyRoundTypeLabel(run.partyRoundType)),
+        seedModes: this.countPlaytestRuns(partyRuns, (run) => getPartySeedModeLabel(run.partySeedMode))
       }
     };
   }
@@ -15224,7 +15456,7 @@ class NeonRoadRally {
         </div>
         <div class="score-grid playtest-detail-grid">
           <div class="score-card"><strong>Fuel Runs</strong><span class="is-compact">${aggregate.fuelSummary.runs} runs · ${this.formatPlaytestDecimal(aggregate.fuelSummary.averageGasCansSpawned)} gas spawned · ${formatTime(aggregate.fuelSummary.averageLowFuelTime)} low fuel · ${formatTime(aggregate.fuelSummary.averageCriticalFuelTime)} critical</span></div>
-          <div class="score-card"><strong>Party Summary</strong><span class="is-compact">${aggregate.partySummary.sessions} sessions · avg rank ${this.formatPlaytestDecimal(aggregate.partySummary.averageRank)} · avg gap ${formatScore(aggregate.partySummary.averageLeaderGap)} · avg players ${this.formatPlaytestDecimal(aggregate.partySummary.playerCountAverage)}</span></div>
+          <div class="score-card"><strong>Party Summary</strong><span class="is-compact">${aggregate.partySummary.sessions} sessions · avg rank ${this.formatPlaytestDecimal(aggregate.partySummary.averageRank)} · avg gap ${formatScore(aggregate.partySummary.averageLeaderGap)} · avg players ${this.formatPlaytestDecimal(aggregate.partySummary.playerCountAverage)} · leader changes ${aggregate.partySummary.leaderChanges}</span></div>
         </div>
         <div class="row playtest-action-row">
           <button class="small-button primary" data-action="copyPlaytestReport">Copy Playtest Report</button>
@@ -15531,7 +15763,8 @@ class NeonRoadRally {
       raceMode: normalizeSpeedClassId(this.profiles.data.speedClassId, DEFAULT_SPEED_CLASS_ID),
       raceType: DEFAULT_RACE_TYPE_ID,
       sharedSeed: generateReadableRoadSeed(),
-      roundType: PARTY_ROUND_TYPE_ONE_RUN
+      roundType: PARTY_ROUND_TYPE_ONE_RUN,
+      seedMode: PARTY_SEED_MODE_SAME_ROUND
     };
   }
 
@@ -15547,7 +15780,8 @@ class NeonRoadRally {
     this.partySetup.raceType = DEFAULT_RACE_TYPE_ID;
     this.partySetup.sharedSeed = normalizeRoadSeed(this.partySetup.sharedSeed, "");
     this.partySetup.trackId = normalizeTrackId(this.partySetup.trackId, DEFAULT_TRACK_ID);
-    this.partySetup.roundType = PARTY_ROUND_TYPE_ONE_RUN;
+    this.partySetup.roundType = normalizePartyRoundType(this.partySetup.roundType, PARTY_ROUND_TYPE_ONE_RUN);
+    this.partySetup.seedMode = normalizePartySeedMode(this.partySetup.seedMode, PARTY_SEED_MODE_SAME_ROUND);
     return this.partySetup;
   }
 
@@ -15562,10 +15796,14 @@ class NeonRoadRally {
   readPartySetupForm() {
     const setup = this.getPartySetup();
     const raceMode = document.getElementById("partyRaceMode");
+    const roundType = document.getElementById("partyRoundType");
+    const seedMode = document.getElementById("partySeedMode");
     const seedInput = document.getElementById("partySeedInput");
     const track = this.getSelectedTrackFromInputs("partyTrack", setup.trackId || DEFAULT_TRACK_ID);
     setup.trackId = track.id;
     if (raceMode) setup.raceMode = normalizeSpeedClassId(raceMode.value, setup.raceMode);
+    if (roundType) setup.roundType = normalizePartyRoundType(roundType.value, setup.roundType);
+    if (seedMode) setup.seedMode = normalizePartySeedMode(seedMode.value, setup.seedMode);
     if (seedInput) setup.sharedSeed = normalizeRoadSeed(seedInput.value, "");
     return setup;
   }
@@ -15598,11 +15836,13 @@ class NeonRoadRally {
     const selectedIds = new Set(setup.selectedPlayerIds);
     const seed = setup.sharedSeed || "Random seed on start";
     const seedHash = setup.sharedSeed ? (hashSeed(getRunRandomSeedSource(setup.sharedSeed, track, setup.raceMode, DEFAULT_RACE_TYPE_ID)) >>> 0) : "pending";
+    const roundTypeConfig = getPartyRoundTypeConfig(setup.roundType);
+    const seedModeLabel = getPartySeedModeLabel(setup.seedMode);
     this.layer.classList.remove("is-empty");
     this.layer.innerHTML = `
       <section class="panel party-panel">
         <h2>Party Mode</h2>
-        <p class="hint">One Run Each. Everyone drives the same track, race mode, and shared Road Seed. Party Mode is Classic for this pass.</p>
+        <p class="hint">Pass the keyboard on one local machine. Best of 3 and Total Score use three runs per player. Party Mode stays Classic for this pass.</p>
         <div class="party-summary-strip">
           <div class="score-card"><strong>Selected Players</strong><span>${selectedPlayers.length}/${PARTY_MAX_PLAYERS}</span></div>
           <div class="score-card"><strong>Track</strong><span id="partyTrackSummary">${escapeHtml(track.name)}</span></div>
@@ -15610,7 +15850,8 @@ class NeonRoadRally {
           <div class="score-card"><strong>Race Mode</strong><span>${escapeHtml(getSpeedClassLabel(setup.raceMode))}</span></div>
           <div class="score-card"><strong>Music</strong><span id="partyMusicSummary">${escapeHtml(getTrackMusicStatus(track))}</span></div>
           <div class="score-card"><strong>Shared Seed</strong><span class="is-compact">${escapeHtml(seed)}</span></div>
-          <div class="score-card"><strong>Round</strong><span>One Run Each</span></div>
+          <div class="score-card"><strong>Round Type</strong><span id="partyRoundSummary">${escapeHtml(roundTypeConfig.label)}</span></div>
+          <div class="score-card"><strong>Seed Behavior</strong><span id="partySeedModeSummary">${escapeHtml(seedModeLabel)}</span></div>
         </div>
         <div class="party-setup-grid">
           <div>
@@ -15656,8 +15897,20 @@ class NeonRoadRally {
                 ${SPEED_CLASSES.map((speedClass) => `<option value="${escapeAttr(speedClass.id)}" ${speedClass.id === setup.raceMode ? "selected" : ""}>${escapeHtml(this.formatSpeedClassOptionForTrack(track, speedClass))}</option>`).join("")}
               </select>
             </div>
+            <div class="field">
+              <label for="partyRoundType">Round Type</label>
+              <select id="partyRoundType">
+                ${PARTY_ROUND_TYPES.map((item) => `<option value="${escapeAttr(item.id)}" ${item.id === setup.roundType ? "selected" : ""}>${escapeHtml(item.label)}${item.totalRounds > 1 ? ` - ${item.totalRounds} runs each` : ""}</option>`).join("")}
+              </select>
+            </div>
+            <div class="field">
+              <label for="partySeedMode">Seed Behavior</label>
+              <select id="partySeedMode">
+                ${PARTY_SEED_MODES.map((item) => `<option value="${escapeAttr(item.id)}" ${item.id === setup.seedMode ? "selected" : ""}>${escapeHtml(item.label)}</option>`).join("")}
+              </select>
+            </div>
             <div class="seed-display" aria-live="polite">
-              <span>Shared Party Seed</span>
+              <span>Round 1 Party Seed</span>
               <strong id="partySeedDisplay">${escapeHtml(seed)}</strong>
             </div>
             <div class="field">
@@ -15684,8 +15937,12 @@ class NeonRoadRally {
     const display = document.getElementById("partySeedDisplay");
     const seedHash = document.getElementById("partySeedHash");
     const raceMode = document.getElementById("partyRaceMode");
+    const roundType = document.getElementById("partyRoundType");
+    const seedMode = document.getElementById("partySeedMode");
     const trackSummary = document.getElementById("partyTrackSummary");
     const musicSummary = document.getElementById("partyMusicSummary");
+    const roundSummary = document.getElementById("partyRoundSummary");
+    const seedModeSummary = document.getElementById("partySeedModeSummary");
     const updateSeedDisplay = () => {
       if (!input || !display) return;
       const normalized = normalizeRoadSeed(input.value, "");
@@ -15700,6 +15957,8 @@ class NeonRoadRally {
       }
       if (trackSummary) trackSummary.textContent = track.name;
       if (musicSummary) musicSummary.textContent = getTrackMusicStatus(track);
+      if (roundSummary) roundSummary.textContent = getPartyRoundTypeLabel(roundType?.value || this.getPartySetup().roundType);
+      if (seedModeSummary) seedModeSummary.textContent = getPartySeedModeLabel(seedMode?.value || this.getPartySetup().seedMode);
     };
     const syncTrackDependentControls = () => {
       const setup = this.readPartySetupForm();
@@ -15741,6 +16000,18 @@ class NeonRoadRally {
     }
     if (raceMode) {
       raceMode.addEventListener("change", () => {
+        this.readPartySetupForm();
+        updateSeedDisplay();
+      });
+    }
+    if (roundType) {
+      roundType.addEventListener("change", () => {
+        this.readPartySetupForm();
+        updateSeedDisplay();
+      });
+    }
+    if (seedMode) {
+      seedMode.addEventListener("change", () => {
         this.readPartySetupForm();
         updateSeedDisplay();
       });
@@ -15805,11 +16076,70 @@ class NeonRoadRally {
       track,
       raceMode: setup.raceMode,
       raceType: DEFAULT_RACE_TYPE_ID,
-      roundType: PARTY_ROUND_TYPE_ONE_RUN
+      roundType: setup.roundType,
+      seedMode: setup.seedMode
     });
     this.pendingRoadSeed = sharedSeed;
     this.pendingTrackId = track.id;
-    this.showPartyTurnScreen("Party round ready.");
+    this.showPartyTurnScreen(`${getPartyRoundTypeLabel(setup.roundType)} ready.`);
+  }
+
+  renderPartyCallouts(session, standings, recentResult, final = false) {
+    const leader = standings[0] || null;
+    const runnerUp = standings[1] || null;
+    const callouts = [];
+    if (recentResult?.partyLeaderChanged) {
+      callouts.push(`<span class="score-callout is-hot">New Leader</span>`);
+    }
+    if ((recentResult?.partyComebackPlaces || 0) > 0) {
+      callouts.push(`<span class="score-callout is-hot">Comeback Run +${recentResult.partyComebackPlaces}</span>`);
+    }
+    if (leader && runnerUp && isPartyCloseRaceMargin(leader.rankScore, runnerUp.leaderMargin)) {
+      callouts.push(`<span class="score-callout is-hot">Close Race</span>`);
+    }
+    if (final && leader) {
+      callouts.push(`<span class="score-callout is-hot">Winner by ${formatScore(session.marginOfVictory() || 0)} points</span>`);
+    }
+    if (!final && recentResult?.roundCompleted && session.totalRounds > 1) {
+      callouts.push(`<span class="score-callout">Round ${recentResult.roundNumber} Complete</span>`);
+    }
+    if (!callouts.length) return "";
+    return `<div class="score-callout-row party-callout-row">${callouts.join("")}</div>`;
+  }
+
+  renderPartyStandingsList(session, standings, recentResult = null, final = false) {
+    const metricLabel = session.scoringLabel;
+    return `
+      <ol class="leaderboard-list party-standings-list">
+        ${standings.length ? standings.map((result, index) => {
+          const recent = recentResult && result.playerId === recentResult.playerId && result.resultId === recentResult.resultId;
+          const latestMeta = result.completedRuns > 0
+            ? `${escapeHtml(getRunStatusLabel(result.latestStatus, result.latestReason))} · ${formatTime(result.latestTime)} · Round ${result.latestRoundNumber}`
+            : "Waiting for first run";
+          return `
+            <li class="leaderboard-item party-standing-row ${final && index === 0 ? "is-winner" : ""} ${recent ? "is-recent" : ""}">
+              <span class="leaderboard-rank">#${result.rank}</span>
+              <span>
+                <strong>${escapeHtml(result.playerName)}</strong>
+                <span class="meta">${escapeHtml(result.carName)} · ${escapeHtml(latestMeta)}${result.leaderboardRank ? ` · Top 20 #${result.leaderboardRank}` : ""}</span>
+                <span class="party-stat-grid">
+                  <span><strong>Latest</strong><em>${formatScore(result.latestScore)}</em></span>
+                  <span><strong>Best</strong><em>${formatScore(result.bestScore)}</em></span>
+                  <span><strong>Total</strong><em>${formatScore(result.totalScore)}</em></span>
+                  <span><strong>Runs</strong><em>${result.completedRuns}/${session.totalRounds}</em></span>
+                </span>
+                ${this.renderMedalChips(result.medals, true)}
+              </span>
+              <span class="party-score-stack">
+                <small>${escapeHtml(metricLabel)}</small>
+                <span class="leaderboard-score">${formatScore(result.rankScore)}</span>
+                <span class="party-margin">${result.leaderMargin === 0 ? "Leader" : `${formatScore(result.leaderMargin)} back`}</span>
+              </span>
+            </li>
+          `;
+        }).join("") : `<li class="leaderboard-item"><span class="meta">No party players selected.</span></li>`}
+      </ol>
+    `;
   }
 
   showPartyTurnScreen(message = "") {
@@ -15826,22 +16156,25 @@ class NeonRoadRally {
     this.setScreen("partyTurn");
     this.audio.playMusic("title", false);
     const standings = session.standings();
+    const roundSeed = session.currentSeed;
     this.layer.classList.remove("is-empty");
     this.layer.innerHTML = `
       <section class="panel split party-turn-panel">
         <div class="form-stack">
           <div>
-            <span class="eyebrow">Party Turn ${session.currentTurnNumber} of ${session.totalPlayers}</span>
+            <span class="eyebrow">Round ${session.roundNumber} of ${session.totalRounds} · Player ${session.currentTurnNumber} of ${session.totalPlayers}</span>
             <h2>${escapeHtml(player.name)}'s Run</h2>
           </div>
           <div class="score-grid">
             <div class="score-card"><strong>Driver</strong><span>${escapeHtml(player.name)}</span></div>
-            <div class="score-card"><strong>Turn</strong><span>Player ${session.currentTurnNumber} of ${session.totalPlayers}</span></div>
+            <div class="score-card"><strong>Turn</strong><span>Run ${session.completedRuns + 1} of ${session.totalRuns}</span></div>
+            <div class="score-card"><strong>Round</strong><span>${session.roundNumber} of ${session.totalRounds}</span></div>
             <div class="score-card"><strong>Track</strong><span>${escapeHtml(session.track.name)}</span></div>
             <div class="score-card"><strong>Race Type</strong><span>${escapeHtml(getRaceTypeLabel(session.raceType))}</span></div>
             <div class="score-card"><strong>Race Mode</strong><span>${escapeHtml(getSpeedClassLabel(session.raceMode))}</span></div>
-            <div class="score-card"><strong>Shared Seed</strong><span>${escapeHtml(session.sharedSeed)}</span></div>
-            <div class="score-card"><strong>Round Type</strong><span>One Run Each</span></div>
+            <div class="score-card"><strong>Current Seed</strong><span>${escapeHtml(roundSeed)}</span></div>
+            <div class="score-card"><strong>Round Type</strong><span>${escapeHtml(getPartyRoundTypeLabel(session.roundType))}</span></div>
+            <div class="score-card"><strong>Seed Behavior</strong><span>${escapeHtml(getPartySeedModeLabel(session.seedMode))}</span></div>
           </div>
           <p class="hint">Press Enter or Start Run when this player is at the keyboard.</p>
           <div class="row">
@@ -15850,20 +16183,9 @@ class NeonRoadRally {
             <button class="small-button" data-action="title">Return to Title</button>
           </div>
           <p class="status-line">${escapeHtml(message)}</p>
-          ${standings.length ? `
+          ${standings.some((result) => result.completedRuns > 0) ? `
             <h2>Current Standings</h2>
-            <ol class="leaderboard-list">
-              ${standings.map((result) => `
-                <li class="leaderboard-item">
-                  <span class="leaderboard-rank">#${result.rank}</span>
-                  <span>
-                    <strong>${escapeHtml(result.playerName)}</strong>
-                    <span class="meta">${escapeHtml(result.carName)} · ${escapeHtml(getRaceTypeLabel(result.raceType))} · ${escapeHtml(getRunStatusLabel(result.status, result.reason))} · ${formatTime(result.time)}</span>
-                  </span>
-                  <span class="leaderboard-score">${formatScore(result.score)}</span>
-                </li>
-              `).join("")}
-            </ol>
+            ${this.renderPartyStandingsList(session, standings)}
           ` : ""}
         </div>
         <canvas id="partyCarPreview" class="car-preview" width="360" height="280" aria-label="Party car preview"></canvas>
@@ -15920,7 +16242,7 @@ class NeonRoadRally {
       track: session.track,
       speedClassId: session.raceMode,
       raceTypeId: DEFAULT_RACE_TYPE_ID,
-      seed: session.sharedSeed,
+      seed: session.currentSeed,
       partyMode: true,
       partySeedLocked: true
     });
@@ -16064,6 +16386,8 @@ class NeonRoadRally {
     const nextPlayer = session.currentPlayer;
     const summary = this.lastSummary;
     const recentResult = summary?.partyResult || null;
+    const roundSeed = session.currentSeed;
+    const partyCallouts = this.renderPartyCallouts(session, standings, recentResult, final);
     this.setScreen(final ? "partyFinal" : "partyStandings");
     this.audio.playMusic("title", false);
     if (final && !session.finalSfxPlayed) {
@@ -16077,14 +16401,17 @@ class NeonRoadRally {
           <div>
             <span class="eyebrow">${final ? "Final Party Result" : "Current Party Race"}</span>
             <h2>${final && leader ? `${escapeHtml(leader.playerName)} Wins` : "Party Standings"}</h2>
-            <p class="hint">${escapeHtml(session.track.name)} · ${escapeHtml(getRaceTypeLabel(session.raceType))} · ${escapeHtml(getSpeedClassLabel(session.raceMode))} · Seed ${escapeHtml(session.sharedSeed)}</p>
+            <p class="hint">${escapeHtml(getPartyRoundTypeLabel(session.roundType))} · ${escapeHtml(session.track.name)} · ${escapeHtml(getRaceTypeLabel(session.raceType))} · ${escapeHtml(getSpeedClassLabel(session.raceMode))} · ${final ? "Final seed" : `Round ${session.roundNumber} seed`} ${escapeHtml(roundSeed)}</p>
+            <p class="hint">${escapeHtml(getPartySeedModeLabel(session.seedMode))} · ${session.completedRuns}/${session.totalRuns} runs complete</p>
+            ${partyCallouts}
           </div>
           <div class="party-leader-card ${final ? "is-final" : ""}">
             <span>${final ? "Winner" : "Leader"}</span>
             <strong>${leader ? escapeHtml(leader.playerName) : "No runs yet"}</strong>
-            <em>${leader ? formatScore(leader.score) : "0"}</em>
+            <em>${leader ? formatScore(leader.rankScore) : "0"}</em>
+            ${leader ? `<small>${escapeHtml(session.scoringLabel)}</small>` : ""}
             ${leader && final ? `<small>Victory margin ${formatScore(margin || 0)}</small>` : ""}
-            ${leader && !final ? `<small>${standings.length}/${session.totalPlayers} runs complete</small>` : ""}
+            ${leader && !final ? `<small>${session.completedRuns}/${session.totalRuns} runs complete</small>` : ""}
           </div>
         </div>
         ${summary?.partyMode ? `
@@ -16092,7 +16419,7 @@ class NeonRoadRally {
             <div>
               <span class="eyebrow">Latest Run</span>
               <strong>${escapeHtml(summary.playerName)}</strong>
-              <span class="meta">${escapeHtml(summary.carName)} · ${escapeHtml(getRunStatusLabel(summary.status, summary.reason))} · ${formatTime(summary.time)}</span>
+              <span class="meta">${escapeHtml(summary.carName)} · Round ${summary.partyRoundIndex || recentResult?.roundNumber || 1} · Seed ${escapeHtml(summary.partySeed || summary.seed)} · ${escapeHtml(getRunStatusLabel(summary.status, summary.reason))} · ${formatTime(summary.time)}</span>
             </div>
             <div class="party-last-score">
               <span data-tally-value="${escapeAttr(summary.finalScore)}">${formatScore(summary.finalScore)}</span>
@@ -16101,22 +16428,7 @@ class NeonRoadRally {
             ${this.renderMedalChips(summary.medals, true)}
           </div>
         ` : ""}
-        <ol class="leaderboard-list party-standings-list">
-          ${standings.length ? standings.map((result, index) => `
-            <li class="leaderboard-item party-standing-row ${final && index === 0 ? "is-winner" : ""} ${recentResult && result.playerId === recentResult.playerId && result.date === recentResult.date ? "is-recent" : ""}">
-              <span class="leaderboard-rank">#${result.rank}</span>
-              <span>
-                <strong>${escapeHtml(result.playerName)}</strong>
-                <span class="meta">${escapeHtml(result.carName)} · ${escapeHtml(getRaceTypeLabel(result.raceType))} · ${escapeHtml(getRunStatusLabel(result.status, result.reason))} · ${formatTime(result.time)}${result.leaderboardRank ? ` · Top 20 #${result.leaderboardRank}` : ""}</span>
-                ${this.renderMedalChips(result.medals, true)}
-              </span>
-              <span class="party-score-stack">
-                <span class="leaderboard-score">${formatScore(result.score)}</span>
-                <span class="party-margin">${result.leaderMargin === 0 ? "Leader" : `${formatScore(result.leaderMargin)} back`}</span>
-              </span>
-            </li>
-          `).join("") : `<li class="leaderboard-item"><span class="meta">No party runs recorded yet.</span></li>`}
-        </ol>
+        ${this.renderPartyStandingsList(session, standings, recentResult, final)}
         <div class="party-action-row">
           ${final ? `
             <button class="small-button primary" data-action="partyRematchSameSeed">Rematch Same Seed</button>
@@ -16129,7 +16441,7 @@ class NeonRoadRally {
             <button class="small-button" data-action="title">Return to Title</button>
           `}
         </div>
-        ${!final && nextPlayer ? `<p class="hint next-player-hint">Next up: ${escapeHtml(nextPlayer.name)}. Press Enter to continue.</p>` : `<p class="hint next-player-hint">Press Enter for a same-seed rematch.</p>`}
+        ${!final && nextPlayer ? `<p class="hint next-player-hint">Next up: ${escapeHtml(nextPlayer.name)} · Round ${session.roundNumber} seed ${escapeHtml(roundSeed)}. Press Enter to continue.</p>` : `<p class="hint next-player-hint">Press Enter for a same-seed rematch.</p>`}
         <p class="status-line">${escapeHtml(message)}</p>
       </section>
     `;
@@ -16148,17 +16460,18 @@ class NeonRoadRally {
       return;
     }
     const seed = useSameSeed ? session.sharedSeed : generateReadableRoadSeed();
-    this.partySession = session.createRematch(seed);
+    this.partySession = session.createRematch(seed, { reuseRoundSeeds: useSameSeed });
     this.partySetup = {
       selectedPlayerIds: this.partySession.selectedPlayers.map((player) => player.id),
       trackId: this.partySession.track.id,
       raceMode: this.partySession.raceMode,
       raceType: DEFAULT_RACE_TYPE_ID,
       sharedSeed: this.partySession.sharedSeed,
-      roundType: PARTY_ROUND_TYPE_ONE_RUN
+      roundType: this.partySession.roundType,
+      seedMode: this.partySession.seedMode
     };
     this.pendingRoadSeed = this.partySession.sharedSeed;
-    this.showPartyTurnScreen(useSameSeed ? "Rematch with the same seed." : "Rematch with a new seed.");
+    this.showPartyTurnScreen(useSameSeed ? "Rematch with the same settings and seed set." : "Rematch with the same settings and new seed.");
   }
 
   handlePartyChangeSetup() {
@@ -16170,7 +16483,8 @@ class NeonRoadRally {
         raceMode: session.raceMode,
         raceType: DEFAULT_RACE_TYPE_ID,
         sharedSeed: session.sharedSeed,
-        roundType: PARTY_ROUND_TYPE_ONE_RUN
+        roundType: session.roundType,
+        seedMode: session.seedMode
       };
     } else {
       this.getPartySetup();
@@ -16512,7 +16826,7 @@ class NeonRoadRally {
               <span class="leaderboard-rank">#${index + 1}</span>
               <span>
                 <strong>${escapeHtml(entry.playerName)}</strong>
-                <span class="meta">${entry.challengeId ? `Challenge: ${escapeHtml(entry.challengeName || entry.challengeId)} · ` : ""}${entry.partyMode ? "Party · " : ""}${escapeHtml(entry.carName)} · ${escapeHtml(entry.trackName)} · ${escapeHtml(getRaceTypeLabel(entry.raceType))} · ${escapeHtml(getSpeedClassLabel(entry.raceMode || entry.speedClass))} · Seed ${escapeHtml(formatRoadSeed(entry.seed))} · ${escapeHtml(getRunStatusLabel(entry.status))} · ${formatTime(entry.time)}${entry.raceType === FUEL_RUN_RACE_TYPE_ID ? ` · Fuel ${Math.max(0, entry.fuelRemaining || 0)}` : ""}${formatShortDate(entry.date) ? ` · ${escapeHtml(formatShortDate(entry.date))}` : ""}</span>
+                <span class="meta">${entry.challengeId ? `Challenge: ${escapeHtml(entry.challengeName || entry.challengeId)} · ` : ""}${entry.partyMode ? `Party ${escapeHtml(getPartyRoundTypeLabel(entry.partyRoundType))} R${entry.partyRoundIndex || 1} · ` : ""}${escapeHtml(entry.carName)} · ${escapeHtml(entry.trackName)} · ${escapeHtml(getRaceTypeLabel(entry.raceType))} · ${escapeHtml(getSpeedClassLabel(entry.raceMode || entry.speedClass))} · Seed ${escapeHtml(formatRoadSeed(entry.seed))} · ${escapeHtml(getRunStatusLabel(entry.status))} · ${formatTime(entry.time)}${entry.raceType === FUEL_RUN_RACE_TYPE_ID ? ` · Fuel ${Math.max(0, entry.fuelRemaining || 0)}` : ""}${formatShortDate(entry.date) ? ` · ${escapeHtml(formatShortDate(entry.date))}` : ""}</span>
               </span>
               <span class="leaderboard-score">${formatScore(entry.score)}</span>
             </li>
@@ -16598,7 +16912,7 @@ class NeonRoadRally {
               <span class="leaderboard-rank">#${index + 1}</span>
               <span>
                 <strong>${escapeHtml(entry.playerName)}</strong>
-                <span class="meta">${entry.challengeId ? `Challenge: ${escapeHtml(entry.challengeName || entry.challengeId)} · ` : ""}${entry.partyMode ? "Party · " : ""}${escapeHtml(entry.carName)} · ${escapeHtml(entry.trackName)} · ${escapeHtml(getRaceTypeLabel(entry.raceType))} · ${escapeHtml(getSpeedClassLabel(entry.raceMode || entry.speedClass))} · Seed ${escapeHtml(formatRoadSeed(entry.seed))} · ${escapeHtml(getRunStatusLabel(entry.status))} · ${formatTime(entry.time)}</span>
+                <span class="meta">${entry.challengeId ? `Challenge: ${escapeHtml(entry.challengeName || entry.challengeId)} · ` : ""}${entry.partyMode ? `Party ${escapeHtml(getPartyRoundTypeLabel(entry.partyRoundType))} R${entry.partyRoundIndex || 1} · ` : ""}${escapeHtml(entry.carName)} · ${escapeHtml(entry.trackName)} · ${escapeHtml(getRaceTypeLabel(entry.raceType))} · ${escapeHtml(getSpeedClassLabel(entry.raceMode || entry.speedClass))} · Seed ${escapeHtml(formatRoadSeed(entry.seed))} · ${escapeHtml(getRunStatusLabel(entry.status))} · ${formatTime(entry.time)}</span>
               </span>
               <span class="leaderboard-score">${formatScore(entry.score)}</span>
             </li>

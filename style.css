@@ -1127,7 +1127,38 @@ button:disabled {
 }
 
 .party-standing-row {
-  grid-template-columns: auto minmax(0, 1fr) minmax(110px, auto);
+  grid-template-columns: auto minmax(0, 1fr) minmax(132px, auto);
+  align-items: start;
+}
+
+.party-stat-grid {
+  display: grid;
+  gap: 6px;
+  grid-template-columns: repeat(4, minmax(70px, 1fr));
+  margin-top: 8px;
+}
+
+.party-stat-grid span {
+  display: grid;
+  gap: 2px;
+  border: 1px solid rgba(40, 246, 255, 0.18);
+  border-radius: 6px;
+  padding: 6px 8px;
+  background: rgba(5, 8, 20, 0.48);
+}
+
+.party-stat-grid strong {
+  color: var(--yellow);
+  font-size: 0.68rem;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.party-stat-grid em {
+  color: var(--text);
+  font-style: normal;
+  font-weight: 800;
+  overflow-wrap: anywhere;
 }
 
 .leaderboard-item.is-recent,
@@ -1141,6 +1172,12 @@ button:disabled {
   display: grid;
   gap: 2px;
   justify-items: end;
+}
+
+.party-score-stack small {
+  color: var(--yellow);
+  font-size: 0.68rem;
+  text-transform: uppercase;
 }
 
 .party-margin {
@@ -1250,6 +1287,10 @@ button:disabled {
 
   .party-score-stack .leaderboard-score {
     grid-column: auto;
+  }
+
+  .party-stat-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .final-score-card,
