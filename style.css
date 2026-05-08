@@ -1024,6 +1024,101 @@ button:disabled {
   background: rgba(255, 59, 88, 0.12);
 }
 
+.badge-earned-panel,
+.badge-profile-panel {
+  display: grid;
+  gap: 10px;
+  border: 1px solid rgba(255, 228, 94, 0.34);
+  border-radius: 8px;
+  padding: 12px;
+  background: rgba(255, 228, 94, 0.08);
+}
+
+.badge-earned-panel {
+  margin: 0 0 14px;
+}
+
+.badge-earned-panel.is-compact {
+  margin: 8px 0 0;
+  padding: 10px;
+}
+
+.badge-chip-row,
+.badge-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.badge-chip,
+.badge-card {
+  display: grid;
+  gap: 2px;
+  min-width: 116px;
+  border: 1px solid rgba(255, 228, 94, 0.48);
+  border-radius: 7px;
+  padding: 8px 10px;
+  background: rgba(5, 8, 20, 0.74);
+}
+
+.badge-chip strong,
+.badge-card strong {
+  color: var(--yellow);
+  font-size: 0.72rem;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.badge-chip span,
+.badge-card span {
+  color: var(--text);
+  font-size: 0.78rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.badge-card small {
+  color: var(--muted);
+  font-size: 0.68rem;
+  line-height: 1.25;
+}
+
+.badge-card.is-locked {
+  border-color: rgba(184, 198, 217, 0.22);
+  opacity: 0.56;
+  background: rgba(5, 8, 20, 0.42);
+}
+
+.badge-profile-panel {
+  margin-top: 4px;
+}
+
+.badge-profile-header {
+  display: flex;
+  gap: 10px;
+  align-items: end;
+  justify-content: space-between;
+}
+
+.badge-profile-header strong {
+  display: block;
+  color: var(--yellow);
+  font-size: 1rem;
+  text-transform: uppercase;
+}
+
+.badge-profile-header > span {
+  color: var(--muted);
+  font-size: 0.78rem;
+  text-transform: uppercase;
+}
+
+.badge-grid {
+  max-height: 220px;
+  overflow: auto;
+  padding-right: 2px;
+}
+
 .score-info-grid {
   margin-bottom: 18px;
 }

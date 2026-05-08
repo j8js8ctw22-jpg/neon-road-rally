@@ -24,6 +24,100 @@ const LOCAL_PLAYER_MAX_COUNT = 16;
 const LEADERBOARD_MAX_ENTRIES = 20;
 const LEADERBOARD_IMPORT_SCAN_LIMIT = 200;
 const MAX_DISPLAY_SCORE = 999999999;
+const BADGE_SAVE_VERSION = 1;
+const BADGE_DEFINITIONS = [
+  {
+    id: "first_run_posted",
+    name: "First Run",
+    description: "Complete any saved run.",
+    category: "starter",
+    difficulty: "Easy",
+    hidden: false,
+    icon: "RUN"
+  },
+  {
+    id: "first_finish",
+    name: "First Finish",
+    description: "Finish any race.",
+    category: "starter",
+    difficulty: "Easy",
+    hidden: false,
+    icon: "FIN"
+  },
+  {
+    id: "first_personal_best",
+    name: "Personal Best",
+    description: "Earn a new personal best.",
+    category: "starter",
+    difficulty: "Easy",
+    hidden: false,
+    icon: "PB"
+  },
+  {
+    id: "top_20_entry",
+    name: "Top 20",
+    description: "Enter the local Top 20 leaderboard.",
+    category: "score",
+    difficulty: "Normal",
+    hidden: false,
+    icon: "20"
+  },
+  {
+    id: "sunset_finisher",
+    name: "Sunset Finisher",
+    description: "Finish Sunset Highway.",
+    category: "track",
+    difficulty: "Easy",
+    hidden: false,
+    icon: "SUN"
+  },
+  {
+    id: "turbo_survivor",
+    name: "Turbo Survivor",
+    description: "Finish any Turbo race.",
+    category: "race_mode",
+    difficulty: "Hard",
+    hidden: false,
+    icon: "TUR"
+  },
+  {
+    id: "clean_run",
+    name: "Clean Run",
+    description: "Finish with zero slowdown hits.",
+    category: "skill",
+    difficulty: "Hard",
+    hidden: false,
+    icon: "CLN"
+  },
+  {
+    id: "near_miss_streak",
+    name: "Near-Miss Streak",
+    description: "Earn at least 5 near misses in one run.",
+    category: "skill",
+    difficulty: "Hard",
+    hidden: false,
+    icon: "NM"
+  },
+  {
+    id: "fuel_run_finish",
+    name: "Fuel Survivor",
+    description: "Finish any Fuel Run.",
+    category: "fuel_run",
+    difficulty: "Normal",
+    hidden: false,
+    icon: "FUEL"
+  },
+  {
+    id: "first_challenge",
+    name: "Challenge Cleared",
+    description: "Complete any Challenge Mode challenge.",
+    category: "challenge",
+    difficulty: "Normal",
+    hidden: false,
+    icon: "CH"
+  }
+];
+const BADGE_DEFINITION_BY_ID = Object.fromEntries(BADGE_DEFINITIONS.map((badge) => [badge.id, badge]));
 const LANES = 5;
 const CAMERA_CONFIG = {
   originalViewDistance: 1700,
@@ -2151,6 +2245,88 @@ function normalizeDateString(value, fallback = "") {
   return Number.isFinite(time) ? new Date(time).toISOString() : fallback;
 }
 
+function getBadgeDefinition(id) {
+  return BADGE_DEFINITION_BY_ID[String(id || "")] || null;
+}
+
+function normalizeBadgeId(value) {
+  const id = normalizeStorageId(value, "");
+  return getBadgeDefinition(id) ? id : "";
+}
+
+function normalizeBadgeIdList(value, limit = BADGE_DEFINITIONS.length) {
+  const source = Array.isArray(value) ? value : [];
+  const seen = new Set();
+  const result = [];
+  source.forEach((item) => {
+    const id = normalizeBadgeId(typeof item === "object" ? item?.id : item);
+    if (id && !seen.has(id) && result.length < limit) {
+      seen.add(id);
+      result.push(id);
+    }
+  });
+  return result;
+}
+
+function createDefaultBadgeSave() {
+  return {
+    version: BADGE_SAVE_VERSION,
+    earned: {}
+  };
+}
+
+function normalizePlayerBadges(value) {
+  const fallback = createDefaultBadgeSave();
+  const source = value && typeof value === "object" ? value : {};
+  const rawEarned = Array.isArray(value)
+    ? value
+    : (source.earned && typeof source.earned === "object" ? source.earned : {});
+  const earned = {};
+
+  if (Array.isArray(rawEarned)) {
+    rawEarned.forEach((entry) => {
+      const id = normalizeBadgeId(typeof entry === "object" ? entry?.id : entry);
+      if (!id) return;
+      const earnedAt = typeof entry === "object"
+        ? normalizeDateString(entry.earnedAt || entry.firstEarnedAt || entry.date, "")
+        : "";
+      earned[id] = { earnedAt };
+    });
+  } else {
+    Object.entries(rawEarned).forEach(([key, entry]) => {
+      const id = normalizeBadgeId(entry && typeof entry === "object" ? (entry.id || key) : key);
+      if (!id || entry === false || entry === null || entry?.earned === false) return;
+      const earnedAt = entry && typeof entry === "object"
+        ? normalizeDateString(entry.earnedAt || entry.firstEarnedAt || entry.date, "")
+        : "";
+      earned[id] = { earnedAt };
+    });
+  }
+
+  return {
+    ...fallback,
+    earned
+  };
+}
+
+function getBadgeProgress(player) {
+  const badges = normalizePlayerBadges(player?.badges);
+  const earnedIds = BADGE_DEFINITIONS
+    .map((badge) => badge.id)
+    .filter((id) => Boolean(badges.earned[id]));
+  return {
+    earnedIds,
+    earnedCount: earnedIds.length,
+    totalCount: BADGE_DEFINITIONS.length,
+    badges
+  };
+}
+
+function formatBadgeEarnedDate(entry) {
+  const earnedAt = normalizeDateString(entry?.earnedAt, "");
+  return earnedAt ? formatShortDate(earnedAt) : "Earned";
+}
+
 function normalizeCarConfig(value, fallback = DEFAULT_CAR) {
   const source = value && typeof value === "object" ? value : {};
   const fallbackCar = { ...DEFAULT_CAR, ...(fallback && typeof fallback === "object" ? fallback : {}) };
@@ -2438,6 +2614,8 @@ function normalizePlaytestRunSummary(entry) {
     challengeCompleted: Boolean(entry.challengeCompleted),
     challengePreviousBest: normalizeNonNegativeInteger(entry.challengePreviousBest || entry.previousBest),
     challengeNewBest: Boolean(entry.challengeNewBest || entry.newBest),
+    newlyEarnedBadges: normalizeBadgeIdList(entry.newlyEarnedBadges || entry.badgesEarned, BADGE_DEFINITIONS.length),
+    totalBadgesEarned: normalizeNonNegativeInteger(entry.totalBadgesEarned, 0, BADGE_DEFINITIONS.length),
     partyMode: Boolean(entry.partyMode),
     partySessionId: normalizeStorageId(entry.partySessionId, ""),
     partyRoundType: normalizePartyRoundType(entry.partyRoundType, PARTY_ROUND_TYPE_ONE_RUN),
@@ -2911,7 +3089,8 @@ class PlayerProfileManager {
           id,
           name: sanitizePlayerName(player?.name, `PLAYER ${index + 1}`),
           car: normalizeCarConfig(player?.car),
-          bestScore: normalizeNonNegativeInteger(player?.bestScore)
+          bestScore: normalizeNonNegativeInteger(player?.bestScore),
+          badges: normalizePlayerBadges(player?.badges)
         };
       })
       .filter((player) => {
@@ -2990,7 +3169,8 @@ class PlayerProfileManager {
       id: uid(),
       name: sanitizePlayerName(name, "PLAYER"),
       car: { ...DEFAULT_CAR },
-      bestScore: 0
+      bestScore: 0,
+      badges: createDefaultBadgeSave()
     };
     this.data.players.push(player);
     this.data.currentPlayerId = player.id;
@@ -3028,6 +3208,64 @@ class PlayerProfileManager {
   updateSpeedClass(speedClassId) {
     this.data.speedClassId = normalizeSpeedClassId(speedClassId, DEFAULT_SPEED_CLASS_ID);
     this.save();
+  }
+
+  getPlayerBadgeProgress(playerOrId) {
+    const player = typeof playerOrId === "string" ? this.getPlayerById(playerOrId) : playerOrId;
+    return getBadgeProgress(player);
+  }
+
+  getBadgeViewModels(playerOrId) {
+    const player = typeof playerOrId === "string" ? this.getPlayerById(playerOrId) : playerOrId;
+    const badges = normalizePlayerBadges(player?.badges);
+    return BADGE_DEFINITIONS.map((definition) => {
+      const earnedEntry = badges.earned[definition.id] || null;
+      return {
+        ...definition,
+        earned: Boolean(earnedEntry),
+        earnedAt: earnedEntry?.earnedAt || ""
+      };
+    });
+  }
+
+  awardBadges(playerId, badgeIds, earnedAt = new Date().toISOString()) {
+    const player = this.getPlayerById(playerId);
+    if (!player) return [];
+    player.badges = normalizePlayerBadges(player.badges);
+    const newlyEarned = [];
+    normalizeBadgeIdList(badgeIds).forEach((id) => {
+      if (player.badges.earned[id]) return;
+      const definition = getBadgeDefinition(id);
+      if (!definition) return;
+      player.badges.earned[id] = { earnedAt };
+      newlyEarned.push({
+        ...definition,
+        earnedAt
+      });
+    });
+    if (newlyEarned.length) this.save();
+    return newlyEarned;
+  }
+
+  evaluateRunBadges(summary) {
+    if (!summary?.scoreSaved || !summary.playerId) return [];
+    const badgeIds = ["first_run_posted"];
+
+    if (summary.status === "finished") {
+      badgeIds.push("first_finish");
+      if (summary.trackId === "sunset-highway") badgeIds.push("sunset_finisher");
+      if (summary.speedClass === "turbo") badgeIds.push("turbo_survivor");
+      if ((summary.slowdownHits || 0) === 0) badgeIds.push("clean_run");
+      if (summary.raceTypeId === FUEL_RUN_RACE_TYPE_ID) badgeIds.push("fuel_run_finish");
+    }
+    if (summary.newPersonalBest) badgeIds.push("first_personal_best");
+    if (summary.entersTopTwenty) badgeIds.push("top_20_entry");
+    if ((summary.nearMisses || 0) >= 5) badgeIds.push("near_miss_streak");
+    if (summary.challengeMode && summary.challengeResult?.completed && summary.challengeResult?.saved !== false) {
+      badgeIds.push("first_challenge");
+    }
+
+    return this.awardBadges(summary.playerId, badgeIds);
   }
 
   recordScore(entry) {
@@ -12625,6 +12863,10 @@ class NeonRoadRally {
       challengeCompleted: Boolean(challengeResult.completed),
       challengePreviousBest: challengeResult.previousBestScore || 0,
       challengeNewBest: Boolean(challengeResult.newBest || challengeResult.newlyCompleted),
+      newlyEarnedBadges: Array.isArray(summary.newlyEarnedBadges)
+        ? summary.newlyEarnedBadges.map((badge) => badge.id).filter(Boolean)
+        : [],
+      totalBadgesEarned: summary.totalBadgesEarned || 0,
       partyMode: Boolean(summary.partyMode),
       partySessionId: summary.partyMode ? (run.partySessionId || this.partySession?.sessionId || "") : "",
       partyRoundType: summary.partyMode ? (summary.partyRoundType || run.partyRoundType || PARTY_ROUND_TYPE_ONE_RUN) : PARTY_ROUND_TYPE_ONE_RUN,
@@ -12899,6 +13141,9 @@ class NeonRoadRally {
         }].concat(summary.medals).slice(0, 3);
       }
     }
+    summary.newlyEarnedBadges = this.profiles.evaluateRunBadges(summary);
+    summary.totalBadgesEarned = this.profiles.getPlayerBadgeProgress(summary.playerId).earnedCount;
+    summary.totalBadgesAvailable = BADGE_DEFINITIONS.length;
     this.lastSummary = summary;
     if (run.partyMode && this.partySession?.isPartyMode) {
       this.lastSummary.partyResult = this.partySession.addResult(this.lastSummary);
@@ -14937,6 +15182,8 @@ class NeonRoadRally {
       averageBoostsUsed: this.averagePlaytestField(runs, "boostsUsed"),
       averageLaneChanges: this.averagePlaytestField(runs, "laneChanges"),
       averageCenterLaneTime: this.averagePlaytestField(runs, "centerLaneTime"),
+      totalNewBadges: runs.reduce((sum, run) => sum + (Array.isArray(run.newlyEarnedBadges) ? run.newlyEarnedBadges.length : 0), 0),
+      maxTotalBadgesEarned: runs.reduce((max, run) => Math.max(max, Number(run.totalBadgesEarned) || 0), 0),
       averageWavesFirst10Seconds: this.averagePlaytestField(runs, "wavesFirst10Seconds"),
       averageLaunchWaveCount: this.averagePlaytestField(runs, "launchWaveCount"),
       averageMeaningfulWaveCount: this.averagePlaytestField(runs, "meaningfulWaveCount"),
@@ -15036,6 +15283,8 @@ class NeonRoadRally {
         averageBoostsUsed: Number(aggregate.averageBoostsUsed.toFixed(2)),
         averageLaneChanges: Number(aggregate.averageLaneChanges.toFixed(2)),
         averageCenterLaneTimeSeconds: Number(aggregate.averageCenterLaneTime.toFixed(2)),
+        totalNewBadges: aggregate.totalNewBadges,
+        maxTotalBadgesEarned: aggregate.maxTotalBadgesEarned,
         averageWavesFirst10Seconds: Number(aggregate.averageWavesFirst10Seconds.toFixed(2)),
         averageLaunchWaveCount: Number(aggregate.averageLaunchWaveCount.toFixed(2)),
         averageMeaningfulWaveCount: Number(aggregate.averageMeaningfulWaveCount.toFixed(2)),
@@ -15627,6 +15876,8 @@ class NeonRoadRally {
           <div class="score-card"><strong>Avg Boosts Used</strong><span>${this.formatPlaytestDecimal(aggregate.averageBoostsUsed)}</span></div>
           <div class="score-card"><strong>Avg Lane Changes</strong><span>${this.formatPlaytestDecimal(aggregate.averageLaneChanges)}</span></div>
           <div class="score-card"><strong>Avg Center-Lane Time</strong><span>${formatTime(aggregate.averageCenterLaneTime)}</span></div>
+          <div class="score-card"><strong>New Badges</strong><span>${aggregate.totalNewBadges}</span></div>
+          <div class="score-card"><strong>Badge High Water</strong><span>${aggregate.maxTotalBadgesEarned}/${BADGE_DEFINITIONS.length}</span></div>
           <div class="score-card"><strong>Avg Waves First 10s</strong><span>${this.formatPlaytestDecimal(aggregate.averageWavesFirst10Seconds)}</span></div>
           <div class="score-card"><strong>Avg Launch Waves</strong><span>${this.formatPlaytestDecimal(aggregate.averageLaunchWaveCount)}</span></div>
           <div class="score-card"><strong>Avg Meaningful Waves</strong><span>${this.formatPlaytestDecimal(aggregate.averageMeaningfulWaveCount)}</span></div>
@@ -16468,6 +16719,58 @@ class NeonRoadRally {
     });
   }
 
+  renderNewBadgeCallouts(summary) {
+    const badges = Array.isArray(summary?.newlyEarnedBadges) ? summary.newlyEarnedBadges.slice(0, 3) : [];
+    if (!badges.length) return "";
+    return badges.map((badge) => `
+      <span class="score-callout is-hot">Badge Earned: ${escapeHtml(badge.name)}</span>
+    `).join("");
+  }
+
+  renderBadgeEarnedPanel(summary, compact = false) {
+    const badges = Array.isArray(summary?.newlyEarnedBadges) ? summary.newlyEarnedBadges.slice(0, 4) : [];
+    if (!badges.length) return "";
+    return `
+      <div class="badge-earned-panel ${compact ? "is-compact" : ""}">
+        <span class="eyebrow">${badges.length === 1 ? "Badge Earned" : "Badges Earned"}</span>
+        <div class="badge-chip-row">
+          ${badges.map((badge) => `
+            <span class="badge-chip is-earned">
+              <strong>${escapeHtml(badge.icon || "BDG")}</strong>
+              <span>${escapeHtml(badge.name)}</span>
+            </span>
+          `).join("")}
+        </div>
+      </div>
+    `;
+  }
+
+  renderPlayerBadgePanel(player) {
+    if (!player) return "";
+    const progress = this.profiles.getPlayerBadgeProgress(player);
+    const badges = this.profiles.getBadgeViewModels(player).filter((badge) => badge.earned || !badge.hidden);
+    return `
+      <div class="badge-profile-panel">
+        <div class="badge-profile-header">
+          <div>
+            <span class="eyebrow">Driver Badges</span>
+            <strong>${progress.earnedCount}/${progress.totalCount} earned</strong>
+          </div>
+          <span>${progress.totalCount - progress.earnedCount} left</span>
+        </div>
+        <div class="badge-grid">
+          ${badges.map((badge) => `
+            <span class="badge-card ${badge.earned ? "is-earned" : "is-locked"}">
+              <strong>${escapeHtml(badge.icon || "BDG")}</strong>
+              <span>${escapeHtml(badge.name)}</span>
+              <small>${badge.earned ? escapeHtml(formatBadgeEarnedDate({ earnedAt: badge.earnedAt })) : escapeHtml(badge.description)}</small>
+            </span>
+          `).join("")}
+        </div>
+      </div>
+    `;
+  }
+
   renderMedalChips(medals, compact = false) {
     const items = Array.isArray(medals) ? medals.slice(0, 3) : [];
     if (!items.length) return "";
@@ -16628,6 +16931,7 @@ class NeonRoadRally {
             <p class="hint">${escapeHtml(getPartyRoundTypeLabel(session.roundType))} · ${escapeHtml(session.track.name)} · ${escapeHtml(getRaceTypeLabel(session.raceType))} · ${escapeHtml(getSpeedClassLabel(session.raceMode))} · ${final ? "Final seed" : `Round ${session.roundNumber} seed`} ${escapeHtml(roundSeed)}</p>
             <p class="hint">${escapeHtml(getPartySeedModeLabel(session.seedMode))} · ${session.completedRuns}/${session.totalRuns} runs complete</p>
             ${partyCallouts}
+            ${summary?.newlyEarnedBadges?.length ? `<div class="score-callout-row">${this.renderNewBadgeCallouts(summary)}</div>` : ""}
           </div>
           <div class="party-leader-card ${final ? "is-final" : ""}">
             <span>${final ? "Winner" : "Leader"}</span>
@@ -16650,6 +16954,7 @@ class NeonRoadRally {
               ${summary.topTwentyRank ? `<small>Top 20 #${summary.topTwentyRank}</small>` : `<small>${summary.newPersonalBest ? "Personal Best" : "Run Score"}</small>`}
             </div>
             ${this.renderMedalChips(summary.medals, true)}
+            ${this.renderBadgeEarnedPanel(summary, true)}
           </div>
         ` : ""}
         ${this.renderPartyStandingsList(session, standings, recentResult, final)}
@@ -16756,18 +17061,22 @@ class NeonRoadRally {
             <button class="small-button" data-action="customize" ${current ? "" : "disabled"}>Customize Current Car</button>
             <button class="small-button" data-action="title">Back</button>
           </div>
+          ${this.renderPlayerBadgePanel(current)}
           <p class="status-line">${escapeHtml(message)}</p>
         </div>
         <div>
           <h2>Local Players</h2>
           <ul class="profile-list">
-            ${players.length ? players.map((player) => `
-              <li class="profile-item ${current && current.id === player.id ? "is-current" : ""}">
-                <strong>${escapeHtml(player.name)}</strong>
-                <span class="meta">${escapeHtml(player.car.name)} · Best ${formatScore(player.bestScore)}</span>
-                <button class="small-button" data-action="selectPlayer" data-id="${escapeAttr(player.id)}">${current && current.id === player.id ? "Selected" : "Select"}</button>
-              </li>
-            `).join("") : `<li class="profile-item"><span class="meta">No profiles yet.</span></li>`}
+            ${players.length ? players.map((player) => {
+              const badgeProgress = this.profiles.getPlayerBadgeProgress(player);
+              return `
+                <li class="profile-item ${current && current.id === player.id ? "is-current" : ""}">
+                  <strong>${escapeHtml(player.name)}</strong>
+                  <span class="meta">${escapeHtml(player.car.name)} · Best ${formatScore(player.bestScore)} · Badges ${badgeProgress.earnedCount}/${badgeProgress.totalCount}</span>
+                  <button class="small-button" data-action="selectPlayer" data-id="${escapeAttr(player.id)}">${current && current.id === player.id ? "Selected" : "Select"}</button>
+                </li>
+              `;
+            }).join("") : `<li class="profile-item"><span class="meta">No profiles yet.</span></li>`}
           </ul>
         </div>
       </section>
@@ -17090,7 +17399,7 @@ class NeonRoadRally {
             <span class="eyebrow">${summary.challengeMode ? "Challenge Run Result" : (summary.partyMode ? "Party Run Result" : "Run Result")}</span>
             <h2>${summary.challengeMode ? (summary.challengeResult?.completed ? "Challenge Complete" : "Challenge Failed") : (summary.status === "finished" ? "Track Complete" : (summary.status === "outOfFuel" ? "Out of Fuel" : "Run Over"))}</h2>
             <p class="hint">${summary.challengeMode ? `${escapeHtml(summary.challengeName)} · ` : ""}${escapeHtml(summary.trackName)} · ${escapeHtml(summary.raceTypeLabel || getRaceTypeLabel(summary.raceTypeId))} · ${escapeHtml(summary.speedClassLabel)} · Seed ${escapeHtml(summary.seed)}</p>
-            <div class="score-callout-row">${this.renderChallengeCallouts(summary)}${this.renderLeaderboardContext(summary)}</div>
+            <div class="score-callout-row">${this.renderNewBadgeCallouts(summary)}${this.renderChallengeCallouts(summary)}${this.renderLeaderboardContext(summary)}</div>
           </div>
           <div class="final-score-card">
             <span>Final Score</span>
@@ -17098,6 +17407,7 @@ class NeonRoadRally {
             <small>${escapeHtml(outcomeText)}</small>
           </div>
         </div>
+        ${this.renderBadgeEarnedPanel(summary)}
         ${this.renderMedalChips(summary.medals)}
         ${this.renderChallengeResultPanel(summary)}
         <div class="score-grid score-info-grid">
@@ -17303,7 +17613,7 @@ class NeonRoadRally {
   }
 
   handleResetData() {
-    const confirmed = window.confirm("Reset Neon Road Rally local data in this browser? This deletes only the neonRoadRally.v1 key: local players, car settings, scores, challenge progress, and audio/default race settings.");
+    const confirmed = window.confirm("Reset Neon Road Rally local data in this browser? This deletes only the neonRoadRally.v1 key: local players, badges, car settings, scores, challenge progress, and audio/default race settings.");
     if (!confirmed) return;
     this.profiles.resetAll();
     this.audio.setMusicMuted(false);
@@ -17342,7 +17652,7 @@ class NeonRoadRally {
   }
 
   handleClearPlaytestReports() {
-    const confirmed = window.confirm("Clear only local Playtest Report run summaries? This does not delete players, leaderboard, settings, challenge progress, or car data.");
+    const confirmed = window.confirm("Clear only local Playtest Report run summaries? This does not delete players, badges, leaderboard, settings, challenge progress, or car data.");
     if (!confirmed) return;
     this.playtestReports.clear();
     this.playtestReportCopyText = "";
