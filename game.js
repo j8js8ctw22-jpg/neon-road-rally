@@ -1470,6 +1470,7 @@ const FUEL_RUN_CONFIG = {
     pro: 18,
     turbo: 16
   },
+  fuelDrainMultiplierDuringManualBoost: 0,
   lowFuelThreshold: 35,
   criticalFuelThreshold: 14,
   gasCanScore: 500,
@@ -3117,6 +3118,9 @@ function normalizePlaytestRunSummary(entry) {
     gasCansSpawned: normalizeNonNegativeInteger(entry.gasCansSpawned, 0, 9999),
     gasCansCollected: normalizeNonNegativeInteger(entry.gasCansCollected || entry.fuelCollected, 0, 9999),
     fuelRemaining: normalizeNonNegativeNumber(entry.fuelRemaining, 0, FUEL_RUN_CONFIG.fuelMax),
+    fuelSavedByBoost: normalizeNonNegativeNumber(entry.fuelSavedByBoost, 0, FUEL_RUN_CONFIG.fuelMax),
+    fuelDrainPausedTime: normalizeNonNegativeNumber(entry.fuelDrainPausedTime, 0, 24 * 60 * 60),
+    boostsUsedInFuelRun: normalizeNonNegativeInteger(entry.boostsUsedInFuelRun, 0, 99),
     lowestFuelReached: normalizeNonNegativeNumber(entry.lowestFuelReached, 0, FUEL_RUN_CONFIG.fuelMax),
     fuelAt25Percent: normalizeOptionalFuelAmount(entry.fuelAt25Percent),
     fuelAt50Percent: normalizeOptionalFuelAmount(entry.fuelAt50Percent),
@@ -11175,8 +11179,8 @@ class Renderer {
       "DEBUG `",
       `playtest result: ${currentResultStatus}`,
       `playtest lanes: changes ${run.laneMoves || 0} center ${(run.centerLaneTime || 0).toFixed(1)}s streak ${(run.currentCenterLaneStreak || 0).toFixed(1)}s max ${(run.longestCenterLaneStreak || 0).toFixed(1)}s`,
-      `playtest fuel: gas ${run.gasCansCollected || 0}/${run.gasCansSpawned || 0} low ${(run.lowFuelSeconds || 0).toFixed(1)}s critical ${(run.criticalFuelSeconds || 0).toFixed(1)}s`,
-      `playtest boost: manual ${run.manualBoostsUsed || 0} pads ${run.boostPadsCollected || 0} ramps ${run.rampsUsed || 0} targets ${run.rampTargetsCleared || 0}/${run.rampTargetsAssigned || 0}`,
+      `playtest fuel: gas ${run.gasCansCollected || 0}/${run.gasCansSpawned || 0} saved ${(run.fuelSavedByBoost || 0).toFixed(1)} pause ${(run.fuelDrainPausedTime || 0).toFixed(1)}s low ${(run.lowFuelSeconds || 0).toFixed(1)}s critical ${(run.criticalFuelSeconds || 0).toFixed(1)}s`,
+      `playtest boost: manual ${run.manualBoostsUsed || 0} fuel ${run.boostsUsedInFuelRun || 0} pads ${run.boostPadsCollected || 0} ramps ${run.rampsUsed || 0} targets ${run.rampTargetsCleared || 0}/${run.rampTargetsAssigned || 0}`,
       `playtest director: waves ${directorDebug.waveCount || 0} meaningful ${directorDebug.meaningfulWaveCount || 0} support ${directorDebug.supportWaveCount || 0}`,
       `playtest launch: first10 ${directorDebug.wavesFirst10Seconds || 0} launch ${directorDebug.launchWaveCount || 0}/${directorDebug.launchMeaningfulWaveCount || 0} hardest ${directorDebug.hardestPressureObserved || 0}`,
       `race type: ${directorDebug.raceType}`,
@@ -12462,6 +12466,9 @@ class NeonRoadRally {
       gasCansSpawned: 0,
       gasCansCollected: 0,
       fuelCollected: 0,
+      fuelSavedByBoost: 0,
+      fuelDrainPausedTime: 0,
+      boostsUsedInFuelRun: 0,
       lowestFuelReached: 0,
       fuelAt25Percent: null,
       fuelAt50Percent: null,
@@ -12752,6 +12759,9 @@ class NeonRoadRally {
     run.gasCansSpawned = 0;
     run.gasCansCollected = 0;
     run.fuelCollected = 0;
+    run.fuelSavedByBoost = 0;
+    run.fuelDrainPausedTime = 0;
+    run.boostsUsedInFuelRun = 0;
     run.lowestFuelReached = fuelRun ? tuning.fuelMax : 0;
     run.fuelAt25Percent = null;
     run.fuelAt50Percent = null;
@@ -12807,7 +12817,17 @@ class NeonRoadRally {
     run.timeSinceLastGasCan = Math.max(0, (run.timeSinceLastGasCan || 0) + dt);
     run.longestNoFuelStretchSeconds = Math.max(run.longestNoFuelStretchSeconds || 0, run.timeSinceLastGasCan);
     run.fuelWarningCooldown = Math.max(0, (run.fuelWarningCooldown || 0) - dt);
-    run.fuel = clamp(run.fuel - run.fuelDrainPerSecond * dt, 0, run.fuelMax);
+    const baseDrainThisFrame = Math.max(0, (run.fuelDrainPerSecond || 0) * dt);
+    const manualBoostSavingFuel = run.boostTimer > 0 && baseDrainThisFrame > 0;
+    const drainMultiplier = manualBoostSavingFuel
+      ? clampNumber(FUEL_RUN_CONFIG.fuelDrainMultiplierDuringManualBoost, 0, 1, 0)
+      : 1;
+    const drainThisFrame = baseDrainThisFrame * drainMultiplier;
+    if (manualBoostSavingFuel && drainThisFrame < baseDrainThisFrame) {
+      run.fuelSavedByBoost = Math.max(0, (run.fuelSavedByBoost || 0) + (baseDrainThisFrame - drainThisFrame));
+      run.fuelDrainPausedTime = Math.max(0, (run.fuelDrainPausedTime || 0) + dt);
+    }
+    run.fuel = clamp(run.fuel - drainThisFrame, 0, run.fuelMax);
     run.lowFuelActive = run.fuel <= run.lowFuelThreshold;
     run.criticalFuelActive = run.fuel <= run.criticalFuelThreshold;
     this.updateFuelRunTelemetry(dt);
@@ -13278,6 +13298,7 @@ class NeonRoadRally {
     if (run.paused || run.ended || !run.raceActive || run.manualBoosts <= 0) return;
     run.manualBoosts -= 1;
     run.manualBoostsUsed += 1;
+    if (isFuelRunRaceType(run.raceTypeId)) run.boostsUsedInFuelRun = Math.max(0, (run.boostsUsedInFuelRun || 0) + 1);
     run.boostTimer = Math.max(run.boostTimer, SPEED_TUNING.manualBoostDuration);
     run.boostBurstTimer = Math.max(run.boostBurstTimer || 0, ARCADE_FEEL.boostBurstSeconds);
     run.screenShake = Math.max(run.screenShake || 0, 0.18);
@@ -13685,6 +13706,9 @@ class NeonRoadRally {
       gasCansSpawned: summary.gasCansSpawned,
       gasCansCollected: summary.gasCansCollected,
       fuelRemaining: summary.fuelRemaining,
+      fuelSavedByBoost: isFuelRunRaceType(summary.raceTypeId) ? (run.fuelSavedByBoost || 0) : 0,
+      fuelDrainPausedTime: isFuelRunRaceType(summary.raceTypeId) ? (run.fuelDrainPausedTime || 0) : 0,
+      boostsUsedInFuelRun: isFuelRunRaceType(summary.raceTypeId) ? (run.boostsUsedInFuelRun || 0) : 0,
       lowestFuelReached: isFuelRunRaceType(summary.raceTypeId) ? (run.lowestFuelReached || 0) : 0,
       fuelAt25Percent: isFuelRunRaceType(summary.raceTypeId) ? run.fuelAt25Percent : null,
       fuelAt50Percent: isFuelRunRaceType(summary.raceTypeId) ? run.fuelAt50Percent : null,
@@ -13858,6 +13882,9 @@ class NeonRoadRally {
       gasCansCollected: run.gasCansCollected || 0,
       fuelCollected: run.gasCansCollected || 0,
       fuelRemaining: isFuelRunRaceType(run.raceTypeId) ? Math.max(0, Math.round(run.fuel || 0)) : 0,
+      fuelSavedByBoost: isFuelRunRaceType(run.raceTypeId) ? (run.fuelSavedByBoost || 0) : 0,
+      fuelDrainPausedTime: isFuelRunRaceType(run.raceTypeId) ? (run.fuelDrainPausedTime || 0) : 0,
+      boostsUsedInFuelRun: isFuelRunRaceType(run.raceTypeId) ? (run.boostsUsedInFuelRun || 0) : 0,
       fuelAt25Percent: isFuelRunRaceType(run.raceTypeId) ? run.fuelAt25Percent : null,
       fuelAt50Percent: isFuelRunRaceType(run.raceTypeId) ? run.fuelAt50Percent : null,
       fuelAt75Percent: isFuelRunRaceType(run.raceTypeId) ? run.fuelAt75Percent : null,
@@ -15920,6 +15947,9 @@ class NeonRoadRally {
     const runs = this.filterPlaytestRuns(allRuns, filter);
     const fuelRuns = runs.filter((run) => run.raceTypeId === FUEL_RUN_RACE_TYPE_ID);
     const fuelFinishes = fuelRuns.filter((run) => run.status === "finished");
+    const totalFuelSavedByBoost = fuelRuns.reduce((sum, run) => sum + (Number(run.fuelSavedByBoost) || 0), 0);
+    const totalFuelDrainPausedTime = fuelRuns.reduce((sum, run) => sum + (Number(run.fuelDrainPausedTime) || 0), 0);
+    const totalBoostsUsedInFuelRun = fuelRuns.reduce((sum, run) => sum + (Number(run.boostsUsedInFuelRun) || 0), 0);
     const challengeRuns = runs.filter((run) => Boolean(run.challengeId));
     const partyRuns = runs.filter((run) => Boolean(run.partyMode));
     const partySessionIds = new Set(partyRuns.map((run) => run.partySessionId).filter(Boolean));
@@ -15988,6 +16018,10 @@ class NeonRoadRally {
         averageGasCansCollected: this.averagePlaytestField(fuelRuns, "gasCansCollected"),
         averageGasCansSpawned: this.averagePlaytestField(fuelRuns, "gasCansSpawned"),
         averageFuelRemainingOnFinishes: this.averagePlaytestField(fuelFinishes, "fuelRemaining"),
+        averageFuelSavedByBoost: this.averagePlaytestField(fuelRuns, "fuelSavedByBoost"),
+        totalFuelSavedByBoost,
+        totalFuelDrainPausedTime,
+        totalBoostsUsedInFuelRun,
         averageLowestFuelReached: this.averagePlaytestField(fuelRuns, "lowestFuelReached"),
         averageLowFuelTime: this.averagePlaytestField(fuelRuns, "lowFuelTime"),
         averageCriticalFuelTime: this.averagePlaytestField(fuelRuns, "criticalFuelTime"),
@@ -16673,6 +16707,9 @@ class NeonRoadRally {
           <div class="score-card"><strong>Over-Density Delays</strong><span>${aggregate.totalOverActivityDelays}</span></div>
           <div class="score-card"><strong>Fuel Gas Collected</strong><span>${this.formatPlaytestDecimal(aggregate.fuelSummary.averageGasCansCollected)}</span></div>
           <div class="score-card"><strong>Fuel Left On Finishes</strong><span>${this.formatPlaytestDecimal(aggregate.fuelSummary.averageFuelRemainingOnFinishes)}</span></div>
+          <div class="score-card"><strong>Fuel Saved By Boost</strong><span>${this.formatPlaytestDecimal(aggregate.fuelSummary.totalFuelSavedByBoost)} fuel</span></div>
+          <div class="score-card"><strong>Fuel Pause Time</strong><span>${this.formatPlaytestDecimal(aggregate.fuelSummary.totalFuelDrainPausedTime)}s</span></div>
+          <div class="score-card"><strong>Fuel Boost Uses</strong><span>${aggregate.fuelSummary.totalBoostsUsedInFuelRun}</span></div>
           <div class="score-card"><strong>Challenge Runs</strong><span>${aggregate.challengeSummary.completed}/${aggregate.challengeSummary.runs}</span></div>
           <div class="score-card"><strong>Party Runs</strong><span>${aggregate.partySummary.runs}</span></div>
         </div>
@@ -16860,6 +16897,7 @@ class NeonRoadRally {
             <input id="roadSeedInput" type="text" maxlength="32" value="${escapeAttr(seed)}" autocomplete="off" spellcheck="false" inputmode="text">
           </div>
           <p class="hint">Same seed + same track + same race speed + same race type repeats the Road Director sequence.</p>
+          <p id="fuelRunBoostHint" class="hint" ${raceType.id === FUEL_RUN_RACE_TYPE_ID ? "" : "hidden"}>Fuel Run: Boost saves fuel.</p>
           <p id="roadSeedHash" class="hint">Seed hash: ${seedHash}</p>
           <div class="row">
             <button class="small-button" data-action="randomSeed">Random Seed</button>
@@ -16881,6 +16919,7 @@ class NeonRoadRally {
     const seedHashValue = document.getElementById("roadSeedHashValue");
     const raceTypeSelect = document.getElementById("preRaceType");
     const raceTypeSummary = document.getElementById("preRaceTypeSummary");
+    const fuelRunBoostHint = document.getElementById("fuelRunBoostHint");
     const modeSelect = document.getElementById("preRaceSpeedClass");
     const modeSummary = document.getElementById("preRaceModeSummary");
     const trackSummary = document.getElementById("preRaceTrackSummary");
@@ -16906,6 +16945,9 @@ class NeonRoadRally {
       }
       if (raceTypeSummary) {
         raceTypeSummary.textContent = raceType.label;
+      }
+      if (fuelRunBoostHint) {
+        fuelRunBoostHint.hidden = raceType.id !== FUEL_RUN_RACE_TYPE_ID;
       }
       if (trackSummary) {
         trackSummary.textContent = track.name;
@@ -18315,6 +18357,7 @@ class NeonRoadRally {
           ${summary.raceTypeId === FUEL_RUN_RACE_TYPE_ID ? `
             <div class="score-card"><strong>Fuel Collected</strong><span>${Math.max(0, summary.gasCansCollected || 0).toLocaleString()} gas cans</span></div>
             <div class="score-card"><strong>Fuel Remaining</strong><span>${Math.max(0, summary.fuelRemaining || 0).toLocaleString()} / ${FUEL_RUN_CONFIG.fuelMax}</span></div>
+            <div class="score-card"><strong>Boost Fuel Saved</strong><span>${this.formatPlaytestDecimal(summary.fuelSavedByBoost || 0)} fuel · ${this.formatPlaytestDecimal(summary.fuelDrainPausedTime || 0)}s</span></div>
             <div class="score-card"><strong>Fuel Bonus</strong><span>${formatScore(summary.fuelBonus || 0)}</span></div>
           ` : ""}
           <div class="score-card"><strong>Distance</strong><span>${Math.round(summary.distance).toLocaleString()} / ${summary.trackDistance.toLocaleString()}</span></div>
