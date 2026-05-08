@@ -47,19 +47,23 @@ const BADGE_DEFINITIONS = [
   {
     id: "first_personal_best",
     name: "Personal Best",
-    description: "Beat your own best saved score.",
+    description: "Legacy score-screen callout. No longer awarded as a permanent badge.",
     category: "starter",
     difficulty: "Easy",
-    hidden: false,
+    hidden: true,
+    deprecated: true,
+    visible: false,
     icon: "PB"
   },
   {
     id: "top_20_entry",
     name: "Top 20",
-    description: "Enter the local Top 20 leaderboard.",
+    description: "Legacy score-screen callout. No longer awarded as a permanent badge.",
     category: "starter",
     difficulty: "Normal",
-    hidden: false,
+    hidden: true,
+    deprecated: true,
+    visible: false,
     icon: "20"
   },
   {
@@ -70,6 +74,15 @@ const BADGE_DEFINITIONS = [
     difficulty: "Easy",
     hidden: false,
     icon: "SUN"
+  },
+  {
+    id: "redline_finisher",
+    name: "Redline Finisher",
+    description: "Finish Redline Run.",
+    category: "track",
+    difficulty: "Normal",
+    hidden: false,
+    icon: "RED"
   },
   {
     id: "turbo_survivor",
@@ -115,6 +128,15 @@ const BADGE_DEFINITIONS = [
     difficulty: "Normal",
     hidden: false,
     icon: "CH"
+  },
+  {
+    id: "party_starter",
+    name: "Party Starter",
+    description: "Complete a Party Mode round.",
+    category: "party",
+    difficulty: "Easy",
+    hidden: false,
+    icon: "PTY"
   }
 ];
 const BADGE_DEFINITION_BY_ID = Object.fromEntries(BADGE_DEFINITIONS.map((badge) => [badge.id, badge]));
@@ -125,7 +147,8 @@ const BADGE_CATEGORY_FILTERS = [
   { id: "track", label: "Track" },
   { id: "mode", label: "Mode" },
   { id: "fuel", label: "Fuel" },
-  { id: "challenge", label: "Challenge" }
+  { id: "challenge", label: "Challenge" },
+  { id: "party", label: "Party" }
 ];
 const BADGE_CATEGORY_LABELS = Object.fromEntries(BADGE_CATEGORY_FILTERS.map((filter) => [filter.id, filter.label]));
 const PLAYER_CHALLENGE_SAVE_VERSION = 1;
@@ -229,7 +252,13 @@ const ROAD_READABILITY_CONFIG = {
   fuelMinorHazardScale: 0,
   rampTargetMinGap: 470,
   rampTargetMaxGap: 840,
-  rampLandingClearDistance: 980,
+  rampClearDistance: 1380,
+  rampLandingSafetyDistance: 420,
+  rampLandingClearDistance: 1380,
+  rampMinAirborneDuration: 0.74,
+  rampMaxAirborneDuration: 1.35,
+  rampLandingGraceSeconds: 0.08,
+  rampPathCollectibleSafetyDistance: 180,
   routeTimingBufferSeconds: 0.18,
   routeTimingLookaheadSeconds: 2.4
 };
@@ -1910,6 +1939,10 @@ const HITBOX_CONFIG = {
 
 const HARD_VEHICLE_TYPES = new Set(["slowCar", "fastCar", "truck", "barrier"]);
 const MINOR_HAZARD_TYPES = new Set(["cone", "oil", "branch", "deer"]);
+const RAMP_CLEARABLE_TYPES = new Set(["slowCar", "fastCar", "truck", "barrier", "cone", "oil", "branch", "deer", "gasCan", "boostPad", "ramp"]);
+const RAMP_TARGET_TYPES = new Set([...HARD_VEHICLE_TYPES, ...MINOR_HAZARD_TYPES]);
+const RAMP_LANDING_UNSAFE_TYPES = new Set([...HARD_VEHICLE_TYPES, ...MINOR_HAZARD_TYPES]);
+const RAMP_PATH_COLLECTIBLE_TYPES = new Set(["gasCan", "boostPad"]);
 const CAMERA_HAZARD_SCALE_TYPES = new Set(["cone", "oil", "deer", "ramp", "boostPad", "gasCan", "branch"]);
 
 const OBSTACLE_INFO = {
@@ -1929,6 +1962,46 @@ const OBSTACLE_INFO = {
 
 function clamp(value, min, max) {
   return Math.min(max, Math.max(min, value));
+}
+
+function getVisibleBadgeDefinitions() {
+  return BADGE_DEFINITIONS.filter((badge) => badge && badge.hidden !== true && badge.deprecated !== true && badge.visible !== false);
+}
+
+function isVisibleBadgeDefinition(badge) {
+  return Boolean(badge) && badge.hidden !== true && badge.deprecated !== true && badge.visible !== false;
+}
+
+function getRampTargetGap(ramp) {
+  const targetDistance = Number.isFinite(ramp?.solutionTargetDistance) ? ramp.solutionTargetDistance : null;
+  if (!targetDistance || !Number.isFinite(ramp?.distance)) return ROAD_READABILITY_CONFIG.rampTargetMaxGap;
+  return clamp(
+    targetDistance - ramp.distance,
+    ROAD_READABILITY_CONFIG.rampTargetMinGap,
+    ROAD_READABILITY_CONFIG.rampTargetMaxGap
+  );
+}
+
+function getRampRequiredClearDistance(targetGap = ROAD_READABILITY_CONFIG.rampTargetMaxGap) {
+  return Math.max(
+    ROAD_READABILITY_CONFIG.rampClearDistance,
+    Math.max(0, targetGap) + ROAD_READABILITY_CONFIG.rampLandingSafetyDistance
+  );
+}
+
+function getRampAirborneDurationForSpeed(speed, targetGap = ROAD_READABILITY_CONFIG.rampTargetMaxGap) {
+  const safeSpeed = Math.max(1, Number.isFinite(speed) ? speed : 1);
+  const requiredSeconds = getRampRequiredClearDistance(targetGap) / safeSpeed;
+  return clamp(
+    requiredSeconds,
+    ROAD_READABILITY_CONFIG.rampMinAirborneDuration,
+    ROAD_READABILITY_CONFIG.rampMaxAirborneDuration
+  );
+}
+
+function getRampClearDistanceForSpeed(speed, targetGap = ROAD_READABILITY_CONFIG.rampTargetMaxGap) {
+  const safeSpeed = Math.max(1, Number.isFinite(speed) ? speed : 1);
+  return safeSpeed * getRampAirborneDurationForSpeed(safeSpeed, targetGap);
 }
 
 function clampNumber(value, min, max, fallback) {
@@ -2367,13 +2440,14 @@ function normalizePlayerBadges(value) {
 
 function getBadgeProgress(player) {
   const badges = normalizePlayerBadges(player?.badges);
-  const earnedIds = BADGE_DEFINITIONS
+  const visibleDefinitions = getVisibleBadgeDefinitions();
+  const earnedIds = visibleDefinitions
     .map((badge) => badge.id)
     .filter((id) => Boolean(badges.earned[id]));
   return {
     earnedIds,
     earnedCount: earnedIds.length,
-    totalCount: BADGE_DEFINITIONS.length,
+    totalCount: visibleDefinitions.length,
     badges
   };
 }
@@ -2398,7 +2472,7 @@ function getRecentlyEarnedBadges(player, limit = 3) {
   return Object.entries(badges.earned)
     .map(([id, entry]) => {
       const definition = getBadgeDefinition(id);
-      if (!definition) return null;
+      if (!isVisibleBadgeDefinition(definition)) return null;
       return {
         ...definition,
         earnedAt: entry?.earnedAt || ""
@@ -2958,8 +3032,9 @@ function normalizePlaytestRunSummary(entry) {
     challengeCompleted: Boolean(entry.challengeCompleted),
     challengePreviousBest: normalizeNonNegativeInteger(entry.challengePreviousBest || entry.previousBest),
     challengeNewBest: Boolean(entry.challengeNewBest || entry.newBest),
-    newlyEarnedBadges: normalizeBadgeIdList(entry.newlyEarnedBadges || entry.badgesEarned, BADGE_DEFINITIONS.length),
-    totalBadgesEarned: normalizeNonNegativeInteger(entry.totalBadgesEarned, 0, BADGE_DEFINITIONS.length),
+    newlyEarnedBadges: normalizeBadgeIdList(entry.newlyEarnedBadges || entry.badgesEarned, BADGE_DEFINITIONS.length)
+      .filter((id) => isVisibleBadgeDefinition(getBadgeDefinition(id))),
+    totalBadgesEarned: normalizeNonNegativeInteger(entry.totalBadgesEarned, 0, getVisibleBadgeDefinitions().length),
     partyMode: Boolean(entry.partyMode),
     partySessionId: normalizeStorageId(entry.partySessionId, ""),
     partyRoundType: normalizePartyRoundType(entry.partyRoundType, PARTY_ROUND_TYPE_ONE_RUN),
@@ -3030,6 +3105,14 @@ function normalizePlaytestRunSummary(entry) {
     waveFamilyCounts: normalizeCountMap(entry.waveFamilyCounts),
     rewardLaneDistribution: normalizeCountMap(entry.rewardLaneDistribution || entry.rewardLaneCounts, 8),
     rampUseRate: normalizeNonNegativeNumber(entry.rampUseRate, 0, 1),
+    rampsSpawned: normalizeNonNegativeInteger(entry.rampsSpawned, 0, 9999),
+    rampAirborneDuration: normalizeNonNegativeNumber(entry.rampAirborneDuration, 0, 10),
+    rampClearDistance: normalizeNonNegativeNumber(entry.rampClearDistance, 0, 99999),
+    rampLandingSafetyDistance: normalizeNonNegativeNumber(entry.rampLandingSafetyDistance, 0, 99999),
+    rampTargetsAssigned: normalizeNonNegativeInteger(entry.rampTargetsAssigned, 0, 9999),
+    rampTargetsCleared: normalizeNonNegativeInteger(entry.rampTargetsCleared, 0, 9999),
+    rampLandingRejected: normalizeNonNegativeInteger(entry.rampLandingRejected, 0, 9999),
+    rampFailedToClearTarget: normalizeNonNegativeInteger(entry.rampFailedToClearTarget, 0, 9999),
     hardestPressureObserved: normalizeNonNegativeNumber(entry.hardestPressureObserved, 0, 999),
     gasCansSpawned: normalizeNonNegativeInteger(entry.gasCansSpawned, 0, 9999),
     gasCansCollected: normalizeNonNegativeInteger(entry.gasCansCollected || entry.fuelCollected, 0, 9999),
@@ -3564,7 +3647,7 @@ class PlayerProfileManager {
   getBadgeViewModels(playerOrId) {
     const player = typeof playerOrId === "string" ? this.getPlayerById(playerOrId) : playerOrId;
     const badges = normalizePlayerBadges(player?.badges);
-    return BADGE_DEFINITIONS.map((definition) => {
+    return getVisibleBadgeDefinitions().map((definition) => {
       const earnedEntry = badges.earned[definition.id] || null;
       return {
         ...definition,
@@ -3618,7 +3701,7 @@ class PlayerProfileManager {
     normalizeBadgeIdList(badgeIds).forEach((id) => {
       if (player.badges.earned[id]) return;
       const definition = getBadgeDefinition(id);
-      if (!definition) return;
+      if (!isVisibleBadgeDefinition(definition)) return;
       player.badges.earned[id] = { earnedAt };
       newlyEarned.push({
         ...definition,
@@ -3636,12 +3719,11 @@ class PlayerProfileManager {
     if (summary.status === "finished") {
       badgeIds.push("first_finish");
       if (summary.trackId === "sunset-highway") badgeIds.push("sunset_finisher");
+      if (summary.trackId === "redline-run") badgeIds.push("redline_finisher");
       if (summary.speedClass === "turbo") badgeIds.push("turbo_survivor");
       if ((summary.slowdownHits || 0) === 0) badgeIds.push("clean_run");
       if (summary.raceTypeId === FUEL_RUN_RACE_TYPE_ID) badgeIds.push("fuel_run_finish");
     }
-    if (summary.newPersonalBest) badgeIds.push("first_personal_best");
-    if (summary.entersTopTwenty) badgeIds.push("top_20_entry");
     if ((summary.nearMisses || 0) >= 5) badgeIds.push("near_miss_streak");
     if (summary.challengeMode && summary.challengeResult?.completed && summary.challengeResult?.saved !== false) {
       badgeIds.push("first_challenge");
@@ -4889,6 +4971,9 @@ class RoadDirector {
       longestGasCanGapSeconds: 0,
       fuelPatternCounts: {},
       rampSolutionCount: 0,
+      rampTargetsAssigned: 0,
+      rampLandingRejected: 0,
+      rampFailedToClearTarget: 0,
       minorHazardCount: 0,
       supportWaveCount: 0,
       wavesFirst10Seconds: 0,
@@ -5849,6 +5934,47 @@ class RoadDirector {
     }
   }
 
+  removePlacement(obstacle, result) {
+    if (!obstacle) return;
+    obstacle.remove = true;
+    this.manager.obstacles = this.manager.obstacles.filter((item) => item !== obstacle);
+    this.manager.seedLockedSpawnObstacles = this.manager.seedLockedSpawnObstacles.filter((item) => item.id !== obstacle.id);
+    if (!result) return;
+    result.spawned = result.spawned.filter((item) => item !== obstacle);
+    const count = result.obstacleTypes[obstacle.type] || 0;
+    if (count <= 1) delete result.obstacleTypes[obstacle.type];
+    else result.obstacleTypes[obstacle.type] = count - 1;
+    result.pressure = Math.max(0, result.pressure - (TRACK_DIRECTOR.pressureValues[obstacle.type] || 0));
+    this.rebuildPlacementLaneState(result);
+  }
+
+  rebuildPlacementLaneState(result) {
+    result.boostLanes = [];
+    result.rampLanes = [];
+    result.gasCanLanes = [];
+    result.rewardLanes = [];
+    result.blockedLanes = new Set();
+    result.centerBlocked = false;
+    for (const obstacle of result.spawned) {
+      const lane = Math.round(clamp(Number.isFinite(obstacle.laneFloat) ? obstacle.laneFloat : obstacle.lane, 0, LANES - 1));
+      if (obstacle.type === "boostPad") {
+        result.boostLanes.push(lane);
+        result.rewardLanes.push(lane);
+      } else if (obstacle.type === "ramp") {
+        result.rampLanes.push(lane);
+        result.rewardLanes.push(lane);
+      } else if (obstacle.type === "gasCan") {
+        result.gasCanLanes.push(lane);
+        result.rewardLanes.push(lane);
+      }
+      if (this.manager.isFairnessBlocker(obstacle)) {
+        const blockedLane = obstacle.type === "deer" ? TRACK_DIRECTOR.centerLane : lane;
+        result.blockedLanes.add(blockedLane);
+        if (blockedLane === TRACK_DIRECTOR.centerLane) result.centerBlocked = true;
+      }
+    }
+  }
+
   recordFuelPlacement(obstacle, context, result, pattern = result?.type || "fuel") {
     if (!obstacle) return;
     const run = context.run || this.manager.game.run || {};
@@ -6319,6 +6445,14 @@ class RoadDirector {
       launchSupportWaveCount: stats.launchSupportWaveCount,
       rampUsefulCount: stats.rampUsefulCount,
       rampSolutionCount: stats.rampSolutionCount,
+      rampsSpawned: rampSpawned,
+      rampsUsed: run.rampsUsed || 0,
+      rampAirborneDuration: run.rampAirborneDuration || 0,
+      rampClearDistance: run.rampClearDistance || ROAD_READABILITY_CONFIG.rampClearDistance,
+      rampTargetsAssigned: run.rampTargetsAssigned || stats.rampTargetsAssigned || 0,
+      rampTargetsCleared: run.rampTargetsCleared || 0,
+      rampLandingRejected: run.rampLandingRejected || stats.rampLandingRejected || 0,
+      rampFailedToClearTarget: run.rampFailedToClearTarget || stats.rampFailedToClearTarget || 0,
       minorHazardCount: stats.minorHazardCount,
       pressureBudgetFailures: stats.pressureBudgetFailures,
       blockedLaneSum: stats.blockedLaneSum,
@@ -6433,35 +6567,91 @@ class RoadDirector {
 
   recordRampSolution(result, ramp, target) {
     if (!ramp || !target) return;
+    const targetGap = Math.max(0, target.distance - ramp.distance);
+    const clearDistance = Number.isFinite(ramp.solutionClearDistance)
+      ? ramp.solutionClearDistance
+      : getRampRequiredClearDistance(targetGap);
     result.rampSolutions.push({
       lane: Math.round(clamp(ramp.lane, 0, LANES - 1)),
       rampDistance: Math.round(ramp.distance),
       targetDistance: Math.round(target.distance),
-      targetType: target.type
+      targetType: target.type,
+      targetId: target.id || "",
+      clearDistance: Math.round(clearDistance),
+      landingSafetyDistance: ROAD_READABILITY_CONFIG.rampLandingSafetyDistance
     });
+    this.stats.rampTargetsAssigned = (this.stats.rampTargetsAssigned || 0) + 1;
+    const run = this.manager.game.run;
+    if (run) run.rampTargetsAssigned = (run.rampTargetsAssigned || 0) + 1;
+  }
+
+  isRampSolutionCandidateClearable(rampLane, rampDistance, targetDistance, context) {
+    if (!Number.isFinite(targetDistance) || targetDistance <= rampDistance) return false;
+    const targetGap = targetDistance - rampDistance;
+    const clearDistance = getRampClearDistanceForSpeed(context.cruiseSpeed, targetGap);
+    const requiredClearDistance = targetGap + ROAD_READABILITY_CONFIG.rampLandingSafetyDistance;
+    if (clearDistance + 1 < requiredClearDistance) return false;
+    if (this.manager.hasRampPathCollectibleConflict(rampLane, rampDistance, targetDistance, this.manager.obstacles)) return false;
+    if (this.manager.isRampLandingRangeUnsafe(rampLane, targetDistance, this.manager.obstacles)) return false;
+    return true;
+  }
+
+  recordRampRejected(context) {
+    this.stats.rampLandingRejected = (this.stats.rampLandingRejected || 0) + 1;
+    const run = context?.run || this.manager.game.run;
+    if (run) run.rampLandingRejected = (run.rampLandingRejected || 0) + 1;
   }
 
   spawnRampSolution(rampLane, distance, context, result, options = {}) {
     const targetType = options.targetType || this.chooseMinorHazard(context, { includeBranch: true });
-    const targetGap = clamp(
+    const baseTargetGap = clamp(
       options.targetGap || context.cruiseSpeed * 0.34,
       ROAD_READABILITY_CONFIG.rampTargetMinGap,
       ROAD_READABILITY_CONFIG.rampTargetMaxGap
     );
-    const targetDistance = distance + targetGap;
-    const target = this.spawn(targetType, rampLane, targetDistance, result, {
-      rampTarget: true,
-      allowLaneAdjust: false
-    });
-    if (!target) return null;
-    const ramp = this.spawn("ramp", rampLane, distance, result, {
-      rampSolution: true,
-      solutionTargetDistance: targetDistance,
-      solutionTargetType: targetType,
-      allowLaneAdjust: false
-    });
-    if (ramp) this.recordRampSolution(result, ramp, target);
-    return ramp;
+    const gapCandidates = [
+      baseTargetGap,
+      baseTargetGap + 120,
+      baseTargetGap - 120,
+      ROAD_READABILITY_CONFIG.rampTargetMinGap,
+      ROAD_READABILITY_CONFIG.rampTargetMaxGap
+    ];
+    const seenGaps = new Set();
+    for (const rawGap of gapCandidates) {
+      const targetGap = clamp(rawGap, ROAD_READABILITY_CONFIG.rampTargetMinGap, ROAD_READABILITY_CONFIG.rampTargetMaxGap);
+      const gapKey = Math.round(targetGap / 10) * 10;
+      if (seenGaps.has(gapKey)) continue;
+      seenGaps.add(gapKey);
+      const targetDistance = distance + targetGap;
+      if (!this.isRampSolutionCandidateClearable(rampLane, distance, targetDistance, context)) {
+        this.recordRampRejected(context);
+        continue;
+      }
+      const target = this.spawn(targetType, rampLane, targetDistance, result, {
+        rampTarget: true,
+        allowLaneAdjust: false
+      });
+      if (!target) continue;
+      const clearDistance = getRampClearDistanceForSpeed(context.cruiseSpeed, targetGap);
+      const ramp = this.spawn("ramp", rampLane, distance, result, {
+        rampSolution: true,
+        solutionTargetDistance: targetDistance,
+        solutionTargetType: targetType,
+        solutionTargetId: target.id,
+        solutionClearDistance: clearDistance,
+        solutionLandingSafetyDistance: ROAD_READABILITY_CONFIG.rampLandingSafetyDistance,
+        allowLaneAdjust: false
+      });
+      if (!ramp) {
+        this.removePlacement(target, result);
+        this.recordRampRejected(context);
+        continue;
+      }
+      target.rampSolutionId = ramp.id;
+      this.recordRampSolution(result, ramp, target);
+      return ramp;
+    }
+    return null;
   }
 
   pickPressureLane(context, centerChance = 0.25, excluded = []) {
@@ -6782,6 +6972,10 @@ class RoadDirector {
     const ramp = this.spawnRampSolution(rampLane, distance, context, result, {
       targetType: this.random() < 0.68 ? this.getTrackMinorFallback("cone", context) : this.chooseMinorHazard(context, { includeBranch: true })
     });
+    if (!ramp) {
+      this.waveBoostTemptation(distance, context, result);
+      return;
+    }
     const lanes = this.orderPressureLanes(context, shuffle(this.lanesExcept(rampLane), () => this.random()));
     const pressureDistance = distance + clamp(context.cruiseSpeed * 0.28, 380, 700);
     const firstType = this.chooseBlockerType(context, 0.14);
@@ -6790,7 +6984,7 @@ class RoadDirector {
     if (context.band.id !== "opening" && context.speedClassId !== "sunday" && this.canAddPressure(result, "slowCar", context, 0.35)) {
       this.spawn("slowCar", lanes[1], pressureDistance + this.staggerDistance(context, 0.1, 110, 210), result);
     }
-    if (ramp && context.band.id === "final" && (context.speedClassId === "pro" || context.speedClassId === "turbo") && this.canAddPressure(result, "fastCar", context, 0.3)) {
+    if (context.band.id === "final" && (context.speedClassId === "pro" || context.speedClassId === "turbo") && this.canAddPressure(result, "fastCar", context, 0.3)) {
       this.spawn("fastCar", lanes[2], pressureDistance + this.staggerDistance(context, 0.24, 270, 470), result);
     }
   }
@@ -6927,13 +7121,17 @@ class RoadDirector {
       targetType: "cone",
       targetGap: this.staggerDistance(context, 0.2, 245, 390)
     });
+    if (!ramp) {
+      this.waveRedlineSlalom(distance, context, result);
+      return;
+    }
     const lanes = this.orderPressureLanes(context, shuffle(this.lanesExcept(rampLane), () => this.random()));
     const pressureDistance = distance + this.staggerDistance(context, 0.28, 390, 660);
     const leadType = context.progress > 0.5 && this.random() < 0.44 ? "truck" : "fastCar";
     if (this.canAddPressure(result, leadType, context, 0.35)) {
       this.spawn(leadType, lanes[0], pressureDistance, result);
     }
-    if (ramp && this.canAddPressure(result, "slowCar", context, 0.28)) {
+    if (this.canAddPressure(result, "slowCar", context, 0.28)) {
       this.spawn("slowCar", lanes[1], pressureDistance + this.staggerDistance(context, 0.08, 95, 175), result);
     }
   }
@@ -8053,6 +8251,9 @@ class ObstacleManager {
       rampSolution: Boolean(options.rampSolution),
       solutionTargetDistance: Number.isFinite(options.solutionTargetDistance) ? options.solutionTargetDistance : null,
       solutionTargetType: options.solutionTargetType || "",
+      solutionTargetId: options.solutionTargetId || "",
+      solutionClearDistance: Number.isFinite(options.solutionClearDistance) ? options.solutionClearDistance : null,
+      solutionLandingSafetyDistance: Number.isFinite(options.solutionLandingSafetyDistance) ? options.solutionLandingSafetyDistance : ROAD_READABILITY_CONFIG.rampLandingSafetyDistance,
       waveType: options.waveType || "",
       waveLabel: options.waveLabel || "",
       waveId: options.waveId || "",
@@ -8596,22 +8797,63 @@ class ObstacleManager {
     };
   }
 
-  isRampLandingUnsafe(ramp, obstacles) {
-    const rampLane = Math.round(clamp(Number.isFinite(ramp.laneFloat) ? ramp.laneFloat : ramp.lane, 0, LANES - 1));
-    const landingEnd = ramp.distance + ROAD_READABILITY_CONFIG.rampLandingClearDistance;
+  isRampLandingRangeUnsafe(rampLane, targetDistance, obstacles, excluded = new Set()) {
+    const landingStart = targetDistance;
+    const landingEnd = landingStart + ROAD_READABILITY_CONFIG.rampLandingSafetyDistance;
     return obstacles.some((obstacle) => {
-      if (obstacle === ramp || obstacle.hit || obstacle.remove || !HARD_VEHICLE_TYPES.has(obstacle.type)) return false;
-      if (obstacle.distance <= ramp.distance || obstacle.distance > landingEnd) return false;
+      if (excluded.has(obstacle) || obstacle.hit || obstacle.remove || !RAMP_LANDING_UNSAFE_TYPES.has(obstacle.type)) return false;
+      if (obstacle.distance <= landingStart || obstacle.distance > landingEnd) return false;
       return this.getWorldLaneCoverage(obstacle, 0.16).includes(rampLane);
     });
   }
 
+  hasRampPathCollectibleConflict(rampOrLane, rampDistance, targetDistance, obstacles = this.obstacles) {
+    const rampLane = typeof rampOrLane === "object"
+      ? Math.round(clamp(Number.isFinite(rampOrLane.laneFloat) ? rampOrLane.laneFloat : rampOrLane.lane, 0, LANES - 1))
+      : Math.round(clamp(rampOrLane, 0, LANES - 1));
+    const startDistance = typeof rampOrLane === "object" ? rampOrLane.distance : rampDistance;
+    const targetEnd = Number.isFinite(targetDistance)
+      ? targetDistance
+      : (typeof rampOrLane === "object" && Number.isFinite(rampOrLane.solutionTargetDistance)
+        ? rampOrLane.solutionTargetDistance
+        : startDistance + ROAD_READABILITY_CONFIG.rampTargetMaxGap);
+    const pathEnd = targetEnd + ROAD_READABILITY_CONFIG.rampPathCollectibleSafetyDistance;
+    return obstacles.some((obstacle) => {
+      if (obstacle === rampOrLane || obstacle.hit || obstacle.remove || !RAMP_PATH_COLLECTIBLE_TYPES.has(obstacle.type)) return false;
+      if (obstacle.distance <= startDistance || obstacle.distance > pathEnd) return false;
+      return this.getWorldLaneCoverage(obstacle, 0.16).includes(rampLane);
+    });
+  }
+
+  isRampLandingUnsafe(ramp, obstacles) {
+    const rampLane = Math.round(clamp(Number.isFinite(ramp.laneFloat) ? ramp.laneFloat : ramp.lane, 0, LANES - 1));
+    const target = this.getRampSolutionTarget(ramp, obstacles);
+    const targetDistance = Number.isFinite(target?.distance)
+      ? target.distance
+      : (Number.isFinite(ramp.solutionTargetDistance)
+        ? ramp.solutionTargetDistance
+        : ramp.distance + getRampTargetGap(ramp));
+    return this.isRampLandingRangeUnsafe(rampLane, targetDistance, obstacles, new Set([ramp, target].filter(Boolean)));
+  }
+
   getRampSolutionTarget(ramp, obstacles) {
     const rampLane = Math.round(clamp(Number.isFinite(ramp.laneFloat) ? ramp.laneFloat : ramp.lane, 0, LANES - 1));
+    if (ramp.solutionTargetId) {
+      const assigned = obstacles.find((obstacle) => obstacle.id === ramp.solutionTargetId && !obstacle.hit && !obstacle.remove) || null;
+      if (assigned) return assigned;
+    }
+    const targetGap = getRampTargetGap(ramp);
+    const clearDistance = Number.isFinite(ramp.solutionClearDistance)
+      ? ramp.solutionClearDistance
+      : getRampRequiredClearDistance(targetGap);
+    const maxTargetGap = Math.min(
+      ROAD_READABILITY_CONFIG.rampTargetMaxGap,
+      Math.max(ROAD_READABILITY_CONFIG.rampTargetMinGap, clearDistance - ROAD_READABILITY_CONFIG.rampLandingSafetyDistance)
+    );
     return obstacles.find((obstacle) => {
-      if (obstacle === ramp || obstacle.hit || obstacle.remove || !MINOR_HAZARD_TYPES.has(obstacle.type)) return false;
+      if (obstacle === ramp || obstacle.hit || obstacle.remove || !RAMP_TARGET_TYPES.has(obstacle.type)) return false;
       const gap = obstacle.distance - ramp.distance;
-      if (gap < ROAD_READABILITY_CONFIG.rampTargetMinGap || gap > ROAD_READABILITY_CONFIG.rampTargetMaxGap) return false;
+      if (gap < ROAD_READABILITY_CONFIG.rampTargetMinGap || gap > maxTargetGap) return false;
       return this.getWorldLaneCoverage(obstacle, 0.16).includes(rampLane);
     }) || null;
   }
@@ -8625,7 +8867,8 @@ class ObstacleManager {
     const details = ramps.map((ramp) => {
       const target = this.getRampSolutionTarget(ramp, obstacles);
       const unsafeLanding = this.isRampLandingUnsafe(ramp, obstacles);
-      const useful = Boolean(target) && !unsafeLanding;
+      const pathCollectibleConflict = this.hasRampPathCollectibleConflict(ramp, null, target?.distance, obstacles);
+      const useful = Boolean(target) && !unsafeLanding && !pathCollectibleConflict;
       return {
         id: ramp.id,
         lane: Math.round(clamp(Number.isFinite(ramp.laneFloat) ? ramp.laneFloat : ramp.lane, 0, LANES - 1)),
@@ -8633,6 +8876,8 @@ class ObstacleManager {
         wave: ramp.waveType || "unknown",
         useful,
         unsafeLanding,
+        pathCollectibleConflict,
+        clearDistance: Math.round(ramp.solutionClearDistance || getRampRequiredClearDistance(getRampTargetGap(ramp))),
         targetType: target?.type || "",
         targetDistance: target ? Math.round(target.distance) : null
       };
@@ -8642,7 +8887,8 @@ class ObstacleManager {
       total: details.length,
       useful: details.filter((item) => item.useful).length,
       withoutUsefulTarget: details.filter((item) => !item.useful).length,
-      unsafeLanding: details.filter((item) => item.unsafeLanding).length
+      unsafeLanding: details.filter((item) => item.unsafeLanding).length,
+      pathCollectibleConflict: details.filter((item) => item.pathCollectibleConflict).length
     };
   }
 
@@ -8678,15 +8924,25 @@ class ObstacleManager {
     const rampSolutions = obstacles
       .filter((obstacle) => obstacle.type === "ramp" && !obstacle.hit && !obstacle.remove)
       .filter((obstacle) => obstacle.distance >= start - ROAD_READABILITY_CONFIG.rampTargetMaxGap && obstacle.distance <= end)
-      .map((ramp) => ({
-        lane: Math.round(clamp(Number.isFinite(ramp.laneFloat) ? ramp.laneFloat : ramp.lane, 0, LANES - 1)),
-        start: ramp.distance + ROAD_READABILITY_CONFIG.rampTargetMinGap,
-        end: ramp.distance + ROAD_READABILITY_CONFIG.rampTargetMaxGap,
-        unsafe: this.isRampLandingUnsafe(ramp, obstacles)
-      }))
+      .map((ramp) => {
+        const target = this.getRampSolutionTarget(ramp, obstacles);
+        const targetGap = getRampTargetGap(ramp);
+        const clearDistance = Number.isFinite(ramp.solutionClearDistance)
+          ? ramp.solutionClearDistance
+          : getRampClearDistanceForSpeed(currentSpeed, targetGap);
+        return {
+          lane: Math.round(clamp(Number.isFinite(ramp.laneFloat) ? ramp.laneFloat : ramp.lane, 0, LANES - 1)),
+          start: ramp.distance + ROAD_READABILITY_CONFIG.rampTargetMinGap,
+          end: target
+            ? target.distance + 160
+            : ramp.distance + Math.max(ROAD_READABILITY_CONFIG.rampTargetMinGap, clearDistance - ROAD_READABILITY_CONFIG.rampLandingSafetyDistance),
+          unsafe: this.isRampLandingUnsafe(ramp, obstacles),
+          pathCollectibleConflict: this.hasRampPathCollectibleConflict(ramp, null, target?.distance, obstacles)
+        };
+      })
       .filter((ramp) => !ramp.unsafe);
-    const minorIsSolvedByRamp = (lane, distance) => rampSolutions.some((ramp) => (
-      ramp.lane === lane && distance >= ramp.start && distance <= ramp.end
+    const objectIsSolvedByRamp = (lane, distance, type) => RAMP_TARGET_TYPES.has(type) && rampSolutions.some((ramp) => (
+      !ramp.pathCollectibleConflict && ramp.lane === lane && distance >= ramp.start && distance <= ramp.end
     ));
     const sampleDistances = [];
     for (let distance = start; distance <= end; distance += band) {
@@ -8708,7 +8964,11 @@ class ObstacleManager {
       for (const record of records) {
         if (Math.abs(record.obstacle.distance - sampleDistance) > band * 0.5) continue;
         if (HARD_VEHICLE_TYPES.has(record.obstacle.type)) {
-          for (const lane of record.lanes) hardLanes.add(lane);
+          for (const lane of record.lanes) {
+            if (!objectIsSolvedByRamp(lane, record.obstacle.distance, record.obstacle.type)) {
+              hardLanes.add(lane);
+            }
+          }
           blockers.push({
             type: record.obstacle.type,
             lane: record.obstacle.lane,
@@ -8718,7 +8978,7 @@ class ObstacleManager {
           });
         } else if (MINOR_HAZARD_TYPES.has(record.obstacle.type)) {
           for (const lane of record.lanes) {
-            if (!minorIsSolvedByRamp(lane, record.obstacle.distance)) {
+            if (!objectIsSolvedByRamp(lane, record.obstacle.distance, record.obstacle.type)) {
               minorLanes.add(lane);
             }
           }
@@ -9128,15 +9388,12 @@ class CollisionSystem {
       if (collision.hit) {
         const result = this.getCollisionResult(obstacle, info);
         this.logCollision(obstacle, info, playerBox, obstacleBox, collision.overlap, result, minOverlapPx);
-        if (obstacle.type === "gasCan") {
-          this.game.collectGasCan(obstacle);
+        if (result === "airborne-pass") {
+          this.resolveAirbornePass(obstacle, info);
           continue;
         }
-        if (run.airborne && !info.tall && obstacle.type !== "ramp" && obstacle.type !== "boostPad") {
-          obstacle.hit = true;
-          obstacle.remove = true;
-          run.lastCollision = `jumped ${info.label}`;
-          run.collisionState = `airborne over ${info.label}`;
+        if (obstacle.type === "gasCan") {
+          this.game.collectGasCan(obstacle);
           continue;
         }
         run.collisionState = `hit ${info.label}`;
@@ -9161,15 +9418,24 @@ class CollisionSystem {
     return passedPlayer && stillCloseVertically && closeHorizontally;
   }
 
+  shouldAirborneClear(obstacle) {
+    return Boolean(this.game.run.airborne && RAMP_CLEARABLE_TYPES.has(obstacle.type));
+  }
+
   getCollisionResult(obstacle, info) {
-    const run = this.game.run;
-    if (run.airborne && !info.tall && obstacle.type !== "ramp" && obstacle.type !== "boostPad") return "airborne-pass";
+    if (this.shouldAirborneClear(obstacle, info)) return "airborne-pass";
     if (info.crash) return "crash";
     if (obstacle.type === "gasCan") return "collect";
     if (obstacle.type === "oil") return "oil";
     if (obstacle.type === "ramp") return "ramp";
     if (obstacle.type === "boostPad") return "boost";
     return "slowdown";
+  }
+
+  resolveAirbornePass(obstacle, info) {
+    obstacle.hit = true;
+    obstacle.remove = true;
+    this.game.recordRampAirbornePass(obstacle, info);
   }
 
   logCollision(obstacle, info, playerBox, obstacleBox, overlap, result, minOverlapPx) {
@@ -9212,7 +9478,7 @@ class CollisionSystem {
 
     if (obstacle.type === "ramp") {
       run.rampsUsed += 1;
-      this.game.launchJump();
+      this.game.launchJump(obstacle);
       this.game.addScoreEvent("ramp", 80);
       this.game.audio.playSfx("ramp");
       return;
@@ -10910,7 +11176,7 @@ class Renderer {
       `playtest result: ${currentResultStatus}`,
       `playtest lanes: changes ${run.laneMoves || 0} center ${(run.centerLaneTime || 0).toFixed(1)}s streak ${(run.currentCenterLaneStreak || 0).toFixed(1)}s max ${(run.longestCenterLaneStreak || 0).toFixed(1)}s`,
       `playtest fuel: gas ${run.gasCansCollected || 0}/${run.gasCansSpawned || 0} low ${(run.lowFuelSeconds || 0).toFixed(1)}s critical ${(run.criticalFuelSeconds || 0).toFixed(1)}s`,
-      `playtest boost: manual ${run.manualBoostsUsed || 0} pads ${run.boostPadsCollected || 0} ramps ${run.rampsUsed || 0}`,
+      `playtest boost: manual ${run.manualBoostsUsed || 0} pads ${run.boostPadsCollected || 0} ramps ${run.rampsUsed || 0} targets ${run.rampTargetsCleared || 0}/${run.rampTargetsAssigned || 0}`,
       `playtest director: waves ${directorDebug.waveCount || 0} meaningful ${directorDebug.meaningfulWaveCount || 0} support ${directorDebug.supportWaveCount || 0}`,
       `playtest launch: first10 ${directorDebug.wavesFirst10Seconds || 0} launch ${directorDebug.launchWaveCount || 0}/${directorDebug.launchMeaningfulWaveCount || 0} hardest ${directorDebug.hardestPressureObserved || 0}`,
       `race type: ${directorDebug.raceType}`,
@@ -10961,14 +11227,15 @@ class Renderer {
       `progress: ${(progress * 100).toFixed(1)}%`,
       `section: ${directorDebug.sectionId} ${directorDebug.sectionLabel} ${(directorDebug.sectionProgress * 100).toFixed(0)}%`,
       `section mult: pressure ${directorDebug.sectionPressureMultiplier.toFixed(2)} visual ${directorDebug.sectionVisualIntensity.toFixed(2)}`,
-      `airborne: ${run.airborne}`,
+      `airborne: ${run.airborne} remaining ${(run.jumpTimer || 0).toFixed(2)}s clear ${(run.rampClearDistance || 0).toFixed(0)} landing ${(run.rampLandingSafetyDistance || 0).toFixed(0)}`,
       `collision: ${run.collisionState}`,
       `last hit: ${run.lastCollision}`,
       `danger max: ${this.game.obstacles.lastSafetySummary?.maxBlocked ?? 0}`,
       `hard blockers visible: max ${visibleHardBlockers.maxBlocked} ${visibleHardBlockers.invalid ? "WALL" : (visibleHardBlockers.maxBlocked >= 4 ? "warning" : "ok")}`,
       `hard rows: max ${visibleHardRows.maxBlocked} flat3+ ${visibleHardRows.flatRows} flat4 ${visibleHardRows.fourLaneRows}`,
       `route: failures ${visibleRoute.routeFailures} timing ${visibleRoute.timingRouteFailures || 0} minor-only-open ${visibleRoute.minorOnlyOpenLaneEvents}`,
-      `ramps visible: useful ${visibleRamps.useful}/${visibleRamps.total} unsafe ${visibleRamps.unsafeLanding}`,
+      `ramps visible: useful ${visibleRamps.useful}/${visibleRamps.total} unsafe ${visibleRamps.unsafeLanding} path-conflict ${visibleRamps.pathCollectibleConflict || 0}`,
+      `ramp target: ${run.lastRampTargetStatus || "none"} rejected ${run.rampLandingRejected || 0} failed ${run.rampFailedToClearTarget || 0}`,
       `prevented: ${this.game.obstacles.preventedUnsafeSpawns}`,
       `band: ${directorDebug.band}`,
       `wave: ${directorDebug.wave}`,
@@ -12267,9 +12534,18 @@ class NeonRoadRally {
       slowdownTimer: 0,
       slowdownFactor: 1,
       jumpTimer: 0,
-      jumpDuration: 0.95,
+      jumpDuration: ROAD_READABILITY_CONFIG.rampMinAirborneDuration + ROAD_READABILITY_CONFIG.rampLandingGraceSeconds,
       jumpOffset: 0,
       airborne: false,
+      rampAirborneDuration: 0,
+      rampClearDistance: ROAD_READABILITY_CONFIG.rampClearDistance,
+      rampLandingSafetyDistance: ROAD_READABILITY_CONFIG.rampLandingSafetyDistance,
+      rampTargetsAssigned: 0,
+      rampTargetsCleared: 0,
+      rampLandingRejected: 0,
+      rampFailedToClearTarget: 0,
+      activeRampTarget: null,
+      lastRampTargetStatus: "none",
       cleanTimer: 0,
       cleanBonusCount: 0,
       nearMisses: 0,
@@ -12627,11 +12903,14 @@ class NeonRoadRally {
     }
 
     if (run.jumpTimer > 0) {
+      const wasAirborne = run.airborne;
       run.jumpTimer = Math.max(0, run.jumpTimer - dt);
       const progress = 1 - run.jumpTimer / run.jumpDuration;
       run.jumpOffset = Math.sin(progress * Math.PI) * 56;
-      run.airborne = run.jumpTimer > 0.08;
+      run.airborne = run.jumpTimer > ROAD_READABILITY_CONFIG.rampLandingGraceSeconds;
+      if (wasAirborne && !run.airborne) this.finishRampLanding();
     } else {
+      if (run.airborne) this.finishRampLanding();
       run.jumpOffset = 0;
       run.airborne = false;
     }
@@ -13005,11 +13284,70 @@ class NeonRoadRally {
     this.audio.playSfx("boost");
   }
 
-  launchJump() {
+  launchJump(obstacle = null) {
     const run = this.run;
-    run.jumpDuration = 0.95;
+    const speed = Math.max(1, Number.isFinite(run.currentSpeed) ? run.currentSpeed : run.baseCruiseSpeed || 1);
+    const targetGap = getRampTargetGap(obstacle);
+    const airborneDuration = getRampAirborneDurationForSpeed(speed, targetGap);
+    const clearDistance = getRampClearDistanceForSpeed(speed, targetGap);
+    run.rampAirborneDuration = airborneDuration;
+    run.rampClearDistance = clearDistance;
+    run.rampLandingSafetyDistance = ROAD_READABILITY_CONFIG.rampLandingSafetyDistance;
+    run.jumpDuration = airborneDuration + ROAD_READABILITY_CONFIG.rampLandingGraceSeconds;
     run.jumpTimer = run.jumpDuration;
     run.airborne = true;
+    if (obstacle?.solutionTargetDistance) {
+      run.activeRampTarget = {
+        id: obstacle.solutionTargetId || "",
+        type: obstacle.solutionTargetType || "",
+        lane: Math.round(clamp(Number.isFinite(obstacle.laneFloat) ? obstacle.laneFloat : obstacle.lane, 0, LANES - 1)),
+        rampDistance: obstacle.distance,
+        targetDistance: obstacle.solutionTargetDistance,
+        targetRunDistance: run.distance + targetGap,
+        clearDistance,
+        landingSafetyDistance: ROAD_READABILITY_CONFIG.rampLandingSafetyDistance,
+        cleared: false
+      };
+      run.lastRampTargetStatus = `airborne toward ${obstacle.solutionTargetType || "target"}`;
+    } else {
+      run.activeRampTarget = null;
+      run.lastRampTargetStatus = "free jump";
+    }
+  }
+
+  recordRampAirbornePass(obstacle, info = OBSTACLE_INFO[obstacle?.type] || {}) {
+    const run = this.run;
+    if (!run) return;
+    const label = info.label || obstacle?.type || "object";
+    run.lastCollision = `jumped ${label}`;
+    run.collisionState = `airborne over ${label}`;
+    const target = run.activeRampTarget;
+    if (!target || target.cleared || !obstacle) return;
+    const obstacleLane = Math.round(clamp(Number.isFinite(obstacle.laneFloat) ? obstacle.laneFloat : obstacle.lane, 0, LANES - 1));
+    const sameTarget = target.id
+      ? obstacle.id === target.id
+      : (obstacle.type === target.type && obstacleLane === target.lane && Math.abs(obstacle.distance - target.targetDistance) <= 180);
+    if (!sameTarget) return;
+    target.cleared = true;
+    run.rampTargetsCleared = (run.rampTargetsCleared || 0) + 1;
+    run.lastRampTargetStatus = `cleared ${label}`;
+  }
+
+  finishRampLanding() {
+    const run = this.run;
+    const target = run?.activeRampTarget;
+    if (!target) return;
+    if (!target.cleared) {
+      if (run.distance >= target.targetRunDistance) {
+        target.cleared = true;
+        run.rampTargetsCleared = (run.rampTargetsCleared || 0) + 1;
+        run.lastRampTargetStatus = target.type ? `cleared ${target.type}` : "cleared ramp target";
+      } else {
+        run.rampFailedToClearTarget = (run.rampFailedToClearTarget || 0) + 1;
+        run.lastRampTargetStatus = target.type ? `landed before ${target.type}` : "landed before target";
+      }
+    }
+    run.activeRampTarget = null;
   }
 
   focusControls() {
@@ -13216,6 +13554,18 @@ class NeonRoadRally {
     )) || standings.find((standing) => standing.playerId === summary.playerId) || null;
   }
 
+  awardCompletedPartySessionBadges(session, summary) {
+    if (!session?.isPartyMode || !session.completed || session.partyStarterBadgesAwarded) return [];
+    session.partyStarterBadgesAwarded = true;
+    const earnedForSummary = [];
+    const completedAt = new Date().toISOString();
+    session.selectedPlayers.forEach((player) => {
+      const earned = this.profiles.awardBadges(player.id, ["party_starter"], completedAt);
+      if (player.id === summary?.playerId) earnedForSummary.push(...earned);
+    });
+    return earnedForSummary;
+  }
+
   buildPlaytestRunSummary(summary) {
     const run = this.run || {};
     const directorStats = this.obstacles?.director?.getSimulationStats
@@ -13323,6 +13673,14 @@ class NeonRoadRally {
       waveFamilyCounts: normalizeCountMap(directorStats.waveFamilyCounts || {}),
       rewardLaneDistribution,
       rampUseRate: directorStats.rampUseRate || 0,
+      rampsSpawned: directorStats.rampsSpawned || 0,
+      rampAirborneDuration: run.rampAirborneDuration || 0,
+      rampClearDistance: run.rampClearDistance || 0,
+      rampLandingSafetyDistance: run.rampLandingSafetyDistance || ROAD_READABILITY_CONFIG.rampLandingSafetyDistance,
+      rampTargetsAssigned: run.rampTargetsAssigned || directorStats.rampTargetsAssigned || 0,
+      rampTargetsCleared: run.rampTargetsCleared || directorStats.rampTargetsCleared || 0,
+      rampLandingRejected: run.rampLandingRejected || directorStats.rampLandingRejected || 0,
+      rampFailedToClearTarget: run.rampFailedToClearTarget || directorStats.rampFailedToClearTarget || 0,
       hardestPressureObserved: run.hardestPressureObserved || 0,
       gasCansSpawned: summary.gasCansSpawned,
       gasCansCollected: summary.gasCansCollected,
@@ -13541,11 +13899,15 @@ class NeonRoadRally {
     }
     summary.newlyEarnedBadges = this.profiles.evaluateRunBadges(summary);
     summary.totalBadgesEarned = this.profiles.getPlayerBadgeProgress(summary.playerId).earnedCount;
-    summary.totalBadgesAvailable = BADGE_DEFINITIONS.length;
+    summary.totalBadgesAvailable = getVisibleBadgeDefinitions().length;
     summary.titleChanges = this.profiles.evaluateRunTitles(summary, previousTitleBoard);
     this.lastSummary = summary;
     if (run.partyMode && this.partySession?.isPartyMode) {
       this.lastSummary.partyResult = this.partySession.addResult(this.lastSummary);
+      const partyBadges = this.awardCompletedPartySessionBadges(this.partySession, this.lastSummary);
+      if (partyBadges.length) {
+        this.lastSummary.newlyEarnedBadges = this.lastSummary.newlyEarnedBadges.concat(partyBadges);
+      }
       const partyStanding = this.getPartyStandingForSummary(this.lastSummary);
       if (partyStanding && this.lastSummary.partyResult) {
         this.lastSummary.partyResult.rank = partyStanding.rank;
@@ -13558,6 +13920,8 @@ class NeonRoadRally {
         this.lastSummary.partyCompletedRuns = partyStanding.completedRuns;
       }
       this.lastSummary.partyLeaderChanges = this.partySession.leaderChanges || 0;
+      this.lastSummary.totalBadgesEarned = this.profiles.getPlayerBadgeProgress(this.lastSummary.playerId).earnedCount;
+      this.lastSummary.totalBadgesAvailable = getVisibleBadgeDefinitions().length;
     }
     this.recordPlaytestRunSummary(this.lastSummary);
 
@@ -16066,6 +16430,12 @@ class NeonRoadRally {
         centerRewards: director?.stats?.centerRewardCount || 0,
         rampsSpawned: director?.stats?.rampLaneCounts?.reduce((sum, count) => sum + count, 0) || 0,
         rampsUsed: run.rampsUsed || 0,
+        rampAirborneDuration: Number.isFinite(run.rampAirborneDuration) ? Number(run.rampAirborneDuration.toFixed(2)) : 0,
+        rampClearDistance: Math.round(run.rampClearDistance || ROAD_READABILITY_CONFIG.rampClearDistance),
+        rampTargetsAssigned: run.rampTargetsAssigned || director?.stats?.rampTargetsAssigned || 0,
+        rampTargetsCleared: run.rampTargetsCleared || 0,
+        rampLandingRejected: run.rampLandingRejected || director?.stats?.rampLandingRejected || 0,
+        rampFailedToClearTarget: run.rampFailedToClearTarget || director?.stats?.rampFailedToClearTarget || 0,
         boostPadsSpawned: director?.stats?.boostLaneCounts?.reduce((sum, count) => sum + count, 0) || 0,
         boostPadsCollected: run.boostPadsCollected || 0,
         gasCansSpawned: run.gasCansSpawned || 0,
@@ -16175,6 +16545,7 @@ class NeonRoadRally {
           ${card("Schedule Detail", `${snapshot.schedule.nextScheduledWaveDistance ?? "unknown"} world`, `horizon ${snapshot.schedule.spawnHorizonAhead ?? "unknown"} - max/frame ${snapshot.schedule.maxWavesPerFrame ?? "unknown"}`)}
           ${card("Corrections", `${snapshot.counters.underActivityCorrections} underactivity`, `${snapshot.counters.overActivityDelays} over-density delays`)}
           ${card("Reward Counts", `${snapshot.rewardLaneDistribution.boostPadsCollected}/${snapshot.rewardLaneDistribution.boostPadsSpawned} boosts`, `${snapshot.rewardLaneDistribution.rampsUsed}/${snapshot.rewardLaneDistribution.rampsSpawned} ramps - ${snapshot.rewardLaneDistribution.gasCansCollected}/${snapshot.rewardLaneDistribution.gasCansSpawned} gas`)}
+          ${card("Ramp Trust", `${snapshot.rewardLaneDistribution.rampTargetsCleared}/${snapshot.rewardLaneDistribution.rampTargetsAssigned} targets`, `${snapshot.rewardLaneDistribution.rampAirborneDuration}s air - ${snapshot.rewardLaneDistribution.rampClearDistance} clear - ${snapshot.rewardLaneDistribution.rampLandingRejected} rejects - ${snapshot.rewardLaneDistribution.rampFailedToClearTarget} failed`)}
           ${card("Counters", `${snapshot.counters.activeFieldBudgetDelays} active-field delays`, `${snapshot.counters.activeFieldRejectedSpawns} active rejects - ${snapshot.counters.combinedRouteFailures} route blocks`)}
         </div>
         <div class="playtest-report-columns director-lab-columns">
@@ -16279,7 +16650,7 @@ class NeonRoadRally {
           <div class="score-card"><strong>Avg Lane Changes</strong><span>${this.formatPlaytestDecimal(aggregate.averageLaneChanges)}</span></div>
           <div class="score-card"><strong>Avg Center-Lane Time</strong><span>${formatTime(aggregate.averageCenterLaneTime)}</span></div>
           <div class="score-card"><strong>New Badges</strong><span>${aggregate.totalNewBadges}</span></div>
-          <div class="score-card"><strong>Badge High Water</strong><span>${aggregate.maxTotalBadgesEarned}/${BADGE_DEFINITIONS.length}</span></div>
+          <div class="score-card"><strong>Badge High Water</strong><span>${aggregate.maxTotalBadgesEarned}/${getVisibleBadgeDefinitions().length}</span></div>
           <div class="score-card"><strong>Avg Waves First 10s</strong><span>${this.formatPlaytestDecimal(aggregate.averageWavesFirst10Seconds)}</span></div>
           <div class="score-card"><strong>Avg Launch Waves</strong><span>${this.formatPlaytestDecimal(aggregate.averageLaunchWaveCount)}</span></div>
           <div class="score-card"><strong>Avg Meaningful Waves</strong><span>${this.formatPlaytestDecimal(aggregate.averageMeaningfulWaveCount)}</span></div>
@@ -17235,7 +17606,7 @@ class NeonRoadRally {
     if (!player) return "";
     const progress = this.profiles.getPlayerBadgeProgress(player);
     const activeFilter = normalizeBadgeFilter(this.badgeFilter);
-    const badgeModels = this.profiles.getBadgeViewModels(player).filter((badge) => badge.earned || !badge.hidden);
+    const badgeModels = this.profiles.getBadgeViewModels(player).filter(isVisibleBadgeDefinition);
     const badges = activeFilter === "all"
       ? badgeModels
       : badgeModels.filter((badge) => badge.category === activeFilter);
