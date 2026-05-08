@@ -29,7 +29,7 @@ const BADGE_DEFINITIONS = [
   {
     id: "first_run_posted",
     name: "First Run",
-    description: "Complete any saved run.",
+    description: "Post any saved run, finished or crashed.",
     category: "starter",
     difficulty: "Easy",
     hidden: false,
@@ -47,7 +47,7 @@ const BADGE_DEFINITIONS = [
   {
     id: "first_personal_best",
     name: "Personal Best",
-    description: "Earn a new personal best.",
+    description: "Beat your own best saved score.",
     category: "starter",
     difficulty: "Easy",
     hidden: false,
@@ -57,7 +57,7 @@ const BADGE_DEFINITIONS = [
     id: "top_20_entry",
     name: "Top 20",
     description: "Enter the local Top 20 leaderboard.",
-    category: "score",
+    category: "starter",
     difficulty: "Normal",
     hidden: false,
     icon: "20"
@@ -75,7 +75,7 @@ const BADGE_DEFINITIONS = [
     id: "turbo_survivor",
     name: "Turbo Survivor",
     description: "Finish any Turbo race.",
-    category: "race_mode",
+    category: "mode",
     difficulty: "Hard",
     hidden: false,
     icon: "TUR"
@@ -102,7 +102,7 @@ const BADGE_DEFINITIONS = [
     id: "fuel_run_finish",
     name: "Fuel Survivor",
     description: "Finish any Fuel Run.",
-    category: "fuel_run",
+    category: "fuel",
     difficulty: "Normal",
     hidden: false,
     icon: "FUEL"
@@ -118,6 +118,16 @@ const BADGE_DEFINITIONS = [
   }
 ];
 const BADGE_DEFINITION_BY_ID = Object.fromEntries(BADGE_DEFINITIONS.map((badge) => [badge.id, badge]));
+const BADGE_CATEGORY_FILTERS = [
+  { id: "all", label: "All" },
+  { id: "starter", label: "Starter" },
+  { id: "skill", label: "Skill" },
+  { id: "track", label: "Track" },
+  { id: "mode", label: "Mode" },
+  { id: "fuel", label: "Fuel" },
+  { id: "challenge", label: "Challenge" }
+];
+const BADGE_CATEGORY_LABELS = Object.fromEntries(BADGE_CATEGORY_FILTERS.map((filter) => [filter.id, filter.label]));
 const LANES = 5;
 const CAMERA_CONFIG = {
   originalViewDistance: 1700,
@@ -2327,6 +2337,36 @@ function formatBadgeEarnedDate(entry) {
   return earnedAt ? formatShortDate(earnedAt) : "Earned";
 }
 
+function normalizeBadgeFilter(value) {
+  const id = normalizeStorageId(value, "all");
+  return BADGE_CATEGORY_FILTERS.some((filter) => filter.id === id) ? id : "all";
+}
+
+function getBadgeCategoryLabel(category) {
+  const id = normalizeStorageId(category, "");
+  return BADGE_CATEGORY_LABELS[id] || "Badge";
+}
+
+function getRecentlyEarnedBadges(player, limit = 3) {
+  const badges = normalizePlayerBadges(player?.badges);
+  return Object.entries(badges.earned)
+    .map(([id, entry]) => {
+      const definition = getBadgeDefinition(id);
+      if (!definition) return null;
+      return {
+        ...definition,
+        earnedAt: entry?.earnedAt || ""
+      };
+    })
+    .filter(Boolean)
+    .sort((a, b) => {
+      const aTime = Date.parse(a.earnedAt || "") || 0;
+      const bTime = Date.parse(b.earnedAt || "") || 0;
+      return bTime - aTime;
+    })
+    .slice(0, Math.max(0, Math.min(6, limit)));
+}
+
 function normalizeCarConfig(value, fallback = DEFAULT_CAR) {
   const source = value && typeof value === "object" ? value : {};
   const fallbackCar = { ...DEFAULT_CAR, ...(fallback && typeof fallback === "object" ? fallback : {}) };
@@ -3222,6 +3262,7 @@ class PlayerProfileManager {
       const earnedEntry = badges.earned[definition.id] || null;
       return {
         ...definition,
+        categoryLabel: getBadgeCategoryLabel(definition.category),
         earned: Boolean(earnedEntry),
         earnedAt: earnedEntry?.earnedAt || ""
       };
@@ -11756,6 +11797,7 @@ class NeonRoadRally {
     this.pendingTrackId = DEFAULT_TRACK_ID;
     this.partySetup = null;
     this.partySession = null;
+    this.badgeFilter = "all";
     this.playtestReportFilter = "all";
     this.playtestReportCopyText = "";
     this.roadDirectorReportCopyText = "";
@@ -12393,6 +12435,7 @@ class NeonRoadRally {
     this.setScreen("challenges");
     this.audio.playMusic("title", false);
     const player = this.profiles.getCurrentPlayer();
+    const badgeProgress = player ? this.profiles.getPlayerBadgeProgress(player) : null;
     this.layer.classList.remove("is-empty");
     this.layer.innerHTML = `
       <section class="panel challenge-panel">
@@ -12404,7 +12447,7 @@ class NeonRoadRally {
           </div>
           <div class="challenge-player-card">
             <strong>${player ? escapeHtml(player.name) : "No Player"}</strong>
-            <span>${player ? `Driving ${escapeHtml(player.car.name)}` : "Create a local player first"}</span>
+            <span>${player ? `Driving ${escapeHtml(player.car.name)} - Badges ${badgeProgress.earnedCount}/${badgeProgress.totalCount}` : "Create a local player first"}</span>
           </div>
         </div>
         <div class="challenge-track-list">
@@ -14973,7 +15016,10 @@ class NeonRoadRally {
     const player = this.profiles.getCurrentPlayer();
     const selectedSpeedClass = getSpeedClassConfig(this.profiles.data.speedClassId);
     const playerName = player ? escapeHtml(player.name) : "No Player";
-    const playerDetail = player ? `Driving ${escapeHtml(player.car.name)}` : "Create or choose a local driver";
+    const badgeProgress = player ? this.profiles.getPlayerBadgeProgress(player) : null;
+    const playerDetail = player
+      ? `Driving ${escapeHtml(player.car.name)} - Badges ${badgeProgress.earnedCount}/${badgeProgress.totalCount}`
+      : "Create or choose a local driver";
     const audioStatus = `Music ${this.audio.musicMuted ? "Muted" : "On"} / SFX ${this.audio.sfxMuted ? "Muted" : "On"}`;
     this.layer.classList.remove("is-empty");
     this.layer.innerHTML = `
@@ -16720,26 +16766,40 @@ class NeonRoadRally {
   }
 
   renderNewBadgeCallouts(summary) {
-    const badges = Array.isArray(summary?.newlyEarnedBadges) ? summary.newlyEarnedBadges.slice(0, 3) : [];
+    const badges = Array.isArray(summary?.newlyEarnedBadges) ? summary.newlyEarnedBadges : [];
     if (!badges.length) return "";
-    return badges.map((badge) => `
-      <span class="score-callout is-hot">Badge Earned: ${escapeHtml(badge.name)}</span>
-    `).join("");
+    const label = badges.length === 1
+      ? `Badge Earned: ${badges[0].name}`
+      : `${badges.length} Badges Earned`;
+    return `
+      <span class="score-callout is-hot is-badge">${escapeHtml(label)}</span>
+    `;
   }
 
   renderBadgeEarnedPanel(summary, compact = false) {
-    const badges = Array.isArray(summary?.newlyEarnedBadges) ? summary.newlyEarnedBadges.slice(0, 4) : [];
-    if (!badges.length) return "";
+    const allBadges = Array.isArray(summary?.newlyEarnedBadges) ? summary.newlyEarnedBadges : [];
+    const badges = allBadges.slice(0, 4);
+    if (!allBadges.length) return "";
+    const playerName = sanitizePlayerName(summary?.playerName, "Driver");
+    const overflowCount = Math.max(0, allBadges.length - badges.length);
     return `
       <div class="badge-earned-panel ${compact ? "is-compact" : ""}">
-        <span class="eyebrow">${badges.length === 1 ? "Badge Earned" : "Badges Earned"}</span>
+        <div class="badge-earned-header">
+          <span class="eyebrow">${allBadges.length === 1 ? "Badge Earned" : "Badges Earned"}</span>
+          <strong>${allBadges.length === 1 ? escapeHtml(allBadges[0].name) : `${allBadges.length} new badges`}</strong>
+          ${compact ? "" : `<small>Saved to ${escapeHtml(playerName)}'s driver profile.</small>`}
+        </div>
         <div class="badge-chip-row">
           ${badges.map((badge) => `
             <span class="badge-chip is-earned">
               <strong>${escapeHtml(badge.icon || "BDG")}</strong>
-              <span>${escapeHtml(badge.name)}</span>
+              <span>
+                <b>${escapeHtml(badge.name)}</b>
+                ${compact ? "" : `<small>${escapeHtml(getBadgeCategoryLabel(badge.category))} - ${escapeHtml(badge.description)}</small>`}
+              </span>
             </span>
           `).join("")}
+          ${overflowCount ? `<span class="badge-chip is-earned"><strong>+${overflowCount}</strong><span><b>More saved</b></span></span>` : ""}
         </div>
       </div>
     `;
@@ -16748,7 +16808,16 @@ class NeonRoadRally {
   renderPlayerBadgePanel(player) {
     if (!player) return "";
     const progress = this.profiles.getPlayerBadgeProgress(player);
-    const badges = this.profiles.getBadgeViewModels(player).filter((badge) => badge.earned || !badge.hidden);
+    const activeFilter = normalizeBadgeFilter(this.badgeFilter);
+    const badgeModels = this.profiles.getBadgeViewModels(player).filter((badge) => badge.earned || !badge.hidden);
+    const badges = activeFilter === "all"
+      ? badgeModels
+      : badgeModels.filter((badge) => badge.category === activeFilter);
+    const recentBadges = getRecentlyEarnedBadges(player, 3);
+    const filteredEarned = badges.filter((badge) => badge.earned).length;
+    const filteredLabel = activeFilter === "all"
+      ? `${progress.totalCount - progress.earnedCount} left`
+      : `${filteredEarned}/${badges.length} shown`;
     return `
       <div class="badge-profile-panel">
         <div class="badge-profile-header">
@@ -16756,14 +16825,35 @@ class NeonRoadRally {
             <span class="eyebrow">Driver Badges</span>
             <strong>${progress.earnedCount}/${progress.totalCount} earned</strong>
           </div>
-          <span>${progress.totalCount - progress.earnedCount} left</span>
+          <span>${escapeHtml(filteredLabel)}</span>
+        </div>
+        ${recentBadges.length ? `
+          <div class="recent-badge-row">
+            <span class="eyebrow">Recently Earned</span>
+            ${recentBadges.map((badge) => `
+              <span class="recent-badge-chip">
+                <strong>${escapeHtml(badge.icon || "BDG")}</strong>
+                <span>${escapeHtml(badge.name)}</span>
+              </span>
+            `).join("")}
+          </div>
+        ` : ""}
+        <div class="badge-filter-row" aria-label="Badge categories">
+          ${BADGE_CATEGORY_FILTERS.map((filter) => `
+            <button class="badge-filter-button ${activeFilter === filter.id ? "is-active" : ""}" type="button" data-action="setBadgeFilter" data-filter="${escapeHtml(filter.id)}">
+              ${escapeHtml(filter.label)}
+            </button>
+          `).join("")}
         </div>
         <div class="badge-grid">
           ${badges.map((badge) => `
             <span class="badge-card ${badge.earned ? "is-earned" : "is-locked"}">
               <strong>${escapeHtml(badge.icon || "BDG")}</strong>
-              <span>${escapeHtml(badge.name)}</span>
-              <small>${badge.earned ? escapeHtml(formatBadgeEarnedDate({ earnedAt: badge.earnedAt })) : escapeHtml(badge.description)}</small>
+              <span>
+                <b>${escapeHtml(badge.name)}</b>
+                <small>${escapeHtml(badge.categoryLabel)} - ${escapeHtml(badge.difficulty)}</small>
+              </span>
+              <small>${badge.earned ? `Earned ${escapeHtml(formatBadgeEarnedDate({ earnedAt: badge.earnedAt }))}` : `Locked: ${escapeHtml(badge.description)}`}</small>
             </span>
           `).join("")}
         </div>
@@ -17556,6 +17646,7 @@ class NeonRoadRally {
         else if (action === "resume") this.togglePause();
         else if (action === "createPlayer") this.handleCreatePlayer();
         else if (action === "selectPlayer") this.handleSelectPlayer(button.dataset.id);
+        else if (action === "setBadgeFilter") this.handleSetBadgeFilter(button.dataset.filter);
         else if (action === "saveCar") this.handleSaveCar();
         else if (action === "resetData") this.handleResetData();
         else if (action === "copyPlaytestReport") this.handleCopyPlaytestReport();
@@ -17595,6 +17686,11 @@ class NeonRoadRally {
     this.profiles.selectPlayer(id);
     const player = this.profiles.getCurrentPlayer();
     this.showPlayerScreen(player ? `${player.name} selected.` : "");
+  }
+
+  handleSetBadgeFilter(filter) {
+    this.badgeFilter = normalizeBadgeFilter(filter);
+    this.showPlayerScreen();
   }
 
   handleSaveCar() {
