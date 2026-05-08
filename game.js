@@ -1874,20 +1874,62 @@ const TRACK_DIRECTOR_BANDS = [
   }
 ];
 
+const CAR_BODY_STYLES = [
+  { id: "wedge", name: "Wedge Racer", sprite: "assets/cars/wedge-racer.png" },
+  { id: "muscle", name: "Muscle Coupe", sprite: "assets/cars/muscle-coupe.png" },
+  { id: "formula", name: "Tiny Formula", sprite: "assets/cars/tiny-formula.png" }
+];
+
+const PLAYER_CAR_PAINT_STYLE_VERSION = 1;
+const ORIGINAL_CAR_PAINT_ID = "original";
+const DEFAULT_CAR_STYLE = {
+  bodyColor: ORIGINAL_CAR_PAINT_ID,
+  accentColor: ORIGINAL_CAR_PAINT_ID,
+  boostTrail: "cyan"
+};
+
+const CAR_BODY_COLOR_OPTIONS = [
+  { id: ORIGINAL_CAR_PAINT_ID, label: "Original", hex: null },
+  { id: "red", label: "Red", hex: "#ff3b58" },
+  { id: "blue", label: "Blue", hex: "#3777ff" },
+  { id: "green", label: "Green", hex: "#44ff99" },
+  { id: "yellow", label: "Yellow", hex: "#ffe45e" },
+  { id: "purple", label: "Purple", hex: "#8f5cff" },
+  { id: "pink", label: "Pink", hex: "#ff3fd1" },
+  { id: "white", label: "White", hex: "#f6fbff" },
+  { id: "black", label: "Black", hex: "#10131f" },
+  { id: "orange", label: "Orange", hex: "#ff8f3f" },
+  { id: "cyan", label: "Cyan", hex: "#28f6ff" }
+];
+
+const CAR_ACCENT_COLOR_OPTIONS = [
+  { id: ORIGINAL_CAR_PAINT_ID, label: "Original", hex: null },
+  { id: "cyan", label: "Cyan", hex: "#28f6ff" },
+  { id: "magenta", label: "Magenta", hex: "#ff3fd1" },
+  { id: "yellow", label: "Yellow", hex: "#ffe45e" },
+  { id: "white", label: "White", hex: "#f6fbff" },
+  { id: "red", label: "Red", hex: "#ff3b58" },
+  { id: "blue", label: "Blue", hex: "#3777ff" }
+];
+
+const CAR_BOOST_TRAIL_OPTIONS = [
+  { id: "cyan", label: "Cyan", hex: "#28f6ff" },
+  { id: "magenta", label: "Magenta", hex: "#ff3fd1" },
+  { id: "yellow", label: "Yellow", hex: "#ffe45e" },
+  { id: "white", label: "White", hex: "#f6fbff" },
+  { id: "red", label: "Red", hex: "#ff3b58" },
+  { id: "blue", label: "Blue", hex: "#3777ff" }
+];
+
 const DEFAULT_CAR = {
   name: "Neon Runner",
   bodyColor: "#ff3fd1",
   stripeColor: "#28f6ff",
   windowColor: "#9ff7ff",
   bodyStyle: "wedge",
-  useSprite: true
+  useSprite: true,
+  carStyle: { ...DEFAULT_CAR_STYLE }
 };
-
-const CAR_BODY_STYLES = [
-  { id: "wedge", name: "Wedge Racer", sprite: "assets/cars/wedge-racer.png" },
-  { id: "muscle", name: "Muscle Coupe", sprite: "assets/cars/muscle-coupe.png" },
-  { id: "formula", name: "Tiny Formula", sprite: "assets/cars/tiny-formula.png" }
-];
 
 const TRAFFIC_SPRITE_ASSETS = {
   slowCar: [
@@ -2346,6 +2388,92 @@ function normalizeHexColor(value, fallback) {
   return /^#[0-9a-fA-F]{6}$/.test(clean) ? clean.toLowerCase() : fallback;
 }
 
+function getCarPaintOption(options, value, fallbackId) {
+  const id = String(value ?? "").trim();
+  return options.find((option) => option.id === id)
+    || options.find((option) => option.id === fallbackId)
+    || options[0];
+}
+
+function normalizeCarPaintOptionId(value, options, fallbackId) {
+  return getCarPaintOption(options, value, fallbackId)?.id || fallbackId;
+}
+
+function normalizeCarStyle(value, fallback = DEFAULT_CAR_STYLE) {
+  const source = value && typeof value === "object" ? value : {};
+  const fallbackStyle = {
+    ...DEFAULT_CAR_STYLE,
+    ...(fallback && typeof fallback === "object" ? fallback : {})
+  };
+  return {
+    bodyColor: normalizeCarPaintOptionId(source.bodyColor, CAR_BODY_COLOR_OPTIONS, fallbackStyle.bodyColor),
+    accentColor: normalizeCarPaintOptionId(source.accentColor, CAR_ACCENT_COLOR_OPTIONS, fallbackStyle.accentColor),
+    boostTrail: normalizeCarPaintOptionId(source.boostTrail, CAR_BOOST_TRAIL_OPTIONS, fallbackStyle.boostTrail)
+  };
+}
+
+function getCarPaintHex(options, value, fallbackId) {
+  return getCarPaintOption(options, value, fallbackId)?.hex || null;
+}
+
+function getCarStyleBodyHex(carConfig) {
+  const style = normalizeCarStyle(carConfig?.carStyle);
+  return getCarPaintHex(CAR_BODY_COLOR_OPTIONS, style.bodyColor, DEFAULT_CAR_STYLE.bodyColor);
+}
+
+function getCarStyleAccentHex(carConfig) {
+  const style = normalizeCarStyle(carConfig?.carStyle);
+  return getCarPaintHex(CAR_ACCENT_COLOR_OPTIONS, style.accentColor, DEFAULT_CAR_STYLE.accentColor);
+}
+
+function getCarAccentColor(carConfig) {
+  return getCarStyleAccentHex(carConfig)
+    || normalizeHexColor(carConfig?.stripeColor, DEFAULT_CAR.stripeColor);
+}
+
+function getCarBoostTrailColor(carConfig) {
+  const style = normalizeCarStyle(carConfig?.carStyle);
+  return getCarPaintHex(CAR_BOOST_TRAIL_OPTIONS, style.boostTrail, DEFAULT_CAR_STYLE.boostTrail)
+    || getCarAccentColor(carConfig);
+}
+
+function getCanvasBodyColorForCarStyle(carStyle) {
+  const style = normalizeCarStyle(carStyle);
+  return getCarPaintHex(CAR_BODY_COLOR_OPTIONS, style.bodyColor, DEFAULT_CAR_STYLE.bodyColor)
+    || DEFAULT_CAR.bodyColor;
+}
+
+function getCanvasStripeColorForCarStyle(carStyle) {
+  const style = normalizeCarStyle(carStyle);
+  return getCarPaintHex(CAR_ACCENT_COLOR_OPTIONS, style.accentColor, DEFAULT_CAR_STYLE.accentColor)
+    || DEFAULT_CAR.stripeColor;
+}
+
+function formatPaintDebugRatio(value) {
+  return Number.isFinite(value) ? `${Math.round(value * 100)}%` : "n/a";
+}
+
+function renderPaintOptionGroup(name, options, selectedValue, fallbackId, label) {
+  const selectedId = normalizeCarPaintOptionId(selectedValue, options, fallbackId);
+  return `
+    <div class="paint-swatch-grid" role="radiogroup" aria-label="${escapeAttr(label)}">
+      ${options.map((option) => {
+        const selected = option.id === selectedId;
+        const swatchStyle = option.hex
+          ? ` style="--paint-color:${escapeAttr(option.hex)}"`
+          : "";
+        return `
+          <label class="paint-swatch ${selected ? "is-selected" : ""}${option.hex ? "" : " is-original"}"${swatchStyle}>
+            <input type="radio" name="${escapeAttr(name)}" value="${escapeAttr(option.id)}" ${selected ? "checked" : ""}>
+            <span class="paint-chip" aria-hidden="true"></span>
+            <span>${escapeHtml(option.label)}</span>
+          </label>
+        `;
+      }).join("")}
+    </div>
+  `;
+}
+
 function normalizeNonNegativeInteger(value, fallback = 0, max = MAX_DISPLAY_SCORE) {
   const numeric = Number(value);
   if (!Number.isFinite(numeric)) return fallback;
@@ -2758,13 +2886,15 @@ function normalizeCarConfig(value, fallback = DEFAULT_CAR) {
   const source = value && typeof value === "object" ? value : {};
   const fallbackCar = { ...DEFAULT_CAR, ...(fallback && typeof fallback === "object" ? fallback : {}) };
   const style = CAR_BODY_STYLES.some((item) => item.id === source.bodyStyle) ? source.bodyStyle : fallbackCar.bodyStyle;
+  const carStyle = normalizeCarStyle(source.carStyle, fallbackCar.carStyle || DEFAULT_CAR_STYLE);
   return {
     name: sanitizeCarName(source.name, fallbackCar.name),
     bodyColor: normalizeHexColor(source.bodyColor, fallbackCar.bodyColor),
     stripeColor: normalizeHexColor(source.stripeColor, fallbackCar.stripeColor),
     windowColor: normalizeHexColor(source.windowColor, fallbackCar.windowColor),
     bodyStyle: style,
-    useSprite: source.useSprite !== false
+    useSprite: source.useSprite !== false,
+    carStyle
   };
 }
 
@@ -3615,7 +3745,7 @@ class PlayerProfileManager {
     const player = {
       id: uid(),
       name: sanitizePlayerName(name, "PLAYER"),
-      car: { ...DEFAULT_CAR },
+      car: normalizeCarConfig(DEFAULT_CAR),
       bestScore: 0,
       badges: createDefaultBadgeSave(),
       challengeProgress: createDefaultPlayerChallengeSave()
@@ -4470,7 +4600,8 @@ class CarSpriteManager {
       name: style.name,
       path: style.sprite,
       status: "idle",
-      image: null
+      image: null,
+      paintCache: new Map()
     }]));
   }
 
@@ -4478,13 +4609,55 @@ class CarSpriteManager {
     return this.entries.get(styleId) || this.entries.get(DEFAULT_CAR.bodyStyle);
   }
 
-  getSprite(styleId) {
+  getSprite(styleId, carConfig = null) {
     const entry = this.getEntry(styleId);
     if (!entry) return null;
     if (entry.status === "idle") {
       this.load(entry);
     }
-    return entry.status === "loaded" ? entry.image : null;
+    if (entry.status !== "loaded") return null;
+    return carConfig ? this.getStyledSprite(entry, carConfig) : entry.image;
+  }
+
+  getStyledSprite(entry, carConfig) {
+    const carStyle = normalizeCarStyle(carConfig?.carStyle);
+    const cacheKey = this.getPaintCacheKey(entry.id, carStyle);
+    if (!getCarStyleBodyHex({ carStyle }) && !getCarStyleAccentHex({ carStyle })) {
+      entry.lastPaintDebug = {
+        status: "original",
+        cacheSize: this.getPaintCacheSize(),
+        protectedRatio: null,
+        paintRatio: null,
+        bodyRatio: null,
+        accentRatio: null
+      };
+      return entry.image;
+    }
+    if (entry.paintCache.has(cacheKey)) {
+      const cached = entry.paintCache.get(cacheKey);
+      entry.lastPaintDebug = {
+        ...cached.debug,
+        cacheSize: this.getPaintCacheSize()
+      };
+      return cached.sprite || entry.image;
+    }
+    const result = recolorPlayerCarSprite(entry.image, carStyle, entry.id);
+    entry.paintCache.set(cacheKey, result);
+    entry.lastPaintDebug = {
+      ...result.debug,
+      cacheSize: this.getPaintCacheSize()
+    };
+    return result.sprite || entry.image;
+  }
+
+  getPaintCacheKey(styleId, carStyle) {
+    const style = normalizeCarStyle(carStyle);
+    return [
+      PLAYER_CAR_PAINT_STYLE_VERSION,
+      styleId || DEFAULT_CAR.bodyStyle,
+      style.bodyColor,
+      style.accentColor
+    ].join("|");
   }
 
   getStatus(styleId) {
@@ -4497,6 +4670,47 @@ class CarSpriteManager {
     return entry ? entry.path : "";
   }
 
+  getPaintCacheSize() {
+    let total = 0;
+    this.entries.forEach((entry) => {
+      total += entry.paintCache?.size || 0;
+    });
+    return total;
+  }
+
+  getPaintDebugInfo(styleId, carStyle = DEFAULT_CAR_STYLE) {
+    const entry = this.getEntry(styleId);
+    if (!entry) {
+      return {
+        status: "missing",
+        cacheSize: this.getPaintCacheSize(),
+        protectedRatio: null,
+        paintRatio: null,
+        bodyRatio: null,
+        accentRatio: null
+      };
+    }
+    const normalized = normalizeCarStyle(carStyle);
+    const cacheKey = this.getPaintCacheKey(entry.id, normalized);
+    const cached = entry.paintCache?.get(cacheKey);
+    if (cached?.debug) {
+      return {
+        ...cached.debug,
+        cacheSize: this.getPaintCacheSize()
+      };
+    }
+    return {
+      status: !getCarStyleBodyHex({ carStyle: normalized }) && !getCarStyleAccentHex({ carStyle: normalized })
+        ? "original"
+        : entry.status,
+      cacheSize: this.getPaintCacheSize(),
+      protectedRatio: null,
+      paintRatio: null,
+      bodyRatio: null,
+      accentRatio: null
+    };
+  }
+
   load(entry) {
     if (typeof Image !== "function") {
       entry.status = "missing";
@@ -4507,6 +4721,7 @@ class CarSpriteManager {
     image.onload = () => {
       entry.status = image.naturalWidth > 0 && image.naturalHeight > 0 ? "loaded" : "missing";
       image.neonOpaqueBounds = getOpaqueBounds(image);
+      entry.paintCache.clear();
       if (this.onStatusChange) this.onStatusChange(entry);
     };
     image.onerror = () => {
@@ -10820,18 +11035,19 @@ class Renderer {
     const rearY = y + size.h * 0.44;
     const burstW = size.w * lerp(0.45, 1.05, progress);
     const burstH = size.h * lerp(0.1, 0.32, progress);
+    const burstColor = getCarBoostTrailColor(run.player.car);
     const ctx = this.ctx;
     ctx.save();
     ctx.globalAlpha = alpha;
     ctx.shadowBlur = 24;
-    ctx.shadowColor = "#28f6ff";
-    ctx.strokeStyle = "#28f6ff";
+    ctx.shadowColor = burstColor;
+    ctx.strokeStyle = burstColor;
     ctx.lineWidth = 3;
     ctx.beginPath();
     ctx.ellipse(x, rearY, burstW, burstH, 0, 0, Math.PI * 2);
     ctx.stroke();
     ctx.globalAlpha = alpha * 0.45;
-    ctx.fillStyle = "#ffe45e";
+    ctx.fillStyle = shade(burstColor, 54);
     ctx.beginPath();
     ctx.moveTo(x - burstW * 0.34, rearY);
     ctx.lineTo(x, rearY + size.h * 0.36);
@@ -11473,6 +11689,8 @@ class Renderer {
       `src img: ${spriteDebug.natural}`,
       `opaque: ${spriteDebug.opaque}`,
       `render: ${spriteDebug.render}`,
+      `paint: ${spriteDebug.paint?.status || "unknown"} cache ${spriteDebug.paint?.cacheSize || 0}`,
+      `paint px: body ${formatPaintDebugRatio(spriteDebug.paint?.bodyRatio)} accent ${formatPaintDebugRatio(spriteDebug.paint?.accentRatio)} protected ${formatPaintDebugRatio(spriteDebug.paint?.protectedRatio)}`,
       `traffic sprites: ${trafficSpriteDebug.active ? "active" : "fallback"} ${trafficSpriteDebug.loaded}/${trafficSpriteDebug.total}`,
       `missing traffic: ${trafficSpriteDebug.missing}`,
       `near traffic: ${nearbyTrafficSpriteDebug}`,
@@ -11713,6 +11931,267 @@ function getOpaqueBounds(image) {
   }
 }
 
+function rgbFromHex(hex, fallback = { r: 255, g: 255, b: 255 }) {
+  const clean = String(hex || "").replace("#", "");
+  if (!/^[0-9a-fA-F]{6}$/.test(clean)) return fallback;
+  return {
+    r: parseInt(clean.slice(0, 2), 16),
+    g: parseInt(clean.slice(2, 4), 16),
+    b: parseInt(clean.slice(4, 6), 16)
+  };
+}
+
+function rgbaFromHex(hex, alpha = 1) {
+  const rgb = rgbFromHex(hex, rgbFromHex(DEFAULT_CAR.stripeColor));
+  return `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, ${clampNumber(alpha, 0, 1, 1)})`;
+}
+
+function rgbToHsl(r, g, b) {
+  const rn = clamp(r, 0, 255) / 255;
+  const gn = clamp(g, 0, 255) / 255;
+  const bn = clamp(b, 0, 255) / 255;
+  const max = Math.max(rn, gn, bn);
+  const min = Math.min(rn, gn, bn);
+  const l = (max + min) / 2;
+  let h = 0;
+  let s = 0;
+  if (max !== min) {
+    const d = max - min;
+    s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+    if (max === rn) {
+      h = (gn - bn) / d + (gn < bn ? 6 : 0);
+    } else if (max === gn) {
+      h = (bn - rn) / d + 2;
+    } else {
+      h = (rn - gn) / d + 4;
+    }
+    h /= 6;
+  }
+  return { h, s, l };
+}
+
+function hslToRgb(h, s, l) {
+  const hue = ((h % 1) + 1) % 1;
+  const sat = clamp(s, 0, 1);
+  const light = clamp(l, 0, 1);
+  if (sat === 0) {
+    const value = Math.round(light * 255);
+    return { r: value, g: value, b: value };
+  }
+  const hueToRgb = (p, q, t) => {
+    let next = t;
+    if (next < 0) next += 1;
+    if (next > 1) next -= 1;
+    if (next < 1 / 6) return p + (q - p) * 6 * next;
+    if (next < 1 / 2) return q;
+    if (next < 2 / 3) return p + (q - p) * (2 / 3 - next) * 6;
+    return p;
+  };
+  const q = light < 0.5 ? light * (1 + sat) : light + sat - light * sat;
+  const p = 2 * light - q;
+  return {
+    r: Math.round(hueToRgb(p, q, hue + 1 / 3) * 255),
+    g: Math.round(hueToRgb(p, q, hue) * 255),
+    b: Math.round(hueToRgb(p, q, hue - 1 / 3) * 255)
+  };
+}
+
+function getPixelPaintStats(r, g, b) {
+  const hsl = rgbToHsl(r, g, b);
+  return {
+    ...hsl,
+    luminance: (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255,
+    value: Math.max(r, g, b) / 255
+  };
+}
+
+function hueDistance(a, b) {
+  const diff = Math.abs(a - b);
+  return Math.min(diff, 1 - diff);
+}
+
+function isLikelyProtectedPlayerCarPixel(stats, x, y, bounds) {
+  const localX = bounds.width > 0 ? (x - bounds.x) / bounds.width : 0.5;
+  const localY = bounds.height > 0 ? (y - bounds.y) / bounds.height : 0.5;
+  const edgeLightZone = (localX < 0.28 || localX > 0.72) && (localY < 0.23 || localY > 0.8);
+  const redAmberHue = stats.h <= 0.18 || stats.h >= 0.94;
+
+  if (stats.luminance < 0.11) return true;
+  if (stats.luminance < 0.24 && stats.s < 0.58) return true;
+  if (stats.s < 0.16 && stats.luminance < 0.76) return true;
+  if (stats.luminance > 0.88 && stats.s < 0.34) return true;
+  if (edgeLightZone && redAmberHue && stats.s > 0.45 && stats.value > 0.72) return true;
+  return false;
+}
+
+function recolorPlayerCarSprite(image, carStyle, styleId = DEFAULT_CAR.bodyStyle) {
+  const bodyHex = getCarPaintHex(CAR_BODY_COLOR_OPTIONS, carStyle.bodyColor, DEFAULT_CAR_STYLE.bodyColor);
+  const accentHex = getCarPaintHex(CAR_ACCENT_COLOR_OPTIONS, carStyle.accentColor, DEFAULT_CAR_STYLE.accentColor);
+  const debugBase = {
+    status: "original",
+    styleId,
+    protectedRatio: null,
+    paintRatio: null,
+    bodyRatio: null,
+    accentRatio: null,
+    fallbackReason: ""
+  };
+
+  if (!bodyHex && !accentHex) {
+    return { sprite: null, debug: debugBase };
+  }
+
+  const imageW = image.naturalWidth || image.width || 0;
+  const imageH = image.naturalHeight || image.height || 0;
+  if (!imageW || !imageH || typeof document === "undefined") {
+    return {
+      sprite: null,
+      debug: { ...debugBase, status: "fallback", fallbackReason: "canvas unavailable" }
+    };
+  }
+
+  try {
+    const canvas = document.createElement("canvas");
+    canvas.width = imageW;
+    canvas.height = imageH;
+    const ctx = canvas.getContext("2d", { willReadFrequently: true });
+    if (!ctx) {
+      return {
+        sprite: null,
+        debug: { ...debugBase, status: "fallback", fallbackReason: "2d context unavailable" }
+      };
+    }
+
+    ctx.drawImage(image, 0, 0);
+    const imageData = ctx.getImageData(0, 0, imageW, imageH);
+    const pixels = imageData.data;
+    const bounds = getSpriteSourceBounds(image);
+    const candidates = [];
+    const hueBins = new Array(36).fill(0);
+    let opaquePixels = 0;
+    let protectedPixels = 0;
+
+    for (let y = 0; y < imageH; y += 1) {
+      for (let x = 0; x < imageW; x += 1) {
+        const offset = (y * imageW + x) * 4;
+        const alpha = pixels[offset + 3];
+        if (alpha <= SPRITE_OPAQUE_ALPHA_THRESHOLD) continue;
+        opaquePixels += 1;
+        const stats = getPixelPaintStats(pixels[offset], pixels[offset + 1], pixels[offset + 2]);
+        if (isLikelyProtectedPlayerCarPixel(stats, x, y, bounds)) {
+          protectedPixels += 1;
+          continue;
+        }
+        const paintCandidate = stats.s >= 0.28 && stats.value >= 0.18 && stats.luminance >= 0.12 && stats.luminance <= 0.88;
+        if (!paintCandidate) {
+          protectedPixels += 1;
+          continue;
+        }
+        candidates.push({ offset, stats });
+        const bin = clamp(Math.floor(stats.h * hueBins.length), 0, hueBins.length - 1);
+        hueBins[bin] += stats.s * (0.55 + stats.value * 0.45) * (alpha / 255);
+      }
+    }
+
+    const paintRatio = opaquePixels ? candidates.length / opaquePixels : 0;
+    const protectedRatio = opaquePixels ? protectedPixels / opaquePixels : 0;
+    if (!opaquePixels || candidates.length < 40 || paintRatio < 0.02) {
+      return {
+        sprite: null,
+        debug: {
+          ...debugBase,
+          status: "fallback",
+          protectedRatio,
+          paintRatio,
+          fallbackReason: "not enough paint pixels"
+        }
+      };
+    }
+
+    const primaryBin = hueBins.reduce((best, value, index) => value > hueBins[best] ? index : best, 0);
+    const primaryHue = (primaryBin + 0.5) / hueBins.length;
+    const bodyRgb = bodyHex ? rgbFromHex(bodyHex) : null;
+    const accentRgb = accentHex ? rgbFromHex(accentHex) : null;
+    const bodyTarget = bodyRgb ? { hsl: rgbToHsl(bodyRgb.r, bodyRgb.g, bodyRgb.b) } : null;
+    const accentTarget = accentRgb ? { hsl: rgbToHsl(accentRgb.r, accentRgb.g, accentRgb.b) } : null;
+
+    let bodyPixels = 0;
+    let accentPixels = 0;
+    let recoloredPixels = 0;
+
+    candidates.forEach((candidate) => {
+      const hueGap = hueDistance(candidate.stats.h, primaryHue);
+      const bodyPixel = hueGap <= 0.14;
+      const accentPixel = !bodyPixel && hueGap >= 0.18 && candidate.stats.s >= 0.35 && candidate.stats.value >= 0.24;
+      let nextRgb = null;
+      if (bodyPixel) {
+        bodyPixels += 1;
+        if (bodyTarget) nextRgb = mapPaintPixelToTarget(candidate.stats, bodyTarget);
+      } else if (accentPixel) {
+        accentPixels += 1;
+        if (accentTarget) nextRgb = mapPaintPixelToTarget(candidate.stats, accentTarget);
+      }
+      if (!nextRgb) return;
+      pixels[candidate.offset] = nextRgb.r;
+      pixels[candidate.offset + 1] = nextRgb.g;
+      pixels[candidate.offset + 2] = nextRgb.b;
+      recoloredPixels += 1;
+    });
+
+    const needsBody = Boolean(bodyTarget);
+    const needsAccent = Boolean(accentTarget);
+    const enoughBodyPaint = !needsBody || bodyPixels >= 40;
+    const enoughAccentPaint = !needsAccent || accentPixels >= 12;
+    if (!recoloredPixels || !enoughBodyPaint || !enoughAccentPaint) {
+      return {
+        sprite: null,
+        debug: {
+          ...debugBase,
+          status: "fallback",
+          protectedRatio,
+          paintRatio,
+          bodyRatio: opaquePixels ? bodyPixels / opaquePixels : 0,
+          accentRatio: opaquePixels ? accentPixels / opaquePixels : 0,
+          fallbackReason: !enoughBodyPaint ? "body paint not isolated" : "accent paint not isolated"
+        }
+      };
+    }
+
+    ctx.putImageData(imageData, 0, 0);
+    canvas.neonOpaqueBounds = image.neonOpaqueBounds || bounds;
+    canvas.neonPaintDebug = {
+      ...debugBase,
+      status: "recolored",
+      protectedRatio,
+      paintRatio,
+      bodyRatio: opaquePixels ? bodyPixels / opaquePixels : 0,
+      accentRatio: opaquePixels ? accentPixels / opaquePixels : 0,
+      fallbackReason: ""
+    };
+    return {
+      sprite: canvas,
+      debug: canvas.neonPaintDebug
+    };
+  } catch (error) {
+    return {
+      sprite: null,
+      debug: {
+        ...debugBase,
+        status: "fallback",
+        fallbackReason: "canvas read failed"
+      }
+    };
+  }
+}
+
+function mapPaintPixelToTarget(stats, target) {
+  const lightness = clamp(target.hsl.l * 0.58 + stats.l * 0.5, target.hsl.l < 0.18 ? 0.045 : 0.08, target.hsl.l > 0.82 ? 0.98 : 0.92);
+  const saturation = target.hsl.s < 0.08
+    ? target.hsl.s
+    : clamp(target.hsl.s * (0.72 + stats.s * 0.32), 0.08, 1);
+  return hslToRgb(target.hsl.h, saturation, lightness);
+}
+
 function getVehicleLaneWidth(state = {}) {
   return Number.isFinite(state.laneWidth) && state.laneWidth > 0
     ? state.laneWidth
@@ -11795,7 +12274,7 @@ function getScaledSpriteBox(image, targetWidth) {
 
 function getPlayerCarDrawSize(carConfig, state = {}, spriteManager = null) {
   if (carConfig.useSprite !== false && spriteManager) {
-    const sprite = spriteManager.getSprite(getCarStyleId(carConfig));
+    const sprite = spriteManager.getSprite(getCarStyleId(carConfig), carConfig);
     if (sprite) {
       const box = getScaledSpriteBox(sprite, getPlayerSpriteTargetWidth(carConfig, state));
       return {
@@ -11814,12 +12293,20 @@ function getPlayerSpriteDebugInfo(carConfig, state = {}, spriteManager = null) {
     mode: carConfig.useSprite === false ? "canvas off" : "canvas fallback",
     natural: "n/a",
     opaque: "n/a",
-    render: `${canvasSize.w.toFixed(0)}x${canvasSize.h.toFixed(0)}`
+    render: `${canvasSize.w.toFixed(0)}x${canvasSize.h.toFixed(0)}`,
+    paint: {
+      status: carConfig.useSprite === false ? "canvas" : "fallback",
+      cacheSize: spriteManager?.getPaintCacheSize?.() || 0,
+      protectedRatio: null,
+      paintRatio: null,
+      bodyRatio: null,
+      accentRatio: null
+    }
   };
   if (carConfig.useSprite === false || !spriteManager) return fallback;
 
   const style = getCarStyleId(carConfig);
-  const sprite = spriteManager.getSprite(style);
+  const sprite = spriteManager.getSprite(style, carConfig);
   const status = spriteManager.getStatus(style);
   if (!sprite) {
     return {
@@ -11836,7 +12323,8 @@ function getPlayerSpriteDebugInfo(carConfig, state = {}, spriteManager = null) {
     mode: `${style} sprite`,
     natural: `${naturalW}x${naturalH}`,
     opaque: `${source.x},${source.y} ${source.width}x${source.height}`,
-    render: `${box.w.toFixed(0)}x${box.h.toFixed(0)}`
+    render: `${box.w.toFixed(0)}x${box.h.toFixed(0)}`,
+    paint: spriteManager.getPaintDebugInfo(style, carConfig.carStyle)
   };
 }
 
@@ -11862,7 +12350,7 @@ function drawSpriteCentered(ctx, image, centerX, centerY, targetWidth) {
 
 function drawPlayerCar(ctx, x, y, carConfig, state, spriteManager = null) {
   if (carConfig.useSprite !== false && spriteManager) {
-    const sprite = spriteManager.getSprite(getCarStyleId(carConfig));
+    const sprite = spriteManager.getSprite(getCarStyleId(carConfig), carConfig);
     if (sprite) {
       drawSpritePlayerCar(ctx, x, y, carConfig, state, sprite);
       return;
@@ -11872,7 +12360,8 @@ function drawPlayerCar(ctx, x, y, carConfig, state, spriteManager = null) {
 }
 
 function drawSpritePlayerCar(ctx, x, y, carConfig, state, sprite) {
-  const stripe = carConfig.stripeColor || DEFAULT_CAR.stripeColor;
+  const stripe = getCarAccentColor(carConfig);
+  const boostTrail = getCarBoostTrailColor(carConfig);
   const targetWidth = getPlayerSpriteTargetWidth(carConfig, state);
   const spriteBox = getScaledSpriteBox(sprite, targetWidth);
   const laneTilt = clamp(state.laneDelta || 0, -1, 1) * 0.06;
@@ -11898,7 +12387,7 @@ function drawSpritePlayerCar(ctx, x, y, carConfig, state, sprite) {
   }
 
   if (state.boosting) {
-    drawSpriteBoostTrail(ctx, spriteBox.w, spriteBox.h, stripe, state.boostTrailIntensity || 0.7);
+    drawSpriteBoostTrail(ctx, spriteBox.w, spriteBox.h, boostTrail, state.boostTrailIntensity || 0.7);
   }
 
   if (state.laneChanging) {
@@ -11937,14 +12426,14 @@ function drawSpriteBoostTrail(ctx, w, h, stripe, intensity = 1) {
   ctx.globalAlpha = 0.52 + strength * 0.34;
   ctx.shadowBlur = 18 + strength * 10;
   ctx.shadowColor = stripe;
-  ctx.fillStyle = "rgba(40, 246, 255, 0.82)";
+  ctx.fillStyle = rgbaFromHex(stripe, 0.82);
   ctx.beginPath();
   ctx.moveTo(-w * 0.22, h * 0.48);
   ctx.lineTo(-w * 0.08, h * (0.74 + strength * 0.16) + Math.random() * (10 + strength * 10));
   ctx.lineTo(w * 0.02, h * 0.48);
   ctx.closePath();
   ctx.fill();
-  ctx.fillStyle = "#ffe45e";
+  ctx.fillStyle = shade(stripe, 54);
   ctx.beginPath();
   ctx.moveTo(w * 0.05, h * 0.48);
   ctx.lineTo(w * 0.2, h * (0.72 + strength * 0.13) + Math.random() * (8 + strength * 9));
@@ -11964,6 +12453,7 @@ function drawSpriteBoostTrail(ctx, w, h, stripe, intensity = 1) {
 function drawCanvasPlayerCar(ctx, x, y, carConfig, state) {
   const body = carConfig.bodyColor || DEFAULT_CAR.bodyColor;
   const stripe = carConfig.stripeColor || DEFAULT_CAR.stripeColor;
+  const boostTrail = getCarBoostTrailColor(carConfig);
   const glass = carConfig.windowColor || DEFAULT_CAR.windowColor;
   const style = CAR_BODY_STYLES.some((item) => item.id === carConfig.bodyStyle) ? carConfig.bodyStyle : DEFAULT_CAR.bodyStyle;
   const { scale, w, h } = getCanvasPlayerCarRenderSize(state);
@@ -11993,22 +12483,22 @@ function drawCanvasPlayerCar(ctx, x, y, carConfig, state) {
     ctx.save();
     ctx.globalAlpha = 0.52 + boostTrailStrength * 0.34;
     ctx.shadowBlur = 18 + boostTrailStrength * 10;
-    ctx.shadowColor = stripe;
-    ctx.fillStyle = "rgba(40, 246, 255, 0.82)";
+    ctx.shadowColor = boostTrail;
+    ctx.fillStyle = rgbaFromHex(boostTrail, 0.82);
     ctx.beginPath();
     ctx.moveTo(-w * 0.22, h * 0.42);
     ctx.lineTo(-w * 0.08, h * (0.68 + boostTrailStrength * 0.12) + Math.random() * (10 + boostTrailStrength * 10));
     ctx.lineTo(w * 0.02, h * 0.42);
     ctx.closePath();
     ctx.fill();
-    ctx.fillStyle = "#ffe45e";
+    ctx.fillStyle = shade(boostTrail, 54);
     ctx.beginPath();
     ctx.moveTo(w * 0.05, h * 0.42);
     ctx.lineTo(w * 0.2, h * (0.64 + boostTrailStrength * 0.12) + Math.random() * (8 + boostTrailStrength * 9));
     ctx.lineTo(w * 0.3, h * 0.42);
     ctx.closePath();
     ctx.fill();
-    ctx.fillStyle = stripe;
+    ctx.fillStyle = boostTrail;
     ctx.beginPath();
     ctx.moveTo(-w * 0.06, h * 0.44);
     ctx.lineTo(w * 0.06, h * (0.78 + boostTrailStrength * 0.12) + Math.random() * (7 + boostTrailStrength * 8));
@@ -12624,6 +13114,7 @@ class NeonRoadRally {
     this.audio = new AudioManager(this.profiles.data.audio, (settings) => this.profiles.updateAudioSettings(settings));
     this.carSprites = new CarSpriteManager(CAR_BODY_STYLES, () => {
       if (this.screen === "customize") this.renderCarPreview();
+      if (this.screen === "partyTurn") this.renderPartyCarPreview(this.partySession?.currentPlayer);
       if (this.screen === "vehicleScaleDebug") this.renderVehicleScaleDebugCanvas();
     });
     this.trafficSprites = new TrafficSpriteManager(TRAFFIC_SPRITE_ASSETS, () => {
@@ -13530,7 +14021,7 @@ class NeonRoadRally {
     this.lastSummary = null;
     this.run.player = {
       ...player,
-      car: { ...DEFAULT_CAR, ...player.car }
+      car: normalizeCarConfig(player.car)
     };
     this.run.track = track;
     this.run.speedClassId = speedClass.id;
@@ -18617,14 +19108,15 @@ class NeonRoadRally {
       return;
     }
     this.setScreen("customize");
-    const car = { ...DEFAULT_CAR, ...player.car };
+    const car = normalizeCarConfig(player.car);
+    const carStyle = normalizeCarStyle(car.carStyle);
     this.audio.playMusic("title", false);
     this.layer.classList.remove("is-empty");
     this.layer.innerHTML = `
-      <section class="panel split">
+      <section class="panel split customize-panel">
         <div class="form-stack">
           <h2>Customize Car</h2>
-          <p class="hint">Sprite cars use their painted colors. Color pickers apply to classic car mode.</p>
+          <p class="hint">Dynamic paint recolors likely body pixels while preserving sprite windows, tires, lights, trim, and transparent pixels.</p>
           <div class="field">
             <label for="carName">Car name</label>
             <input id="carName" type="text" maxlength="${LOCAL_CAR_NAME_MAX_LENGTH}" value="${escapeAttr(car.name)}">
@@ -18639,21 +19131,22 @@ class NeonRoadRally {
             <input id="useSprite" type="checkbox" ${car.useSprite !== false ? "checked" : ""}>
             <span>Use Sprite Car</span>
           </label>
-          <p id="spriteStatus" class="hint">Sprite cars use their painted colors. Color pickers apply to classic car mode.</p>
+          <p id="spriteStatus" class="hint">Paint cache waiting for a loaded sprite.</p>
           <div class="field">
-            <label for="bodyColor">Body color</label>
-            <input id="bodyColor" type="color" value="${escapeAttr(car.bodyColor)}">
+            <label>Body Color</label>
+            ${renderPaintOptionGroup("carBodyColor", CAR_BODY_COLOR_OPTIONS, carStyle.bodyColor, DEFAULT_CAR_STYLE.bodyColor, "Body Color")}
           </div>
           <div class="field">
-            <label for="stripeColor">Stripe color</label>
-            <input id="stripeColor" type="color" value="${escapeAttr(car.stripeColor)}">
+            <label>Accent Color</label>
+            ${renderPaintOptionGroup("carAccentColor", CAR_ACCENT_COLOR_OPTIONS, carStyle.accentColor, DEFAULT_CAR_STYLE.accentColor, "Accent Color")}
           </div>
           <div class="field">
-            <label for="windowColor">Window color</label>
-            <input id="windowColor" type="color" value="${escapeAttr(car.windowColor)}">
+            <label>Boost Trail Color</label>
+            ${renderPaintOptionGroup("carBoostTrail", CAR_BOOST_TRAIL_OPTIONS, carStyle.boostTrail, DEFAULT_CAR_STYLE.boostTrail, "Boost Trail Color")}
           </div>
           <div class="row">
-            <button class="small-button" data-action="saveCar">Save Car</button>
+            <button class="small-button primary" data-action="saveCar">Save Car</button>
+            <button class="small-button" data-action="resetCarStyle">Reset Visual Style</button>
             <button class="small-button" data-action="title">Back</button>
           </div>
           <p class="status-line">${escapeHtml(message)}</p>
@@ -18663,9 +19156,16 @@ class NeonRoadRally {
     `;
     this.bindLayerButtons();
     const updatePreview = () => this.renderCarPreview();
-    ["carName", "bodyStyle", "bodyColor", "stripeColor", "windowColor", "useSprite"].forEach((id) => {
+    ["carName", "bodyStyle", "useSprite"].forEach((id) => {
       const el = document.getElementById(id);
       if (el) el.addEventListener("input", updatePreview);
+    });
+    document.querySelectorAll("input[name='carBodyColor'], input[name='carAccentColor'], input[name='carBoostTrail']").forEach((input) => {
+      input.addEventListener("change", () => {
+        this.audio.activate();
+        this.audio.playSfx("menu");
+        updatePreview();
+      });
     });
     ["bodyStyle", "useSprite"].forEach((id) => {
       const el = document.getElementById(id);
@@ -18682,6 +19182,7 @@ class NeonRoadRally {
   renderCarPreview() {
     const canvas = document.getElementById("carPreview");
     if (!canvas) return;
+    this.syncPaintSwatchSelection();
     const ctx = canvas.getContext("2d");
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
@@ -18713,16 +19214,29 @@ class NeonRoadRally {
     if (spriteStatus) {
       const status = this.carSprites.getStatus(car.bodyStyle);
       const path = this.carSprites.getPath(car.bodyStyle);
+      const paintInfo = this.carSprites.getPaintDebugInfo(car.bodyStyle, car.carStyle);
+      const paintDetail = paintInfo.status === "recolored"
+        ? `Paint recolored. Body ${formatPaintDebugRatio(paintInfo.bodyRatio)}, accent ${formatPaintDebugRatio(paintInfo.accentRatio)}, protected ${formatPaintDebugRatio(paintInfo.protectedRatio)}. Cache ${paintInfo.cacheSize}.`
+        : (paintInfo.status === "fallback"
+          ? `Paint fallback: ${paintInfo.fallbackReason || "sprite was not cleanly recolorable"}. Cache ${paintInfo.cacheSize}.`
+          : `Original sprite paint. Cache ${paintInfo.cacheSize}.`);
       if (car.useSprite === false) {
-        spriteStatus.textContent = "Sprite car mode is off. Color customization is shown with the classic canvas car.";
+        spriteStatus.textContent = "Sprite car mode is off. Preset colors are shown with the classic canvas car.";
       } else if (status === "loaded") {
-        spriteStatus.textContent = `Using sprite asset: ${path}. Sprite cars use their painted colors.`;
+        spriteStatus.textContent = `Using sprite asset: ${path}. ${paintDetail}`;
       } else if (status === "loading") {
         spriteStatus.textContent = `Looking for sprite asset: ${path}. Falling back to canvas until it loads.`;
       } else {
         spriteStatus.textContent = `Sprite asset not loaded: ${path}. Showing classic canvas fallback with selected colors.`;
       }
     }
+  }
+
+  syncPaintSwatchSelection() {
+    document.querySelectorAll(".paint-swatch").forEach((label) => {
+      const input = label.querySelector("input[type='radio']");
+      label.classList.toggle("is-selected", Boolean(input?.checked));
+    });
   }
 
   showVehicleScaleDebugScreen() {
@@ -18846,14 +19360,25 @@ class NeonRoadRally {
     drawHitboxRect(ctx, hitbox, "#28f6ff", `hit ${hitbox.w.toFixed(0)}x${hitbox.h.toFixed(0)}`, "hitbox");
   }
 
+  readPaintRadio(name, options, fallbackId) {
+    const input = document.querySelector(`input[name="${name}"]:checked`);
+    return normalizeCarPaintOptionId(input?.value, options, fallbackId);
+  }
+
   readCarForm() {
+    const carStyle = normalizeCarStyle({
+      bodyColor: this.readPaintRadio("carBodyColor", CAR_BODY_COLOR_OPTIONS, DEFAULT_CAR_STYLE.bodyColor),
+      accentColor: this.readPaintRadio("carAccentColor", CAR_ACCENT_COLOR_OPTIONS, DEFAULT_CAR_STYLE.accentColor),
+      boostTrail: this.readPaintRadio("carBoostTrail", CAR_BOOST_TRAIL_OPTIONS, DEFAULT_CAR_STYLE.boostTrail)
+    });
     return {
       name: sanitizeCarName(document.getElementById("carName")?.value, DEFAULT_CAR.name),
-      bodyColor: normalizeHexColor(document.getElementById("bodyColor")?.value, DEFAULT_CAR.bodyColor),
-      stripeColor: normalizeHexColor(document.getElementById("stripeColor")?.value, DEFAULT_CAR.stripeColor),
-      windowColor: normalizeHexColor(document.getElementById("windowColor")?.value, DEFAULT_CAR.windowColor),
+      bodyColor: getCanvasBodyColorForCarStyle(carStyle),
+      stripeColor: getCanvasStripeColorForCarStyle(carStyle),
+      windowColor: DEFAULT_CAR.windowColor,
       bodyStyle: document.getElementById("bodyStyle")?.value || DEFAULT_CAR.bodyStyle,
-      useSprite: document.getElementById("useSprite")?.checked !== false
+      useSprite: document.getElementById("useSprite")?.checked !== false,
+      carStyle
     };
   }
 
@@ -19076,6 +19601,7 @@ class NeonRoadRally {
         else if (action === "selectPlayer") this.handleSelectPlayer(button.dataset.id);
         else if (action === "setBadgeFilter") this.handleSetBadgeFilter(button.dataset.filter);
         else if (action === "saveCar") this.handleSaveCar();
+        else if (action === "resetCarStyle") this.handleResetCarStyle();
         else if (action === "resetData") this.handleResetData();
         else if (action === "copyPlaytestReport") this.handleCopyPlaytestReport();
         else if (action === "copyRoadDirectorReport") this.handleCopyRoadDirectorReport();
@@ -19125,6 +19651,24 @@ class NeonRoadRally {
     this.profiles.updateCurrentCar(this.readCarForm());
     const player = this.profiles.getCurrentPlayer();
     this.showCustomizeScreen(`${player?.car.name || "Car"} saved.`);
+  }
+
+  handleResetCarStyle() {
+    const current = this.profiles.getCurrentPlayer();
+    if (!current) {
+      this.showPlayerScreen("Create or choose a player before customizing a car.");
+      return;
+    }
+    const currentCar = normalizeCarConfig(current.car);
+    this.profiles.updateCurrentCar({
+      ...currentCar,
+      bodyColor: DEFAULT_CAR.bodyColor,
+      stripeColor: DEFAULT_CAR.stripeColor,
+      windowColor: DEFAULT_CAR.windowColor,
+      carStyle: { ...DEFAULT_CAR_STYLE }
+    });
+    const player = this.profiles.getCurrentPlayer();
+    this.showCustomizeScreen(`${player?.car.name || "Car"} reset to original paint.`);
   }
 
   handleSetSpeedClass(id) {
