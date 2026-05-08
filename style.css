@@ -987,6 +987,16 @@ button:disabled {
   box-shadow: 0 0 18px rgba(255, 228, 94, 0.22);
 }
 
+.score-callout.is-title {
+  border-color: rgba(255, 63, 209, 0.78);
+  background:
+    linear-gradient(135deg, rgba(255, 63, 209, 0.22), rgba(255, 228, 94, 0.12)),
+    rgba(8, 13, 32, 0.92);
+  color: #ffe6fb;
+  font-weight: 900;
+  box-shadow: 0 0 18px rgba(255, 63, 209, 0.18);
+}
+
 .medal-row {
   margin: 12px 0 16px;
 }
@@ -1035,7 +1045,9 @@ button:disabled {
 }
 
 .badge-earned-panel,
-.badge-profile-panel {
+.badge-profile-panel,
+.title-profile-panel,
+.title-board-panel {
   display: grid;
   gap: 10px;
   border: 1px solid rgba(255, 228, 94, 0.34);
@@ -1154,6 +1166,22 @@ button:disabled {
   margin-top: 4px;
 }
 
+.title-profile-panel,
+.title-board-panel {
+  border-color: rgba(255, 63, 209, 0.34);
+  background:
+    linear-gradient(180deg, rgba(255, 63, 209, 0.1), rgba(40, 246, 255, 0.04)),
+    rgba(5, 8, 20, 0.74);
+}
+
+.title-profile-panel {
+  margin-top: 4px;
+}
+
+.title-board-panel {
+  margin: 12px 0 16px;
+}
+
 .badge-profile-header {
   display: flex;
   gap: 10px;
@@ -1239,6 +1267,66 @@ button:disabled {
 
 .badge-card {
   min-width: 0;
+}
+
+.title-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 8px;
+}
+
+.title-card {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 6px 9px;
+  align-items: start;
+  border: 1px solid rgba(255, 63, 209, 0.42);
+  border-radius: 7px;
+  padding: 9px 10px;
+  background:
+    linear-gradient(135deg, rgba(255, 63, 209, 0.12), rgba(255, 228, 94, 0.06)),
+    rgba(5, 8, 20, 0.82);
+}
+
+.title-card strong {
+  color: var(--magenta);
+  font-size: 0.72rem;
+  text-transform: uppercase;
+}
+
+.title-card b {
+  color: var(--text);
+  font-size: 0.8rem;
+  text-transform: uppercase;
+}
+
+.title-card small {
+  display: block;
+  color: var(--muted);
+  font-size: 0.68rem;
+  line-height: 1.25;
+}
+
+.title-card > small {
+  grid-column: 1 / -1;
+}
+
+.title-empty-state {
+  margin: 0;
+}
+
+.title-board-list {
+  margin: 0;
+}
+
+.title-board-item.is-unclaimed {
+  opacity: 0.62;
+}
+
+.title-board-item .leaderboard-score {
+  font-size: 0.8rem;
+  white-space: normal;
+  text-align: right;
 }
 
 .score-info-grid {
@@ -1549,6 +1637,15 @@ button:disabled {
   .badge-grid {
     grid-template-columns: repeat(auto-fit, minmax(132px, 1fr));
     max-height: 260px;
+  }
+
+  .title-grid {
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  }
+
+  .title-board-item .leaderboard-score {
+    grid-column: 2;
+    text-align: left;
   }
 
   .final-score-card,
