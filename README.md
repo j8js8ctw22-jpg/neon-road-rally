@@ -80,7 +80,7 @@ Race modes:
 
 ### Challenge Mode
 
-Challenge Mode uses curated fixed-seed runs. Each challenge shows its track, race mode, objective, fixed seed, completion status, and best score.
+Challenge Mode uses curated fixed-seed runs. Each challenge shows its track, race type, race mode, difficulty, objective, fixed seed, completion status, best score, and best progress.
 
 Current challenges:
 
@@ -89,6 +89,22 @@ Current challenges:
 - Clean Line
 - Boost Hunter
 - Near-Miss Run
+- Redline Warmup
+- Redline Dare
+- Speed Gate
+- Fuel Panic
+- Last Drop
+- Clean Redline
+- Party Seed Sampler
+- The Dare
+
+Featured demo seeds for future web copy:
+
+- PARTY-SEED
+- REDLINE-WARMUP
+- REDLINE-DARE
+- FUEL-PANIC
+- THE-DARE
 
 ### Party Mode
 

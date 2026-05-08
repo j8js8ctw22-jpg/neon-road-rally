@@ -1322,6 +1322,7 @@ const FUEL_RUN_CONFIG = {
 };
 
 const CHALLENGE_SAVE_VERSION = 1;
+const CHALLENGE_DIFFICULTY_LABELS = ["Easy", "Normal", "Hard", "Dare"];
 const CHALLENGES = [
   {
     id: "first-run",
@@ -1331,6 +1332,7 @@ const CHALLENGES = [
     raceType: "classic",
     raceMode: "rookie",
     seed: "FIRST-RUN",
+    difficulty: "Easy",
     objective: { type: "finish", label: "Finish the race" },
     purpose: "Approachable onboarding challenge"
   },
@@ -1342,6 +1344,7 @@ const CHALLENGES = [
     raceType: "classic",
     raceMode: "turbo",
     seed: "TURBO-DARE",
+    difficulty: "Dare",
     objective: { type: "finish", label: "Finish the race" },
     purpose: "Intense adult/party-style challenge"
   },
@@ -1353,6 +1356,7 @@ const CHALLENGES = [
     raceType: "classic",
     raceMode: "arcade",
     seed: "CLEAN-LINE",
+    difficulty: "Hard",
     objective: { type: "noSlowdownHits", label: "Finish with no slowdown hits" },
     purpose: "Precision challenge"
   },
@@ -1364,6 +1368,7 @@ const CHALLENGES = [
     raceType: "classic",
     raceMode: "pro",
     seed: "BOOST-HUNTER",
+    difficulty: "Hard",
     objective: { type: "useAllManualBoosts", label: "Finish and use all manual boosts", target: 3 },
     purpose: "Risk/reward boost challenge"
   },
@@ -1375,8 +1380,105 @@ const CHALLENGES = [
     raceType: "classic",
     raceMode: "pro",
     seed: "NEAR-MISS",
+    difficulty: "Hard",
     objective: { type: "nearMisses", label: "Earn at least 5 near-miss bonuses", target: 5 },
     purpose: "Advanced scoring challenge"
+  },
+  {
+    id: "redline-warmup",
+    name: "Redline Warmup",
+    description: "A cleaner, faster first taste of Redline Run.",
+    trackId: "redline-run",
+    raceType: "classic",
+    raceMode: "arcade",
+    seed: "REDLINE-WARMUP",
+    difficulty: "Normal",
+    objective: { type: "finish", label: "Finish the race" },
+    purpose: "Introduce Redline's faster cleaner style"
+  },
+  {
+    id: "redline-dare",
+    name: "Redline Dare",
+    description: "Push Turbo speed without needing a full finish yet.",
+    trackId: "redline-run",
+    raceType: "classic",
+    raceMode: "turbo",
+    seed: "REDLINE-DARE",
+    difficulty: "Dare",
+    objective: { type: "reachProgress", label: "Reach 75% progress or finish", targetPercent: 75 },
+    purpose: "Speed-first challenge without requiring immediate full completion"
+  },
+  {
+    id: "speed-gate",
+    name: "Speed Gate",
+    description: "Follow boost routes through Redline pressure.",
+    trackId: "redline-run",
+    raceType: "classic",
+    raceMode: "pro",
+    seed: "SPEED-GATE",
+    difficulty: "Hard",
+    objective: { type: "collectBoostPads", label: "Collect 3 boost pads and reach 50%", target: 3, progressTargetPercent: 50 },
+    purpose: "Boost/risk challenge"
+  },
+  {
+    id: "fuel-panic",
+    name: "Fuel Panic",
+    description: "Stay fueled deep into a Pro Redline Fuel Run.",
+    trackId: "redline-run",
+    raceType: "fuelRun",
+    raceMode: "pro",
+    seed: "FUEL-PANIC",
+    difficulty: "Hard",
+    objective: { type: "fuelProgress", label: "Reach 75% without running out of fuel", targetPercent: 75 },
+    purpose: "Showcase Fuel Run pressure"
+  },
+  {
+    id: "last-drop",
+    name: "Last Drop",
+    description: "An accessible Fuel Run finish on Sunset Highway.",
+    trackId: "sunset-highway",
+    raceType: "fuelRun",
+    raceMode: "arcade",
+    seed: "LAST-DROP",
+    difficulty: "Normal",
+    objective: { type: "finishFuelRun", label: "Finish Fuel Run" },
+    purpose: "Accessible Fuel Run challenge"
+  },
+  {
+    id: "clean-redline",
+    name: "Clean Redline",
+    description: "Finish Redline clean, with no slowdown hits.",
+    trackId: "redline-run",
+    raceType: "classic",
+    raceMode: "arcade",
+    seed: "CLEAN-REDLINE",
+    difficulty: "Hard",
+    objective: { type: "noSlowdownHits", label: "Finish with no slowdown hits" },
+    purpose: "Precision challenge"
+  },
+  {
+    id: "party-seed-sampler",
+    name: "Party Seed Sampler",
+    description: "A fixed Sunset seed for future side-by-side comparison.",
+    trackId: "sunset-highway",
+    raceType: "classic",
+    raceMode: "pro",
+    seed: "PARTY-SEED",
+    difficulty: "Normal",
+    objective: { type: "reachProgress", label: "Reach 50% progress", targetPercent: 50 },
+    purpose: "A good fixed seed for future Party Mode comparison"
+  },
+  {
+    id: "the-dare",
+    name: "The Dare",
+    description: "A hard but reachable Redline Turbo retry target.",
+    trackId: "redline-run",
+    raceType: "classic",
+    raceMode: "turbo",
+    seed: "THE-DARE",
+    difficulty: "Dare",
+    objective: { type: "reachProgress", label: "Reach 50% progress", targetPercent: 50 },
+    purpose: "A hard but achievable try-again challenge"
   }
 ];
 
@@ -1862,6 +1964,16 @@ function getChallengeObjectiveLabel(challenge) {
   return String(challenge?.objective?.label || "Finish the race");
 }
 
+function getChallengeDifficultyLabel(challenge) {
+  const label = String(challenge?.difficulty || "Normal").trim();
+  return CHALLENGE_DIFFICULTY_LABELS.includes(label) ? label : "Normal";
+}
+
+function formatChallengeProgressPercent(value) {
+  const percent = clampNumber(value, 0, 100, 0);
+  return `${Math.round(percent)}%`;
+}
+
 function getSpeedClassStartSpeed(value) {
   const speedClass = getSpeedClassConfig(value);
   return speedClass.startSpeed ?? TRACKS[0].baseSpeed * (speedClass.startMultiplier ?? 1);
@@ -2187,6 +2299,11 @@ function createDefaultChallengeSave() {
 
 function normalizeChallengeRunSummary(summary) {
   if (!summary || typeof summary !== "object") return null;
+  const progressPercent = Number.isFinite(Number(summary.progressPercent))
+    ? Number(summary.progressPercent)
+    : (Number.isFinite(Number(summary.finishProgressPercent))
+      ? Number(summary.finishProgressPercent)
+      : Number(summary.progress || 0) * 100);
   return {
     status: normalizeRunStatus(summary.status),
     score: normalizeNonNegativeInteger(Number.isFinite(Number(summary.score)) ? summary.score : summary.finalScore || 0),
@@ -2194,8 +2311,12 @@ function normalizeChallengeRunSummary(summary) {
     raceMode: normalizeSpeedClassId(summary.raceMode || summary.speedClass, DEFAULT_SPEED_CLASS_ID),
     seed: normalizeStoredRoadSeed(summary.seed, ""),
     time: normalizeNonNegativeNumber(summary.time, 0, 24 * 60 * 60),
+    progressPercent: clampNumber(progressPercent, 0, 100, 0),
     slowdownHits: normalizeNonNegativeInteger(summary.slowdownHits, 0, 999),
     nearMisses: normalizeNonNegativeInteger(summary.nearMisses, 0, 999),
+    boostPadsCollected: normalizeNonNegativeInteger(summary.boostPadsCollected, 0, 999),
+    gasCansCollected: normalizeNonNegativeInteger(summary.gasCansCollected || summary.fuelCollected, 0, 999),
+    outOfFuel: Boolean(summary.outOfFuel || summary.outOfFuelOccurred || summary.status === "outOfFuel"),
     manualBoostsUsed: normalizeNonNegativeInteger(summary.manualBoostsUsed, 0, 99),
     medalsEarned: Array.isArray(summary.medalsEarned || summary.medals)
       ? (summary.medalsEarned || summary.medals)
@@ -2209,13 +2330,20 @@ function normalizeChallengeRunSummary(summary) {
 function normalizeChallengeProgressEntry(entry, challengeId) {
   if (!entry || typeof entry !== "object") return null;
   const bestScore = Number.isFinite(Number(entry.bestScore)) ? entry.bestScore : entry.score;
+  const bestRunSummary = normalizeChallengeRunSummary(entry.bestRunSummary || entry.runSummary || entry.summary);
+  const bestProgressPercent = Number.isFinite(Number(entry.bestProgressPercent))
+    ? Number(entry.bestProgressPercent)
+    : (Number.isFinite(Number(entry.progressPercent))
+      ? Number(entry.progressPercent)
+      : (bestRunSummary?.progressPercent || (entry.completed || entry.bestCompletionStatus ? 100 : 0)));
   return {
     challengeId: normalizeStorageId(entry.challengeId || challengeId || "", challengeId || ""),
     completed: Boolean(entry.completed || entry.bestCompletionStatus),
     bestCompletionStatus: Boolean(entry.completed || entry.bestCompletionStatus),
     bestScore: normalizeNonNegativeInteger(bestScore),
+    bestProgressPercent: clampNumber(bestProgressPercent, 0, 100, 0),
     bestDate: normalizeDateString(entry.bestDate || entry.date, ""),
-    bestRunSummary: normalizeChallengeRunSummary(entry.bestRunSummary || entry.runSummary || entry.summary)
+    bestRunSummary
   };
 }
 
@@ -2404,16 +2532,23 @@ function normalizePlaytestReportFilter(value) {
 
 function getChallengeRunStats(summary) {
   const breakdown = summary?.scoreBreakdown || {};
+  const progressPercent = Number.isFinite(Number(summary?.progressPercent))
+    ? Number(summary.progressPercent)
+    : Number(summary?.progress || 0) * 100;
   return {
     finished: summary?.status === "finished",
+    outOfFuel: summary?.status === "outOfFuel",
     finalScore: Math.max(0, Math.round(summary?.finalScore || 0)),
     raceType: normalizeRaceTypeId(summary?.raceType || summary?.raceTypeId, DEFAULT_RACE_TYPE_ID),
     raceMode: normalizeSpeedClassId(summary?.speedClass, DEFAULT_SPEED_CLASS_ID),
     seed: normalizeStoredRoadSeed(summary?.seed, ""),
+    progressPercent: clampNumber(progressPercent, 0, 100, 0),
     slowdownHits: Math.max(0, Math.round(summary?.slowdownHits || 0)),
     nearMisses: Math.max(0, Math.round(summary?.nearMisses || 0)),
     nearMissScore: Math.max(0, Math.round(breakdown.nearMiss || 0)),
     boostUseCount: Math.max(0, Math.round(summary?.manualBoostsUsed || 0)),
+    boostPadsCollected: Math.max(0, Math.round(summary?.boostPadsCollected || 0)),
+    gasCansCollected: Math.max(0, Math.round(summary?.gasCansCollected || summary?.fuelCollected || 0)),
     medalsEarned: Array.isArray(summary?.medals)
       ? summary.medals.map((medal) => String(medal.title || "")).filter(Boolean)
       : []
@@ -2428,15 +2563,49 @@ function evaluateChallengeObjective(challenge, summary) {
 
   if (objective.type === "noSlowdownHits") {
     completed = stats.finished && stats.slowdownHits === 0;
-    detail = completed
-      ? "Finished without slowdown hits"
-      : `${stats.slowdownHits} slowdown hit${stats.slowdownHits === 1 ? "" : "s"}`;
+    if (completed) {
+      detail = "Finished without slowdown hits";
+    } else if (!stats.finished) {
+      detail = `Finish still needed · ${stats.slowdownHits} slowdown hit${stats.slowdownHits === 1 ? "" : "s"}`;
+    } else {
+      detail = `${stats.slowdownHits} slowdown hit${stats.slowdownHits === 1 ? "" : "s"}`;
+    }
   } else if (objective.type === "useAllManualBoosts") {
     const target = Math.max(1, Math.round(objective.target || 3));
     completed = stats.finished && stats.boostUseCount >= target;
     detail = completed
       ? `Used ${stats.boostUseCount}/${target} manual boosts and finished`
       : `Used ${stats.boostUseCount}/${target} manual boosts${stats.finished ? "" : ", finish still needed"}`;
+  } else if (objective.type === "reachProgress") {
+    const target = clampNumber(objective.targetPercent ?? objective.target, 1, 100, 50);
+    completed = stats.finished || stats.progressPercent >= target;
+    detail = `${formatChallengeProgressPercent(stats.progressPercent)}/${formatChallengeProgressPercent(target)} progress`;
+  } else if (objective.type === "collectBoostPads") {
+    const target = Math.max(1, Math.round(objective.target || 1));
+    const progressTarget = clampNumber(objective.progressTargetPercent ?? objective.targetPercent, 0, 100, 0);
+    completed = stats.boostPadsCollected >= target && stats.progressPercent >= progressTarget;
+    detail = `${stats.boostPadsCollected}/${target} boost pads · ${formatChallengeProgressPercent(stats.progressPercent)}/${formatChallengeProgressPercent(progressTarget)} progress`;
+  } else if (objective.type === "fuelProgress") {
+    const target = clampNumber(objective.targetPercent ?? objective.target, 1, 100, 75);
+    completed = stats.raceType === FUEL_RUN_RACE_TYPE_ID && stats.progressPercent >= target && !stats.outOfFuel;
+    if (stats.raceType !== FUEL_RUN_RACE_TYPE_ID) {
+      detail = "Fuel Run required";
+    } else if (stats.outOfFuel) {
+      detail = `Out of fuel at ${formatChallengeProgressPercent(stats.progressPercent)}/${formatChallengeProgressPercent(target)}`;
+    } else {
+      detail = `${formatChallengeProgressPercent(stats.progressPercent)}/${formatChallengeProgressPercent(target)} progress with fuel`;
+    }
+  } else if (objective.type === "finishFuelRun") {
+    completed = stats.raceType === FUEL_RUN_RACE_TYPE_ID && stats.finished;
+    if (completed) {
+      detail = `Finished Fuel Run with ${stats.gasCansCollected} gas can${stats.gasCansCollected === 1 ? "" : "s"}`;
+    } else if (stats.raceType !== FUEL_RUN_RACE_TYPE_ID) {
+      detail = "Fuel Run required";
+    } else if (stats.outOfFuel) {
+      detail = `Out of fuel at ${formatChallengeProgressPercent(stats.progressPercent)}`;
+    } else {
+      detail = "Fuel Run finish still needed";
+    }
   } else if (objective.type === "nearMisses") {
     const target = Math.max(1, Math.round(objective.target || 5));
     completed = stats.nearMisses >= target;
@@ -2456,11 +2625,16 @@ function evaluateChallengeObjective(challenge, summary) {
     detail,
     score: stats.finalScore,
     raceMode: stats.raceMode,
+    raceType: stats.raceType,
     seed: stats.seed,
+    progressPercent: stats.progressPercent,
     slowdownHits: stats.slowdownHits,
     nearMisses: stats.nearMisses,
     nearMissScore: stats.nearMissScore,
     boostUseCount: stats.boostUseCount,
+    boostPadsCollected: stats.boostPadsCollected,
+    gasCansCollected: stats.gasCansCollected,
+    outOfFuel: stats.outOfFuel,
     medalsEarned: stats.medalsEarned,
     date: new Date().toISOString()
   };
@@ -2887,13 +3061,16 @@ class PlayerProfileManager {
       completed: false,
       bestCompletionStatus: false,
       bestScore: 0,
+      bestProgressPercent: 0,
       bestDate: "",
       bestRunSummary: null
     };
     const score = Math.max(0, Math.round(summary?.finalScore || evaluation.score || 0));
+    const progressPercent = clampNumber(evaluation.progressPercent ?? Number(summary?.progress || 0) * 100, 0, 100, 0);
     const scoreImproved = score > (existing.bestScore || 0);
+    const progressImproved = progressPercent > (existing.bestProgressPercent || 0);
     const completionImproved = Boolean(evaluation.completed && !existing.completed);
-    const shouldStoreRun = scoreImproved || completionImproved || !existing.bestDate;
+    const shouldStoreRun = scoreImproved || progressImproved || completionImproved || !existing.bestDate;
     const date = evaluation.date || new Date().toISOString();
     const bestRunSummary = shouldStoreRun
       ? normalizeChallengeRunSummary({
@@ -2903,8 +3080,12 @@ class PlayerProfileManager {
         raceMode: summary?.speedClass,
         seed: summary?.seed,
         time: summary?.time,
+        progressPercent,
         slowdownHits: summary?.slowdownHits,
         nearMisses: summary?.nearMisses,
+        boostPadsCollected: summary?.boostPadsCollected,
+        gasCansCollected: summary?.gasCansCollected,
+        outOfFuel: summary?.status === "outOfFuel",
         manualBoostsUsed: summary?.manualBoostsUsed,
         medalsEarned: evaluation.medalsEarned
       })
@@ -2915,6 +3096,7 @@ class PlayerProfileManager {
       completed: Boolean(existing.completed || evaluation.completed),
       bestCompletionStatus: Boolean(existing.completed || evaluation.completed),
       bestScore: Math.max(existing.bestScore || 0, score),
+      bestProgressPercent: Math.max(existing.bestProgressPercent || 0, progressPercent),
       bestDate: shouldStoreRun ? date : existing.bestDate,
       bestRunSummary
     };
@@ -2928,7 +3110,9 @@ class PlayerProfileManager {
       bestScore: updated.bestScore,
       bestCompletionStatus: updated.bestCompletionStatus,
       newBest: scoreImproved,
+      newBestProgress: progressImproved,
       newlyCompleted: completionImproved,
+      bestProgressPercent: updated.bestProgressPercent,
       bestDate: updated.bestDate,
       bestRunSummary: updated.bestRunSummary
     };
@@ -11977,18 +12161,17 @@ class NeonRoadRally {
         <div class="challenge-header">
           <div>
             <span class="eyebrow">Challenge Mode</span>
-            <h2>Sunset Highway Challenges</h2>
-            <p class="hint">Curated solo runs with fixed seeds, race modes, and music-shaped Road Director sections.</p>
+            <h2>Challenge Pack</h2>
+            <p class="hint">Curated solo runs with fixed seeds, race types, race modes, and music-shaped Road Director sections.</p>
           </div>
           <div class="challenge-player-card">
             <strong>${player ? escapeHtml(player.name) : "No Player"}</strong>
             <span>${player ? `Driving ${escapeHtml(player.car.name)}` : "Create a local player first"}</span>
           </div>
         </div>
-        <div class="challenge-card-grid">
-          ${CHALLENGES.map((challenge) => this.renderChallengeCard(challenge)).join("")}
+        <div class="challenge-track-list">
+          ${this.renderChallengeTrackGroups()}
         </div>
-        <p class="hint">Redline Challenges coming soon.</p>
         <div class="row" style="margin-top:16px">
           <button class="small-button" data-action="title">Back to Title</button>
           <button class="small-button" data-action="leaderboard">Top 20 Scores</button>
@@ -11999,11 +12182,42 @@ class NeonRoadRally {
     this.bindLayerButtons();
   }
 
+  renderChallengeTrackGroups() {
+    const groups = [];
+    const byTrack = new Map();
+    CHALLENGES.forEach((challenge) => {
+      const track = getTrackById(challenge.trackId);
+      if (!byTrack.has(track.id)) {
+        const group = { track, challenges: [] };
+        byTrack.set(track.id, group);
+        groups.push(group);
+      }
+      byTrack.get(track.id).challenges.push(challenge);
+    });
+
+    return groups.map((group) => `
+      <section class="challenge-track-group">
+        <div class="challenge-track-heading">
+          <div>
+            <span class="eyebrow">${escapeHtml(group.track.name)}</span>
+            <h3>${escapeHtml(group.track.name)} Challenges</h3>
+          </div>
+          <span>${group.challenges.length} run${group.challenges.length === 1 ? "" : "s"}</span>
+        </div>
+        <div class="challenge-card-grid">
+          ${group.challenges.map((challenge) => this.renderChallengeCard(challenge)).join("")}
+        </div>
+      </section>
+    `).join("");
+  }
+
   renderChallengeCard(challenge) {
     const progress = this.profiles.getChallengeProgress(challenge.id);
     const track = getTrackById(challenge.trackId);
     const completed = Boolean(progress?.completed);
     const bestScore = progress?.bestScore ? formatScore(progress.bestScore) : "No score yet";
+    const bestProgressPercent = progress?.bestProgressPercent || (completed ? 100 : 0);
+    const bestProgress = bestProgressPercent > 0 ? formatChallengeProgressPercent(bestProgressPercent) : "No progress yet";
     const bestDate = progress?.bestDate ? formatShortDate(progress.bestDate) : "";
     const statusText = completed ? `Completed${bestDate ? ` ${bestDate}` : ""}` : "Not completed";
     return `
@@ -12021,9 +12235,11 @@ class NeonRoadRally {
           <span><strong>Track</strong>${escapeHtml(track.name)}</span>
           <span><strong>Race Type</strong>${escapeHtml(getRaceTypeLabel(challenge.raceType || DEFAULT_RACE_TYPE_ID))}</span>
           <span><strong>Race Mode</strong>${escapeHtml(getSpeedClassLabel(challenge.raceMode))}</span>
+          <span><strong>Difficulty</strong>${escapeHtml(getChallengeDifficultyLabel(challenge))}</span>
           <span><strong>Fixed Seed</strong>${escapeHtml(normalizeRoadSeed(challenge.seed, DEFAULT_ROAD_SEED))}</span>
-          <span><strong>Best Score</strong>${escapeHtml(bestScore)}</span>
           <span><strong>Status</strong>${escapeHtml(statusText)}</span>
+          <span><strong>Best Score</strong>${escapeHtml(bestScore)}</span>
+          <span><strong>Best Progress</strong>${escapeHtml(bestProgress)}</span>
         </div>
         <button class="small-button primary" data-action="startChallenge" data-id="${escapeAttr(challenge.id)}">Start Challenge</button>
       </article>
@@ -12356,7 +12572,9 @@ class NeonRoadRally {
         bestScore: progress?.bestScore || 0,
         bestCompletionStatus: Boolean(progress?.completed),
         newBest: false,
+        newBestProgress: false,
         newlyCompleted: false,
+        bestProgressPercent: progress?.bestProgressPercent || 0,
         bestDate: progress?.bestDate || "",
         bestRunSummary: progress?.bestRunSummary || null
       };
@@ -12640,6 +12858,8 @@ class NeonRoadRally {
       slowdownHits: run.slowdownHits || 0,
       nearMisses: run.nearMisses || 0,
       manualBoostsUsed: run.manualBoostsUsed || 0,
+      boostPadsCollected: run.boostPadsCollected || 0,
+      rampsUsed: run.rampsUsed || 0,
       laneMoves: run.laneMoves || 0,
       gasCansSpawned: run.gasCansSpawned || 0,
       gasCansCollected: run.gasCansCollected || 0,
@@ -16328,6 +16548,9 @@ class NeonRoadRally {
     } else if (result.bestScore > 0) {
       callouts.push(`<span class="score-callout">Challenge Best ${formatScore(result.bestScore)}</span>`);
     }
+    if (!result.completed && result.bestProgressPercent > 0) {
+      callouts.push(`<span class="score-callout">Best Progress ${formatChallengeProgressPercent(result.bestProgressPercent)}</span>`);
+    }
     return callouts.join("");
   }
 
@@ -16335,10 +16558,11 @@ class NeonRoadRally {
     if (!summary.challengeMode) return "";
     const result = summary.challengeResult || {};
     const bestText = result.bestScore ? formatScore(result.bestScore) : "No saved best";
-    const completionText = result.bestCompletionStatus ? "Completed" : "Not completed";
+    const bestProgress = formatChallengeProgressPercent(result.bestProgressPercent || result.progressPercent || 0);
+    const completionText = result.bestCompletionStatus ? "Completed" : `Best Progress ${bestProgress}`;
     const saveText = !result.saved && summary.debugSpeedScaleActive
       ? "Not saved in debug speed"
-      : (result.newlyCompleted ? "First completion" : (result.newBest ? "New challenge best" : "Saved locally"));
+      : (result.newlyCompleted ? "First completion" : (result.newBest ? "New challenge best" : (result.newBestProgress ? "New best progress" : "Saved locally")));
     return `
       <div class="challenge-result-card ${result.completed ? "is-complete" : "is-failed"}">
         <div>
