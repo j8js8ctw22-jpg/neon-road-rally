@@ -1094,7 +1094,7 @@ const TRACKS = [
     music: "audio/redline-run.mp3",
     musicFallback: "audio/sunset-highway.mp3",
     musicOptional: true,
-    musicStatus: "Optional Redline song; uses Sunset Highway music until it is added.",
+    musicStatus: "Uses Redline Run music; falls back safely if missing.",
     recommendedModes: ["Solo / Seeded Run", "Fuel Run", "Party Mode", "Pro / Turbo"],
     fuelRunSupport: true,
     targetDurationSeconds: 78,
