@@ -12646,6 +12646,8 @@ class NeonRoadRally {
     this.pendingTrackId = DEFAULT_TRACK_ID;
     this.partySetup = null;
     this.partySession = null;
+    this.guideTab = "basics";
+    this.guideReturnScreen = "title";
     this.badgeFilter = "all";
     this.playtestReportFilter = "all";
     this.playtestReportCopyText = "";
@@ -13403,6 +13405,7 @@ class NeonRoadRally {
         </div>
         <div class="row" style="margin-top:16px">
           <button class="small-button" data-action="title">Back to Title</button>
+          <button class="small-button" data-action="howToPlay">How To Play</button>
           <button class="small-button" data-action="leaderboard">Top 20 Scores</button>
         </div>
         <p class="status-line">${escapeHtml(message)}</p>
@@ -16121,6 +16124,212 @@ class NeonRoadRally {
     this.layer.classList.add("is-empty");
   }
 
+  shouldShowNewDriverHint() {
+    const player = this.profiles.getCurrentPlayer();
+    const leaderboardHasRuns = Array.isArray(this.profiles.data.leaderboard) && this.profiles.data.leaderboard.length > 0;
+    return !player || (!leaderboardHasRuns && (player.bestScore || 0) <= 0);
+  }
+
+  renderNewDriverHint() {
+    if (!this.shouldShowNewDriverHint()) return "";
+    return `
+      <p class="new-driver-hint">
+        <strong>New?</strong>
+        Start with Arcade on Sunset Highway, or Rookie for younger drivers.
+      </p>
+    `;
+  }
+
+  getHowToPlayTabs() {
+    return [
+      { id: "basics", label: "Basics" },
+      { id: "modes", label: "Modes" },
+      { id: "party", label: "Party" },
+      { id: "rewards", label: "Rewards" }
+    ];
+  }
+
+  getHowToPlaySections() {
+    return {
+      basics: [
+        {
+          title: "Basic Controls",
+          chips: ["Arrows / WASD", "Space Boost", "Enter", "F Fullscreen"],
+          points: [
+            "Arrow keys or WASD move the car.",
+            "Left/Right: tap once to change one lane.",
+            "Holding left/right does not sweep lanes. Each lane change needs a fresh tap.",
+            "Up/Down: hold to move forward or back on screen.",
+            "Space uses manual boost. Enter selects or continues. F toggles fullscreen if supported."
+          ]
+        },
+        {
+          title: "Main Goal",
+          chips: ["Avoid", "Survive", "Score", "Finish"],
+          points: [
+            "Avoid traffic and survive the road.",
+            "Chase score and finish the run if possible.",
+            "Near misses, boosts, ramps, and clean driving improve score."
+          ]
+        },
+        {
+          title: "Tracks",
+          chips: ["Sunset Highway", "Redline Run"],
+          points: [
+            "Sunset Highway is the balanced arcade road with mixed hazards and is the best starting track.",
+            "Redline Run is a faster neon expressway: cleaner, more intense, and backed by dedicated Redline music."
+          ]
+        },
+        {
+          title: "Ramps",
+          chips: ["Jump", "Clear", "Land"],
+          points: [
+            "Ramps jump over road objects.",
+            "A good ramp can clear cars, trucks, barriers, and smaller hazards.",
+            "Landing still matters, so be ready for the next lane choice."
+          ]
+        }
+      ],
+      modes: [
+        {
+          title: "Race Types",
+          chips: ["Classic", "Fuel Run"],
+          points: [
+            "Classic: survive, score, and finish.",
+            "Fuel Run: fuel drains over time, gas cans refill it, manual boost saves fuel, and running out ends the run."
+          ]
+        },
+        {
+          title: "Race Modes",
+          chips: ["Sunday Drive", "Rookie", "Arcade", "Pro", "Turbo"],
+          points: [
+            "Sunday Drive is the easiest.",
+            "Rookie is for beginners and younger drivers.",
+            "Arcade is the default.",
+            "Pro is the serious challenge.",
+            "Turbo is dare mode."
+          ]
+        },
+        {
+          title: "Challenge Mode",
+          chips: ["Fixed Seeds", "Objectives", "Practice"],
+          points: [
+            "Challenge Mode uses fixed seeds and specific objectives.",
+            "It is good for replay, practice, and learning a track without changing the setup every run."
+          ]
+        }
+      ],
+      party: [
+        {
+          title: "Party Mode",
+          chips: ["Local", "Pass Keyboard", "Same Seed"],
+          points: [
+            "Party Mode is local pass-the-keyboard competition on one computer.",
+            "Players use the same seed for fair comparison.",
+            "One Run Each, Best of 3, and Total Score decide the winner by highest score."
+          ]
+        }
+      ],
+      rewards: [
+        {
+          title: "Badges and Titles",
+          chips: ["Badges", "Titles", "Fair"],
+          points: [
+            "Badges are permanent local achievements.",
+            "Titles are local crowns that can be taken by another player.",
+            "Rewards do not give stat upgrades, so fairness stays intact."
+          ]
+        },
+        {
+          title: "Local Saves",
+          chips: ["Browser Save", "Local Only", "No Online Board"],
+          points: [
+            "Profiles, scores, badges, and titles save locally in this browser or computer.",
+            "Clearing browser data can remove progress.",
+            "There is no online leaderboard yet."
+          ]
+        }
+      ]
+    };
+  }
+
+  renderGuideCard(section) {
+    return `
+      <article class="how-to-card">
+        <div class="how-to-card-header">
+          <h3>${escapeHtml(section.title)}</h3>
+          <div class="how-to-chip-row">
+            ${section.chips.map((chip) => `<span class="how-to-chip">${escapeHtml(chip)}</span>`).join("")}
+          </div>
+        </div>
+        <ul>
+          ${section.points.map((point) => `<li>${escapeHtml(point)}</li>`).join("")}
+        </ul>
+      </article>
+    `;
+  }
+
+  getGuideReturnLabel() {
+    if (this.guideReturnScreen === "settings") return "Settings";
+    if (this.guideReturnScreen === "partySetup") return "Party Setup";
+    if (this.guideReturnScreen === "challenges") return "Challenge Mode";
+    if (this.guideReturnScreen === "preRace") return "Race Setup";
+    return "Title";
+  }
+
+  openHowToPlayFromCurrentScreen() {
+    if (this.screen === "partySetup") this.readPartySetupForm();
+    this.guideReturnScreen = ["settings", "partySetup", "challenges", "preRace"].includes(this.screen)
+      ? this.screen
+      : "title";
+    this.showHowToPlayScreen("basics");
+  }
+
+  showHowToPlayScreen(tabId = "basics") {
+    const tabs = this.getHowToPlayTabs();
+    const sectionsByTab = this.getHowToPlaySections();
+    const safeTab = tabs.some((tab) => tab.id === tabId) ? tabId : "basics";
+    this.guideTab = safeTab;
+    this.setScreen("howToPlay");
+    this.audio.playMusic("title", false);
+    this.layer.classList.remove("is-empty");
+    this.layer.innerHTML = `
+      <section class="panel how-to-panel">
+        <div class="how-to-header">
+          <div>
+            <span class="eyebrow">Driver Guide</span>
+            <h2>How To Play</h2>
+            <p class="hint">Fast rules for new drivers, kids, party guests, and website visitors.</p>
+          </div>
+          <div class="how-to-tab-row" role="tablist" aria-label="How To Play sections">
+            ${tabs.map((tab) => `
+              <button class="small-button how-to-tab ${tab.id === safeTab ? "primary" : ""}" data-action="guideTab" data-tab="${escapeAttr(tab.id)}" role="tab" aria-selected="${tab.id === safeTab ? "true" : "false"}">
+                ${escapeHtml(tab.label)}
+              </button>
+            `).join("")}
+          </div>
+        </div>
+        <div class="how-to-grid">
+          ${sectionsByTab[safeTab].map((section) => this.renderGuideCard(section)).join("")}
+        </div>
+        <div class="row how-to-actions">
+          <button class="small-button primary" data-action="guideBack">Back to ${escapeHtml(this.getGuideReturnLabel())}</button>
+          <button class="small-button" data-action="title">Title</button>
+        </div>
+      </section>
+    `;
+    this.bindLayerButtons();
+  }
+
+  handleGuideBack() {
+    const target = this.guideReturnScreen || "title";
+    if (target === "settings") this.showSettingsScreen();
+    else if (target === "partySetup") this.showPartySetupScreen();
+    else if (target === "challenges") this.showChallengeScreen();
+    else if (target === "preRace") this.showPreRaceScreen();
+    else this.showTitle();
+  }
+
   showTitle() {
     this.partySession = null;
     this.partySetup = null;
@@ -16160,10 +16369,12 @@ class NeonRoadRally {
             </div>
           </div>
           <p class="keyboard-hints">Enter starts Solo. Arrows/WASD drive. Space boosts. F fullscreen. Backtick opens debug tools.</p>
+          ${this.renderNewDriverHint()}
         </div>
         <div class="title-menu-card">
           <div class="menu-stack main-menu">
             <button class="menu-button primary" data-action="start"><strong>Solo / Seeded Run</strong><span>Set a road seed and chase the finish.</span></button>
+            <button class="menu-button" data-action="howToPlay"><strong>How To Play</strong><span>Controls, race types, party rules, rewards, and local saves.</span></button>
             <button class="menu-button" data-action="challengeMode"><strong>Challenge Mode</strong><span>Fixed seeds, clear objectives, saved bests.</span></button>
             <button class="menu-button" data-action="partyMode"><strong>Party Mode</strong><span>Pass the keyboard with one-run, best-of-3, or total-score rounds.</span></button>
             <button class="menu-button" data-action="customize"><strong>Customize Car</strong><span>Pick the local driver car.</span></button>
@@ -16239,6 +16450,7 @@ class NeonRoadRally {
             <button class="small-button" data-action="toggleMusic">Music: ${this.audio.musicMuted ? "Muted" : "On"}</button>
             <button class="small-button" data-action="toggleSfx">SFX: ${this.audio.sfxMuted ? "Muted" : "On"}</button>
             <button class="small-button" data-action="fullscreen">Fullscreen</button>
+            <button class="small-button" data-action="howToPlay">How To Play</button>
             <button class="small-button" data-action="showPlaytestReport">Playtest Report</button>
             ${this.debugMode ? `<button class="small-button" data-action="roadDirectorLab">Road Director Lab</button>` : ""}
             <button class="small-button primary" data-action="title">Back to Title</button>
@@ -17474,6 +17686,7 @@ class NeonRoadRally {
           <p class="hint">Create at least two local player profiles before starting pass-the-keyboard competition.</p>
           <div class="row" style="margin-top:16px">
             <button class="small-button primary" data-action="players">Create More Players</button>
+            <button class="small-button" data-action="howToPlay">How To Play</button>
             <button class="small-button" data-action="title">Return to Title</button>
           </div>
           <p class="status-line">${escapeHtml(message || "Party Mode needs 2-8 local players.")}</p>
@@ -17574,6 +17787,7 @@ class NeonRoadRally {
             <div class="row">
               <button class="small-button" data-action="partyRandomSeed">Random Seed</button>
               <button class="small-button primary" data-action="partyStartRound" ${selectedPlayers.length < PARTY_MIN_PLAYERS ? "disabled" : ""}>Start Party Round</button>
+              <button class="small-button" data-action="howToPlay">How To Play</button>
               <button class="small-button" data-action="title">Return to Title</button>
             </div>
             <p class="status-line">${escapeHtml(message || `${selectedPlayers.length} selected. Choose 2-${PARTY_MAX_PLAYERS} players.`)}</p>
@@ -18818,6 +19032,9 @@ class NeonRoadRally {
         else if (action === "challengeMode") this.showChallengeScreen();
         else if (action === "startChallenge") this.handleStartChallenge(button.dataset.id);
         else if (action === "partyMode") this.showPartySetupScreen();
+        else if (action === "howToPlay") this.openHowToPlayFromCurrentScreen();
+        else if (action === "guideTab") this.showHowToPlayScreen(button.dataset.tab);
+        else if (action === "guideBack") this.handleGuideBack();
         else if (action === "players") this.showPlayerScreen();
         else if (action === "customize") this.showCustomizeScreen();
         else if (action === "leaderboard") this.showLeaderboard();

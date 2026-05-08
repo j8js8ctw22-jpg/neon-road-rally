@@ -853,6 +853,115 @@ button:disabled {
   white-space: normal;
 }
 
+.new-driver-hint {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+  width: fit-content;
+  max-width: 100%;
+  margin: 0;
+  border: 1px solid rgba(255, 228, 94, 0.46);
+  border-radius: 6px;
+  padding: 8px 10px;
+  background: rgba(255, 228, 94, 0.08);
+  color: var(--muted);
+  line-height: 1.35;
+}
+
+.new-driver-hint strong {
+  color: var(--yellow);
+  text-transform: uppercase;
+}
+
+.how-to-panel {
+  width: min(1080px, 100%);
+}
+
+.how-to-header {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: minmax(0, 1fr) minmax(330px, 0.52fr);
+  align-items: start;
+  margin-bottom: 16px;
+}
+
+.how-to-header h2 {
+  margin-bottom: 6px;
+}
+
+.how-to-tab-row {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.how-to-tab {
+  text-align: center;
+}
+
+.how-to-grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+}
+
+.how-to-card {
+  display: grid;
+  gap: 11px;
+  align-content: start;
+  border: 1px solid rgba(40, 246, 255, 0.36);
+  border-radius: 8px;
+  padding: 13px;
+  background: rgba(5, 8, 20, 0.74);
+}
+
+.how-to-card-header {
+  display: grid;
+  gap: 8px;
+}
+
+.how-to-card h3 {
+  margin: 0;
+  color: var(--yellow);
+  font-size: 1rem;
+  text-transform: uppercase;
+}
+
+.how-to-card ul {
+  display: grid;
+  gap: 7px;
+  margin: 0;
+  padding-left: 18px;
+  color: var(--muted);
+  line-height: 1.38;
+}
+
+.how-to-card li::marker {
+  color: var(--cyan);
+}
+
+.how-to-chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.how-to-chip {
+  border: 1px solid rgba(255, 63, 209, 0.46);
+  border-radius: 999px;
+  padding: 4px 7px;
+  background: rgba(255, 63, 209, 0.1);
+  color: #ffe6fb;
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.how-to-actions {
+  margin-top: 16px;
+}
+
 .playtest-copy-field {
   margin-top: 14px;
 }
@@ -1654,6 +1763,8 @@ button:disabled {
   .playtest-report-columns,
   .score-hero,
   .party-drama-header,
+  .how-to-header,
+  .how-to-grid,
   .party-last-run-card,
   .score-grid,
   .track-select-grid,
