@@ -25,6 +25,7 @@ const LEADERBOARD_MAX_ENTRIES = 20;
 const LEADERBOARD_IMPORT_SCAN_LIMIT = 200;
 const MAX_DISPLAY_SCORE = 999999999;
 const BADGE_SAVE_VERSION = 1;
+const PLAYER_BADGE_STATS_VERSION = 1;
 const BADGE_DEFINITIONS = [
   {
     id: "first_run_posted",
@@ -88,7 +89,7 @@ const BADGE_DEFINITIONS = [
     id: "turbo_survivor",
     name: "Turbo Survivor",
     description: "Finish any Turbo race.",
-    category: "mode",
+    category: "speed",
     difficulty: "Hard",
     hidden: false,
     icon: "TUR"
@@ -137,18 +138,234 @@ const BADGE_DEFINITIONS = [
     difficulty: "Easy",
     hidden: false,
     icon: "PTY"
+  },
+  {
+    id: "party_regular",
+    name: "Party Regular",
+    description: "Complete 5 Party runs.",
+    category: "party",
+    difficulty: "Normal",
+    hidden: false,
+    icon: "P5"
+  },
+  {
+    id: "party_winner",
+    name: "Party Winner",
+    description: "Win a Party session.",
+    category: "party",
+    difficulty: "Normal",
+    hidden: false,
+    icon: "WIN"
+  },
+  {
+    id: "comeback_driver",
+    name: "Comeback Driver",
+    description: "Win a Party session after trailing.",
+    category: "party",
+    difficulty: "Hard",
+    hidden: false,
+    icon: "BACK"
+  },
+  {
+    id: "best_of_3_winner",
+    name: "Best of 3 Winner",
+    description: "Win a Best of 3 Party session.",
+    category: "party",
+    difficulty: "Hard",
+    hidden: false,
+    icon: "B3"
+  },
+  {
+    id: "overdrive_survivor",
+    name: "Overdrive Survivor",
+    description: "Finish an Overdrive race.",
+    category: "speed",
+    difficulty: "Hard",
+    hidden: false,
+    icon: "OD"
+  },
+  {
+    id: "redline_survivor",
+    name: "Redline Survivor",
+    description: "Finish Redline race mode.",
+    category: "speed",
+    difficulty: "Very Hard",
+    hidden: false,
+    icon: "RL"
+  },
+  {
+    id: "speed_demon",
+    name: "Speed Demon",
+    description: "Finish with a very high average speed.",
+    category: "speed",
+    difficulty: "Very Hard",
+    hidden: false,
+    icon: "SPD"
+  },
+  {
+    id: "no_boost_turbo",
+    name: "Turbo No Boost",
+    description: "Finish Turbo or faster without manual boost.",
+    category: "speed",
+    difficulty: "Very Hard",
+    hidden: false,
+    icon: "NOB"
+  },
+  {
+    id: "redline_master",
+    name: "Redline Master",
+    description: "Finish Redline Run on Pro or faster.",
+    category: "track",
+    difficulty: "Hard",
+    hidden: false,
+    icon: "RDM"
+  },
+  {
+    id: "sunset_master",
+    name: "Sunset Master",
+    description: "Finish Sunset Highway on Pro or faster.",
+    category: "track",
+    difficulty: "Hard",
+    hidden: false,
+    icon: "SUM"
+  },
+  {
+    id: "fuel_clutch",
+    name: "Fuel Clutch",
+    description: "Finish Fuel Run with 10 or less fuel.",
+    category: "fuel",
+    difficulty: "Hard",
+    hidden: false,
+    icon: "F10"
+  },
+  {
+    id: "fuel_hoarder",
+    name: "Fuel Hoarder",
+    description: "Finish Fuel Run with 40 or more fuel.",
+    category: "fuel",
+    difficulty: "Hard",
+    hidden: false,
+    icon: "F40"
+  },
+  {
+    id: "gas_gremlin",
+    name: "Gas Grabber",
+    description: "Collect 5 gas cans in one Fuel Run.",
+    category: "fuel",
+    difficulty: "Normal",
+    hidden: false,
+    icon: "GAS"
+  },
+  {
+    id: "boost_saver",
+    name: "Boost Saver",
+    description: "Save 10 fuel with manual boosts in one Fuel Run.",
+    category: "fuel",
+    difficulty: "Hard",
+    hidden: false,
+    icon: "SAVE"
+  },
+  {
+    id: "ramp_rider",
+    name: "Ramp Rider",
+    description: "Use 5 ramps in one run.",
+    category: "skill",
+    difficulty: "Normal",
+    hidden: false,
+    icon: "RMP"
+  },
+  {
+    id: "jump_master",
+    name: "Jump Master",
+    description: "Clear 5 ramp targets in one run.",
+    category: "skill",
+    difficulty: "Hard",
+    hidden: false,
+    icon: "JMP"
+  },
+  {
+    id: "near_miss_10",
+    name: "Near-Miss 10",
+    description: "Earn 10 near misses in one run.",
+    category: "skill",
+    difficulty: "Very Hard",
+    hidden: false,
+    icon: "NM10"
+  },
+  {
+    id: "clean_turbo",
+    name: "Clean Turbo",
+    description: "Finish Turbo or faster with zero slowdown hits.",
+    category: "skill",
+    difficulty: "Very Hard",
+    hidden: false,
+    icon: "CT"
+  },
+  {
+    id: "no_boost_finish",
+    name: "No Boost Finish",
+    description: "Finish Pro or faster without manual boost.",
+    category: "skill",
+    difficulty: "Hard",
+    hidden: false,
+    icon: "NB"
+  },
+  {
+    id: "comeback_finish",
+    name: "Clutch Finish",
+    description: "Finish Fuel Run after dipping below 25 fuel.",
+    category: "skill",
+    difficulty: "Very Hard",
+    hidden: false,
+    icon: "CLT"
+  },
+  {
+    id: "challenge_regular",
+    name: "Challenge Regular",
+    description: "Complete 3 challenges.",
+    category: "challenge",
+    difficulty: "Normal",
+    hidden: false,
+    icon: "C3"
+  },
+  {
+    id: "challenge_ace",
+    name: "Challenge Ace",
+    description: "Complete 8 challenges.",
+    category: "challenge",
+    difficulty: "Very Hard",
+    hidden: false,
+    icon: "C8"
+  },
+  {
+    id: "daredevil",
+    name: "Daredevil",
+    description: "Complete any Dare difficulty challenge.",
+    category: "challenge",
+    difficulty: "Very Hard",
+    hidden: false,
+    icon: "DARE"
+  },
+  {
+    id: "first_redline_challenge",
+    name: "Redline Challenger",
+    description: "Complete a Redline Run challenge.",
+    category: "challenge",
+    difficulty: "Hard",
+    hidden: false,
+    icon: "RCH"
   }
 ];
 const BADGE_DEFINITION_BY_ID = Object.fromEntries(BADGE_DEFINITIONS.map((badge) => [badge.id, badge]));
 const BADGE_CATEGORY_FILTERS = [
   { id: "all", label: "All" },
   { id: "starter", label: "Starter" },
+  { id: "party", label: "Party" },
+  { id: "speed", label: "Speed" },
   { id: "skill", label: "Skill" },
   { id: "track", label: "Track" },
-  { id: "mode", label: "Mode" },
   { id: "fuel", label: "Fuel" },
-  { id: "challenge", label: "Challenge" },
-  { id: "party", label: "Party" }
+  { id: "challenge", label: "Challenge" }
 ];
 const BADGE_CATEGORY_LABELS = Object.fromEntries(BADGE_CATEGORY_FILTERS.map((filter) => [filter.id, filter.label]));
 const PLAYER_CHALLENGE_SAVE_VERSION = 1;
@@ -246,7 +463,9 @@ const ROAD_READABILITY_CONFIG = {
     rookie: 0.72,
     arcade: 0.52,
     pro: 0.38,
-    turbo: 0.28
+    turbo: 0.28,
+    overdrive: 0.22,
+    redline: 0.16
   },
   denseTrafficMinorScale: 0.28,
   fuelMinorHazardScale: 0,
@@ -275,7 +494,9 @@ const START_CLEAR_CONFIG = {
     rookie: 3.45,
     arcade: 3.3,
     pro: 3.15,
-    turbo: 3.05
+    turbo: 3.05,
+    overdrive: 2.95,
+    redline: 2.85
   }
 };
 const LAUNCH_PACING_CONFIG = {
@@ -319,6 +540,32 @@ const LAUNCH_PACING_CONFIG = {
     minorScaleMultiplier: 0.2,
     boostWeightMultiplier: 0.18,
     rampWeightMultiplier: 0.45
+  },
+  overdrive: {
+    spawnLeadSeconds: 3.05,
+    spacingMultiplier: 2,
+    randomSecondsMultiplier: 2.1,
+    pressureBudgetMultiplier: 0.56,
+    pressureBudgetAllowance: 1.03,
+    forceMeaningfulMultiplier: 2,
+    centerChallengeStartProgress: 0.19,
+    softCenterStartProgress: 0.23,
+    minorScaleMultiplier: 0.16,
+    boostWeightMultiplier: 0.16,
+    rampWeightMultiplier: 0.42
+  },
+  redline: {
+    spawnLeadSeconds: 2.95,
+    spacingMultiplier: 2.24,
+    randomSecondsMultiplier: 2.35,
+    pressureBudgetMultiplier: 0.52,
+    pressureBudgetAllowance: 1.02,
+    forceMeaningfulMultiplier: 2.15,
+    centerChallengeStartProgress: 0.2,
+    softCenterStartProgress: 0.24,
+    minorScaleMultiplier: 0.12,
+    boostWeightMultiplier: 0.14,
+    rampWeightMultiplier: 0.38
   }
 };
 const SPAWN_VISIBILITY_CONFIG = {
@@ -414,6 +661,36 @@ const ACTIVE_FIELD_BUDGET_CONFIG = {
     maxUpcomingDecisionGapSeconds: 1.2,
     deadScreenLimitSeconds: 1.2,
     lonelyObjectLimitSeconds: 0.9,
+    maxVisibleHardBlockers: 6,
+    maxTacticalHardBlockers: 6,
+    maxHardBlockersNext3Seconds: 5,
+    maxHardBlockersInTwoSeconds: 4,
+    maxHardBlockersInThreeLaneNeighborhood: 4,
+    maxVisibleHardWaveOverlap: 2,
+    spawnDelayVisibleHardBlockers: 5,
+    spikeVisibleHardBlockers: 7
+  },
+  overdrive: {
+    minVisibleMeaningful: 3,
+    targetVisibleMeaningful: 4,
+    maxUpcomingDecisionGapSeconds: 1.05,
+    deadScreenLimitSeconds: 1.05,
+    lonelyObjectLimitSeconds: 0.82,
+    maxVisibleHardBlockers: 6,
+    maxTacticalHardBlockers: 6,
+    maxHardBlockersNext3Seconds: 5,
+    maxHardBlockersInTwoSeconds: 4,
+    maxHardBlockersInThreeLaneNeighborhood: 4,
+    maxVisibleHardWaveOverlap: 2,
+    spawnDelayVisibleHardBlockers: 5,
+    spikeVisibleHardBlockers: 7
+  },
+  redline: {
+    minVisibleMeaningful: 3,
+    targetVisibleMeaningful: 4,
+    maxUpcomingDecisionGapSeconds: 0.95,
+    deadScreenLimitSeconds: 0.95,
+    lonelyObjectLimitSeconds: 0.75,
     maxVisibleHardBlockers: 6,
     maxTacticalHardBlockers: 6,
     maxHardBlockersNext3Seconds: 5,
@@ -878,11 +1155,11 @@ const PARTY_SEED_MODES = [
 const WEEKEND_PLAYTEST_PICKS = [
   {
     id: "kids-first-race",
-    title: "Kids First Race",
+    title: "First Arcade Race",
     trackId: DEFAULT_TRACK_ID,
     trackLabel: "Sunset Highway",
     raceTypeId: DEFAULT_RACE_TYPE_ID,
-    speedClassId: "rookie",
+    speedClassId: "arcade",
     suggestedUse: "younger/new players"
   },
   {
@@ -935,7 +1212,7 @@ const WEEKEND_PLAYTEST_PICKS = [
   }
 ];
 const WEEKEND_PLAYTEST_CHECKLIST = [
-  "Try Kids First Race",
+  "Try First Arcade Race",
   "Try Family Arcade",
   "Try Redline Dare",
   "Try Fuel Run",
@@ -1137,7 +1414,7 @@ const TRACKS = [
     ],
     distanceToFinish: 155000,
     baseSpeed: 1000,
-    maxSpeed: 4300,
+    maxSpeed: 5900,
     speedCurveType: "smoothstep",
     startSpeedMultiplier: 1,
     earlySpeedMultiplier: 1.15,
@@ -1179,7 +1456,9 @@ const TRACKS = [
       rookie: 0.86,
       arcade: 1,
       pro: 1.25,
-      turbo: 1.08
+      turbo: 1.08,
+      overdrive: 1.12,
+      redline: 1.18
     },
     speedScale: 1.15,
     speedScaleByMode: {
@@ -1187,10 +1466,12 @@ const TRACKS = [
       rookie: 1.14,
       arcade: 1.2,
       pro: 1.15,
-      turbo: 1.18
+      turbo: 1.18,
+      overdrive: 1.05,
+      redline: 1.02
     },
     baseSpeed: 1000,
-    maxSpeed: 5200,
+    maxSpeed: 6600,
     speedCurveType: "smoothstep",
     startSpeedMultiplier: 1,
     earlySpeedMultiplier: 1.18,
@@ -1241,7 +1522,9 @@ const TRACKS = [
         rookie: { cadenceScale: 1.14, spacingScale: 1.1, recoveryScale: 1.2 },
         arcade: { cadenceScale: 1.1, spacingScale: 1.08, recoveryScale: 1.16 },
         pro: { cadenceScale: 1.06, spacingScale: 1.06, recoveryScale: 1.12 },
-        turbo: { cadenceScale: 1.02, spacingScale: 1.05, recoveryScale: 1.08 }
+        turbo: { cadenceScale: 1.02, spacingScale: 1.05, recoveryScale: 1.08 },
+        overdrive: { cadenceScale: 1.04, spacingScale: 1.1, recoveryScale: 1.14 },
+        redline: { cadenceScale: 1.08, spacingScale: 1.16, recoveryScale: 1.22 }
       },
       waveWeightMultipliers: {
         singleBlocker: 0.72,
@@ -1507,12 +1790,18 @@ const TRACKS = [
 ];
 
 const SPEED_CLASSES = [
-  { id: "sunday", label: "Sunday Drive", startSpeed: 700, endSpeed: 1100, scoreMultiplier: 0.75, distanceMultiplier: 0.82 },
-  { id: "rookie", label: "Rookie", startSpeed: 950, endSpeed: 1500, scoreMultiplier: 0.9, distanceMultiplier: 0.92 },
-  { id: "arcade", label: "Arcade", startSpeed: 1250, endSpeed: 2100, scoreMultiplier: 1, distanceMultiplier: 1 },
-  { id: "pro", label: "Pro", startSpeed: 2250, endSpeed: 3600, scoreMultiplier: 1.25, distanceMultiplier: 1.25 },
-  { id: "turbo", label: "Turbo", startSpeed: 2700, endSpeed: 4300, scoreMultiplier: 1.55, distanceMultiplier: 1.2 }
+  { id: "sunday", label: "Sunday Drive", startSpeed: 700, endSpeed: 1100, scoreMultiplier: 0.75, distanceMultiplier: 0.82, description: "Training cruise.", training: true },
+  { id: "rookie", label: "Rookie", startSpeed: 950, endSpeed: 1500, scoreMultiplier: 0.9, distanceMultiplier: 0.92, description: "Training warmup.", training: true },
+  { id: "arcade", label: "Arcade", startSpeed: 1250, endSpeed: 2100, scoreMultiplier: 1, distanceMultiplier: 1, description: "Default family-speed race.", visibleNormal: true },
+  { id: "pro", label: "Pro", startSpeed: 2250, endSpeed: 3600, scoreMultiplier: 1.25, distanceMultiplier: 1.25, description: "Serious traffic pressure.", visibleNormal: true },
+  { id: "turbo", label: "Turbo", startSpeed: 2700, endSpeed: 4300, scoreMultiplier: 1.55, distanceMultiplier: 1.2, description: "Fast, dangerous, fair.", visibleNormal: true },
+  { id: "overdrive", label: "Overdrive", startSpeed: 3300, endSpeed: 5200, scoreMultiplier: 1.85, distanceMultiplier: 1.12, description: "High-speed dare run.", visibleNormal: true },
+  { id: "redline", label: "Redline", startSpeed: 3800, endSpeed: 5900, scoreMultiplier: 2.15, distanceMultiplier: 1.12, description: "Maximum-speed local bragging rights.", visibleNormal: true }
 ];
+const NORMAL_SPEED_CLASS_IDS = ["arcade", "pro", "turbo", "overdrive", "redline"];
+const TRAINING_SPEED_CLASS_IDS = ["sunday", "rookie"];
+const SPEED_CLASS_ORDER = TRAINING_SPEED_CLASS_IDS.concat(NORMAL_SPEED_CLASS_IDS);
+const SPEED_DEMON_AVERAGE_SPEED_THRESHOLD = 3600;
 
 const RACE_TYPES = [
   {
@@ -1536,14 +1825,18 @@ const FUEL_RUN_CONFIG = {
     rookie: 1.15,
     arcade: 1.65,
     pro: 2.65,
-    turbo: 3.1
+    turbo: 3.1,
+    overdrive: 3.1,
+    redline: 3.1
   },
   gasCanRestoreAmount: {
     sunday: 24,
     rookie: 23,
     arcade: 20,
     pro: 18,
-    turbo: 16
+    turbo: 16,
+    overdrive: 16,
+    redline: 16
   },
   fuelDrainMultiplierDuringManualBoost: 0,
   lowFuelThreshold: 35,
@@ -1558,21 +1851,27 @@ const FUEL_RUN_CONFIG = {
     rookie: 10,
     arcade: 9,
     pro: 8,
-    turbo: 7
+    turbo: 7,
+    overdrive: 7,
+    redline: 7
   },
   targetGasGapSeconds: {
     sunday: 22,
     rookie: 20,
     arcade: 17,
     pro: 15,
-    turbo: 13
+    turbo: 13,
+    overdrive: 13,
+    redline: 13
   },
   maxGasGapSeconds: {
     sunday: 32,
     rookie: 29,
     arcade: 25,
     pro: 22,
-    turbo: 19
+    turbo: 19,
+    overdrive: 19,
+    redline: 19
   }
 };
 
@@ -1812,35 +2111,45 @@ const ROAD_DIRECTOR = {
     rookie: { early: 2.75, mid: 2.2, late: 1.75, randomEarly: 0.36, randomLate: 0.15, spacingScale: 1.02, recoveryScale: 1.05, centerSafe: 8, laneStill: 4.4, forceMeaningful: 3.55 },
     arcade: { early: 1.55, mid: 1.18, late: 0.9, randomEarly: 0.14, randomLate: 0.06, spacingScale: 0.7, recoveryScale: 0.52, centerSafe: 3.6, centerHold: 2.65, laneStill: 2.1, forceMeaningful: 1.75 },
     pro: { early: 1.34, mid: 1.08, late: 0.84, randomEarly: 0.11, randomLate: 0.05, spacingScale: 0.68, recoveryScale: 0.5, centerSafe: 2.25, centerHold: 1.9, laneStill: 1.4, forceMeaningful: 1.34 },
-    turbo: { early: 1.52, mid: 1.22, late: 0.98, randomEarly: 0.13, randomLate: 0.06, spacingScale: 0.78, recoveryScale: 0.62, centerSafe: 2.1, centerHold: 1.75, laneStill: 1.25, forceMeaningful: 1.55 }
+    turbo: { early: 1.52, mid: 1.22, late: 0.98, randomEarly: 0.13, randomLate: 0.06, spacingScale: 0.78, recoveryScale: 0.62, centerSafe: 2.1, centerHold: 1.75, laneStill: 1.25, forceMeaningful: 1.55 },
+    overdrive: { early: 1.68, mid: 1.34, late: 1.08, randomEarly: 0.14, randomLate: 0.06, spacingScale: 0.86, recoveryScale: 0.72, centerSafe: 1.95, centerHold: 1.62, laneStill: 1.12, forceMeaningful: 1.7 },
+    redline: { early: 1.82, mid: 1.46, late: 1.18, randomEarly: 0.15, randomLate: 0.07, spacingScale: 0.92, recoveryScale: 0.82, centerSafe: 1.85, centerHold: 1.48, laneStill: 1, forceMeaningful: 1.85 }
   },
   centerChallengeMinSeconds: {
     sunday: 8,
     rookie: 6.8,
     arcade: 2.7,
     pro: 1.9,
-    turbo: 1.75
+    turbo: 1.75,
+    overdrive: 1.62,
+    redline: 1.48
   },
   centerSoftPressure: {
     sunday: 0.1,
     rookie: 0.14,
     arcade: 0.65,
     pro: 0.9,
-    turbo: 0.92
+    turbo: 0.92,
+    overdrive: 0.94,
+    redline: 0.96
   },
   centerRestChance: {
     sunday: 0.72,
     rookie: 0.64,
     arcade: 0.16,
     pro: 0.04,
-    turbo: 0.03
+    turbo: 0.03,
+    overdrive: 0.025,
+    redline: 0.02
   },
   pressureBudgetAllowance: {
     sunday: 2.6,
     rookie: 2.6,
     arcade: 2.6,
     pro: 2.6,
-    turbo: 2.6
+    turbo: 2.6,
+    overdrive: 2.6,
+    redline: 2.6
   },
   pressureValues: {
     cone: 0.45,
@@ -1860,7 +2169,9 @@ const ROAD_DIRECTOR = {
     rookie: 1.05,
     arcade: 1.55,
     pro: 2.25,
-    turbo: 2.35
+    turbo: 2.35,
+    overdrive: 2.3,
+    redline: 2.25
   }
 };
 
@@ -2191,6 +2502,33 @@ function getSpeedClassConfig(value) {
 
 function getSpeedClassLabel(value) {
   return getSpeedClassConfig(value).label;
+}
+
+function getSpeedClassRank(value) {
+  const id = normalizeSpeedClassId(value, DEFAULT_SPEED_CLASS_ID);
+  const index = SPEED_CLASS_ORDER.indexOf(id);
+  return index >= 0 ? index : SPEED_CLASS_ORDER.indexOf(DEFAULT_SPEED_CLASS_ID);
+}
+
+function isSpeedClassAtLeast(value, minimum) {
+  return getSpeedClassRank(value) >= getSpeedClassRank(minimum);
+}
+
+function getNormalVisibleSpeedClasses() {
+  return NORMAL_SPEED_CLASS_IDS
+    .map((id) => getSpeedClassConfig(id))
+    .filter((speedClass) => speedClass?.visibleNormal === true);
+}
+
+function getTrainingSpeedClasses() {
+  return TRAINING_SPEED_CLASS_IDS
+    .map((id) => getSpeedClassConfig(id))
+    .filter((speedClass) => speedClass?.training === true);
+}
+
+function getSpeedClassLadderNumber(value) {
+  const index = NORMAL_SPEED_CLASS_IDS.indexOf(normalizeSpeedClassId(value, ""));
+  return index >= 0 ? index + 1 : null;
 }
 
 function normalizeRaceTypeId(value, fallback = DEFAULT_RACE_TYPE_ID) {
@@ -2654,6 +2992,28 @@ function normalizePlayerBadges(value) {
   return {
     ...fallback,
     earned
+  };
+}
+
+function createDefaultPlayerBadgeStats() {
+  return {
+    version: PLAYER_BADGE_STATS_VERSION,
+    totalRuns: 0,
+    partyRuns: 0,
+    partyWins: 0,
+    bestOf3Wins: 0
+  };
+}
+
+function normalizePlayerBadgeStats(value) {
+  const fallback = createDefaultPlayerBadgeStats();
+  const source = value && typeof value === "object" ? value : {};
+  return {
+    ...fallback,
+    totalRuns: normalizeNonNegativeInteger(source.totalRuns || source.runs, 0, 999999),
+    partyRuns: normalizeNonNegativeInteger(source.partyRuns, 0, 999999),
+    partyWins: normalizeNonNegativeInteger(source.partyWins, 0, 999999),
+    bestOf3Wins: normalizeNonNegativeInteger(source.bestOf3Wins, 0, 999999)
   };
 }
 
@@ -3742,6 +4102,7 @@ class PlayerProfileManager {
           car: normalizeCarConfig(player?.car),
           bestScore: normalizeNonNegativeInteger(player?.bestScore),
           badges: normalizePlayerBadges(player?.badges),
+          badgeStats: normalizePlayerBadgeStats(player?.badgeStats || player?.stats),
           challengeProgress: normalizePlayerChallengeSave(player?.challengeProgress || player?.challengeStats)
         };
       })
@@ -3823,6 +4184,7 @@ class PlayerProfileManager {
       car: normalizeCarConfig(DEFAULT_CAR),
       bestScore: 0,
       badges: createDefaultBadgeSave(),
+      badgeStats: createDefaultPlayerBadgeStats(),
       challengeProgress: createDefaultPlayerChallengeSave()
     };
     this.data.players.push(player);
@@ -3936,21 +4298,69 @@ class PlayerProfileManager {
     return newlyEarned;
   }
 
+  recordBadgeRunStats(summary) {
+    const player = this.getPlayerById(summary?.playerId);
+    if (!player || summary?.scoreSaved === false) return createDefaultPlayerBadgeStats();
+    player.badgeStats = normalizePlayerBadgeStats(player.badgeStats);
+    player.badgeStats.totalRuns += 1;
+    if (summary.partyMode) player.badgeStats.partyRuns += 1;
+    this.save();
+    return player.badgeStats;
+  }
+
+  recordPartySessionWin(playerId, roundType) {
+    const player = this.getPlayerById(playerId);
+    if (!player) return createDefaultPlayerBadgeStats();
+    player.badgeStats = normalizePlayerBadgeStats(player.badgeStats);
+    player.badgeStats.partyWins += 1;
+    if (normalizePartyRoundType(roundType) === PARTY_ROUND_TYPE_BEST_OF_3) {
+      player.badgeStats.bestOf3Wins += 1;
+    }
+    this.save();
+    return player.badgeStats;
+  }
+
   evaluateRunBadges(summary) {
     if (!summary?.scoreSaved || !summary.playerId) return [];
     const badgeIds = ["first_run_posted"];
+    const player = this.getPlayerById(summary.playerId);
+    const badgeStats = normalizePlayerBadgeStats(player?.badgeStats);
+    const speedClass = normalizeSpeedClassId(summary.speedClass, DEFAULT_SPEED_CLASS_ID);
 
     if (summary.status === "finished") {
       badgeIds.push("first_finish");
       if (summary.trackId === "sunset-highway") badgeIds.push("sunset_finisher");
       if (summary.trackId === "redline-run") badgeIds.push("redline_finisher");
       if (summary.speedClass === "turbo") badgeIds.push("turbo_survivor");
+      if (summary.speedClass === "overdrive") badgeIds.push("overdrive_survivor");
+      if (summary.speedClass === "redline") badgeIds.push("redline_survivor");
+      if ((summary.averageSpeed || 0) >= SPEED_DEMON_AVERAGE_SPEED_THRESHOLD) badgeIds.push("speed_demon");
+      if (summary.trackId === "redline-run" && isSpeedClassAtLeast(speedClass, "pro")) badgeIds.push("redline_master");
+      if (summary.trackId === "sunset-highway" && isSpeedClassAtLeast(speedClass, "pro")) badgeIds.push("sunset_master");
+      if (isSpeedClassAtLeast(speedClass, "turbo") && (summary.manualBoostsUsed || 0) === 0) badgeIds.push("no_boost_turbo");
+      if (isSpeedClassAtLeast(speedClass, "pro") && (summary.manualBoostsUsed || 0) === 0) badgeIds.push("no_boost_finish");
       if ((summary.slowdownHits || 0) === 0) badgeIds.push("clean_run");
+      if (isSpeedClassAtLeast(speedClass, "turbo") && (summary.slowdownHits || 0) === 0) badgeIds.push("clean_turbo");
       if (summary.raceTypeId === FUEL_RUN_RACE_TYPE_ID) badgeIds.push("fuel_run_finish");
+      if (summary.raceTypeId === FUEL_RUN_RACE_TYPE_ID && (summary.fuelRemaining || 0) <= 10) badgeIds.push("fuel_clutch");
+      if (summary.raceTypeId === FUEL_RUN_RACE_TYPE_ID && (summary.fuelRemaining || 0) >= 40) badgeIds.push("fuel_hoarder");
+      if (summary.raceTypeId === FUEL_RUN_RACE_TYPE_ID && (summary.lowestFuelReached || FUEL_RUN_CONFIG.fuelMax) <= 25) badgeIds.push("comeback_finish");
     }
     if ((summary.nearMisses || 0) >= 5) badgeIds.push("near_miss_streak");
+    if ((summary.nearMisses || 0) >= 10) badgeIds.push("near_miss_10");
+    if ((summary.rampsUsed || 0) >= 5) badgeIds.push("ramp_rider");
+    if ((summary.rampTargetsCleared || 0) >= 5) badgeIds.push("jump_master");
+    if (summary.raceTypeId === FUEL_RUN_RACE_TYPE_ID && (summary.gasCansCollected || 0) >= 5) badgeIds.push("gas_gremlin");
+    if (summary.raceTypeId === FUEL_RUN_RACE_TYPE_ID && (summary.fuelSavedByBoost || 0) >= 10) badgeIds.push("boost_saver");
+    if (summary.partyMode && badgeStats.partyRuns >= 5) badgeIds.push("party_regular");
     if (summary.challengeMode && summary.challengeResult?.completed && summary.challengeResult?.saved !== false) {
       badgeIds.push("first_challenge");
+      const challenge = getChallengeById(summary.challengeId);
+      const challengeStats = getPlayerChallengeTitleStats(player);
+      if (challengeStats.completedCount >= 3) badgeIds.push("challenge_regular");
+      if (challengeStats.completedCount >= 8) badgeIds.push("challenge_ace");
+      if (getChallengeDifficultyLabel(challenge) === "Dare") badgeIds.push("daredevil");
+      if (challenge?.trackId === "redline-run") badgeIds.push("first_redline_challenge");
     }
 
     return this.awardBadges(summary.playerId, badgeIds);
@@ -14505,8 +14915,22 @@ class NeonRoadRally {
     session.partyStarterBadgesAwarded = true;
     const earnedForSummary = [];
     const completedAt = new Date().toISOString();
+    const standings = session.standings();
+    const winner = standings[0] || null;
     session.selectedPlayers.forEach((player) => {
-      const earned = this.profiles.awardBadges(player.id, ["party_starter"], completedAt);
+      const playerStats = normalizePlayerBadgeStats(this.profiles.getPlayerById(player.id)?.badgeStats);
+      const badgeIds = ["party_starter"];
+      if (playerStats.partyRuns >= 5) badgeIds.push("party_regular");
+      if (winner?.playerId === player.id) {
+        this.profiles.recordPartySessionWin(player.id, session.roundType);
+        badgeIds.push("party_winner");
+        if (session.roundType === PARTY_ROUND_TYPE_BEST_OF_3) badgeIds.push("best_of_3_winner");
+        const cameBack = session.results.some((result) => (
+          result.playerId === player.id && (result.partyComebackPlaces || 0) > 0
+        ));
+        if (cameBack) badgeIds.push("comeback_driver");
+      }
+      const earned = this.profiles.awardBadges(player.id, badgeIds, completedAt);
       if (player.id === summary?.playerId) earnedForSummary.push(...earned);
     });
     return earnedForSummary;
@@ -14765,6 +15189,9 @@ class NeonRoadRally {
       ? Math.max(1, Math.round(topTwentyCutoff - run.score + 1))
       : 0;
     const scoreBreakdown = this.buildRunScoreBreakdown(run);
+    const averageSpeed = run.speedSampleSeconds > 0
+      ? run.speedWeightedSum / run.speedSampleSeconds
+      : (run.elapsed > 0 ? Math.min(run.distance, run.track.distanceToFinish) / run.elapsed : 0);
 
     const summary = {
       scoreEntry: entry,
@@ -14806,6 +15233,8 @@ class NeonRoadRally {
       status,
       reason,
       time: run.elapsed,
+      averageSpeed,
+      maxSpeed: run.maxSpeedObserved || run.currentSpeed || 0,
       bonuses: { ...run.bonuses },
       penalties: run.penalties,
       slowdownHits: run.slowdownHits || 0,
@@ -14813,11 +15242,13 @@ class NeonRoadRally {
       manualBoostsUsed: run.manualBoostsUsed || 0,
       boostPadsCollected: run.boostPadsCollected || 0,
       rampsUsed: run.rampsUsed || 0,
+      rampTargetsCleared: run.rampTargetsCleared || 0,
       laneMoves: run.laneMoves || 0,
       gasCansSpawned: run.gasCansSpawned || 0,
       gasCansCollected: run.gasCansCollected || 0,
       fuelCollected: run.gasCansCollected || 0,
       fuelRemaining: isFuelRunRaceType(run.raceTypeId) ? Math.max(0, Math.round(run.fuel || 0)) : 0,
+      lowestFuelReached: isFuelRunRaceType(run.raceTypeId) ? (run.lowestFuelReached || 0) : 0,
       fuelSavedByBoost: isFuelRunRaceType(run.raceTypeId) ? (run.fuelSavedByBoost || 0) : 0,
       fuelDrainPausedTime: isFuelRunRaceType(run.raceTypeId) ? (run.fuelDrainPausedTime || 0) : 0,
       boostsUsedInFuelRun: isFuelRunRaceType(run.raceTypeId) ? (run.boostsUsedInFuelRun || 0) : 0,
@@ -14860,6 +15291,7 @@ class NeonRoadRally {
         }].concat(summary.medals).slice(0, 3);
       }
     }
+    this.profiles.recordBadgeRunStats(summary);
     summary.newlyEarnedBadges = this.profiles.evaluateRunBadges(summary);
     summary.totalBadgesEarned = this.profiles.getPlayerBadgeProgress(summary.playerId).earnedCount;
     summary.totalBadgesAvailable = getVisibleBadgeDefinitions().length;
@@ -16701,7 +17133,7 @@ class NeonRoadRally {
     return `
       <p class="new-driver-hint">
         <strong>New?</strong>
-        Start with Arcade on Sunset Highway, or Rookie for younger drivers.
+        Start with Arcade on Sunset Highway. Rookie and Sunday Drive live under Training if needed.
       </p>
     `;
   }
@@ -16871,13 +17303,13 @@ class NeonRoadRally {
         },
         {
           title: "Race Modes",
-          chips: ["Sunday Drive", "Rookie", "Arcade", "Pro", "Turbo"],
+          chips: ["Arcade", "Pro", "Turbo", "Overdrive", "Redline"],
           points: [
-            "Sunday Drive is the easiest.",
-            "Rookie is for beginners and younger drivers.",
-            "Arcade is the default.",
-            "Pro is the serious challenge.",
-            "Turbo is dare mode."
+            "Arcade is the default family-speed race.",
+            "Pro adds serious traffic pressure.",
+            "Turbo is fast, dangerous, and fair.",
+            "Overdrive is a short high-speed dare run.",
+            "Redline is maximum-speed local bragging rights."
           ]
         },
         {
@@ -16925,7 +17357,7 @@ class NeonRoadRally {
           title: "Weekend Flow",
           chips: ["Picks", "Checklist", "Report"],
           points: [
-            "Start with Kids First Race or Family Arcade before jumping to Redline Dare.",
+            "Start with First Arcade Race or Family Arcade before jumping to Redline Dare.",
             "Use Party Starter when the room wants pass-the-keyboard competition.",
             "After the session, open Playtest Report, copy it, and paste it into ChatGPT for tuning notes."
           ]
@@ -17114,10 +17546,11 @@ class NeonRoadRally {
               <strong>${escapeHtml(selectedSpeedClass.label)} · Score x${selectedSpeedClass.scoreMultiplier.toFixed(2)}</strong>
             </div>
             <div class="speed-class-grid">
-              ${SPEED_CLASSES.map((speedClass) => `
-                <button class="speed-class-button ${speedClass.id === selectedSpeedClass.id ? "is-selected" : ""}" data-action="setSpeedClass" data-id="${escapeAttr(speedClass.id)}">
+              ${getNormalVisibleSpeedClasses().concat(getTrainingSpeedClasses()).map((speedClass) => `
+                <button class="speed-class-button ${speedClass.training ? "is-training" : ""} ${speedClass.id === selectedSpeedClass.id ? "is-selected" : ""}" data-action="setSpeedClass" data-id="${escapeAttr(speedClass.id)}">
                   <strong>${escapeHtml(speedClass.label)}</strong>
                   <span>${Math.round(getSpeedClassStartSpeed(speedClass.id))}-${Math.round(getSpeedClassEndSpeed(speedClass.id, TRACKS[0]))} MPH · x${speedClass.scoreMultiplier.toFixed(2)}</span>
+                  <small>${escapeHtml(speedClass.description || "")}</small>
                 </button>
               `).join("")}
             </div>
@@ -18035,11 +18468,52 @@ class NeonRoadRally {
     }
   }
 
-  formatSpeedClassOptionForTrack(track, speedClass) {
+  formatSpeedClassOptionForTrack(track, speedClass, options = {}) {
     const raceTrack = createRaceTrackForSpeedClass(track, speedClass.id);
     const startSpeed = Math.round(getTrackCruiseSpeed(raceTrack, 0, speedClass.id));
     const endSpeed = Math.round(getTrackCruiseSpeed(raceTrack, 1, speedClass.id));
-    return `${speedClass.label} · ${startSpeed}-${endSpeed} MPH · x${speedClass.scoreMultiplier.toFixed(2)}`;
+    const ladderNumber = getSpeedClassLadderNumber(speedClass.id);
+    const prefix = ladderNumber ? `${ladderNumber}. ` : "";
+    const copy = options.withDescription !== false && speedClass.description
+      ? ` - ${speedClass.description}`
+      : "";
+    return `${prefix}${speedClass.label} · ${startSpeed}-${endSpeed} MPH · x${speedClass.scoreMultiplier.toFixed(2)}${copy}`;
+  }
+
+  renderSpeedClassOptionsForTrack(track, selectedSpeedClassId) {
+    const selectedId = normalizeSpeedClassId(selectedSpeedClassId, DEFAULT_SPEED_CLASS_ID);
+    const optionFor = (speedClass) => `<option value="${escapeAttr(speedClass.id)}" ${speedClass.id === selectedId ? "selected" : ""}>${escapeHtml(this.formatSpeedClassOptionForTrack(track, speedClass))}</option>`;
+    const normalOptions = getNormalVisibleSpeedClasses().map(optionFor).join("");
+    const trainingOptions = getTrainingSpeedClasses().map(optionFor).join("");
+    return `
+      <optgroup label="Main Race Ladder">
+        ${normalOptions}
+      </optgroup>
+      <optgroup label="Training / Easy Modes">
+        ${trainingOptions}
+      </optgroup>
+    `;
+  }
+
+  renderSpeedClassLadder(track, selectedSpeedClassId) {
+    const selectedId = normalizeSpeedClassId(selectedSpeedClassId, DEFAULT_SPEED_CLASS_ID);
+    return `
+      <div class="mode-ladder" aria-label="Main race mode ladder">
+        ${getNormalVisibleSpeedClasses().map((speedClass, index) => {
+          const raceTrack = createRaceTrackForSpeedClass(track, speedClass.id);
+          const startSpeed = Math.round(getTrackCruiseSpeed(raceTrack, 0, speedClass.id));
+          const endSpeed = Math.round(getTrackCruiseSpeed(raceTrack, 1, speedClass.id));
+          return `
+            <button class="mode-ladder-card ${speedClass.id === selectedId ? "is-selected" : ""}" type="button" data-action="setModePickerSpeed" data-id="${escapeAttr(speedClass.id)}">
+              <span>${index + 1}</span>
+              <strong>${escapeHtml(speedClass.label)}</strong>
+              <small>${escapeHtml(speedClass.description || "")}</small>
+              <em>${startSpeed}-${endSpeed} MPH</em>
+            </button>
+          `;
+        }).join("")}
+      </div>
+    `;
   }
 
   renderRaceTypeOptionsForTrack(track, selectedRaceTypeId) {
@@ -18102,9 +18576,27 @@ class NeonRoadRally {
 
   syncSpeedClassSelectForTrack(select, track) {
     if (!select) return;
-    Array.from(select.options || []).forEach((option) => {
-      const speedClass = getSpeedClassConfig(option.value);
-      option.textContent = this.formatSpeedClassOptionForTrack(track, speedClass);
+    const selectedId = normalizeSpeedClassId(select.value, DEFAULT_SPEED_CLASS_ID);
+    select.innerHTML = this.renderSpeedClassOptionsForTrack(track, selectedId);
+    select.value = selectedId;
+  }
+
+  syncModeLadderSelection(selectedSpeedClassId) {
+    const selectedId = normalizeSpeedClassId(selectedSpeedClassId, DEFAULT_SPEED_CLASS_ID);
+    document.querySelectorAll(".mode-ladder-card").forEach((card) => {
+      card.classList.toggle("is-selected", card.dataset.id === selectedId);
+    });
+  }
+
+  syncModeLadderMetrics(track) {
+    const safeTrack = track || TRACKS[0];
+    document.querySelectorAll(".mode-ladder-card").forEach((card) => {
+      const speedClass = getSpeedClassConfig(card.dataset.id);
+      const raceTrack = createRaceTrackForSpeedClass(safeTrack, speedClass.id);
+      const startSpeed = Math.round(getTrackCruiseSpeed(raceTrack, 0, speedClass.id));
+      const endSpeed = Math.round(getTrackCruiseSpeed(raceTrack, 1, speedClass.id));
+      const readout = card.querySelector("em");
+      if (readout) readout.textContent = `${startSpeed}-${endSpeed} MPH`;
     });
   }
 
@@ -18157,8 +18649,9 @@ class NeonRoadRally {
           </div>
           <div class="field">
             <label for="preRaceSpeedClass">Race Mode</label>
+            ${this.renderSpeedClassLadder(track, speedClass.id)}
             <select id="preRaceSpeedClass">
-              ${SPEED_CLASSES.map((item) => `<option value="${escapeAttr(item.id)}" ${item.id === speedClass.id ? "selected" : ""}>${escapeHtml(this.formatSpeedClassOptionForTrack(track, item))}</option>`).join("")}
+              ${this.renderSpeedClassOptionsForTrack(track, speedClass.id)}
             </select>
           </div>
           <div class="seed-display" aria-live="polite">
@@ -18206,6 +18699,7 @@ class NeonRoadRally {
       const raceTypeId = normalizeRaceTypeId(raceTypeSelect?.value || this.pendingRaceTypeId || DEFAULT_RACE_TYPE_ID, DEFAULT_RACE_TYPE_ID);
       const raceType = getRaceTypeConfig(trackSupportsRaceType(track, raceTypeId) ? raceTypeId : DEFAULT_RACE_TYPE_ID);
       const hash = normalized ? (hashSeed(getRunRandomSeedSource(normalized, track, speedClass.id, raceType.id)) >>> 0) : "pending";
+      this.syncModeLadderMetrics(track);
       display.textContent = normalized || "Random seed on start";
       if (seedHash) {
         seedHash.textContent = `Seed hash: ${hash}`;
@@ -18216,6 +18710,7 @@ class NeonRoadRally {
       if (modeSummary) {
         modeSummary.textContent = `${speedClass.label} · x${speedClass.scoreMultiplier.toFixed(2)}`;
       }
+      this.syncModeLadderSelection(speedClass.id);
       if (raceTypeSummary) {
         raceTypeSummary.textContent = raceType.label;
       }
@@ -18455,8 +18950,9 @@ class NeonRoadRally {
             </div>
             <div class="field">
               <label for="partyRaceMode">Race Mode</label>
+              ${this.renderSpeedClassLadder(track, setup.raceMode)}
               <select id="partyRaceMode">
-                ${SPEED_CLASSES.map((speedClass) => `<option value="${escapeAttr(speedClass.id)}" ${speedClass.id === setup.raceMode ? "selected" : ""}>${escapeHtml(this.formatSpeedClassOptionForTrack(track, speedClass))}</option>`).join("")}
+                ${this.renderSpeedClassOptionsForTrack(track, setup.raceMode)}
               </select>
             </div>
             <div class="field">
@@ -18512,6 +19008,8 @@ class NeonRoadRally {
       if (input.value !== normalized) input.value = normalized;
       const track = this.getSelectedTrackFromInputs("partyTrack", this.getPartySetup().trackId || DEFAULT_TRACK_ID);
       const mode = normalizeSpeedClassId(raceMode?.value, DEFAULT_SPEED_CLASS_ID);
+      this.syncModeLadderMetrics(track);
+      this.syncModeLadderSelection(mode);
       display.textContent = normalized || "Random seed on start";
       if (seedHash) {
         seedHash.textContent = normalized
@@ -19777,6 +20275,7 @@ class NeonRoadRally {
         }
         else if (action === "fullscreen") this.toggleFullscreen();
         else if (action === "setSpeedClass") this.handleSetSpeedClass(button.dataset.id);
+        else if (action === "setModePickerSpeed") this.handleModePickerSpeed(button.dataset.id);
         else if (action === "randomSeed") this.handleRandomSeed();
         else if (action === "startSeededRace") this.handleStartSeededRace();
         else if (action === "partyTogglePlayer") this.handlePartyTogglePlayer(button.dataset.id);
@@ -19914,6 +20413,17 @@ class NeonRoadRally {
     } else {
       this.showTitle();
     }
+  }
+
+  handleModePickerSpeed(id) {
+    const selectedId = normalizeSpeedClassId(id, DEFAULT_SPEED_CLASS_ID);
+    const select = this.screen === "partySetup"
+      ? document.getElementById("partyRaceMode")
+      : document.getElementById("preRaceSpeedClass");
+    if (!select) return;
+    select.value = selectedId;
+    select.dispatchEvent(new Event("change", { bubbles: true }));
+    this.syncModeLadderSelection(selectedId);
   }
 
   handleResetData() {

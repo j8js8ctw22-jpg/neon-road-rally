@@ -72,11 +72,15 @@ Solo is the main one-player route. Choose a race mode, use a random or manual Ro
 
 Race modes:
 
-- Sunday Drive
-- Rookie
 - Arcade
 - Pro
 - Turbo
+- Overdrive
+- Redline
+
+Arcade is the default family-speed race. Pro adds serious traffic pressure. Turbo is fast, dangerous, and fair. Overdrive is a high-speed dare run. Redline is maximum-speed local bragging rights.
+
+Sunday Drive and Rookie remain available under Training / Easy Modes for older saves and approachable fixed-seed challenges.
 
 ### Challenge Mode
 

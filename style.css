@@ -516,7 +516,8 @@ button {
 }
 
 .speed-class-button strong,
-.speed-class-button span {
+.speed-class-button span,
+.speed-class-button small {
   display: block;
 }
 
@@ -533,6 +534,20 @@ button {
   line-height: 1.25;
 }
 
+.speed-class-button small {
+  margin-top: 5px;
+  color: var(--cyan);
+  font-size: 0.66rem;
+  font-weight: 800;
+  line-height: 1.2;
+  text-transform: uppercase;
+}
+
+.speed-class-button.is-training {
+  border-style: dashed;
+  opacity: 0.82;
+}
+
 .speed-class-button:hover,
 .speed-class-button:focus-visible {
   outline: none;
@@ -544,6 +559,74 @@ button {
   border-color: var(--magenta);
   background: linear-gradient(180deg, rgba(255, 63, 209, 0.25), rgba(40, 246, 255, 0.1));
   box-shadow: inset 0 0 18px rgba(255, 63, 209, 0.12);
+}
+
+.mode-ladder {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 7px;
+  margin: 0 0 8px;
+}
+
+.mode-ladder-card {
+  min-height: 96px;
+  border: 1px solid rgba(40, 246, 255, 0.34);
+  border-radius: 7px;
+  padding: 8px;
+  background: rgba(9, 16, 42, 0.82);
+  color: var(--text);
+  cursor: pointer;
+  text-align: left;
+}
+
+.mode-ladder-card span,
+.mode-ladder-card strong,
+.mode-ladder-card small,
+.mode-ladder-card em {
+  display: block;
+}
+
+.mode-ladder-card span {
+  color: var(--yellow);
+  font-size: 0.68rem;
+  font-weight: 900;
+}
+
+.mode-ladder-card strong {
+  margin-top: 2px;
+  color: var(--text);
+  font-size: 0.76rem;
+  text-transform: uppercase;
+}
+
+.mode-ladder-card small {
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 0.66rem;
+  font-weight: 750;
+  line-height: 1.2;
+}
+
+.mode-ladder-card em {
+  margin-top: 6px;
+  color: var(--cyan);
+  font-size: 0.66rem;
+  font-style: normal;
+  font-weight: 850;
+}
+
+.mode-ladder-card:hover,
+.mode-ladder-card:focus-visible {
+  outline: none;
+  border-color: var(--yellow);
+  box-shadow: 0 0 14px rgba(255, 228, 94, 0.18);
+}
+
+.mode-ladder-card.is-selected {
+  border-color: var(--magenta);
+  background:
+    linear-gradient(180deg, rgba(255, 63, 209, 0.22), rgba(40, 246, 255, 0.08)),
+    rgba(9, 16, 42, 0.92);
 }
 
 .danger-button {
@@ -875,7 +958,10 @@ button:disabled {
 }
 
 .track-option input {
-  position: absolute;
+  appearance: none;
+  width: 0;
+  height: 0;
+  margin: 0;
   opacity: 0;
   pointer-events: none;
 }
@@ -1672,14 +1758,15 @@ button:disabled {
 
 .badge-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(148px, 1fr));
-  max-height: 220px;
+  grid-template-columns: repeat(auto-fit, minmax(164px, 1fr));
+  max-height: clamp(260px, 45vh, 460px);
   overflow: auto;
   padding-right: 2px;
 }
 
 .badge-card {
   min-width: 0;
+  min-height: 96px;
 }
 
 .title-grid {
@@ -2030,7 +2117,8 @@ button:disabled {
   .score-grid,
   .track-select-grid,
   .audio-grid,
-  .speed-class-grid {
+  .speed-class-grid,
+  .mode-ladder {
     grid-template-columns: 1fr;
   }
 
@@ -2082,6 +2170,10 @@ button:disabled {
     max-height: 260px;
   }
 
+  .mode-ladder-card {
+    min-height: 0;
+  }
+
   .title-grid {
     grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
   }
@@ -2121,5 +2213,9 @@ button:disabled {
 
   .badge-grid {
     grid-template-columns: 1fr;
+  }
+
+  .mode-ladder-card {
+    padding: 7px;
   }
 }
