@@ -2790,6 +2790,20 @@ function sanitizeCarName(value, fallback = DEFAULT_CAR.name) {
   return sanitizeDisplayText(value, fallback, LOCAL_CAR_NAME_MAX_LENGTH);
 }
 
+function getOptionalCarNickname(car) {
+  const name = sanitizeCarName(car?.name, "");
+  return name && name !== DEFAULT_CAR.name ? name : "";
+}
+
+function getCarGarageLabel(car) {
+  return getOptionalCarNickname(car) || "No nickname";
+}
+
+function getCarBodyStyleLabel(styleId) {
+  const style = CAR_BODY_STYLES.find((item) => item.id === styleId);
+  return style?.name || "Garage car";
+}
+
 function normalizeStorageId(value, fallback = "") {
   const clean = sanitizeDisplayText(value, "", STORAGE_ID_MAX_LENGTH)
     .replace(/[^a-zA-Z0-9_-]/g, "");
@@ -4098,7 +4112,7 @@ class PlayerProfileManager {
         const id = normalizeStorageId(player?.id, uid());
         return {
           id,
-          name: sanitizePlayerName(player?.name, `PLAYER ${index + 1}`),
+          name: sanitizePlayerName(player?.name, `DRIVER ${index + 1}`),
           car: normalizeCarConfig(player?.car),
           bestScore: normalizeNonNegativeInteger(player?.bestScore),
           badges: normalizePlayerBadges(player?.badges),
@@ -4170,17 +4184,17 @@ class PlayerProfileManager {
       }
       return this.getCurrentPlayer();
     }
-    return this.createPlayer("PLAYER 1");
+    return this.createPlayer("DRIVER 1");
   }
 
-  createPlayer(name) {
+  createPlayer(name, options = {}) {
     if (this.data.players.length >= LOCAL_PLAYER_MAX_COUNT) {
       this.saveStatus = `Local player limit reached (${LOCAL_PLAYER_MAX_COUNT})`;
       return null;
     }
     const player = {
       id: uid(),
-      name: sanitizePlayerName(name, "PLAYER"),
+      name: sanitizePlayerName(name, `DRIVER ${this.data.players.length + 1}`),
       car: normalizeCarConfig(DEFAULT_CAR),
       bestScore: 0,
       badges: createDefaultBadgeSave(),
@@ -4188,7 +4202,9 @@ class PlayerProfileManager {
       challengeProgress: createDefaultPlayerChallengeSave()
     };
     this.data.players.push(player);
-    this.data.currentPlayerId = player.id;
+    if (options.select !== false) {
+      this.data.currentPlayerId = player.id;
+    }
     this.save();
     return player;
   }
@@ -4200,6 +4216,15 @@ class PlayerProfileManager {
       return true;
     }
     return false;
+  }
+
+  renamePlayer(id, name) {
+    const player = this.getPlayerById(id);
+    const rawName = String(name ?? "").trim();
+    if (!player || !rawName) return false;
+    player.name = sanitizePlayerName(rawName, player.name);
+    this.save();
+    return true;
   }
 
   updateCurrentCar(carConfig) {
@@ -13598,7 +13623,10 @@ class NeonRoadRally {
     this.playtestReports = new PlaytestReportStore(PLAYTEST_REPORT_STORAGE_KEY);
     this.audio = new AudioManager(this.profiles.data.audio, (settings) => this.profiles.updateAudioSettings(settings));
     this.carSprites = new CarSpriteManager(CAR_BODY_STYLES, () => {
-      if (this.screen === "customize") this.renderCarPreview();
+      if (this.screen === "customize" || this.screen === "players" || this.screen === "partySetup" || this.screen === "title") {
+        this.renderCarPreview();
+        this.renderDriverMiniPreviews();
+      }
       if (this.screen === "partyTurn") this.renderPartyCarPreview(this.partySession?.currentPlayer);
       if (this.screen === "vehicleScaleDebug") this.renderVehicleScaleDebugCanvas();
     });
@@ -17457,8 +17485,9 @@ class NeonRoadRally {
     const selectedSpeedClass = getSpeedClassConfig(this.profiles.data.speedClassId);
     const playerName = player ? escapeHtml(player.name) : "No Player";
     const badgeProgress = player ? this.profiles.getPlayerBadgeProgress(player) : null;
+    const titleCount = player ? this.profiles.getPlayerTitles(player).length : 0;
     const playerDetail = player
-      ? `Driving ${escapeHtml(player.car.name)} - Badges ${badgeProgress.earnedCount}/${badgeProgress.totalCount}`
+      ? `Badges ${badgeProgress.earnedCount}/${badgeProgress.totalCount} - Titles ${titleCount}/${TITLE_DEFINITIONS.length}`
       : "Create or choose a local driver";
     const audioStatus = `Music ${this.audio.musicMuted ? "Muted" : "On"} / SFX ${this.audio.sfxMuted ? "Muted" : "On"}`;
     this.layer.classList.remove("is-empty");
@@ -17469,10 +17498,13 @@ class NeonRoadRally {
           <h1 class="game-title"><span>Neon</span><span>Road</span><span>Rally</span></h1>
           <p class="subtitle title-tagline">Five lanes. One car. No brakes. Beat the room.</p>
           <div class="title-status-grid">
-            <div class="title-status-card">
-              <span>Current Player</span>
-              <strong>${playerName}</strong>
-              <small>${playerDetail}</small>
+            <div class="title-status-card title-driver-status">
+              <div>
+                <span>Active Driver</span>
+                <strong>${playerName}</strong>
+                <small>${playerDetail}</small>
+              </div>
+              ${player ? this.renderDriverMiniCanvas(player, "title-car-chip") : ""}
             </div>
             <div class="title-status-card">
               <span>Race Mode</span>
@@ -17491,16 +17523,16 @@ class NeonRoadRally {
         </div>
         <div class="title-menu-card">
           <div class="menu-stack main-menu">
-            <button class="menu-button primary" data-action="start"><strong>Solo / Seeded Run</strong><span>Set a road seed and chase the finish.</span></button>
+            <button class="menu-button primary" data-action="start"><strong>Solo Race</strong><span>Set a road seed and chase the finish.</span></button>
             <button class="menu-button" data-action="howToPlay"><strong>How To Play</strong><span>Controls, race types, party rules, rewards, and local saves.</span></button>
-            <button class="menu-button" data-action="challengeMode"><strong>Challenge Mode</strong><span>Fixed seeds, clear objectives, saved bests.</span></button>
+            <button class="menu-button" data-action="challengeMode"><strong>Challenges</strong><span>Fixed seeds, clear objectives, saved bests.</span></button>
             <button class="menu-button" data-action="partyMode"><strong>Party Mode</strong><span>Pass the keyboard with one-run, best-of-3, or total-score rounds.</span></button>
-            <button class="menu-button" data-action="customize"><strong>Customize Car</strong><span>Pick the local driver car.</span></button>
+            <button class="menu-button" data-action="players"><strong>Driver Garage</strong><span>Switch drivers, rename profiles, style cars, and view badges.</span></button>
             <button class="menu-button" data-action="leaderboard"><strong>Leaderboard</strong><span>Top 20 local scores.</span></button>
             <button class="menu-button" data-action="settings"><strong>Settings</strong><span>Audio, race mode, fullscreen.</span></button>
           </div>
           <div class="title-utility-row">
-            <button class="small-button" data-action="players">Choose / Create Player</button>
+            <button class="small-button" data-action="players">Switch Driver</button>
             <button class="small-button" data-action="toggleMusic">Music: ${this.audio.musicMuted ? "Muted" : "On"}</button>
             <button class="small-button" data-action="toggleSfx">SFX: ${this.audio.sfxMuted ? "Muted" : "On"}</button>
             <button class="small-button" data-action="fullscreen">Fullscreen</button>
@@ -17521,6 +17553,7 @@ class NeonRoadRally {
     `;
     this.bindLayerButtons();
     this.bindTitleAudioControls();
+    this.renderDriverMiniPreviews();
   }
 
   showSettingsScreen(message = "") {
@@ -18872,9 +18905,17 @@ class NeonRoadRally {
       this.layer.innerHTML = `
         <section class="panel compact">
           <h2>Party Mode</h2>
-          <p class="hint">Create at least two local player profiles before starting pass-the-keyboard competition.</p>
+          <p class="hint">Create at least two local driver profiles before starting pass-the-keyboard competition.</p>
+          <div class="driver-card-grid party-driver-grid">
+            ${players.length ? players.map((player) => this.renderDriverCard(player, { context: "party", selectedIds: new Set(), currentId: this.profiles.data.currentPlayerId })).join("") : `<p class="hint">No local drivers yet.</p>`}
+          </div>
+          <div class="field" style="margin-top:16px">
+            <label for="partyNewDriverName">New Driver Name</label>
+            <input id="partyNewDriverName" type="text" maxlength="${LOCAL_PLAYER_NAME_MAX_LENGTH}" value="" placeholder="DRIVER ${players.length + 1}">
+          </div>
           <div class="row" style="margin-top:16px">
-            <button class="small-button primary" data-action="players">Create More Players</button>
+            <button class="small-button primary" data-action="partyQuickAddDriver">Add Driver</button>
+            <button class="small-button" data-action="players">Driver Garage</button>
             <button class="small-button" data-action="howToPlay">How To Play</button>
             <button class="small-button" data-action="title">Return to Title</button>
           </div>
@@ -18882,6 +18923,19 @@ class NeonRoadRally {
         </section>
       `;
       this.bindLayerButtons();
+      const partyInput = document.getElementById("partyNewDriverName");
+      if (partyInput) {
+        partyInput.addEventListener("keydown", (event) => {
+          if (event.key === "Enter") {
+            event.preventDefault();
+            if (event.repeat) return;
+            this.audio.activate();
+            this.audio.playSfx("menu");
+            this.handlePartyQuickAddDriver();
+          }
+        });
+      }
+      this.renderDriverMiniPreviews();
       return;
     }
 
@@ -18898,8 +18952,6 @@ class NeonRoadRally {
       <section class="panel party-panel">
         <h2>Party Mode</h2>
         <p class="hint">Pass the keyboard on one local machine. Best of 3 and Total Score use three runs per player. Party Mode stays Classic for this pass.</p>
-        ${this.renderPartySetupHelp()}
-        ${this.renderWeekendPlaytestPicks({ context: "party", heading: "Party Playtest Pick", hint: "Use this for the first room-friendly pass.", filter: "party" })}
         <div class="party-summary-strip">
           <div class="score-card"><strong>Selected Players</strong><span>${selectedPlayers.length}/${PARTY_MAX_PLAYERS}</span></div>
           <div class="score-card"><strong>Track</strong><span id="partyTrackSummary">${escapeHtml(track.name)}</span></div>
@@ -18911,34 +18963,60 @@ class NeonRoadRally {
           <div class="score-card"><strong>Seed Behavior</strong><span id="partySeedModeSummary">${escapeHtml(seedModeLabel)}</span></div>
         </div>
         <div class="party-setup-grid">
-          <div>
-            <h2>Local Players</h2>
-            <ul class="profile-list party-player-list">
+          <div class="form-stack">
+            <div class="garage-section-heading">
+              <span class="eyebrow">Party Roster</span>
+              <h3>Choose Drivers</h3>
+            </div>
+            <p class="hint">Pick 2-8 local drivers. Driver names and car style are cosmetic, so Party stays fair.</p>
+            <div class="field">
+              <label for="partyNewDriverName">Add Driver</label>
+              <input id="partyNewDriverName" type="text" maxlength="${LOCAL_PLAYER_NAME_MAX_LENGTH}" value="" placeholder="DRIVER ${players.length + 1}">
+            </div>
+            <div class="row">
+              <button class="small-button" data-action="partyQuickAddDriver">Add Driver</button>
+              <button class="small-button" data-action="players">Driver Garage</button>
+            </div>
+            <div class="party-quick-rename">
+              <div class="field">
+                <label for="partyRenamePlayer">Quick Rename</label>
+                <select id="partyRenamePlayer">
+                  ${players.map((player) => `<option value="${escapeAttr(player.id)}" ${selectedIds.has(player.id) ? "selected" : ""}>${escapeHtml(player.name)}</option>`).join("")}
+                </select>
+              </div>
+              <div class="field">
+                <label for="partyRenameName">New Driver Name</label>
+                <input id="partyRenameName" type="text" maxlength="${LOCAL_PLAYER_NAME_MAX_LENGTH}" value="" placeholder="Driver name">
+              </div>
+              <button class="small-button" data-action="partyInlineRenamePlayer">Save Name</button>
+            </div>
+            <div class="driver-card-grid party-driver-grid">
               ${players.map((player) => {
                 const selected = selectedIds.has(player.id);
                 const disabled = !selected && selectedPlayers.length >= PARTY_MAX_PLAYERS;
-                return `
-                  <li class="profile-item ${selected ? "is-current" : ""}">
-                    <strong>${escapeHtml(player.name)}</strong>
-                    <span class="meta">${escapeHtml(player.car.name)} · Best ${formatScore(player.bestScore)}</span>
-                    <button class="small-button" data-action="partyTogglePlayer" data-id="${escapeAttr(player.id)}" ${disabled ? "disabled" : ""}>${selected ? "Remove" : "Add"}</button>
-                  </li>
-                `;
+                return this.renderDriverCard(player, {
+                  context: "party",
+                  selectedIds,
+                  currentId: this.profiles.data.currentPlayerId,
+                  disabled
+                });
               }).join("")}
-            </ul>
+            </div>
           </div>
           <div class="form-stack">
             <div>
               <h2>Selected Order</h2>
               <ol class="profile-list party-order-list">
                 ${selectedPlayers.length ? selectedPlayers.map((player, index) => `
-                  <li class="profile-item">
+                  <li class="profile-item party-order-card">
+                    ${this.renderDriverMiniCanvas(player, "mini-car-preview is-order-preview")}
                     <strong>${index + 1}. ${escapeHtml(player.name)}</strong>
-                    <span class="meta">${escapeHtml(player.car.name)}</span>
+                    <span class="meta">${escapeHtml(getCarBodyStyleLabel(player.car?.bodyStyle))}${getOptionalCarNickname(player.car) ? ` · ${escapeHtml(getOptionalCarNickname(player.car))}` : ""}</span>
                     <div class="row">
                       <button class="small-button" data-action="partyMovePlayer" data-id="${escapeAttr(player.id)}" data-dir="-1" ${index === 0 ? "disabled" : ""}>Up</button>
                       <button class="small-button" data-action="partyMovePlayer" data-id="${escapeAttr(player.id)}" data-dir="1" ${index === selectedPlayers.length - 1 ? "disabled" : ""}>Down</button>
                       <button class="small-button" data-action="partyRemovePlayer" data-id="${escapeAttr(player.id)}">Remove</button>
+                      <button class="small-button" data-action="promptRenamePlayer" data-id="${escapeAttr(player.id)}" data-return-screen="partySetup">Rename</button>
                     </div>
                   </li>
                 `).join("") : `<li class="profile-item"><span class="meta">Choose 2-8 players.</span></li>`}
@@ -18985,10 +19063,13 @@ class NeonRoadRally {
             <p class="status-line">${escapeHtml(message || `${selectedPlayers.length} selected. Choose 2-${PARTY_MAX_PLAYERS} players.`)}</p>
           </div>
         </div>
+        ${this.renderPartySetupHelp()}
+        ${this.renderWeekendPlaytestPicks({ context: "party", heading: "Party Playtest Pick", hint: "Use this for the first room-friendly pass.", filter: "party" })}
       </section>
     `;
     this.bindLayerButtons();
     this.bindPartySetupControls();
+    this.renderDriverMiniPreviews();
   }
 
   bindPartySetupControls() {
@@ -18998,6 +19079,8 @@ class NeonRoadRally {
     const raceMode = document.getElementById("partyRaceMode");
     const roundType = document.getElementById("partyRoundType");
     const seedMode = document.getElementById("partySeedMode");
+    const newDriverInput = document.getElementById("partyNewDriverName");
+    const renameInput = document.getElementById("partyRenameName");
     const trackSummary = document.getElementById("partyTrackSummary");
     const musicSummary = document.getElementById("partyMusicSummary");
     const roundSummary = document.getElementById("partyRoundSummary");
@@ -19077,6 +19160,28 @@ class NeonRoadRally {
         updateSeedDisplay();
       });
     }
+    if (newDriverInput) {
+      newDriverInput.addEventListener("keydown", (event) => {
+        if (event.key === "Enter") {
+          event.preventDefault();
+          if (event.repeat) return;
+          this.audio.activate();
+          this.audio.playSfx("menu");
+          this.handlePartyQuickAddDriver();
+        }
+      });
+    }
+    if (renameInput) {
+      renameInput.addEventListener("keydown", (event) => {
+        if (event.key === "Enter") {
+          event.preventDefault();
+          if (event.repeat) return;
+          this.audio.activate();
+          this.audio.playSfx("menu");
+          this.handlePartyInlineRenamePlayer();
+        }
+      });
+    }
     syncTrackDependentControls();
   }
 
@@ -19110,6 +19215,42 @@ class NeonRoadRally {
     }
     [setup.selectedPlayerIds[index], setup.selectedPlayerIds[nextIndex]] = [setup.selectedPlayerIds[nextIndex], setup.selectedPlayerIds[index]];
     this.showPartySetupScreen("Player order updated.");
+  }
+
+  handlePartyQuickAddDriver() {
+    if (this.screen === "partySetup") this.readPartySetupForm();
+    const input = document.getElementById("partyNewDriverName");
+    const fallbackName = `DRIVER ${this.profiles.data.players.length + 1}`;
+    const name = sanitizePlayerName(input?.value, fallbackName);
+    const player = this.profiles.createPlayer(name);
+    if (!player) {
+      this.showPartySetupScreen(`Local driver limit is ${LOCAL_PLAYER_MAX_COUNT}.`);
+      return;
+    }
+    const setup = this.getPartySetup();
+    if (setup.selectedPlayerIds.length < PARTY_MAX_PLAYERS && !setup.selectedPlayerIds.includes(player.id)) {
+      setup.selectedPlayerIds.push(player.id);
+    }
+    this.showPartySetupScreen(`${player.name} added to the party roster.`);
+  }
+
+  handlePartyInlineRenamePlayer() {
+    if (this.screen === "partySetup") this.readPartySetupForm();
+    const select = document.getElementById("partyRenamePlayer");
+    const input = document.getElementById("partyRenameName");
+    const player = this.profiles.getPlayerById(select?.value);
+    const rawName = String(input?.value ?? "").trim();
+    if (!player) {
+      this.showPartySetupScreen("Choose a driver to rename.");
+      return;
+    }
+    if (!rawName) {
+      this.showPartySetupScreen("Driver name cannot be empty.");
+      return;
+    }
+    const nextName = sanitizePlayerName(rawName, player.name);
+    this.profiles.renamePlayer(player.id, nextName);
+    this.showPartySetupScreen(`${nextName} renamed.`);
   }
 
   handlePartyRandomSeed() {
@@ -19747,51 +19888,252 @@ class NeonRoadRally {
   }
 
   showPlayerScreen(message = "") {
+    this.showDriverGarageScreen(message);
+  }
+
+  getPlayerLastPlayedLabel(player) {
+    const playerId = normalizeStorageId(player?.id, "");
+    if (!playerId) return "No runs yet";
+    const latestTimestamp = (this.profiles.data.leaderboard || [])
+      .filter((entry) => normalizeStorageId(entry.playerId, "") === playerId)
+      .map((entry) => normalizeDateString(entry.date, ""))
+      .filter(Boolean)
+      .sort((a, b) => Date.parse(b) - Date.parse(a))[0] || "";
+    return latestTimestamp ? formatShortDate(latestTimestamp) : "No runs yet";
+  }
+
+  renderDriverMiniCanvas(player, className = "mini-car-preview") {
+    if (!player?.id) return "";
+    return `<canvas class="${className}" width="172" height="96" data-driver-car-preview="${escapeAttr(player.id)}" aria-label="${escapeAttr(player.name)} car preview"></canvas>`;
+  }
+
+  renderDriverCard(player, options = {}) {
+    const currentId = normalizeStorageId(options.currentId || this.profiles.data.currentPlayerId, "");
+    const selectedIds = options.selectedIds instanceof Set ? options.selectedIds : new Set();
+    const context = options.context || "garage";
+    const isCurrent = currentId && player.id === currentId;
+    const isSelected = selectedIds.has(player.id);
+    const badgeProgress = this.profiles.getPlayerBadgeProgress(player);
+    const titleCount = this.profiles.getPlayerTitles(player).length;
+    const car = normalizeCarConfig(player.car);
+    const carNickname = getCarGarageLabel(car);
+    const bodyStyle = getCarBodyStyleLabel(car.bodyStyle);
+    const lastPlayed = this.getPlayerLastPlayedLabel(player);
+    const classes = [
+      "driver-card",
+      isCurrent ? "is-active" : "",
+      isSelected ? "is-selected" : "",
+      context === "party" ? "is-party-card" : ""
+    ].filter(Boolean).join(" ");
+    const controls = context === "party"
+      ? `
+        <button class="small-button ${isSelected ? "" : "primary"}" data-action="partyTogglePlayer" data-id="${escapeAttr(player.id)}" ${options.disabled ? "disabled" : ""}>${isSelected ? "Remove" : "Add"}</button>
+        <button class="small-button" data-action="promptRenamePlayer" data-id="${escapeAttr(player.id)}" data-return-screen="partySetup">Rename</button>
+      `
+      : `
+        <button class="small-button ${isCurrent ? "" : "primary"}" data-action="selectPlayer" data-id="${escapeAttr(player.id)}" ${isCurrent ? "disabled" : ""}>${isCurrent ? "Active" : "Use Driver"}</button>
+        <button class="small-button" data-action="promptRenamePlayer" data-id="${escapeAttr(player.id)}" data-return-screen="garage">Rename</button>
+      `;
+    return `
+      <article class="${classes}">
+        <div class="driver-card-preview">
+          ${this.renderDriverMiniCanvas(player)}
+          <span>${escapeHtml(isCurrent ? "Active Driver" : (isSelected ? "In Party" : "Local Driver"))}</span>
+        </div>
+        <div class="driver-card-body">
+          <div class="driver-card-title">
+            <strong>${escapeHtml(player.name)}</strong>
+            <small>${escapeHtml(bodyStyle)}${carNickname !== "No nickname" ? ` - ${escapeHtml(carNickname)}` : ""}</small>
+          </div>
+          <div class="driver-card-stats">
+            <span><b>${formatScore(player.bestScore)}</b><small>Best</small></span>
+            <span><b>${badgeProgress.earnedCount}/${badgeProgress.totalCount}</b><small>Badges</small></span>
+            <span><b>${titleCount}</b><small>Titles</small></span>
+            <span><b>${escapeHtml(lastPlayed)}</b><small>Last</small></span>
+          </div>
+          <div class="row driver-card-actions">${controls}</div>
+        </div>
+      </article>
+    `;
+  }
+
+  renderGarageStats(player) {
+    if (!player) {
+      return `
+        <div class="score-grid garage-stat-grid">
+          <div class="score-card"><strong>Driver</strong><span>No active driver</span></div>
+          <div class="score-card"><strong>Badges</strong><span>0/${getVisibleBadgeDefinitions().length}</span></div>
+          <div class="score-card"><strong>Titles</strong><span>0/${TITLE_DEFINITIONS.length}</span></div>
+          <div class="score-card"><strong>Best Score</strong><span>0</span></div>
+        </div>
+      `;
+    }
+    const badgeProgress = this.profiles.getPlayerBadgeProgress(player);
+    const titleCount = this.profiles.getPlayerTitles(player).length;
+    const challengeStats = getPlayerChallengeTitleStats(player);
+    return `
+      <div class="score-grid garage-stat-grid">
+        <div class="score-card"><strong>Driver</strong><span>${escapeHtml(player.name)}</span></div>
+        <div class="score-card"><strong>Badges</strong><span>${badgeProgress.earnedCount}/${badgeProgress.totalCount}</span></div>
+        <div class="score-card"><strong>Titles</strong><span>${titleCount}/${TITLE_DEFINITIONS.length}</span></div>
+        <div class="score-card"><strong>Best Score</strong><span>${formatScore(player.bestScore)}</span></div>
+        <div class="score-card"><strong>Challenges</strong><span>${challengeStats.completedCount}/${CHALLENGES.length} complete</span></div>
+        <div class="score-card"><strong>Last Played</strong><span>${escapeHtml(this.getPlayerLastPlayedLabel(player))}</span></div>
+      </div>
+    `;
+  }
+
+  showDriverGarageScreen(message = "", options = {}) {
     this.setScreen("players");
-    const current = this.profiles.getCurrentPlayer();
+    const player = this.profiles.getCurrentPlayer();
+    if (!player) {
+      this.audio.playMusic("title", false);
+    }
     const players = this.profiles.data.players;
+    const car = normalizeCarConfig(player?.car || DEFAULT_CAR);
+    const carStyle = normalizeCarStyle(car.carStyle);
+    const nickname = getOptionalCarNickname(car);
+    const activeCopy = player
+      ? `${escapeHtml(player.name)} is the active local driver.`
+      : "Create a local driver to save badges, titles, car style, and scores.";
     this.audio.playMusic("title", false);
     this.layer.classList.remove("is-empty");
     this.layer.innerHTML = `
-      <section class="panel split">
-        <div class="form-stack">
-          <h2>Choose/Create Player</h2>
-          <p class="hint">${current ? `Current player: ${escapeHtml(current.name)} driving ${escapeHtml(current.car.name)}.` : "Profiles live only in this browser through localStorage."}</p>
-          <div class="field">
-            <label for="playerName">New player name</label>
-            <input id="playerName" type="text" maxlength="${LOCAL_PLAYER_NAME_MAX_LENGTH}" value="" placeholder="PLAYER NAME">
+      <section class="panel garage-panel">
+        <div class="garage-hero">
+          <div class="garage-driver-summary">
+            <span class="eyebrow">Driver Garage</span>
+            <h2>${player ? escapeHtml(player.name) : "Add a Driver"}</h2>
+            <p class="hint">${activeCopy}</p>
+            <div class="garage-action-row">
+              <button class="small-button" data-action="focusGarageSection" data-target="garageDriverList">Change Driver</button>
+              <button class="small-button" data-action="focusGarageSection" data-target="garageAddDriver">Add Driver</button>
+              <button class="small-button" data-action="focusGarageSection" data-target="garageRenameDriver" ${player ? "" : "disabled"}>Rename Driver</button>
+              <button class="small-button" data-action="focusGarageSection" data-target="garageCarStyle" ${player ? "" : "disabled"}>Customize Car</button>
+              <button class="small-button" data-action="resetCarStyle" ${player ? "" : "disabled"}>Reset Visual Style</button>
+              <button class="small-button" data-action="title">Back</button>
+            </div>
           </div>
-          <div class="row">
-            <button class="small-button" data-action="createPlayer">Create Player</button>
-            <button class="small-button" data-action="customize" ${current ? "" : "disabled"}>Customize Current Car</button>
-            <button class="small-button" data-action="title">Back</button>
+          <div class="garage-preview-card">
+            <canvas id="carPreview" class="car-preview" width="360" height="250" aria-label="Active driver car preview"></canvas>
+            <p class="hint">Cars are cosmetic for fair local competition. Paint, style, and boost trail personalize your driver. Performance classes may come later.</p>
           </div>
-          ${this.renderPlayerTitlePanel(current)}
-          ${this.renderPlayerBadgePanel(current)}
-          <p class="status-line">${escapeHtml(message)}</p>
         </div>
-        <div>
-          <h2>Local Players</h2>
-          <ul class="profile-list">
-            ${players.length ? players.map((player) => {
-              const badgeProgress = this.profiles.getPlayerBadgeProgress(player);
-              const titleCount = this.profiles.getPlayerTitles(player).length;
-              return `
-                <li class="profile-item ${current && current.id === player.id ? "is-current" : ""}">
-                  <strong>${escapeHtml(player.name)}</strong>
-                  <span class="meta">${escapeHtml(player.car.name)} · Best ${formatScore(player.bestScore)} · Titles ${titleCount} · Badges ${badgeProgress.earnedCount}/${badgeProgress.totalCount}</span>
-                  <button class="small-button" data-action="selectPlayer" data-id="${escapeAttr(player.id)}">${current && current.id === player.id ? "Selected" : "Select"}</button>
-                </li>
-              `;
-            }).join("") : `<li class="profile-item"><span class="meta">No profiles yet.</span></li>`}
-          </ul>
+
+        ${this.renderGarageStats(player)}
+
+        <div class="garage-layout">
+          <section class="garage-section" id="garageRenameDriver">
+            <div class="garage-section-heading">
+              <span class="eyebrow">Driver Profile</span>
+              <h3>Rename and Records</h3>
+            </div>
+            <div class="field">
+              <label for="driverRenameName">Driver Name</label>
+              <input id="driverRenameName" type="text" maxlength="${LOCAL_PLAYER_NAME_MAX_LENGTH}" value="${player ? escapeAttr(player.name) : ""}" placeholder="DRIVER NAME" ${player ? "" : "disabled"}>
+            </div>
+            <div class="row">
+              <button class="small-button primary" data-action="renameDriver" ${player ? "" : "disabled"}>Rename Driver</button>
+              <button class="small-button" data-action="focusGarageSection" data-target="garageDriverList">Change Driver</button>
+            </div>
+            ${this.renderPlayerTitlePanel(player)}
+            ${this.renderPlayerBadgePanel(player)}
+          </section>
+
+          <section class="garage-section" id="garageCarStyle">
+            <div class="garage-section-heading">
+              <span class="eyebrow">Garage</span>
+              <h3>Car Style</h3>
+            </div>
+            <p class="hint">Car nickname is optional flavor. Driver name is your main identity.</p>
+            <div class="field">
+              <label for="carName">Optional Car Nickname</label>
+              <input id="carName" type="text" maxlength="${LOCAL_CAR_NAME_MAX_LENGTH}" value="${escapeAttr(nickname)}" placeholder="Optional nickname" ${player ? "" : "disabled"}>
+            </div>
+            <div class="field">
+              <label for="bodyStyle">Body Style</label>
+              <select id="bodyStyle" ${player ? "" : "disabled"}>
+                ${CAR_BODY_STYLES.map((style) => `<option value="${escapeAttr(style.id)}" ${style.id === car.bodyStyle ? "selected" : ""}>${escapeHtml(style.name)}</option>`).join("")}
+              </select>
+            </div>
+            <label class="check-field">
+              <input id="useSprite" type="checkbox" ${car.useSprite !== false ? "checked" : ""} ${player ? "" : "disabled"}>
+              <span>Use Sprite Car</span>
+            </label>
+            <p id="spriteStatus" class="hint">Paint cache waiting for a loaded sprite.</p>
+            <div class="field">
+              <label>Body Color</label>
+              ${renderPaintOptionGroup("carBodyColor", CAR_BODY_COLOR_OPTIONS, carStyle.bodyColor, DEFAULT_CAR_STYLE.bodyColor, "Body Color")}
+            </div>
+            <div class="field">
+              <label>Accent Color</label>
+              ${renderPaintOptionGroup("carAccentColor", CAR_ACCENT_COLOR_OPTIONS, carStyle.accentColor, DEFAULT_CAR_STYLE.accentColor, "Accent Color")}
+            </div>
+            <div class="field">
+              <label>Boost Trail</label>
+              ${renderPaintOptionGroup("carBoostTrail", CAR_BOOST_TRAIL_OPTIONS, carStyle.boostTrail, DEFAULT_CAR_STYLE.boostTrail, "Boost Trail")}
+            </div>
+            <div class="row">
+              <button class="small-button primary" data-action="saveCar" ${player ? "" : "disabled"}>Save Style</button>
+              <button class="small-button" data-action="resetCarStyle" ${player ? "" : "disabled"}>Reset Visual Style</button>
+            </div>
+          </section>
+
+          <section class="garage-section" id="garageDriverList">
+            <div class="garage-section-heading">
+              <span class="eyebrow">Choose Driver</span>
+              <h3>Local Driver Cards</h3>
+            </div>
+            <div class="driver-card-grid">
+              ${players.length ? players.map((item) => this.renderDriverCard(item, { context: "garage", currentId: player?.id || "" })).join("") : `<p class="hint">No local drivers yet.</p>`}
+            </div>
+          </section>
+
+          <section class="garage-section" id="garageAddDriver">
+            <div class="garage-section-heading">
+              <span class="eyebrow">Add Driver</span>
+              <h3>New Local Profile</h3>
+            </div>
+            <p class="hint">Adds one local driver in this browser. You can rename immediately and style the car here.</p>
+            <div class="field">
+              <label for="newDriverName">New Driver Name</label>
+              <input id="newDriverName" type="text" maxlength="${LOCAL_PLAYER_NAME_MAX_LENGTH}" value="" placeholder="DRIVER ${players.length + 1}">
+            </div>
+            <div class="row">
+              <button class="small-button primary" data-action="createPlayer">Add Driver</button>
+              <button class="small-button" data-action="title">Back</button>
+            </div>
+            <p class="status-line">${escapeHtml(message)}</p>
+          </section>
         </div>
       </section>
     `;
     this.bindLayerButtons();
-    const input = document.getElementById("playerName");
-    if (input) {
-      input.addEventListener("keydown", (event) => {
+    this.bindGarageControls(options);
+    this.renderCarPreview();
+    this.renderDriverMiniPreviews();
+  }
+
+  showCustomizeScreen(message = "") {
+    this.showDriverGarageScreen(message, { focusTarget: "garageCarStyle" });
+  }
+
+  bindGarageControls(options = {}) {
+    const renameInput = document.getElementById("driverRenameName");
+    if (renameInput) {
+      renameInput.addEventListener("keydown", (event) => {
+        if (event.key === "Enter") {
+          event.preventDefault();
+          if (event.repeat) return;
+          this.audio.activate();
+          this.audio.playSfx("menu");
+          this.handleRenameDriver();
+        }
+      });
+    }
+    const addInput = document.getElementById("newDriverName");
+    if (addInput) {
+      addInput.addEventListener("keydown", (event) => {
         if (event.key === "Enter") {
           event.preventDefault();
           if (event.repeat) return;
@@ -19800,64 +20142,7 @@ class NeonRoadRally {
           this.handleCreatePlayer();
         }
       });
-      input.focus();
     }
-  }
-
-  showCustomizeScreen(message = "") {
-    const player = this.profiles.getCurrentPlayer();
-    if (!player) {
-      this.showPlayerScreen("Create or choose a player before customizing a car.");
-      return;
-    }
-    this.setScreen("customize");
-    const car = normalizeCarConfig(player.car);
-    const carStyle = normalizeCarStyle(car.carStyle);
-    this.audio.playMusic("title", false);
-    this.layer.classList.remove("is-empty");
-    this.layer.innerHTML = `
-      <section class="panel split customize-panel">
-        <div class="form-stack">
-          <h2>Customize Car</h2>
-          <p class="hint">Dynamic paint recolors likely body pixels while preserving sprite windows, tires, lights, trim, and transparent pixels.</p>
-          <div class="field">
-            <label for="carName">Car name</label>
-            <input id="carName" type="text" maxlength="${LOCAL_CAR_NAME_MAX_LENGTH}" value="${escapeAttr(car.name)}">
-          </div>
-          <div class="field">
-            <label for="bodyStyle">Body style</label>
-            <select id="bodyStyle">
-              ${CAR_BODY_STYLES.map((style) => `<option value="${escapeAttr(style.id)}" ${style.id === car.bodyStyle ? "selected" : ""}>${escapeHtml(style.name)}</option>`).join("")}
-            </select>
-          </div>
-          <label class="check-field">
-            <input id="useSprite" type="checkbox" ${car.useSprite !== false ? "checked" : ""}>
-            <span>Use Sprite Car</span>
-          </label>
-          <p id="spriteStatus" class="hint">Paint cache waiting for a loaded sprite.</p>
-          <div class="field">
-            <label>Body Color</label>
-            ${renderPaintOptionGroup("carBodyColor", CAR_BODY_COLOR_OPTIONS, carStyle.bodyColor, DEFAULT_CAR_STYLE.bodyColor, "Body Color")}
-          </div>
-          <div class="field">
-            <label>Accent Color</label>
-            ${renderPaintOptionGroup("carAccentColor", CAR_ACCENT_COLOR_OPTIONS, carStyle.accentColor, DEFAULT_CAR_STYLE.accentColor, "Accent Color")}
-          </div>
-          <div class="field">
-            <label>Boost Trail Color</label>
-            ${renderPaintOptionGroup("carBoostTrail", CAR_BOOST_TRAIL_OPTIONS, carStyle.boostTrail, DEFAULT_CAR_STYLE.boostTrail, "Boost Trail Color")}
-          </div>
-          <div class="row">
-            <button class="small-button primary" data-action="saveCar">Save Car</button>
-            <button class="small-button" data-action="resetCarStyle">Reset Visual Style</button>
-            <button class="small-button" data-action="title">Back</button>
-          </div>
-          <p class="status-line">${escapeHtml(message)}</p>
-        </div>
-        <canvas id="carPreview" class="car-preview" width="360" height="280" aria-label="Car preview"></canvas>
-      </section>
-    `;
-    this.bindLayerButtons();
     const updatePreview = () => this.renderCarPreview();
     ["carName", "bodyStyle", "useSprite"].forEach((id) => {
       const el = document.getElementById(id);
@@ -19876,10 +20161,22 @@ class NeonRoadRally {
         el.addEventListener("change", () => {
           this.audio.activate();
           this.audio.playSfx("menu");
+          updatePreview();
         });
       }
     });
-    updatePreview();
+    if (options.focusTarget) {
+      requestAnimationFrame(() => this.focusGarageSection(options.focusTarget));
+    } else if (!this.profiles.getCurrentPlayer() && addInput) {
+      addInput.focus();
+    }
+  }
+
+  focusGarageSection(targetId) {
+    const target = document.getElementById(targetId);
+    if (target) target.scrollIntoView({ block: "start", behavior: "smooth" });
+    const input = target?.querySelector("input, select, button");
+    if (input && !input.disabled) input.focus({ preventScroll: true });
   }
 
   renderCarPreview() {
@@ -19933,6 +20230,37 @@ class NeonRoadRally {
         spriteStatus.textContent = `Sprite asset not loaded: ${path}. Showing classic canvas fallback with selected colors.`;
       }
     }
+  }
+
+  renderDriverMiniPreviews() {
+    document.querySelectorAll("canvas[data-driver-car-preview]").forEach((canvas) => {
+      const player = this.profiles.getPlayerById(canvas.dataset.driverCarPreview);
+      const car = normalizeCarConfig(player?.car || DEFAULT_CAR);
+      const ctx = canvas.getContext("2d");
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      const gradient = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
+      gradient.addColorStop(0, "rgba(40, 246, 255, 0.18)");
+      gradient.addColorStop(0.52, "rgba(5, 8, 20, 0.92)");
+      gradient.addColorStop(1, "rgba(255, 63, 209, 0.16)");
+      ctx.fillStyle = gradient;
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.strokeStyle = "rgba(255, 228, 94, 0.22)";
+      ctx.beginPath();
+      ctx.moveTo(0, canvas.height - 20);
+      ctx.lineTo(canvas.width, canvas.height - 42);
+      ctx.stroke();
+      const laneWidth = Math.max(72, canvas.width / 3);
+      drawPlayerCar(ctx, canvas.width / 2, canvas.height / 2 + 12, car, {
+        preview: true,
+        boosting: false,
+        airborne: false,
+        laneWidth,
+        laneChanging: false,
+        laneDelta: 0,
+        verticalInput: 0,
+        crashFlash: 0
+      }, this.carSprites);
+    });
   }
 
   syncPaintSwatchSelection() {
@@ -20276,11 +20604,14 @@ class NeonRoadRally {
         else if (action === "fullscreen") this.toggleFullscreen();
         else if (action === "setSpeedClass") this.handleSetSpeedClass(button.dataset.id);
         else if (action === "setModePickerSpeed") this.handleModePickerSpeed(button.dataset.id);
+        else if (action === "focusGarageSection") this.focusGarageSection(button.dataset.target);
         else if (action === "randomSeed") this.handleRandomSeed();
         else if (action === "startSeededRace") this.handleStartSeededRace();
         else if (action === "partyTogglePlayer") this.handlePartyTogglePlayer(button.dataset.id);
         else if (action === "partyRemovePlayer") this.handlePartyTogglePlayer(button.dataset.id);
         else if (action === "partyMovePlayer") this.handlePartyMovePlayer(button.dataset.id, Number(button.dataset.dir || 0));
+        else if (action === "partyQuickAddDriver") this.handlePartyQuickAddDriver();
+        else if (action === "partyInlineRenamePlayer") this.handlePartyInlineRenamePlayer();
         else if (action === "partyRandomSeed") this.handlePartyRandomSeed();
         else if (action === "partyStartRound") this.handlePartyStartRound();
         else if (action === "partyStartRun") this.startCurrentPartyRun();
@@ -20304,6 +20635,8 @@ class NeonRoadRally {
         else if (action === "resume") this.togglePause();
         else if (action === "createPlayer") this.handleCreatePlayer();
         else if (action === "selectPlayer") this.handleSelectPlayer(button.dataset.id);
+        else if (action === "renameDriver") this.handleRenameDriver();
+        else if (action === "promptRenamePlayer") this.handlePromptRenamePlayer(button.dataset.id, button.dataset.returnScreen);
         else if (action === "setBadgeFilter") this.handleSetBadgeFilter(button.dataset.filter);
         else if (action === "saveCar") this.handleSaveCar();
         else if (action === "resetCarStyle") this.handleResetCarStyle();
@@ -20331,37 +20664,76 @@ class NeonRoadRally {
   }
 
   handleCreatePlayer() {
-    const input = document.getElementById("playerName");
-    const name = sanitizePlayerName(input?.value, `PLAYER ${this.profiles.data.players.length + 1}`);
+    const input = document.getElementById("newDriverName") || document.getElementById("playerName");
+    const fallbackName = `DRIVER ${this.profiles.data.players.length + 1}`;
+    const name = sanitizePlayerName(input?.value, fallbackName);
     const player = this.profiles.createPlayer(name);
     if (!player) {
-      this.showPlayerScreen(`Local player limit is ${LOCAL_PLAYER_MAX_COUNT}.`);
+      this.showDriverGarageScreen(`Local driver limit is ${LOCAL_PLAYER_MAX_COUNT}.`);
       return;
     }
-    this.showPlayerScreen(`${player.name} is ready.`);
+    this.showDriverGarageScreen(`${player.name} is ready.`, { focusTarget: "garageRenameDriver" });
   }
 
   handleSelectPlayer(id) {
     this.profiles.selectPlayer(id);
     const player = this.profiles.getCurrentPlayer();
-    this.showPlayerScreen(player ? `${player.name} selected.` : "");
+    this.showDriverGarageScreen(player ? `${player.name} selected.` : "");
+  }
+
+  handleRenameDriver() {
+    const player = this.profiles.getCurrentPlayer();
+    const input = document.getElementById("driverRenameName");
+    const rawName = String(input?.value ?? "").trim();
+    if (!player) {
+      this.showDriverGarageScreen("Add a driver before renaming.");
+      return;
+    }
+    if (!rawName) {
+      this.showDriverGarageScreen("Driver name cannot be empty.", { focusTarget: "garageRenameDriver" });
+      return;
+    }
+    const nextName = sanitizePlayerName(rawName, player.name);
+    this.profiles.renamePlayer(player.id, nextName);
+    this.showDriverGarageScreen(`${nextName} renamed.`, { focusTarget: "garageRenameDriver" });
+  }
+
+  handlePromptRenamePlayer(id, returnScreen = "garage") {
+    const player = this.profiles.getPlayerById(id);
+    if (!player) {
+      if (returnScreen === "partySetup") this.showPartySetupScreen("Driver not found.");
+      else this.showDriverGarageScreen("Driver not found.");
+      return;
+    }
+    const rawName = window.prompt("Rename driver", player.name);
+    if (rawName === null) return;
+    const cleanRawName = String(rawName || "").trim();
+    if (!cleanRawName) {
+      if (returnScreen === "partySetup") this.showPartySetupScreen("Driver name cannot be empty.");
+      else this.showDriverGarageScreen("Driver name cannot be empty.", { focusTarget: "garageDriverList" });
+      return;
+    }
+    const nextName = sanitizePlayerName(cleanRawName, player.name);
+    this.profiles.renamePlayer(player.id, nextName);
+    if (returnScreen === "partySetup") this.showPartySetupScreen(`${nextName} renamed.`);
+    else this.showDriverGarageScreen(`${nextName} renamed.`, { focusTarget: "garageDriverList" });
   }
 
   handleSetBadgeFilter(filter) {
     this.badgeFilter = normalizeBadgeFilter(filter);
-    this.showPlayerScreen();
+    this.showDriverGarageScreen("", { focusTarget: "garageRenameDriver" });
   }
 
   handleSaveCar() {
     this.profiles.updateCurrentCar(this.readCarForm());
     const player = this.profiles.getCurrentPlayer();
-    this.showCustomizeScreen(`${player?.car.name || "Car"} saved.`);
+    this.showDriverGarageScreen(`${player?.name || "Driver"} style saved.`, { focusTarget: "garageCarStyle" });
   }
 
   handleResetCarStyle() {
     const current = this.profiles.getCurrentPlayer();
     if (!current) {
-      this.showPlayerScreen("Create or choose a player before customizing a car.");
+      this.showDriverGarageScreen("Create or choose a driver before customizing a car.");
       return;
     }
     const currentCar = normalizeCarConfig(current.car);
@@ -20373,7 +20745,7 @@ class NeonRoadRally {
       carStyle: { ...DEFAULT_CAR_STYLE }
     });
     const player = this.profiles.getCurrentPlayer();
-    this.showCustomizeScreen(`${player?.car.name || "Car"} reset to original paint.`);
+    this.showDriverGarageScreen(`${player?.name || "Driver"} visual style reset.`, { focusTarget: "garageCarStyle" });
   }
 
   handleApplyPlaytestPick(id) {
