@@ -17150,6 +17150,18 @@ class NeonRoadRally {
     this.layer.classList.add("is-empty");
   }
 
+  getActivePanelScrollTop() {
+    const panel = this.layer?.querySelector(".panel");
+    return panel ? panel.scrollTop : 0;
+  }
+
+  setActivePanelScrollTop(value = 0) {
+    const panel = this.layer?.querySelector(".panel");
+    if (!panel) return;
+    const nextScrollTop = Number.isFinite(value) ? Math.max(0, value) : 0;
+    panel.scrollTop = nextScrollTop;
+  }
+
   shouldShowNewDriverHint() {
     const player = this.profiles.getCurrentPlayer();
     const leaderboardHasRuns = Array.isArray(this.profiles.data.leaderboard) && this.profiles.data.leaderboard.length > 0;
@@ -20112,6 +20124,7 @@ class NeonRoadRally {
     this.bindGarageControls(options);
     this.renderCarPreview();
     this.renderDriverMiniPreviews();
+    this.setActivePanelScrollTop(options.preserveScrollTop ?? 0);
   }
 
   showCustomizeScreen(message = "") {
@@ -20168,13 +20181,21 @@ class NeonRoadRally {
     if (options.focusTarget) {
       requestAnimationFrame(() => this.focusGarageSection(options.focusTarget));
     } else if (!this.profiles.getCurrentPlayer() && addInput) {
-      addInput.focus();
+      requestAnimationFrame(() => addInput.focus({ preventScroll: true }));
     }
   }
 
   focusGarageSection(targetId) {
     const target = document.getElementById(targetId);
-    if (target) target.scrollIntoView({ block: "start", behavior: "smooth" });
+    if (!target) return;
+    const panel = target.closest(".panel");
+    if (panel) {
+      const panelRect = panel.getBoundingClientRect();
+      const targetRect = target.getBoundingClientRect();
+      panel.scrollTop = Math.max(0, panel.scrollTop + targetRect.top - panelRect.top - 12);
+    } else {
+      target.scrollIntoView({ block: "start", behavior: "auto" });
+    }
     const input = target?.querySelector("input, select, button");
     if (input && !input.disabled) input.focus({ preventScroll: true });
   }
@@ -20672,7 +20693,7 @@ class NeonRoadRally {
       this.showDriverGarageScreen(`Local driver limit is ${LOCAL_PLAYER_MAX_COUNT}.`);
       return;
     }
-    this.showDriverGarageScreen(`${player.name} is ready.`, { focusTarget: "garageRenameDriver" });
+    this.showDriverGarageScreen(`${player.name} is ready.`);
   }
 
   handleSelectPlayer(id) {
@@ -20682,6 +20703,7 @@ class NeonRoadRally {
   }
 
   handleRenameDriver() {
+    const scrollTop = this.getActivePanelScrollTop();
     const player = this.profiles.getCurrentPlayer();
     const input = document.getElementById("driverRenameName");
     const rawName = String(input?.value ?? "").trim();
@@ -20695,7 +20717,7 @@ class NeonRoadRally {
     }
     const nextName = sanitizePlayerName(rawName, player.name);
     this.profiles.renamePlayer(player.id, nextName);
-    this.showDriverGarageScreen(`${nextName} renamed.`, { focusTarget: "garageRenameDriver" });
+    this.showDriverGarageScreen(`${nextName} renamed.`, { preserveScrollTop: scrollTop });
   }
 
   handlePromptRenamePlayer(id, returnScreen = "garage") {
@@ -20720,17 +20742,20 @@ class NeonRoadRally {
   }
 
   handleSetBadgeFilter(filter) {
+    const scrollTop = this.getActivePanelScrollTop();
     this.badgeFilter = normalizeBadgeFilter(filter);
-    this.showDriverGarageScreen("", { focusTarget: "garageRenameDriver" });
+    this.showDriverGarageScreen("", { preserveScrollTop: scrollTop });
   }
 
   handleSaveCar() {
+    const scrollTop = this.getActivePanelScrollTop();
     this.profiles.updateCurrentCar(this.readCarForm());
     const player = this.profiles.getCurrentPlayer();
-    this.showDriverGarageScreen(`${player?.name || "Driver"} style saved.`, { focusTarget: "garageCarStyle" });
+    this.showDriverGarageScreen(`${player?.name || "Driver"} style saved.`, { preserveScrollTop: scrollTop });
   }
 
   handleResetCarStyle() {
+    const scrollTop = this.getActivePanelScrollTop();
     const current = this.profiles.getCurrentPlayer();
     if (!current) {
       this.showDriverGarageScreen("Create or choose a driver before customizing a car.");
@@ -20745,7 +20770,7 @@ class NeonRoadRally {
       carStyle: { ...DEFAULT_CAR_STYLE }
     });
     const player = this.profiles.getCurrentPlayer();
-    this.showDriverGarageScreen(`${player?.name || "Driver"} visual style reset.`, { focusTarget: "garageCarStyle" });
+    this.showDriverGarageScreen(`${player?.name || "Driver"} visual style reset.`, { preserveScrollTop: scrollTop });
   }
 
   handleApplyPlaytestPick(id) {
