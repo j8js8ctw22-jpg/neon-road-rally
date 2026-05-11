@@ -2678,10 +2678,19 @@ const FUEL_CAN_REACHABILITY_CONFIG = {
   approachMaxDistance: 880,
   collectClearBefore: 360,
   collectClearAfter: 170,
+  sameLaneHardClearBefore: 520,
+  sameLaneHardImmediateAfter: 300,
   nearbyClearBefore: 470,
   nearbyClearAfter: 210,
+  escapeLookaheadSeconds: 0.62,
+  escapeLookaheadMinDistance: 360,
+  escapeLookaheadMaxDistance: 680,
+  exitLaneClearBefore: 70,
   routeSampleStep: 120,
   routeTimingBufferSeconds: 0.16,
+  assistVisualClearDistance: 260,
+  assistAdjacentVisualClearDistance: 150,
+  highDensityAdjacentEscapeHardBlockers: 2,
   maxNearbyHardBlockers: 3,
   maxLaneNeighborhoodHardBlockers: 2
 };
@@ -5298,6 +5307,11 @@ function normalizePlaytestRunSummary(entry) {
     gasCanSpawnRejected: normalizeNonNegativeInteger(entry.gasCanSpawnRejected, 0, 99999),
     gasCanSpawnRepositioned: normalizeNonNegativeInteger(entry.gasCanSpawnRepositioned, 0, 99999),
     gasCanReachabilityFailuresPrevented: normalizeNonNegativeInteger(entry.gasCanReachabilityFailuresPrevented, 0, 99999),
+    gasCanPlacementAttempts: normalizeNonNegativeInteger(entry.gasCanPlacementAttempts, 0, 99999),
+    gasCanPlacementRejectedUnsafe: normalizeNonNegativeInteger(entry.gasCanPlacementRejectedUnsafe, 0, 99999),
+    gasCanPlacementSkippedNoFairRoute: normalizeNonNegativeInteger(entry.gasCanPlacementSkippedNoFairRoute, 0, 99999),
+    gasCanRouteSafetyFailures: normalizeNonNegativeInteger(entry.gasCanRouteSafetyFailures, 0, 99999),
+    gasCanNearestBlockerDistanceMin: normalizeOptionalFiniteNumber(entry.gasCanNearestBlockerDistanceMin, 0, 999999),
     fuelRemaining: normalizeNonNegativeNumber(entry.fuelRemaining, 0, FUEL_RUN_CONFIG.fuelMax),
     fuelSavedByBoost: normalizeNonNegativeNumber(entry.fuelSavedByBoost, 0, FUEL_RUN_CONFIG.fuelMax),
     fuelDrainPausedTime: normalizeNonNegativeNumber(entry.fuelDrainPausedTime, 0, 24 * 60 * 60),
@@ -10072,18 +10086,24 @@ class RoadDirector {
     const lanes = Array.isArray(preferredLanes) ? preferredLanes : [preferredLanes];
     const fallback = shuffle(this.allLanes(), () => this.random());
     const ordered = lanes.concat(fallback).filter((lane, index, list) => Number.isFinite(lane) && lane >= 0 && lane < LANES && list.indexOf(lane) === index);
+    const run = context.run || this.manager.game.run || {};
     let attempts = 0;
     for (const lane of ordered) {
       attempts += 1;
+      if (isFuelRunRaceType(run.raceTypeId)) {
+        run.gasCanPlacementAttempts = (run.gasCanPlacementAttempts || 0) + 1;
+      }
       const spawned = this.spawn("gasCan", lane, distance, result, { allowLaneAdjust: false });
       if (spawned) {
-        const run = context.run || this.manager.game.run || {};
         if (attempts > 1 && isFuelRunRaceType(run.raceTypeId)) {
           run.gasCanSpawnRepositioned = (run.gasCanSpawnRepositioned || 0) + 1;
         }
         this.recordFuelPlacement(spawned, context, result, pattern);
         return spawned;
       }
+    }
+    if (isFuelRunRaceType(run.raceTypeId) && ordered.length) {
+      run.gasCanPlacementSkippedNoFairRoute = (run.gasCanPlacementSkippedNoFairRoute || 0) + 1;
     }
     return null;
   }
@@ -10959,6 +10979,7 @@ class ObstacleManager {
       invalid: false,
       maxBlocked: 0,
       gasCanReachabilityFailure: true,
+      gasCanRouteSafetyFailure: true,
       reason,
       ...extra
     });
@@ -10976,6 +10997,11 @@ class ObstacleManager {
     const collectEnd = candidate.distance + FUEL_CAN_REACHABILITY_CONFIG.collectClearAfter;
     const nearbyStart = candidate.distance - FUEL_CAN_REACHABILITY_CONFIG.nearbyClearBefore;
     const nearbyEnd = candidate.distance + FUEL_CAN_REACHABILITY_CONFIG.nearbyClearAfter;
+    const escapeEnd = candidate.distance + clamp(
+      speed * FUEL_CAN_REACHABILITY_CONFIG.escapeLookaheadSeconds,
+      FUEL_CAN_REACHABILITY_CONFIG.escapeLookaheadMinDistance,
+      FUEL_CAN_REACHABILITY_CONFIG.escapeLookaheadMaxDistance
+    );
     const nearbyLanes = [lane - 1, lane, lane + 1].filter((item) => item >= 0 && item < LANES);
     const hardRecords = existingObstacles
       .filter((obstacle) => HARD_VEHICLE_TYPES.has(obstacle.type) && !obstacle.hit && !obstacle.remove)
@@ -10984,7 +11010,44 @@ class ObstacleManager {
         distance: obstacle.distance,
         lanes: this.getWorldLaneCoverage(obstacle, 0.16)
       }))
-      .filter((record) => record.lanes.length && record.distance >= approachStart - 120 && record.distance <= nearbyEnd + 120);
+      .filter((record) => record.lanes.length && record.distance >= approachStart - 120 && record.distance <= escapeEnd + 120);
+    const nearestHardDistance = hardRecords.reduce((min, record) => Math.min(min, Math.abs(record.distance - candidate.distance)), Infinity);
+    if (Number.isFinite(nearestHardDistance)) {
+      run.gasCanNearestBlockerDistanceMin = Math.min(
+        Number.isFinite(run.gasCanNearestBlockerDistanceMin) ? run.gasCanNearestBlockerDistanceMin : Infinity,
+        nearestHardDistance
+      );
+    }
+    const assistConflict = existingObstacles
+      .filter((obstacle) => ["boostPad", "ramp"].includes(obstacle.type) && !obstacle.hit && !obstacle.remove)
+      .map((obstacle) => ({
+        obstacle,
+        distance: obstacle.distance,
+        gap: Math.abs(obstacle.distance - candidate.distance),
+        lanes: this.getWorldLaneCoverage(obstacle, 0.12)
+      }))
+      .find((record) => (
+        record.lanes.includes(lane)
+        && record.gap < FUEL_CAN_REACHABILITY_CONFIG.assistVisualClearDistance
+      ) || (
+        record.lanes.some((item) => Math.abs(item - lane) <= 1)
+        && record.gap < FUEL_CAN_REACHABILITY_CONFIG.assistAdjacentVisualClearDistance
+      ));
+    if (assistConflict) {
+      return fail("gas can visual spacing near reward object", {
+        gasCanNearestBlockerDistance: Number.isFinite(nearestHardDistance) ? nearestHardDistance : null
+      });
+    }
+    const previousSameLaneHard = hardRecords.find((record) => (
+      record.distance < candidate.distance
+      && candidate.distance - record.distance < FUEL_CAN_REACHABILITY_CONFIG.sameLaneHardClearBefore
+      && record.lanes.includes(lane)
+    ));
+    if (previousSameLaneHard) {
+      return fail("gas can hidden behind hard blocker in pickup lane", {
+        gasCanNearestBlockerDistance: candidate.distance - previousSameLaneHard.distance
+      });
+    }
     const fuelLaneBlockers = hardRecords.filter((record) => (
       record.distance >= collectStart
       && record.distance <= collectEnd
@@ -11039,6 +11102,41 @@ class ObstacleManager {
       }
     }
 
+    const exitStart = candidate.distance + FUEL_CAN_REACHABILITY_CONFIG.exitLaneClearBefore;
+    const sameLaneFutureBlocker = hardRecords.find((record) => (
+      record.distance > candidate.distance
+      && record.distance <= escapeEnd
+      && record.lanes.includes(lane)
+    ));
+    if (sameLaneFutureBlocker && sameLaneFutureBlocker.distance - candidate.distance < FUEL_CAN_REACHABILITY_CONFIG.sameLaneHardImmediateAfter) {
+      return fail("gas can too close before hard blocker in pickup lane", {
+        gasCanNearestBlockerDistance: sameLaneFutureBlocker.distance - candidate.distance
+      });
+    }
+    const exitLanes = nearbyLanes.filter((exitLane) => {
+      const neededSeconds = Math.abs(exitLane - lane) * INPUT_CONFIG.laneChangeDurationSeconds
+        + FUEL_CAN_REACHABILITY_CONFIG.routeTimingBufferSeconds;
+      const exitSeconds = Math.max(0, (escapeEnd - candidate.distance) / speed);
+      if (exitSeconds < neededSeconds) return false;
+      return !hardRecords.some((record) => (
+        record.distance >= exitStart
+        && record.distance <= escapeEnd
+        && record.lanes.includes(exitLane)
+      ));
+    });
+    const adjacentExitLanes = exitLanes.filter((exitLane) => Math.abs(exitLane - lane) === 1);
+    if (!exitLanes.length) {
+      return fail("gas can has no safe lane exit", {
+        gasCanNearestBlockerDistance: Number.isFinite(nearestHardDistance) ? nearestHardDistance : null
+      });
+    }
+    if ((sameLaneFutureBlocker || nearbyHard.length >= FUEL_CAN_REACHABILITY_CONFIG.highDensityAdjacentEscapeHardBlockers)
+      && !adjacentExitLanes.length) {
+      return fail("gas can high-density route lacks adjacent escape", {
+        gasCanNearestBlockerDistance: Number.isFinite(nearestHardDistance) ? nearestHardDistance : null
+      });
+    }
+
     const sampleDistance = Math.max(0, candidate.distance - VIEW_DISTANCE * 0.5);
     const budget = this.getActiveFieldBudget(run);
     const density = this.getActiveFieldDensity(existingObstacles, sampleDistance);
@@ -11064,8 +11162,10 @@ class ObstacleManager {
       gasCanReachability: {
         lane,
         clearApproachLanes,
+        exitLanes,
         nearbyHardBlockers: nearbyHard.length
-      }
+      },
+      gasCanNearestBlockerDistance: Number.isFinite(nearestHardDistance) ? nearestHardDistance : null
     };
   }
 
@@ -11267,8 +11367,18 @@ class ObstacleManager {
     }
     if (candidate?.type === "gasCan" && isFuelRunRaceType(run.raceTypeId)) {
       run.gasCanSpawnRejected = (run.gasCanSpawnRejected || 0) + 1;
+      run.gasCanPlacementRejectedUnsafe = (run.gasCanPlacementRejectedUnsafe || 0) + 1;
       if (result.gasCanReachabilityFailure) {
         run.gasCanReachabilityFailuresPrevented = (run.gasCanReachabilityFailuresPrevented || 0) + 1;
+      }
+      if (result.gasCanReachabilityFailure || result.gasCanRouteSafetyFailure) {
+        run.gasCanRouteSafetyFailures = (run.gasCanRouteSafetyFailures || 0) + 1;
+      }
+      if (Number.isFinite(result.gasCanNearestBlockerDistance)) {
+        run.gasCanNearestBlockerDistanceMin = Math.min(
+          Number.isFinite(run.gasCanNearestBlockerDistanceMin) ? run.gasCanNearestBlockerDistanceMin : Infinity,
+          result.gasCanNearestBlockerDistance
+        );
       }
     }
     if (result.activeFieldInvalid) {
@@ -12174,6 +12284,8 @@ class ObstacleManager {
           maxBlocked: 0,
           overlap,
           gasCanReachabilityFailure: true,
+          gasCanRouteSafetyFailure: true,
+          gasCanNearestBlockerDistance: Number.isFinite(overlap.actualGap) ? overlap.actualGap : null,
           reason: `gas can blocked by ${overlap.obstacle.type}`
         };
       }
@@ -16392,6 +16504,11 @@ class NeonRoadRally {
       gasCanSpawnRejected: 0,
       gasCanSpawnRepositioned: 0,
       gasCanReachabilityFailuresPrevented: 0,
+      gasCanPlacementAttempts: 0,
+      gasCanPlacementRejectedUnsafe: 0,
+      gasCanPlacementSkippedNoFairRoute: 0,
+      gasCanRouteSafetyFailures: 0,
+      gasCanNearestBlockerDistanceMin: null,
       fuelCollected: 0,
       fuelSavedByBoost: 0,
       fuelDrainPausedTime: 0,
@@ -16784,6 +16901,11 @@ class NeonRoadRally {
     run.gasCanSpawnRejected = 0;
     run.gasCanSpawnRepositioned = 0;
     run.gasCanReachabilityFailuresPrevented = 0;
+    run.gasCanPlacementAttempts = 0;
+    run.gasCanPlacementRejectedUnsafe = 0;
+    run.gasCanPlacementSkippedNoFairRoute = 0;
+    run.gasCanRouteSafetyFailures = 0;
+    run.gasCanNearestBlockerDistanceMin = null;
     run.fuelCollected = 0;
     run.fuelSavedByBoost = 0;
     run.fuelDrainPausedTime = 0;
@@ -18129,6 +18251,11 @@ class NeonRoadRally {
       gasCanSpawnRejected: isFuelRunRaceType(summary.raceTypeId) ? (run.gasCanSpawnRejected || 0) : 0,
       gasCanSpawnRepositioned: isFuelRunRaceType(summary.raceTypeId) ? (run.gasCanSpawnRepositioned || 0) : 0,
       gasCanReachabilityFailuresPrevented: isFuelRunRaceType(summary.raceTypeId) ? (run.gasCanReachabilityFailuresPrevented || 0) : 0,
+      gasCanPlacementAttempts: isFuelRunRaceType(summary.raceTypeId) ? (run.gasCanPlacementAttempts || 0) : 0,
+      gasCanPlacementRejectedUnsafe: isFuelRunRaceType(summary.raceTypeId) ? (run.gasCanPlacementRejectedUnsafe || 0) : 0,
+      gasCanPlacementSkippedNoFairRoute: isFuelRunRaceType(summary.raceTypeId) ? (run.gasCanPlacementSkippedNoFairRoute || 0) : 0,
+      gasCanRouteSafetyFailures: isFuelRunRaceType(summary.raceTypeId) ? (run.gasCanRouteSafetyFailures || 0) : 0,
+      gasCanNearestBlockerDistanceMin: isFuelRunRaceType(summary.raceTypeId) && Number.isFinite(run.gasCanNearestBlockerDistanceMin) ? run.gasCanNearestBlockerDistanceMin : null,
       fuelRemaining: summary.fuelRemaining,
       fuelSavedByBoost: isFuelRunRaceType(summary.raceTypeId) ? (run.fuelSavedByBoost || 0) : 0,
       fuelDrainPausedTime: isFuelRunRaceType(summary.raceTypeId) ? (run.fuelDrainPausedTime || 0) : 0,
@@ -18405,6 +18532,11 @@ class NeonRoadRally {
       gasCanSpawnRejected: isFuelRunRaceType(run.raceTypeId) ? (run.gasCanSpawnRejected || 0) : 0,
       gasCanSpawnRepositioned: isFuelRunRaceType(run.raceTypeId) ? (run.gasCanSpawnRepositioned || 0) : 0,
       gasCanReachabilityFailuresPrevented: isFuelRunRaceType(run.raceTypeId) ? (run.gasCanReachabilityFailuresPrevented || 0) : 0,
+      gasCanPlacementAttempts: isFuelRunRaceType(run.raceTypeId) ? (run.gasCanPlacementAttempts || 0) : 0,
+      gasCanPlacementRejectedUnsafe: isFuelRunRaceType(run.raceTypeId) ? (run.gasCanPlacementRejectedUnsafe || 0) : 0,
+      gasCanPlacementSkippedNoFairRoute: isFuelRunRaceType(run.raceTypeId) ? (run.gasCanPlacementSkippedNoFairRoute || 0) : 0,
+      gasCanRouteSafetyFailures: isFuelRunRaceType(run.raceTypeId) ? (run.gasCanRouteSafetyFailures || 0) : 0,
+      gasCanNearestBlockerDistanceMin: isFuelRunRaceType(run.raceTypeId) && Number.isFinite(run.gasCanNearestBlockerDistanceMin) ? run.gasCanNearestBlockerDistanceMin : null,
       fuelRemaining: isFuelRunRaceType(run.raceTypeId) ? Math.max(0, Math.round(run.fuel || 0)) : 0,
       lowestFuelReached: isFuelRunRaceType(run.raceTypeId) ? (run.lowestFuelReached || 0) : 0,
       fuelSavedByBoost: isFuelRunRaceType(run.raceTypeId) ? (run.fuelSavedByBoost || 0) : 0,
@@ -18999,6 +19131,11 @@ class NeonRoadRally {
     let gasCanSpawnRejected = 0;
     let gasCanSpawnRepositioned = 0;
     let gasCanReachabilityFailuresPrevented = 0;
+    let gasCanPlacementAttempts = 0;
+    let gasCanPlacementRejectedUnsafe = 0;
+    let gasCanPlacementSkippedNoFairRoute = 0;
+    let gasCanRouteSafetyFailures = 0;
+    let gasCanNearestBlockerDistanceMin = Infinity;
     let longestNoFuelStretch = 0;
     let simulatedOutOfFuelRuns = 0;
     let ignoringGasOutOfFuelRuns = 0;
@@ -19412,6 +19549,11 @@ class NeonRoadRally {
         gasCanSpawnRejected: 0,
         gasCanSpawnRepositioned: 0,
         gasCanReachabilityFailuresPrevented: 0,
+        gasCanPlacementAttempts: 0,
+        gasCanPlacementRejectedUnsafe: 0,
+        gasCanPlacementSkippedNoFairRoute: 0,
+        gasCanRouteSafetyFailures: 0,
+        gasCanNearestBlockerDistanceMin: Infinity,
         longestNoFuelStretch: 0,
         simulatedOutOfFuelRuns: 0,
         ignoringGasOutOfFuelRuns: 0,
@@ -19651,12 +19793,26 @@ class NeonRoadRally {
           gasCanSpawnRejected += simRun.gasCanSpawnRejected || 0;
           gasCanSpawnRepositioned += simRun.gasCanSpawnRepositioned || 0;
           gasCanReachabilityFailuresPrevented += simRun.gasCanReachabilityFailuresPrevented || 0;
+          gasCanPlacementAttempts += simRun.gasCanPlacementAttempts || 0;
+          gasCanPlacementRejectedUnsafe += simRun.gasCanPlacementRejectedUnsafe || 0;
+          gasCanPlacementSkippedNoFairRoute += simRun.gasCanPlacementSkippedNoFairRoute || 0;
+          gasCanRouteSafetyFailures += simRun.gasCanRouteSafetyFailures || 0;
+          if (Number.isFinite(simRun.gasCanNearestBlockerDistanceMin)) {
+            gasCanNearestBlockerDistanceMin = Math.min(gasCanNearestBlockerDistanceMin, simRun.gasCanNearestBlockerDistanceMin);
+          }
           longestNoFuelStretch = Math.max(longestNoFuelStretch, simRun.longestNoFuelStretchSeconds || maxGasGap);
           perSpeedClass[speedClassId].gasCansSpawnedSum += gasSpawned;
           perSpeedClass[speedClassId].gasCanMaxGapSum += maxGasGap;
           perSpeedClass[speedClassId].gasCanSpawnRejected += simRun.gasCanSpawnRejected || 0;
           perSpeedClass[speedClassId].gasCanSpawnRepositioned += simRun.gasCanSpawnRepositioned || 0;
           perSpeedClass[speedClassId].gasCanReachabilityFailuresPrevented += simRun.gasCanReachabilityFailuresPrevented || 0;
+          perSpeedClass[speedClassId].gasCanPlacementAttempts += simRun.gasCanPlacementAttempts || 0;
+          perSpeedClass[speedClassId].gasCanPlacementRejectedUnsafe += simRun.gasCanPlacementRejectedUnsafe || 0;
+          perSpeedClass[speedClassId].gasCanPlacementSkippedNoFairRoute += simRun.gasCanPlacementSkippedNoFairRoute || 0;
+          perSpeedClass[speedClassId].gasCanRouteSafetyFailures += simRun.gasCanRouteSafetyFailures || 0;
+          if (Number.isFinite(simRun.gasCanNearestBlockerDistanceMin)) {
+            perSpeedClass[speedClassId].gasCanNearestBlockerDistanceMin = Math.min(perSpeedClass[speedClassId].gasCanNearestBlockerDistanceMin, simRun.gasCanNearestBlockerDistanceMin);
+          }
           perSpeedClass[speedClassId].longestNoFuelStretch = Math.max(perSpeedClass[speedClassId].longestNoFuelStretch, simRun.longestNoFuelStretchSeconds || maxGasGap);
           if (simRun.simOutOfFuel) {
             simulatedOutOfFuelRuns += 1;
@@ -19710,6 +19866,7 @@ class NeonRoadRally {
       item.minSameLaneSpacing = Number.isFinite(item.minSameLaneSpacing) ? item.minSameLaneSpacing : null;
       item.averageGasCansSpawned = fuelRun ? item.gasCansSpawnedSum / Math.max(1, runsPerSpeedClass) : 0;
       item.averageMaxTimeBetweenGasCans = fuelRun ? item.gasCanMaxGapSum / Math.max(1, runsPerSpeedClass) : null;
+      item.gasCanNearestBlockerDistanceMin = Number.isFinite(item.gasCanNearestBlockerDistanceMin) ? item.gasCanNearestBlockerDistanceMin : null;
       item.simulatedOutOfFuelRisk = fuelRun ? item.simulatedOutOfFuelRuns / Math.max(1, runsPerSpeedClass) : 0;
       item.ignoringGasOutOfFuelRisk = fuelRun ? item.ignoringGasOutOfFuelRuns / Math.max(1, runsPerSpeedClass) : 0;
       item.averagePursuitHeatMax = pursuitRun ? item.pursuitHeatMaxSum / Math.max(1, runsPerSpeedClass) : 0;
@@ -19956,6 +20113,11 @@ class NeonRoadRally {
       gasCanSpawnRejected,
       gasCanSpawnRepositioned,
       gasCanReachabilityFailuresPrevented,
+      gasCanPlacementAttempts,
+      gasCanPlacementRejectedUnsafe,
+      gasCanPlacementSkippedNoFairRoute,
+      gasCanRouteSafetyFailures,
+      gasCanNearestBlockerDistanceMin: Number.isFinite(gasCanNearestBlockerDistanceMin) ? gasCanNearestBlockerDistanceMin : null,
       longestNoFuelStretch,
       fuelOpportunitiesBySection,
       simulatedOutOfFuelRisk: fuelRun ? simulatedOutOfFuelRuns / Math.max(1, runs) : 0,
@@ -21058,6 +21220,9 @@ class NeonRoadRally {
     const totalFuelSavedByBoost = fuelRuns.reduce((sum, run) => sum + (Number(run.fuelSavedByBoost) || 0), 0);
     const totalFuelDrainPausedTime = fuelRuns.reduce((sum, run) => sum + (Number(run.fuelDrainPausedTime) || 0), 0);
     const totalBoostsUsedInFuelRun = fuelRuns.reduce((sum, run) => sum + (Number(run.boostsUsedInFuelRun) || 0), 0);
+    const gasCanNearestBlockerDistances = fuelRuns
+      .map((run) => normalizeOptionalFiniteNumber(run.gasCanNearestBlockerDistanceMin, 0, 999999))
+      .filter((value) => value !== null);
     const pursuitBonuses = pursuitRuns.reduce((sum, run) => {
       const bonuses = run.pursuitBonuses || {};
       return sum
@@ -21189,6 +21354,11 @@ class NeonRoadRally {
         gasCanSpawnRejected: fuelRuns.reduce((sum, run) => sum + (Number(run.gasCanSpawnRejected) || 0), 0),
         gasCanSpawnRepositioned: fuelRuns.reduce((sum, run) => sum + (Number(run.gasCanSpawnRepositioned) || 0), 0),
         gasCanReachabilityFailuresPrevented: fuelRuns.reduce((sum, run) => sum + (Number(run.gasCanReachabilityFailuresPrevented) || 0), 0),
+        gasCanPlacementAttempts: fuelRuns.reduce((sum, run) => sum + (Number(run.gasCanPlacementAttempts) || 0), 0),
+        gasCanPlacementRejectedUnsafe: fuelRuns.reduce((sum, run) => sum + (Number(run.gasCanPlacementRejectedUnsafe) || 0), 0),
+        gasCanPlacementSkippedNoFairRoute: fuelRuns.reduce((sum, run) => sum + (Number(run.gasCanPlacementSkippedNoFairRoute) || 0), 0),
+        gasCanRouteSafetyFailures: fuelRuns.reduce((sum, run) => sum + (Number(run.gasCanRouteSafetyFailures) || 0), 0),
+        gasCanNearestBlockerDistanceMin: gasCanNearestBlockerDistances.length ? Math.min(...gasCanNearestBlockerDistances) : null,
         averageLowestFuelReached: this.averagePlaytestField(fuelRuns, "lowestFuelReached"),
         averageLowFuelTime: this.averagePlaytestField(fuelRuns, "lowFuelTime"),
         averageCriticalFuelTime: this.averagePlaytestField(fuelRuns, "criticalFuelTime"),
@@ -21998,7 +22168,7 @@ class NeonRoadRally {
           <div class="score-card"><strong>Fuel Saved By Boost</strong><span>${this.formatPlaytestDecimal(aggregate.fuelSummary.totalFuelSavedByBoost)} fuel</span></div>
           <div class="score-card"><strong>Fuel Pause Time</strong><span>${this.formatPlaytestDecimal(aggregate.fuelSummary.totalFuelDrainPausedTime)}s</span></div>
           <div class="score-card"><strong>Fuel Boost Uses</strong><span>${aggregate.fuelSummary.totalBoostsUsedInFuelRun}</span></div>
-          <div class="score-card"><strong>Fuel Route Fixes</strong><span>${aggregate.fuelSummary.gasCanReachabilityFailuresPrevented}</span></div>
+          <div class="score-card"><strong>Fuel Route Fixes</strong><span>${aggregate.fuelSummary.gasCanRouteSafetyFailures} safety / ${aggregate.fuelSummary.gasCanPlacementSkippedNoFairRoute} skipped</span></div>
           <div class="score-card"><strong>Pursuit Runs</strong><span>${aggregate.pursuitSummary.runs}</span></div>
           <div class="score-card"><strong>Pursuit Escapes</strong><span>${aggregate.pursuitSummary.escaped}/${aggregate.pursuitSummary.runs}</span></div>
           <div class="score-card"><strong>Avg Pursuit Heat</strong><span>${this.formatPlaytestDecimal(aggregate.pursuitSummary.averageHeatAtEnd)} / max ${this.formatPlaytestDecimal(aggregate.pursuitSummary.averageHeatMax)}</span></div>
@@ -22042,7 +22212,7 @@ class NeonRoadRally {
           </section>
         </div>
         <div class="score-grid playtest-detail-grid">
-            <div class="score-card"><strong>Fuel Runs</strong><span class="is-compact">${aggregate.fuelSummary.runs} runs · ${this.formatPlaytestDecimal(aggregate.fuelSummary.averageGasCansSpawned)} gas spawned · route fixes ${aggregate.fuelSummary.gasCanReachabilityFailuresPrevented} · repositioned ${aggregate.fuelSummary.gasCanSpawnRepositioned} · ${formatTime(aggregate.fuelSummary.averageLowFuelTime)} low fuel · ${formatTime(aggregate.fuelSummary.averageCriticalFuelTime)} critical</span></div>
+            <div class="score-card"><strong>Fuel Runs</strong><span class="is-compact">${aggregate.fuelSummary.runs} runs · ${this.formatPlaytestDecimal(aggregate.fuelSummary.averageGasCansSpawned)} gas spawned · attempts ${aggregate.fuelSummary.gasCanPlacementAttempts} · unsafe ${aggregate.fuelSummary.gasCanPlacementRejectedUnsafe} · skipped ${aggregate.fuelSummary.gasCanPlacementSkippedNoFairRoute} · nearest blocker ${aggregate.fuelSummary.gasCanNearestBlockerDistanceMin === null ? "n/a" : `${Math.round(aggregate.fuelSummary.gasCanNearestBlockerDistanceMin)}`}</span></div>
             <div class="score-card"><strong>Pacing Summary</strong><span class="is-compact">${finishStats.count} finishes · section avg ${this.formatPlaytestDecimal(aggregate.averageSectionDuration, 1)}s · pace feedback avg ${this.formatPlaytestDecimal(aggregate.averagePaceFeedbackActiveTime, 1)}s · PB delta samples ${aggregate.personalBestTimeDeltaStats.count}</span></div>
             <div class="score-card"><strong>Director Variety</strong><span class="is-compact">intents ${escapeHtml(directorIntentText)} · families ${escapeHtml(waveFamilyText)}</span></div>
             <div class="score-card"><strong>Pursuit Summary</strong><span class="is-compact">${aggregate.pursuitSummary.escaped} escaped · ${aggregate.pursuitSummary.busted} busted · heat critical ${formatTime(aggregate.pursuitSummary.averageHeatCriticalTime)} avg · rising ${formatTime(aggregate.pursuitSummary.averageHeatRisingTime)} · dropping ${formatTime(aggregate.pursuitSummary.averageHeatDroppingTime)} · bonuses ${formatScore(aggregate.pursuitSummary.totalPursuitBonuses)}</span></div>

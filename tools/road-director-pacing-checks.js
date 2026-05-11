@@ -218,9 +218,78 @@ async function main() {
     const blockedGasResult = fuelRegressionManager.canSpawnObstacle(blockedGasCan, blockedFuelRoute);
     assert(!blockedGasResult.canSpawn, "LANE-57517-style blocker cluster should reject impossible gas can");
     assert(blockedGasResult.gasCanReachabilityFailure, "Rejected gas can should be tagged as a reachability prevention");
+    assert(blockedGasResult.gasCanRouteSafetyFailure, "Rejected gas can should be tagged as a route-safety failure");
     const reachableGasCan = fuelRegressionManager.createObstacle("gasCan", 0, 1500, { waveType: "LANE-57517" });
     const reachableGasResult = fuelRegressionManager.canSpawnObstacle(reachableGasCan, []);
     assert(reachableGasResult.canSpawn, "Gas can with a clear side route should remain spawnable");
+    const nearFutureHard = [
+      fuelRegressionManager.createObstacle("slowCar", 2, 1760, { waveType: "fuel-exit-check" })
+    ];
+    const noEscapeGasCan = fuelRegressionManager.createObstacle("gasCan", 2, 1500, { waveType: "fuel-exit-check" });
+    const noEscapeResult = fuelRegressionManager.canSpawnObstacle(noEscapeGasCan, nearFutureHard);
+    assert(!noEscapeResult.canSpawn, "Gas can should reject a near-future hard blocker in the pickup lane");
+    const escapableFutureHard = [
+      fuelRegressionManager.createObstacle("slowCar", 2, 2350, { waveType: "fuel-exit-check" })
+    ];
+    const escapableGasCan = fuelRegressionManager.createObstacle("gasCan", 2, 1500, { waveType: "fuel-exit-check" });
+    const escapableResult = fuelRegressionManager.canSpawnObstacle(escapableGasCan, escapableFutureHard);
+    assert(escapableResult.canSpawn, "Gas can should allow a distant same-lane blocker once spacing and exits are clear");
+    const blockedExitRoute = [
+      fuelRegressionManager.createObstacle("slowCar", 1, 1660, { waveType: "fuel-exit-check" }),
+      fuelRegressionManager.createObstacle("slowCar", 2, 2100, { waveType: "fuel-exit-check" }),
+      fuelRegressionManager.createObstacle("truck", 3, 1660, { waveType: "fuel-exit-check" })
+    ];
+    const blockedExitGasCan = fuelRegressionManager.createObstacle("gasCan", 2, 1500, { waveType: "fuel-exit-check" });
+    const blockedExitResult = fuelRegressionManager.canSpawnObstacle(blockedExitGasCan, blockedExitRoute);
+    assert(!blockedExitResult.canSpawn, "Gas can should reject a route with no safe lane exit after pickup");
+    const rewardVisualConflict = [
+      fuelRegressionManager.createObstacle("boostPad", 3, 1600, { waveType: "fuel-readability-check" })
+    ];
+    const clutteredGasCan = fuelRegressionManager.createObstacle("gasCan", 2, 1500, { waveType: "fuel-readability-check" });
+    const clutteredGasResult = fuelRegressionManager.canSpawnObstacle(clutteredGasCan, rewardVisualConflict);
+    assert(!clutteredGasResult.canSpawn, "Gas can should keep visual spacing from nearby boost/ramp rewards");
+    const partyFuelRun = {
+      ...fuelRegressionRun,
+      partyMode: true,
+      partySeedLocked: true
+    };
+    const partyFuelManager = new ObstacleManager({
+      run: partyFuelRun,
+      renderer: app.renderer,
+      randomFloat: () => 0.5
+    });
+    partyFuelManager.reset(fuelTrack);
+    const partyBlockedGasResult = partyFuelManager.canSpawnObstacle(
+      partyFuelManager.createObstacle("gasCan", 3, 1500, { waveType: "party-fuel-safety" }),
+      blockedFuelRoute
+    );
+    assert(!partyBlockedGasResult.canSpawn, "Party Fuel Run should use the same gas-can route safety");
+    const denseFuelRun = {
+      ...fuelRegressionRun,
+      gasCanPlacementAttempts: 0,
+      gasCanPlacementRejectedUnsafe: 0,
+      gasCanPlacementSkippedNoFairRoute: 0,
+      gasCanRouteSafetyFailures: 0
+    };
+    const denseManager = new ObstacleManager({
+      run: denseFuelRun,
+      renderer: app.renderer,
+      randomFloat: () => 0.5
+    });
+    denseManager.reset(fuelTrack);
+    denseManager.obstacles = [0, 1, 2, 3, 4].map((lane) => denseManager.createObstacle("slowCar", lane, 1450 + lane * 8, { waveType: "dense-fuel-route" }));
+    const denseContext = {
+      run: denseFuelRun,
+      section: getTrackSection(fuelTrack, 0.2),
+      band: { id: "pressure" },
+      sectionProgress: 0.2,
+      pressureBudget: 4
+    };
+    const denseResult = denseManager.director.createWaveResult("fuelTrafficGate", denseContext);
+    const denseGasCan = denseManager.director.trySpawnFuelCan([2], 1500, denseContext, denseResult, "denseFuelRoute");
+    assert.strictEqual(denseGasCan, null, "High-density fuel route should skip instead of forcing an unfair gas can");
+    assert(denseFuelRun.gasCanPlacementAttempts >= LANES, "Skipped gas route should record alternate lane attempts");
+    assert.strictEqual(denseFuelRun.gasCanPlacementSkippedNoFairRoute, 1, "Skipped gas route should record no-fair-route telemetry");
     const lane57517Fuel = await app.runSpawnSafetySimulationCore({
       runs: 1,
       speedClassIds: ["arcade"],
@@ -322,14 +391,25 @@ async function main() {
       gasCansCollected: 3,
       gasCanSpawnRejected: 4,
       gasCanSpawnRepositioned: 1,
-      gasCanReachabilityFailuresPrevented: 2
+      gasCanReachabilityFailuresPrevented: 2,
+      gasCanPlacementAttempts: 8,
+      gasCanPlacementRejectedUnsafe: 4,
+      gasCanPlacementSkippedNoFairRoute: 1,
+      gasCanRouteSafetyFailures: 3,
+      gasCanNearestBlockerDistanceMin: 312
     });
     assert.strictEqual(fuelRoutePlaytest.gasCanReachabilityFailuresPrevented, 2, "Playtest rows should keep fuel reachability prevention counters");
+    assert.strictEqual(fuelRoutePlaytest.gasCanPlacementSkippedNoFairRoute, 1, "Playtest rows should keep fuel placement skip counters");
     app.playtestReports = { getRuns: () => [fuelRoutePlaytest] };
     const fuelAggregate = app.buildPlaytestReportAggregate("all");
     assert.strictEqual(fuelAggregate.fuelSummary.gasCanSpawnRejected, 4, "Playtest Report should aggregate rejected gas can spawn attempts");
     assert.strictEqual(fuelAggregate.fuelSummary.gasCanSpawnRepositioned, 1, "Playtest Report should aggregate repositioned gas cans");
     assert.strictEqual(fuelAggregate.fuelSummary.gasCanReachabilityFailuresPrevented, 2, "Playtest Report should aggregate prevented impossible gas cans");
+    assert.strictEqual(fuelAggregate.fuelSummary.gasCanPlacementAttempts, 8, "Playtest Report should aggregate gas can placement attempts");
+    assert.strictEqual(fuelAggregate.fuelSummary.gasCanPlacementRejectedUnsafe, 4, "Playtest Report should aggregate unsafe gas can placement rejects");
+    assert.strictEqual(fuelAggregate.fuelSummary.gasCanPlacementSkippedNoFairRoute, 1, "Playtest Report should aggregate skipped no-fair-route gas cans");
+    assert.strictEqual(fuelAggregate.fuelSummary.gasCanRouteSafetyFailures, 3, "Playtest Report should aggregate gas can route safety failures");
+    assert.strictEqual(fuelAggregate.fuelSummary.gasCanNearestBlockerDistanceMin, 312, "Playtest Report should keep closest gas-can blocker distance");
   })()
   `, context, { filename: "road-director-pacing-checks" });
 }
