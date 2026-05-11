@@ -2396,6 +2396,11 @@ button:disabled {
   font-weight: 800;
 }
 
+.result-best-moment {
+  border-left-color: rgba(255, 228, 94, 0.68);
+  margin-top: -4px;
+}
+
 .score-breakdown {
   display: grid;
   gap: 8px;

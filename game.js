@@ -2955,13 +2955,14 @@ const ARCADE_FEEL = {
   crashSparkMs: 420,
   bumpShake: 0.28,
   bumpFlashSeconds: 0.24,
-  boostBurstSeconds: 0.36,
-  boostFlashMs: 260,
-  boostStreakPunchMs: 420,
-  boostTrailPunchMs: 520,
-  rampLaunchPulseMs: 220,
-  rampLandingPulseMs: 320,
-  rampClearSparkMs: 420,
+  boostBurstSeconds: 0.48,
+  boostFlashMs: 360,
+  boostStreakPunchMs: 620,
+  boostTrailPunchMs: 720,
+  boostCalloutCooldownSeconds: 1.15,
+  rampLaunchPulseMs: 300,
+  rampLandingPulseMs: 430,
+  rampClearSparkMs: 520,
   finishFlashSeconds: 0.9,
   finishStripeMs: 760,
   nearMissPopupCooldown: 0.38,
@@ -2971,7 +2972,7 @@ const ARCADE_FEEL = {
   fuelSavedPopupCooldown: 1.1,
   floatingTextSeconds: 1.15,
   scoreTallyMs: 950,
-  highSpeedLineStartRatio: 0.45
+  highSpeedLineStartRatio: 0.38
 };
 
 const INPUT_CONFIG = {
@@ -6702,14 +6703,20 @@ class AudioManager {
     this.sfxLastPlayed = {};
     this.sfxActiveCounts = {};
     this.lastPlayedSfx = "none";
+    this.audioContext = null;
     this.sfxCooldowns = {
       menu: 100,
       countdownBeep: 120,
       go: 300,
       boost: 200,
+      boostPickup: 120,
       slowdown: 250,
       oil: 250,
       ramp: 220,
+      rampTakeoff: 180,
+      rampLanding: 180,
+      fuelPickup: 140,
+      pursuitPressure: 900,
       nearMiss: 300,
       warning: 1000,
       finish: 600,
@@ -6729,6 +6736,11 @@ class AudioManager {
       nearMiss: { path: "audio/near-miss.wav", audio: null, loaded: "untested" },
       oil: { path: "audio/oil.wav", audio: null, loaded: "untested" },
       ramp: { path: "audio/ramp.wav", audio: null, loaded: "untested" },
+      boostPickup: { audio: null, loaded: "generated", tone: { type: "sawtooth", frequency: 260, endFrequency: 720, duration: 0.18, gain: 0.34 } },
+      rampTakeoff: { audio: null, loaded: "generated", tone: { type: "triangle", frequency: 220, endFrequency: 520, duration: 0.2, gain: 0.26 } },
+      rampLanding: { audio: null, loaded: "generated", tone: { type: "square", frequency: 150, endFrequency: 92, duration: 0.16, gain: 0.2 } },
+      fuelPickup: { audio: null, loaded: "generated", tone: { type: "sine", frequency: 480, endFrequency: 760, duration: 0.16, gain: 0.22 } },
+      pursuitPressure: { audio: null, loaded: "generated", tone: { type: "sawtooth", frequency: 170, endFrequency: 130, duration: 0.26, gain: 0.18 } },
       countdownBeep: { path: "audio/countdown-beep.wav", audio: null, loaded: "untested" },
       go: { path: "audio/go.wav", audio: null, loaded: "untested" },
       newHighScore: { path: "audio/new-high-score.wav", audio: null, loaded: "untested" },
@@ -6781,6 +6793,7 @@ class AudioManager {
 
   preloadSfx() {
     Object.values(this.sfx).forEach((entry) => {
+      if (!entry.path) return;
       try {
         this.createAudio(entry, false);
       } catch (error) {
@@ -6919,6 +6932,12 @@ class AudioManager {
     const activeCount = this.sfxActiveCounts[key] || 0;
     const maxInstances = options.maxInstances ?? 3;
     if (activeCount >= maxInstances) return false;
+    if (entry.tone && !entry.path) {
+      this.sfxLastPlayed[key] = now;
+      this.sfxActiveCounts[key] = activeCount + 1;
+      this.lastPlayedSfx = key;
+      return this.playGeneratedSfx(key, entry, options);
+    }
     const source = this.createAudio(entry, false);
     if (entry.loaded === "missing") return false;
     let audio;
@@ -6951,6 +6970,48 @@ class AudioManager {
       });
     }
     return true;
+  }
+
+  playGeneratedSfx(key, entry, options = {}) {
+    const AudioContextClass = typeof window !== "undefined" && (window.AudioContext || window.webkitAudioContext);
+    if (!AudioContextClass) {
+      this.sfxActiveCounts[key] = Math.max(0, (this.sfxActiveCounts[key] || 1) - 1);
+      return false;
+    }
+    let context;
+    try {
+      context = this.audioContext || new AudioContextClass();
+      this.audioContext = context;
+      if (context.state === "suspended" && typeof context.resume === "function") {
+        context.resume().catch(() => {});
+      }
+      const tone = entry.tone || {};
+      const now = context.currentTime;
+      const duration = clampNumber(tone.duration, 0.05, 0.65, 0.16);
+      const oscillator = context.createOscillator();
+      const gain = context.createGain();
+      const volume = clampNumber(options.volume ?? this.sfxVolume, 0, 1, this.sfxVolume);
+      const startFrequency = Math.max(20, tone.frequency || 220);
+      const endFrequency = Math.max(20, tone.endFrequency || startFrequency);
+      oscillator.type = tone.type || "sine";
+      oscillator.frequency.setValueAtTime(startFrequency, now);
+      oscillator.frequency.exponentialRampToValueAtTime(endFrequency, now + duration);
+      gain.gain.setValueAtTime(0.0001, now);
+      gain.gain.exponentialRampToValueAtTime(Math.max(0.0001, volume * (tone.gain || 0.24)), now + 0.018);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + duration);
+      oscillator.connect(gain);
+      gain.connect(context.destination);
+      oscillator.start(now);
+      oscillator.stop(now + duration + 0.02);
+      oscillator.addEventListener("ended", () => {
+        this.sfxActiveCounts[key] = Math.max(0, (this.sfxActiveCounts[key] || 1) - 1);
+      }, { once: true });
+      return true;
+    } catch (error) {
+      this.sfxActiveCounts[key] = Math.max(0, (this.sfxActiveCounts[key] || 1) - 1);
+      entry.loaded = "missing";
+      return false;
+    }
   }
 
   setMusicMuted(value) {
@@ -10596,7 +10657,12 @@ class ObstacleManager {
     if (!run || run.paused || run.ended) return;
     if (ahead <= VIEW_DISTANCE + 40 && ahead > -120) {
       obstacle.sfxPlayed = true;
-      this.game.audio.playSfx("warning");
+      const pursuitPressure = obstacle.warningType === "roadblock" && isPursuitRaceType(run.raceTypeId);
+      this.game.audio.playSfx(pursuitPressure ? "pursuitPressure" : "warning", {
+        cooldownMs: pursuitPressure ? 900 : undefined,
+        maxInstances: 1,
+        volume: this.game.audio.sfxVolume * (pursuitPressure ? 0.78 : 1)
+      });
     }
   }
 
@@ -12768,16 +12834,19 @@ class CollisionSystem {
       run.rampsUsed += 1;
       this.game.launchJump(obstacle);
       this.game.addScoreEvent("ramp", 80);
-      this.game.audio.playSfx("ramp", {
+      this.game.audio.playSfx("rampTakeoff", {
         cooldownMs: 0,
         maxInstances: 1,
-        volume: this.game.audio.sfxVolume * 0.92
+        volume: this.game.audio.sfxVolume * 0.76
       });
       return;
     }
 
     if (obstacle.type === "boostPad") {
+      const chainContinues = (run.padBoostTimer || 0) > 0.12;
       run.boostPadsCollected += 1;
+      run.currentBoostPadChain = chainContinues ? Math.max(1, (run.currentBoostPadChain || 0) + 1) : 1;
+      run.bestBoostPadChain = Math.max(run.bestBoostPadChain || 0, run.currentBoostPadChain || 0);
       if (!obstacle.boostReachableRecorded) {
         obstacle.boostReachableRecorded = true;
         run.boostPadsReachableSeen = Math.max(0, (run.boostPadsReachableSeen || 0) + 1);
@@ -12785,9 +12854,22 @@ class CollisionSystem {
       run.estimatedBoostRouteQuality = getBoostRouteQuality(run.boostPadsCollected || 0, run.boostPadsMissedReachable || 0);
       run.padBoostTimer = Math.max(run.padBoostTimer, SPEED_TUNING.padBoostDuration);
       run.boostBurstTimer = Math.max(run.boostBurstTimer || 0, ARCADE_FEEL.boostBurstSeconds);
-      run.screenShake = Math.max(run.screenShake || 0, 0.14);
+      run.boostFlashTimer = Math.max(run.boostFlashTimer || 0, ARCADE_FEEL.boostFlashMs / 1000);
+      run.boostStreakPunchTimer = Math.max(run.boostStreakPunchTimer || 0, ARCADE_FEEL.boostStreakPunchMs / 1000);
+      run.boostTrailPunchTimer = Math.max(run.boostTrailPunchTimer || 0, ARCADE_FEEL.boostTrailPunchMs / 1000);
+      run.screenShake = Math.max(run.screenShake || 0, 0.24);
+      const now = Number.isFinite(run.elapsed) ? run.elapsed : 0;
+      if (now - (run.lastBoostCalloutAt || -Infinity) >= ARCADE_FEEL.boostCalloutCooldownSeconds) {
+        const perfectRoute = (run.bestBoostPadChain || 0) >= 3 && (run.boostPadsMissedReachable || 0) === 0;
+        this.game.showRaceStateCallout(perfectRoute ? "PERFECT ROUTE" : "BOOST", "good", perfectRoute ? 1.2 : 0.9, { replace: true });
+        run.lastBoostCalloutAt = now;
+      }
       this.game.addScoreEvent("boostPad", 400);
-      this.game.audio.playSfx("boost");
+      this.game.audio.playSfx("boostPickup", {
+        cooldownMs: 0,
+        maxInstances: 2,
+        volume: this.game.audio.sfxVolume * 0.92
+      });
       return;
     }
 
@@ -13134,8 +13216,9 @@ class Renderer {
     const h = this.height;
     const w = this.width;
     const visualIntensity = this.getRaceVisualIntensity();
+    const speedFeel = this.getSpeedFeelIntensity();
     const theme = this.getCurrentTrackVisualTheme();
-    const glowStrength = clamp(TRACK_VISUALS.horizonGlowStrength * clamp(visualIntensity, 0.78, 1.28), 0.45, 1);
+    const glowStrength = clamp(TRACK_VISUALS.horizonGlowStrength * clamp(visualIntensity + speedFeel * 0.16, 0.78, 1.38), 0.45, 1.08);
     const sky = ctx.createLinearGradient(0, 0, 0, h);
     sky.addColorStop(0, theme.skyTop || "#100c2b");
     sky.addColorStop(0.26, theme.skyMid || "#2c0d46");
@@ -13177,7 +13260,7 @@ class Renderer {
     if (theme.citySkyline) this.drawTrackCitySkyline(horizonY, theme);
 
     ctx.save();
-    ctx.globalAlpha = 0.24;
+    ctx.globalAlpha = 0.2 + speedFeel * 0.1;
     ctx.strokeStyle = "#28f6ff";
     ctx.lineWidth = 1;
     const gridY = horizonY + 12;
@@ -13280,6 +13363,37 @@ class Renderer {
     return clamp(run.currentSpeed / Math.max(1, run.track.maxSpeed), 0, 1.18);
   }
 
+  getSpeedClassVisualFactor() {
+    const run = this.game.run;
+    if (!run?.speedClassId) return 0.35;
+    return clamp(getSpeedClassRank(run.speedClassId) / Math.max(1, SPEED_CLASS_ORDER.length - 1), 0, 1);
+  }
+
+  getBoostVisualPunch() {
+    const run = this.game.run;
+    if (!run) return 0;
+    const boostPunchDuration = ARCADE_FEEL.boostStreakPunchMs / 1000;
+    const trailPunchDuration = ARCADE_FEEL.boostTrailPunchMs / 1000;
+    const boostPunch = boostPunchDuration > 0 ? clamp((run.boostStreakPunchTimer || 0) / boostPunchDuration, 0, 1) : 0;
+    const trailPunch = trailPunchDuration > 0 ? clamp((run.boostTrailPunchTimer || 0) / trailPunchDuration, 0, 1) : 0;
+    const activeBoost = (run.boostTimer > 0 ? 0.34 : 0) + (run.padBoostTimer > 0 ? 0.48 : 0);
+    return clamp(activeBoost + boostPunch * 0.28 + trailPunch * 0.18, 0, 1);
+  }
+
+  getSpeedFeelIntensity() {
+    const speed = this.getVisualSpeedRatio();
+    const speedClass = this.getSpeedClassVisualFactor();
+    const boostPunch = this.getBoostVisualPunch();
+    const finalStretch = this.getFinalStretchIntensity();
+    return clamp(speed * 0.62 + speedClass * 0.28 + boostPunch * 0.28 + finalStretch * 0.18, 0, 1.32);
+  }
+
+  getVisualMotionMultiplier() {
+    const speedFeel = this.getSpeedFeelIntensity();
+    const boostPunch = this.getBoostVisualPunch();
+    return 1 + speedFeel * 0.11 + boostPunch * 0.18;
+  }
+
   getCurrentTrackVisualTheme() {
     const run = this.game.run;
     const track = (this.game.screen === "game" || this.game.screen === "score")
@@ -13308,7 +13422,7 @@ class Renderer {
   drawRoadsideScenery(alpha = 1) {
     const ctx = this.ctx;
     const road = this.road;
-    const scrollSource = this.getVisualDistance();
+    const scrollSource = this.getVisualDistance() * this.getVisualMotionMultiplier();
     const speedRatio = this.getVisualSpeedRatio();
     const visualIntensity = this.getRaceVisualIntensity();
     const theme = this.getCurrentTrackVisualTheme();
@@ -13562,13 +13676,14 @@ class Renderer {
       ctx.translate((Math.random() - 0.5) * 18 * shake, (Math.random() - 0.5) * 14 * shake);
     }
     this.drawRoadsideScenery(1);
-      this.drawRoadBase(1);
-      this.drawStartLineIfVisible();
-      this.drawSpeedLines();
-      this.drawFinishLineIfVisible();
-      this.drawPursuitEscapeLaneGuides();
+    this.drawRoadBase(1);
+    this.drawStartLineIfVisible();
+    this.drawSpeedLines();
+    this.drawBoostRoadStreak();
+    this.drawFinishLineIfVisible();
+    this.drawPursuitEscapeLaneGuides();
 
-      const sorted = this.game.obstacles.obstacles.slice().sort((a, b) => b.distance - a.distance);
+    const sorted = this.game.obstacles.obstacles.slice().sort((a, b) => b.distance - a.distance);
     for (const obstacle of sorted) {
       const { x, y, scale } = this.getObstacleScreenPosition(obstacle);
       if (y < this.road.y - 110 || y > this.height + 170) continue;
@@ -13578,10 +13693,11 @@ class Renderer {
     this.drawBoostBurst();
     this.drawRampLaunchPulse();
     this.drawRampClearSpark();
-      this.drawRampLandingSpark();
-      this.drawNearMissSpark();
-      this.drawPursuitChasePresence();
-      this.drawPlayer();
+    this.drawRampLandingSpark();
+    this.drawActiveRampTargetCue();
+    this.drawNearMissSpark();
+    this.drawPursuitChasePresence();
+    this.drawPlayer();
     this.drawCrashSparks();
     this.drawBumpFlash();
     if (this.game.debugMode) this.drawHitboxOverlay();
@@ -13604,6 +13720,7 @@ class Renderer {
     const ctx = this.ctx;
     const road = this.road;
     const visualIntensity = this.getRaceVisualIntensity();
+    const speedFeel = this.getSpeedFeelIntensity();
     const theme = this.getCurrentTrackVisualTheme();
     ctx.save();
     ctx.globalAlpha = alpha;
@@ -13619,13 +13736,13 @@ class Renderer {
       }
     }
 
-    const scrollSource = this.getVisualDistance();
+    const scrollSource = this.getVisualDistance() * this.getVisualMotionMultiplier();
     this.drawRoadSurfaceDetails(scrollSource, alpha);
 
-    ctx.shadowBlur = 14 * visualIntensity;
+    ctx.shadowBlur = 14 * visualIntensity + speedFeel * 8;
     ctx.shadowColor = theme.edgeColor || "#28f6ff";
     ctx.strokeStyle = theme.edgeColor || "#28f6ff";
-    ctx.lineWidth = 4 + Math.max(0, visualIntensity - 1) * 1.5;
+    ctx.lineWidth = 4 + Math.max(0, visualIntensity - 1) * 1.5 + speedFeel * 0.9;
     ctx.beginPath();
     ctx.moveTo(road.x, road.y);
     ctx.lineTo(road.x, road.y + road.h);
@@ -13635,16 +13752,16 @@ class Renderer {
     this.drawRoadEdgeDetails(scrollSource, alpha);
     if (theme.tunnelPanels) this.drawTrackTunnelPanels(scrollSource, alpha, theme);
 
-    const dashHeight = 56;
-    const gap = 46;
+    const dashHeight = 56 + speedFeel * 8;
+    const gap = Math.max(38, 46 - speedFeel * 7);
     const scroll = (scrollSource * SPEED_TUNING.roadStripeScrollScale) % (dashHeight + gap);
-    const lanePulse = 0.94 + Math.sin(scrollSource * 0.018) * 0.06 * clamp((visualIntensity - 0.8) / 0.55, 0, 1);
-    ctx.globalAlpha = alpha * clamp(visualIntensity * lanePulse, 0.78, 1.24);
+    const lanePulse = 0.94 + Math.sin(scrollSource * 0.018) * 0.06 * clamp((visualIntensity + speedFeel * 0.4 - 0.8) / 0.55, 0, 1);
+    ctx.globalAlpha = alpha * clamp((visualIntensity + speedFeel * 0.18) * lanePulse, 0.78, 1.32);
     for (let lane = 1; lane < LANES; lane += 1) {
       const x = road.x + lane * road.laneW;
       ctx.shadowColor = lane % 2 ? (theme.laneSecondary || "#ff3fd1") : (theme.lanePrimary || "#ffe45e");
       ctx.strokeStyle = lane % 2 ? (theme.laneSecondary || "#ff3fd1") : (theme.lanePrimary || "#ffe45e");
-      ctx.lineWidth = theme.sharpLaneMarkers ? 3.8 : 3;
+      ctx.lineWidth = (theme.sharpLaneMarkers ? 3.8 : 3) + speedFeel * 0.45;
       for (let y = road.y - dashHeight + scroll; y < road.y + road.h + dashHeight; y += dashHeight + gap) {
         ctx.beginPath();
         ctx.moveTo(x, y);
@@ -13669,8 +13786,9 @@ class Renderer {
     const ctx = this.ctx;
     const road = this.road;
     const visualIntensity = this.getRaceVisualIntensity();
+    const speedFeel = this.getSpeedFeelIntensity();
     const theme = this.getCurrentTrackVisualTheme();
-    const intensity = TRACK_VISUALS.roadDetailIntensity * clampNumber(theme.roadDetailIntensity, 0.2, 1.4, 1) * alpha * clamp(visualIntensity, 0.78, 1.18);
+    const intensity = TRACK_VISUALS.roadDetailIntensity * clampNumber(theme.roadDetailIntensity, 0.2, 1.4, 1) * alpha * clamp(visualIntensity + speedFeel * 0.16, 0.78, 1.28);
     const bandSpacing = TRACK_VISUALS.asphaltBandSpacing;
     const seamSpacing = TRACK_VISUALS.roadSeamSpacing;
     const bandScroll = (scrollSource * 0.28) % bandSpacing;
@@ -13697,7 +13815,7 @@ class Renderer {
       ctx.stroke();
     }
 
-    ctx.globalAlpha = intensity * (0.18 + speedRatio * 0.14);
+    ctx.globalAlpha = intensity * (0.18 + speedRatio * 0.14 + speedFeel * 0.08);
     for (let lane = 0; lane < LANES; lane += 1) {
       const x = road.x + lane * road.laneW;
       const laneGlow = ctx.createLinearGradient(x, 0, x + road.laneW, 0);
@@ -13715,19 +13833,20 @@ class Renderer {
     const road = this.road;
     const speedRatio = this.getVisualSpeedRatio();
     const visualIntensity = this.getRaceVisualIntensity();
+    const speedFeel = this.getSpeedFeelIntensity();
     const theme = this.getCurrentTrackVisualTheme();
     const lightSpacing = TRACK_VISUALS.edgeLightSpacing;
     const reflectorSpacing = TRACK_VISUALS.reflectorSpacing;
-    const lightScroll = (scrollSource * (0.72 + speedRatio * 0.42) * clamp(visualIntensity, 0.92, 1.12)) % lightSpacing;
-    const reflectorScroll = (scrollSource * 0.58) % reflectorSpacing;
+    const lightScroll = (scrollSource * (0.72 + speedRatio * 0.42 + speedFeel * 0.16) * clamp(visualIntensity, 0.92, 1.12)) % lightSpacing;
+    const reflectorScroll = (scrollSource * (0.58 + speedFeel * 0.1)) % reflectorSpacing;
 
     ctx.save();
-    ctx.globalAlpha = alpha * 0.85 * clamp(visualIntensity, 0.78, 1.18);
+    ctx.globalAlpha = alpha * clamp(0.72 + speedFeel * 0.26, 0.72, 1) * clamp(visualIntensity, 0.78, 1.22);
     for (let y = road.y - lightSpacing + lightScroll; y < road.y + road.h + lightSpacing; y += lightSpacing) {
       const t = clamp((y - road.y) / Math.max(1, road.h), 0, 1);
       const size = lerp(3, 7, t);
       const color = Math.floor(y / lightSpacing) % 2 ? (theme.edgeAltColor || "#ff3fd1") : (theme.edgeColor || "#28f6ff");
-      ctx.shadowBlur = 12 * visualIntensity;
+      ctx.shadowBlur = 12 * visualIntensity + speedFeel * 8;
       ctx.shadowColor = color;
       ctx.fillStyle = color;
       ctx.fillRect(road.x - 14, y, size, size * 2.3);
@@ -13735,7 +13854,7 @@ class Renderer {
     }
 
     ctx.shadowBlur = 0;
-    ctx.globalAlpha = alpha * 0.42;
+    ctx.globalAlpha = alpha * (0.36 + speedFeel * 0.18);
     ctx.fillStyle = theme.reflectorColor || "#ffe45e";
     for (let y = road.y - reflectorSpacing + reflectorScroll; y < road.y + road.h + reflectorSpacing; y += reflectorSpacing) {
       ctx.fillRect(road.x + 10, y, 5, 16);
@@ -13894,6 +14013,7 @@ class Renderer {
     } else if (obstacle.type === "oil") {
       drawOilSlick(ctx, x, y, drawScale);
     } else if (obstacle.type === "ramp") {
+      this.drawRampApproachGuide(ctx, obstacle, x, y, visual.w, visual.h, scale);
       drawRamp(ctx, x, y, drawScale);
     } else if (obstacle.type === "boostPad") {
       drawBoostPad(ctx, x, y, drawScale);
@@ -13955,6 +14075,43 @@ class Renderer {
     ctx.restore();
   }
 
+  drawRampApproachGuide(ctx, obstacle, x, y, width, height, scale) {
+    if (!obstacle || obstacle.hit || obstacle.remove || y < this.road.y - 70 || y > this.height + 120) return;
+    const depth = clamp((y - this.road.y) / Math.max(1, this.road.h), 0, 1);
+    const alpha = clamp(0.14 + depth * 0.28, 0.14, 0.42);
+    const laneW = this.road.laneW;
+    ctx.save();
+    ctx.globalCompositeOperation = "lighter";
+    ctx.globalAlpha = alpha;
+    ctx.strokeStyle = "#ffe45e";
+    ctx.fillStyle = "rgba(255, 228, 94, 0.18)";
+    ctx.shadowBlur = 14 * scale;
+    ctx.shadowColor = "#ffe45e";
+    for (let i = 0; i < 3; i += 1) {
+      const chevronY = y + height * 0.34 + i * laneW * 0.24;
+      if (chevronY > this.height + 50) continue;
+      const chevronW = width * lerp(0.58, 0.92, i / 2);
+      const chevronH = Math.max(8, height * 0.14);
+      ctx.beginPath();
+      ctx.moveTo(x - chevronW * 0.42, chevronY + chevronH * 0.5);
+      ctx.lineTo(x, chevronY - chevronH * 0.42);
+      ctx.lineTo(x + chevronW * 0.42, chevronY + chevronH * 0.5);
+      ctx.stroke();
+    }
+    if (obstacle.solutionTargetDistance) {
+      const targetY = this.yForDistance(obstacle.solutionTargetDistance);
+      if (targetY > this.road.y - 50 && targetY < this.height + 80) {
+        ctx.globalAlpha = alpha * 0.78;
+        ctx.strokeStyle = "#44ff99";
+        ctx.shadowColor = "#44ff99";
+        ctx.beginPath();
+        ctx.ellipse(x, targetY, laneW * 0.3, Math.max(7, 12 * scale), 0, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+    }
+    ctx.restore();
+  }
+
   drawPlayer() {
     const run = this.game.run;
     const x = this.laneCenter(run.renderLaneFloat);
@@ -13968,7 +14125,7 @@ class Renderer {
       airborne: run.airborne,
       airborneLift: run.jumpOffset || 0,
       landingPulse,
-      boostTrailIntensity: run.boostTimer > 0 ? 0.74 + boostTrailPunch * 0.38 : (run.padBoostTimer > 0 ? 0.58 : 0),
+      boostTrailIntensity: run.boostTimer > 0 ? 0.92 + boostTrailPunch * 0.46 : (run.padBoostTimer > 0 ? 0.84 + boostTrailPunch * 0.42 : 0),
       laneWidth: this.road.laneW,
       laneChanging: Math.abs(run.renderLaneFloat - run.targetLane) > 0.02,
       laneDelta: run.targetLane - run.renderLaneFloat,
@@ -14106,21 +14263,24 @@ class Renderer {
     if (!(boosting || highSpeed || sectionEnergy)) return;
     const ctx = this.ctx;
     const speedRatio = this.getVisualSpeedRatio();
+    const speedFeel = this.getSpeedFeelIntensity();
+    const speedClass = this.getSpeedClassVisualFactor();
     const finalStretch = this.getFinalStretchIntensity();
     const theme = this.getCurrentTrackVisualTheme();
     const boostPunchDuration = ARCADE_FEEL.boostStreakPunchMs / 1000;
     const boostPunch = boostPunchDuration > 0 ? clamp((run.boostStreakPunchTimer || 0) / boostPunchDuration, 0, 1) : 0;
-    const intensity = (run.boostTimer > 0 ? 0.42 : (run.padBoostTimer > 0 ? 0.32 : (sectionEnergy ? 0.14 : 0.18)))
+    const intensity = (run.boostTimer > 0 ? 0.5 : (run.padBoostTimer > 0 ? 0.45 : (sectionEnergy ? 0.16 : 0.2)))
       * TRACK_VISUALS.speedStreakIntensity
       * clampNumber(theme.speedStreakIntensity, 0.4, 1.8, 1)
       * (1 + finalStretch * 0.25)
       * clamp(visualIntensity, 0.8, 1.35)
-      * (1 + boostPunch * 0.55);
-    const lineCount = Math.round((run.boostTimer > 0 ? 34 : (run.padBoostTimer > 0 ? 24 : (sectionEnergy ? 18 : 16))) * (0.85 + speedRatio * 0.35) * clamp(visualIntensity, 0.92, 1.18) * (1 + boostPunch * 0.38));
+      * (1 + boostPunch * 0.7)
+      * (0.9 + speedFeel * 0.22 + speedClass * 0.14);
+    const lineCount = Math.round((run.boostTimer > 0 ? 42 : (run.padBoostTimer > 0 ? 34 : (sectionEnergy ? 22 : 18))) * (0.85 + speedRatio * 0.42 + speedClass * 0.16) * clamp(visualIntensity, 0.92, 1.18) * (1 + boostPunch * 0.48));
     ctx.save();
-    ctx.globalAlpha = intensity;
+    ctx.globalAlpha = clamp(intensity, 0, 0.82);
     ctx.strokeStyle = boosting ? (theme.boostStreakColor || "#28f6ff") : (theme.speedStreakColor || "#f6fbff");
-    ctx.lineWidth = boosting ? 2.5 + boostPunch * 1.2 : 1.5;
+    ctx.lineWidth = boosting ? 2.9 + boostPunch * 1.6 : 1.4 + speedClass * 0.5;
     for (let i = 0; i < lineCount; i += 1) {
       const side = i % 2 === 0 ? -1 : 1;
       const edgeInset = this.road.laneW * (i % 4 === 0 ? 0.16 : 0.34);
@@ -14128,10 +14288,47 @@ class Renderer {
       const outsideOffset = i % 5 === 0 ? side * (18 + Math.random() * 28) : 0;
       const x = edgeX + outsideOffset + (Math.random() - 0.5) * 18;
       const y = this.road.y + Math.random() * this.road.h;
-      const length = (boosting ? 102 : 64) + Math.random() * (boosting ? 114 : 64) + speedRatio * 42;
+      const length = (boosting ? 128 : 72) + Math.random() * (boosting ? 142 : 72) + speedRatio * 48 + speedClass * 24;
       ctx.beginPath();
       ctx.moveTo(x, y);
       ctx.lineTo(x, y + length);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  drawBoostRoadStreak() {
+    const run = this.game.run;
+    const punch = this.getBoostVisualPunch();
+    if (!ARCADE_FEEL.enabled || punch <= 0.02 || this.game.screen !== "game") return;
+    const { x, y } = this.getPlayerFloatingAnchor();
+    const ctx = this.ctx;
+    const trailColor = getCarBoostTrailColor(run.player.car);
+    const width = this.road.laneW * lerp(0.52, 1.05, punch);
+    const tailY = Math.min(this.height + 40, y + lerp(132, 260, punch));
+    const headY = y + 18;
+    const gradient = ctx.createLinearGradient(0, headY, 0, tailY);
+    gradient.addColorStop(0, rgbaFromHex(trailColor, 0.28 * punch));
+    gradient.addColorStop(0.34, rgbaFromHex(trailColor, 0.18 * punch));
+    gradient.addColorStop(1, rgbaFromHex(trailColor, 0));
+    ctx.save();
+    ctx.globalCompositeOperation = "lighter";
+    ctx.fillStyle = gradient;
+    ctx.beginPath();
+    ctx.moveTo(x - width * 0.22, headY);
+    ctx.lineTo(x - width * 0.56, tailY);
+    ctx.lineTo(x + width * 0.56, tailY);
+    ctx.lineTo(x + width * 0.22, headY);
+    ctx.closePath();
+    ctx.fill();
+    ctx.globalAlpha = 0.28 * punch;
+    ctx.strokeStyle = "#f6fbff";
+    ctx.lineWidth = 2;
+    for (let i = 0; i < 3; i += 1) {
+      const offset = (i - 1) * width * 0.22;
+      ctx.beginPath();
+      ctx.moveTo(x + offset, headY + i * 8);
+      ctx.lineTo(x + offset * 1.8, tailY - i * 18);
       ctx.stroke();
     }
     ctx.restore();
@@ -14141,7 +14338,7 @@ class Renderer {
     const run = this.game.run;
     if (!ARCADE_FEEL.enabled || run.boostBurstTimer <= 0) return;
     const progress = 1 - run.boostBurstTimer / ARCADE_FEEL.boostBurstSeconds;
-    const alpha = (1 - progress) * 0.72;
+    const alpha = (1 - progress) * 0.86;
     const { x, y } = this.getPlayerFloatingAnchor();
     const size = getPlayerCarDrawSize(run.player.car, {
       airborne: run.airborne,
@@ -14154,10 +14351,10 @@ class Renderer {
     const ctx = this.ctx;
     ctx.save();
     ctx.globalAlpha = alpha;
-    ctx.shadowBlur = 24;
+    ctx.shadowBlur = 30;
     ctx.shadowColor = burstColor;
     ctx.strokeStyle = burstColor;
-    ctx.lineWidth = 3;
+    ctx.lineWidth = 4;
     ctx.beginPath();
     ctx.ellipse(x, rearY, burstW, burstH, 0, 0, Math.PI * 2);
     ctx.stroke();
@@ -14177,19 +14374,19 @@ class Renderer {
     const duration = ARCADE_FEEL.boostFlashMs / 1000;
     if (!ARCADE_FEEL.enabled || duration <= 0 || run.boostFlashTimer <= 0) return;
     const progress = 1 - run.boostFlashTimer / duration;
-    const alpha = (1 - progress) * 0.2;
+    const alpha = (1 - progress) * 0.32;
     const { x, y } = this.getPlayerFloatingAnchor();
     const ctx = this.ctx;
     ctx.save();
     ctx.globalAlpha = alpha;
     ctx.strokeStyle = "#28f6ff";
-    ctx.lineWidth = 4;
-    ctx.shadowBlur = 24;
+    ctx.lineWidth = 5;
+    ctx.shadowBlur = 30;
     ctx.shadowColor = "#28f6ff";
     ctx.beginPath();
     ctx.ellipse(x, y, this.road.laneW * lerp(0.48, 1.05, progress), 44 + progress * 26, 0, 0, Math.PI * 2);
     ctx.stroke();
-    ctx.globalAlpha = alpha * 0.42;
+    ctx.globalAlpha = alpha * 0.36;
     ctx.fillStyle = "#28f6ff";
     ctx.fillRect(0, 0, this.width, this.height);
     ctx.restore();
@@ -14264,6 +14461,51 @@ class Renderer {
       const sx = x + side * (18 + i * 5) + (Math.random() - 0.5) * 5;
       const sy = y + 36 + Math.random() * 9;
       ctx.fillRect(sx, sy, 3, 3);
+    }
+    ctx.restore();
+  }
+
+  drawActiveRampTargetCue() {
+    const run = this.game.run;
+    const target = run?.activeRampTarget;
+    if (!ARCADE_FEEL.enabled || !target || !run.airborne) return;
+    const y = this.yForDistance(target.targetDistance);
+    if (y < this.road.y - 80 || y > this.height + 120) return;
+    const x = this.laneCenter(target.lane);
+    const lift = clamp((run.jumpOffset || 0) / 56, 0, 1);
+    const pulse = 0.5 + Math.sin((run.elapsed || 0) * 18) * 0.5;
+    const clear = Boolean(target.cleared);
+    const ctx = this.ctx;
+    ctx.save();
+    ctx.globalCompositeOperation = "lighter";
+    ctx.globalAlpha = clear ? 0.52 + pulse * 0.18 : 0.3 + lift * 0.24;
+    ctx.strokeStyle = clear ? "#44ff99" : "#ffe45e";
+    ctx.shadowColor = ctx.strokeStyle;
+    ctx.shadowBlur = clear ? 22 : 16;
+    ctx.lineWidth = clear ? 4 : 3;
+    const radiusX = this.road.laneW * (clear ? 0.42 : 0.34);
+    const radiusY = clear ? 18 : 13;
+    ctx.beginPath();
+    ctx.ellipse(x, y, radiusX, radiusY, 0, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.globalAlpha *= 0.75;
+    ctx.beginPath();
+    ctx.moveTo(x - radiusX * 0.58, y);
+    ctx.lineTo(x - radiusX * 0.24, y);
+    ctx.moveTo(x + radiusX * 0.24, y);
+    ctx.lineTo(x + radiusX * 0.58, y);
+    ctx.moveTo(x, y - radiusY * 1.35);
+    ctx.lineTo(x, y - radiusY * 0.45);
+    ctx.moveTo(x, y + radiusY * 0.45);
+    ctx.lineTo(x, y + radiusY * 1.35);
+    ctx.stroke();
+    if (clear) {
+      ctx.globalAlpha = 0.86;
+      ctx.fillStyle = "#f6fbff";
+      ctx.font = `900 ${Math.max(10, 12 * this.scaleForY(y))}px Trebuchet MS, Verdana, sans-serif`;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText("CLEAR", x, y - radiusY * 1.7, this.road.laneW * 0.82);
     }
     ctx.restore();
   }
@@ -15899,6 +16141,8 @@ function drawSpritePlayerCar(ctx, x, y, carConfig, state, sprite) {
   const laneTilt = clamp(state.laneDelta || 0, -1, 1) * 0.06;
   const landingPulse = clampNumber(state.landingPulse, 0, 1, 0);
   const airborneLift = Math.max(0, state.airborneLift || 0);
+  const liftRatio = clamp(airborneLift / 56, 0, 1);
+  const boostTrailStrength = clampNumber(state.boostTrailIntensity, 0.45, 1.55, 0.78);
 
   ctx.save();
   ctx.translate(x, y);
@@ -15906,10 +16150,10 @@ function drawSpritePlayerCar(ctx, x, y, carConfig, state, sprite) {
 
   if (state.airborne) {
     const shadowOffset = spriteBox.h * 0.32 + Math.min(spriteBox.h * 0.72, airborneLift * 0.82);
-    ctx.globalAlpha = 0.2;
+    ctx.globalAlpha = 0.28 - liftRatio * 0.13;
     ctx.fillStyle = "#000";
     ctx.beginPath();
-    ctx.ellipse(0, shadowOffset, spriteBox.w * 0.3, spriteBox.h * 0.055, 0, 0, Math.PI * 2);
+    ctx.ellipse(0, shadowOffset, spriteBox.w * (0.34 - liftRatio * 0.08), spriteBox.h * (0.07 - liftRatio * 0.018), 0, 0, Math.PI * 2);
     ctx.fill();
     ctx.globalAlpha = 1;
   }
@@ -15919,7 +16163,18 @@ function drawSpritePlayerCar(ctx, x, y, carConfig, state, sprite) {
   }
 
   if (state.boosting) {
-    drawSpriteBoostTrail(ctx, spriteBox.w, spriteBox.h, boostTrail, state.boostTrailIntensity || 0.7);
+    ctx.save();
+    ctx.globalCompositeOperation = "lighter";
+    ctx.globalAlpha = 0.12 + boostTrailStrength * 0.12;
+    ctx.strokeStyle = boostTrail;
+    ctx.shadowBlur = 20 + boostTrailStrength * 14;
+    ctx.shadowColor = boostTrail;
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.ellipse(0, 0, spriteBox.w * 0.62, spriteBox.h * 0.58, 0, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
+    drawSpriteBoostTrail(ctx, spriteBox.w, spriteBox.h, boostTrail, boostTrailStrength);
   }
 
   if (state.laneChanging) {
@@ -15953,7 +16208,7 @@ function drawSpritePlayerCar(ctx, x, y, carConfig, state, sprite) {
 }
 
 function drawSpriteBoostTrail(ctx, w, h, stripe, intensity = 1) {
-  const strength = clampNumber(intensity, 0.45, 1.2, 1);
+  const strength = clampNumber(intensity, 0.45, 1.55, 1);
   ctx.save();
   ctx.globalAlpha = 0.52 + strength * 0.34;
   ctx.shadowBlur = 18 + strength * 10;
@@ -15992,17 +16247,18 @@ function drawCanvasPlayerCar(ctx, x, y, carConfig, state) {
   const laneTilt = clamp(state.laneDelta || 0, -1, 1) * 0.06;
   const landingPulse = clampNumber(state.landingPulse, 0, 1, 0);
   const airborneLift = Math.max(0, state.airborneLift || 0);
-  const boostTrailStrength = clampNumber(state.boostTrailIntensity, 0.45, 1.2, 0.72);
+  const liftRatio = clamp(airborneLift / 56, 0, 1);
+  const boostTrailStrength = clampNumber(state.boostTrailIntensity, 0.45, 1.55, 0.72);
   ctx.save();
   ctx.translate(x, y);
   ctx.rotate(laneTilt);
 
   if (state.airborne) {
     const shadowOffset = h * 0.3 + Math.min(h * 0.72, airborneLift * 0.82);
-    ctx.globalAlpha = 0.2;
+    ctx.globalAlpha = 0.28 - liftRatio * 0.13;
     ctx.fillStyle = "#000";
     ctx.beginPath();
-    ctx.ellipse(0, shadowOffset, w * 0.32, h * 0.07, 0, 0, Math.PI * 2);
+    ctx.ellipse(0, shadowOffset, w * (0.36 - liftRatio * 0.08), h * (0.085 - liftRatio * 0.02), 0, 0, Math.PI * 2);
     ctx.fill();
     ctx.globalAlpha = 1;
   }
@@ -16012,6 +16268,17 @@ function drawCanvasPlayerCar(ctx, x, y, carConfig, state) {
   }
 
   if (state.boosting) {
+    ctx.save();
+    ctx.globalCompositeOperation = "lighter";
+    ctx.globalAlpha = 0.12 + boostTrailStrength * 0.12;
+    ctx.strokeStyle = boostTrail;
+    ctx.shadowBlur = 20 + boostTrailStrength * 14;
+    ctx.shadowColor = boostTrail;
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.ellipse(0, 0, w * 0.64, h * 0.6, 0, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
     ctx.save();
     ctx.globalAlpha = 0.52 + boostTrailStrength * 0.34;
     ctx.shadowBlur = 18 + boostTrailStrength * 10;
@@ -16390,9 +16657,9 @@ function drawRamp(ctx, x, y, scale = 1) {
   ctx.save();
   ctx.translate(x, y);
   drawShadow(ctx, w, h * 0.5);
-  ctx.shadowBlur = 12;
+  ctx.shadowBlur = 18;
   ctx.shadowColor = "#44ff99";
-  ctx.fillStyle = "#20283c";
+  ctx.fillStyle = "#172033";
   ctx.beginPath();
   ctx.moveTo(-w * 0.5, h * 0.32);
   ctx.lineTo(w * 0.5, h * 0.32);
@@ -16400,9 +16667,27 @@ function drawRamp(ctx, x, y, scale = 1) {
   ctx.lineTo(-w * 0.5, h * 0.05);
   ctx.closePath();
   ctx.fill();
+  ctx.strokeStyle = "#44ff99";
+  ctx.lineWidth = Math.max(2, 3 * scale);
+  ctx.stroke();
+  ctx.shadowBlur = 10;
+  ctx.shadowColor = "#ffe45e";
   ctx.fillStyle = "#44ff99";
   ctx.fillRect(-w * 0.34, h * 0.06, w * 0.2, h * 0.08);
   ctx.fillRect(w * 0.06, -h * 0.04, w * 0.2, h * 0.08);
+  ctx.fillStyle = "#ffe45e";
+  ctx.beginPath();
+  ctx.moveTo(-w * 0.44, h * 0.24);
+  ctx.lineTo(-w * 0.16, h * 0.1);
+  ctx.lineTo(-w * 0.22, h * 0.23);
+  ctx.closePath();
+  ctx.fill();
+  ctx.beginPath();
+  ctx.moveTo(w * 0.04, h * 0.02);
+  ctx.lineTo(w * 0.34, -h * 0.14);
+  ctx.lineTo(w * 0.24, h * 0.02);
+  ctx.closePath();
+  ctx.fill();
   ctx.restore();
 }
 
@@ -16411,18 +16696,29 @@ function drawBoostPad(ctx, x, y, scale = 1) {
   const h = 48 * scale;
   ctx.save();
   ctx.translate(x, y);
-  ctx.shadowBlur = 18;
+  ctx.shadowBlur = 24;
   ctx.shadowColor = "#28f6ff";
-  ctx.fillStyle = "rgba(40, 246, 255, 0.28)";
+  ctx.fillStyle = "rgba(40, 246, 255, 0.36)";
   ctx.fillRect(-w * 0.5, -h * 0.5, w, h);
   ctx.strokeStyle = "#28f6ff";
   ctx.lineWidth = Math.max(2, 3 * scale);
   ctx.strokeRect(-w * 0.5, -h * 0.5, w, h);
+  ctx.globalAlpha = 0.62;
+  ctx.fillStyle = "rgba(246, 251, 255, 0.72)";
+  ctx.fillRect(-w * 0.42, -h * 0.36, w * 0.18, h * 0.72);
+  ctx.fillRect(w * 0.24, -h * 0.36, w * 0.18, h * 0.72);
+  ctx.globalAlpha = 1;
   ctx.fillStyle = "#ffe45e";
   ctx.beginPath();
-  ctx.moveTo(-w * 0.18, -h * 0.28);
-  ctx.lineTo(w * 0.18, 0);
-  ctx.lineTo(-w * 0.18, h * 0.28);
+  ctx.moveTo(-w * 0.22, -h * 0.32);
+  ctx.lineTo(w * 0.24, 0);
+  ctx.lineTo(-w * 0.22, h * 0.32);
+  ctx.closePath();
+  ctx.fill();
+  ctx.beginPath();
+  ctx.moveTo(w * 0.04, -h * 0.32);
+  ctx.lineTo(w * 0.5, 0);
+  ctx.lineTo(w * 0.04, h * 0.32);
   ctx.closePath();
   ctx.fill();
   ctx.restore();
@@ -16881,6 +17177,9 @@ class NeonRoadRally {
       boostPadsReachableSeen: 0,
       boostPadsMissedReachable: 0,
       estimatedBoostRouteQuality: "clean",
+      currentBoostPadChain: 0,
+      bestBoostPadChain: 0,
+      lastBoostCalloutAt: -Infinity,
       rampsUsed: 0,
       boostTimer: 0,
       padBoostTimer: 0,
@@ -16900,6 +17199,9 @@ class NeonRoadRally {
       rampFailedToClearTarget: 0,
       activeRampTarget: null,
       lastRampTargetStatus: "none",
+      lastRampLandingCleared: false,
+      biggestJumpDistance: 0,
+      biggestJumpDuration: 0,
       cleanTimer: 0,
       cleanBonusCount: 0,
       nearMisses: 0,
@@ -17543,10 +17845,10 @@ class NeonRoadRally {
       life: 1,
       yOffset: -88
     });
-    this.audio.playSfx("menu", {
+    this.audio.playSfx("fuelPickup", {
       cooldownMs: 120,
       maxInstances: 1,
-      volume: this.audio.sfxVolume * 0.42
+      volume: this.audio.sfxVolume * 0.62
     });
   }
 
@@ -18108,7 +18410,10 @@ class NeonRoadRally {
     run.jumpTimer = run.jumpDuration;
     run.airborne = true;
     run.rampLaunchPulseTimer = Math.max(run.rampLaunchPulseTimer || 0, ARCADE_FEEL.rampLaunchPulseMs / 1000);
-    run.screenShake = Math.max(run.screenShake || 0, 0.12);
+    run.screenShake = Math.max(run.screenShake || 0, 0.18);
+    run.lastRampLandingCleared = false;
+    run.biggestJumpDistance = Math.max(run.biggestJumpDistance || 0, clearDistance || 0);
+    run.biggestJumpDuration = Math.max(run.biggestJumpDuration || 0, airborneDuration || 0);
     if (obstacle?.solutionTargetDistance) {
       run.activeRampTarget = {
         id: obstacle.solutionTargetId || "",
@@ -18157,7 +18462,10 @@ class NeonRoadRally {
   finishRampLanding() {
     const run = this.run;
     const target = run?.activeRampTarget;
-    if (!target) return;
+    if (!target) {
+      if (run) run.lastRampLandingCleared = false;
+      return;
+    }
     if (!target.cleared) {
       if (run.distance >= target.targetRunDistance) {
         target.cleared = true;
@@ -18168,6 +18476,7 @@ class NeonRoadRally {
         run.lastRampTargetStatus = target.type ? `landed before ${target.type}` : "landed before target";
       }
     }
+    run.lastRampLandingCleared = Boolean(target.cleared);
     run.activeRampTarget = null;
   }
 
@@ -18175,7 +18484,22 @@ class NeonRoadRally {
     const run = this.run;
     if (!run) return;
     run.rampLandingPulseTimer = Math.max(run.rampLandingPulseTimer || 0, ARCADE_FEEL.rampLandingPulseMs / 1000);
-    run.screenShake = Math.max(run.screenShake || 0, 0.11);
+    const cleared = Boolean(run.lastRampLandingCleared);
+    run.screenShake = Math.max(run.screenShake || 0, cleared ? 0.22 : 0.15);
+    if (cleared) {
+      this.addFloatingScoreText("LANDED", {
+        color: "#ffe45e",
+        size: 18,
+        life: 0.62,
+        yOffset: -78,
+        vy: -42
+      });
+    }
+    this.audio.playSfx("rampLanding", {
+      cooldownMs: 0,
+      maxInstances: 1,
+      volume: this.audio.sfxVolume * (cleared ? 0.7 : 0.52)
+    });
   }
 
   focusControls() {
@@ -18898,10 +19222,13 @@ class NeonRoadRally {
       boostPadsCollected: run.boostPadsCollected || 0,
       boostPadsReachableSeen: run.boostPadsReachableSeen || 0,
       boostPadsMissedReachable: run.boostPadsMissedReachable || 0,
+      bestBoostPadChain: run.bestBoostPadChain || 0,
       estimatedBoostRouteQuality: getBoostRouteQuality(run.boostPadsCollected || 0, run.boostPadsMissedReachable || 0),
       boostRouteFeedback: getBoostRouteFeedbackText(run.boostPadsCollected || 0, run.boostPadsMissedReachable || 0),
       rampsUsed: run.rampsUsed || 0,
       rampTargetsCleared: run.rampTargetsCleared || 0,
+      biggestJumpDistance: run.biggestJumpDistance || run.rampClearDistance || 0,
+      biggestJumpDuration: run.biggestJumpDuration || run.rampAirborneDuration || 0,
       laneMoves: run.laneMoves || 0,
       gasCansSpawned: run.gasCansSpawned || 0,
       gasCansCollected: run.gasCansCollected || 0,
@@ -24272,6 +24599,26 @@ class NeonRoadRally {
       `;
     }
 
+    getBestMomentLine(summary) {
+      if (!summary) return "";
+      const roadblocks = Math.max(0, summary.roadblocksCleared || 0);
+      const bestBoostChain = Math.max(0, summary.bestBoostPadChain || 0);
+      const boosts = Math.max(0, summary.boostPadsCollected || 0);
+      const rampClears = Math.max(0, summary.rampTargetsCleared || 0);
+      const jumps = Math.max(0, summary.rampsUsed || 0);
+      const gas = Math.max(0, summary.gasCansCollected || 0);
+      const jumpDistance = Math.max(0, Math.round(summary.biggestJumpDistance || 0));
+      const cleanFinish = normalizeRunStatus(summary.status) === "finished" && (summary.slowdownHits || 0) === 0;
+      if (roadblocks > 0) return `Roadblock cleared${roadblocks > 1 ? ` x${roadblocks}` : ""}`;
+      if (bestBoostChain >= 2) return `Best boost chain x${bestBoostChain}`;
+      if (rampClears > 0) return jumpDistance > 0 ? `Clear jump ${jumpDistance.toLocaleString()} road units` : `Clear jump x${rampClears}`;
+      if (cleanFinish) return "Clean finish";
+      if (boosts > 0) return `${boosts} boost pad${boosts === 1 ? "" : "s"} collected`;
+      if (jumps > 0) return jumpDistance > 0 ? `Biggest jump ${jumpDistance.toLocaleString()} road units` : `${jumps} ramp${jumps === 1 ? "" : "s"} used`;
+      if (summary.raceTypeId === FUEL_RUN_RACE_TYPE_ID && gas > 0) return `${gas} gas can${gas === 1 ? "" : "s"} grabbed`;
+      return "";
+    }
+
     renderRunHighlightPanel(summary) {
     if (!summary) return "";
     const highlights = [];
@@ -24314,6 +24661,7 @@ class NeonRoadRally {
       addHighlight("Challenge", summary.challengeResult?.completed ? "Complete" : "Try Again", summary.challengeResult?.detail || summary.challengeObjective || "Objective checked");
     }
     const boostText = summary.boostRouteFeedback || getBoostRouteFeedbackText(summary.boostPadsCollected || 0, summary.boostPadsMissedReachable || 0);
+    const bestMoment = this.getBestMomentLine(summary);
     return `
       <div class="result-summary-row">
         ${highlights.slice(0, 4).map(([label, value, detail]) => `
@@ -24325,6 +24673,7 @@ class NeonRoadRally {
         `).join("")}
       </div>
       <p class="result-boost-note"><strong>Boost Route</strong> ${escapeHtml(boostText)} <span>${Math.max(0, summary.boostPadsCollected || 0)} collected / ${Math.max(0, summary.boostPadsMissedReachable || 0)} missed reachable.</span></p>
+      ${bestMoment ? `<p class="result-boost-note result-best-moment"><strong>Best Moment</strong> ${escapeHtml(bestMoment)}</p>` : ""}
     `;
   }
 
