@@ -13969,6 +13969,7 @@ class Renderer {
     this.drawActiveRampTargetCue();
     this.drawNearMissSpark();
     this.drawPursuitChasePresence();
+    this.drawAirborneRoadShadow();
     this.drawPlayer();
     this.drawCrashSparks();
     this.drawBumpFlash();
@@ -13996,10 +13997,22 @@ class Renderer {
     const theme = this.getCurrentTrackVisualTheme();
     ctx.save();
     ctx.globalAlpha = alpha;
-    ctx.fillStyle = theme.roadOuter || "#161722";
+    const roadGradient = ctx.createLinearGradient(road.x, 0, road.x + road.w, 0);
+    roadGradient.addColorStop(0, theme.roadOuter || "#161722");
+    roadGradient.addColorStop(0.08, theme.roadInner || "#10111a");
+    roadGradient.addColorStop(0.5, "#0b0d16");
+    roadGradient.addColorStop(0.92, theme.roadInner || "#10111a");
+    roadGradient.addColorStop(1, theme.roadOuter || "#161722");
+    ctx.fillStyle = roadGradient;
     ctx.fillRect(road.x, road.y, road.w, road.h);
-    ctx.fillStyle = theme.roadInner || "#10111a";
-    ctx.fillRect(road.x + 8, road.y, road.w - 16, road.h);
+
+    const shoulderWash = ctx.createLinearGradient(road.x, 0, road.x + road.w, 0);
+    shoulderWash.addColorStop(0, rgbaFromHex(theme.edgeColor || "#28f6ff", 0.12 + speedFeel * 0.04));
+    shoulderWash.addColorStop(0.18, "rgba(0, 0, 0, 0)");
+    shoulderWash.addColorStop(0.82, "rgba(0, 0, 0, 0)");
+    shoulderWash.addColorStop(1, rgbaFromHex(theme.edgeAltColor || "#ff3fd1", 0.12 + speedFeel * 0.04));
+    ctx.fillStyle = shoulderWash;
+    ctx.fillRect(road.x, road.y, road.w, road.h);
 
     ctx.fillStyle = "rgba(255, 255, 255, 0.04)";
     for (let i = 0; i < LANES; i += 1) {
@@ -14043,14 +14056,85 @@ class Renderer {
     }
     ctx.globalAlpha = alpha;
 
-    const glowLane = this.game.run.targetLane;
-    const glowX = road.x + glowLane * road.laneW;
-    ctx.shadowBlur = 20;
-    ctx.shadowColor = "#44ff99";
-    ctx.strokeStyle = "rgba(68, 255, 153, 0.36)";
-    ctx.lineWidth = 3;
-    ctx.strokeRect(glowX + 6, road.y + 6, road.laneW - 12, road.h - 12);
+    this.drawPlayerLaneFloorGlow(alpha);
+    this.drawFuelRoadPulse(alpha);
     this.drawFinalStretchRoadGlow(alpha);
+    ctx.restore();
+  }
+
+  drawPlayerLaneFloorGlow(alpha) {
+    const run = this.game.run;
+    if (!run || this.game.screen !== "game") return;
+    const ctx = this.ctx;
+    const road = this.road;
+    const laneX = road.x + run.targetLane * road.laneW;
+    const playerY = this.getPlayerScreenY();
+    const boostPunch = this.getBoostVisualPunch();
+    const laneChanging = Math.abs(run.renderLaneFloat - run.targetLane) > 0.02;
+    const glowAlpha = alpha * clamp(0.11 + boostPunch * 0.15 + (laneChanging ? 0.08 : 0), 0.08, 0.36);
+    const y0 = clamp(playerY - road.laneW * 1.15, road.y, road.y + road.h);
+    const y1 = clamp(playerY + road.laneW * 1.45, road.y, road.y + road.h);
+    const fill = ctx.createRadialGradient(
+      laneX + road.laneW * 0.5,
+      playerY,
+      road.laneW * 0.08,
+      laneX + road.laneW * 0.5,
+      playerY,
+      road.laneW * 0.86
+    );
+    fill.addColorStop(0, rgbaFromHex(getCarBoostTrailColor(run.player.car), glowAlpha));
+    fill.addColorStop(0.48, "rgba(68, 255, 153, 0.045)");
+    fill.addColorStop(1, "rgba(68, 255, 153, 0)");
+    ctx.save();
+    ctx.globalCompositeOperation = "lighter";
+    ctx.fillStyle = fill;
+    ctx.fillRect(laneX + 8, y0, road.laneW - 16, Math.max(1, y1 - y0));
+    ctx.globalAlpha = glowAlpha * 0.72;
+    ctx.strokeStyle = getCarBoostTrailColor(run.player.car);
+    ctx.shadowBlur = 10 + boostPunch * 10;
+    ctx.shadowColor = ctx.strokeStyle;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(laneX + road.laneW * 0.28, playerY + road.laneW * 0.66);
+    ctx.lineTo(laneX + road.laneW * 0.5, playerY + road.laneW * 0.42);
+    ctx.lineTo(laneX + road.laneW * 0.72, playerY + road.laneW * 0.66);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  drawFuelRoadPulse(alpha) {
+    const run = this.game.run;
+    if (!run || this.game.screen !== "game" || !isFuelRunRaceType(run.raceTypeId)) return;
+    const max = Math.max(1, run.fuelMax || FUEL_RUN_CONFIG.fuelMax);
+    const fuelRatio = clamp((run.fuel || 0) / max, 0, 1);
+    const critical = run.criticalFuelActive || fuelRatio <= 0.18;
+    const low = critical || run.lowFuelActive || fuelRatio <= 0.33;
+    const savedPulse = clamp((run.fuelSavedPulseTimer || 0) / Math.max(0.001, ARCADE_FEEL.fuelSavedPulseMs / 1000), 0, 1);
+    if (!low && savedPulse <= 0.02) return;
+    const ctx = this.ctx;
+    const road = this.road;
+    const pulse = 0.5 + Math.sin((run.elapsed || 0) * (critical ? 13 : 8)) * 0.5;
+    const color = savedPulse > 0.05 ? "#44ff99" : (critical ? "#ff334c" : "#ffe45e");
+    const edgeAlpha = alpha * clamp((low ? 0.1 + pulse * (critical ? 0.16 : 0.09) : 0) + savedPulse * 0.2, 0, 0.34);
+    ctx.save();
+    ctx.globalCompositeOperation = "lighter";
+    ctx.globalAlpha = edgeAlpha;
+    ctx.strokeStyle = color;
+    ctx.shadowColor = color;
+    ctx.shadowBlur = 18 + pulse * 10 + savedPulse * 12;
+    ctx.lineWidth = critical ? 4 : 3;
+    ctx.beginPath();
+    ctx.moveTo(road.x + 22, road.y);
+    ctx.lineTo(road.x + 22, road.y + road.h);
+    ctx.moveTo(road.x + road.w - 22, road.y);
+    ctx.lineTo(road.x + road.w - 22, road.y + road.h);
+    ctx.stroke();
+    const wash = ctx.createLinearGradient(0, road.y, 0, road.y + road.h);
+    wash.addColorStop(0, "rgba(0, 0, 0, 0)");
+    wash.addColorStop(0.78, rgbaFromHex(color, edgeAlpha * 0.55));
+    wash.addColorStop(1, rgbaFromHex(color, edgeAlpha * 0.18));
+    ctx.fillStyle = wash;
+    ctx.fillRect(road.x, road.y, road.w, road.h);
     ctx.restore();
   }
 
@@ -14097,6 +14181,17 @@ class Renderer {
       ctx.fillStyle = laneGlow;
       ctx.fillRect(x + 3, road.y, road.laneW - 6, road.h);
     }
+
+    const grainCount = Math.round(14 + speedRatio * 12 + speedFeel * 8);
+    ctx.globalAlpha = intensity * 0.28;
+    ctx.fillStyle = "rgba(246, 251, 255, 0.12)";
+    for (let i = 0; i < grainCount; i += 1) {
+      const worldIndex = Math.floor(scrollSource * 0.055) + i * 17;
+      const gx = road.x + 18 + deterministicNoise(worldIndex, 71) * (road.w - 36);
+      const gy = road.y + deterministicNoise(worldIndex, 72) * road.h;
+      const length = lerp(14, 52, speedRatio) * lerp(0.6, 1.35, deterministicNoise(worldIndex, 73));
+      ctx.fillRect(gx, gy, Math.max(1, 1.2 * (0.8 + speedFeel)), length);
+    }
     ctx.restore();
   }
 
@@ -14113,6 +14208,15 @@ class Renderer {
     const reflectorScroll = (scrollSource * (0.58 + speedFeel * 0.1)) % reflectorSpacing;
 
     ctx.save();
+    const shoulderGlow = ctx.createLinearGradient(road.x - 34, 0, road.x + road.w + 34, 0);
+    shoulderGlow.addColorStop(0, rgbaFromHex(theme.edgeColor || "#28f6ff", alpha * (0.18 + speedFeel * 0.08)));
+    shoulderGlow.addColorStop(0.11, "rgba(0, 0, 0, 0)");
+    shoulderGlow.addColorStop(0.89, "rgba(0, 0, 0, 0)");
+    shoulderGlow.addColorStop(1, rgbaFromHex(theme.edgeAltColor || "#ff3fd1", alpha * (0.18 + speedFeel * 0.08)));
+    ctx.globalCompositeOperation = "lighter";
+    ctx.fillStyle = shoulderGlow;
+    ctx.fillRect(road.x - 34, road.y, road.w + 68, road.h);
+    ctx.globalCompositeOperation = "source-over";
     ctx.globalAlpha = alpha * clamp(0.72 + speedFeel * 0.26, 0.72, 1) * clamp(visualIntensity, 0.78, 1.22);
     for (let y = road.y - lightSpacing + lightScroll; y < road.y + road.h + lightSpacing; y += lightSpacing) {
       const t = clamp((y - road.y) / Math.max(1, road.h), 0, 1);
@@ -14267,7 +14371,7 @@ class Renderer {
   drawObstacle(ctx, obstacle, x, y, scale) {
     const visual = this.getObstacleVisualSize(obstacle.type, scale, obstacle);
     if (visual.sprite) {
-      drawTrafficSprite(ctx, x, y, visual);
+      drawTrafficSprite(ctx, x, y, { ...visual, type: obstacle.type });
       if (obstacle.pursuitMarker || obstacle.pursuitRoadblock) {
         this.drawPursuitObstacleMarker(ctx, x, y, visual.w, visual.h, scale, obstacle);
       }
@@ -14286,11 +14390,19 @@ class Renderer {
       drawOilSlick(ctx, x, y, drawScale);
     } else if (obstacle.type === "ramp") {
       this.drawRampApproachGuide(ctx, obstacle, x, y, visual.w, visual.h, scale);
-      drawRamp(ctx, x, y, drawScale);
+      drawRamp(ctx, x, y, drawScale, {
+        pulse: 0.5 + Math.sin((this.game.run?.elapsed || 0) * 7 + obstacle.distance * 0.01) * 0.5
+      });
     } else if (obstacle.type === "boostPad") {
-      drawBoostPad(ctx, x, y, drawScale);
+      drawBoostPad(ctx, x, y, drawScale, {
+        pulse: 0.5 + Math.sin((this.game.run?.elapsed || 0) * 9 + obstacle.distance * 0.016) * 0.5,
+        speedFeel: this.getSpeedFeelIntensity()
+      });
     } else if (obstacle.type === "gasCan") {
-      drawGasCan(ctx, x, y, drawScale);
+      drawGasCan(ctx, x, y, drawScale, {
+        pulse: 0.5 + Math.sin((this.game.run?.elapsed || 0) * 8 + obstacle.distance * 0.012) * 0.5,
+        urgent: Boolean(this.game.run?.lowFuelActive || this.game.run?.criticalFuelActive)
+      });
     } else if (obstacle.type === "barrier") {
       drawBarrier(ctx, x, y, drawScale);
     } else if (obstacle.type === "branch") {
@@ -14350,7 +14462,8 @@ class Renderer {
   drawRampApproachGuide(ctx, obstacle, x, y, width, height, scale) {
     if (!obstacle || obstacle.hit || obstacle.remove || y < this.road.y - 70 || y > this.height + 120) return;
     const depth = clamp((y - this.road.y) / Math.max(1, this.road.h), 0, 1);
-    const alpha = clamp(0.14 + depth * 0.28, 0.14, 0.42);
+    const speedFeel = this.getSpeedFeelIntensity();
+    const alpha = clamp(0.16 + depth * 0.3 + speedFeel * 0.08, 0.16, 0.5);
     const laneW = this.road.laneW;
     ctx.save();
     ctx.globalCompositeOperation = "lighter";
@@ -14359,6 +14472,14 @@ class Renderer {
     ctx.fillStyle = "rgba(255, 228, 94, 0.18)";
     ctx.shadowBlur = 14 * scale;
     ctx.shadowColor = "#ffe45e";
+    const guideTop = y - Math.max(height * 0.85, laneW * 0.42);
+    const guideBottom = y + height * 0.32;
+    const guideGradient = ctx.createLinearGradient(0, guideTop, 0, guideBottom);
+    guideGradient.addColorStop(0, "rgba(255, 228, 94, 0)");
+    guideGradient.addColorStop(0.62, "rgba(255, 228, 94, 0.12)");
+    guideGradient.addColorStop(1, "rgba(68, 255, 153, 0.05)");
+    ctx.fillStyle = guideGradient;
+    ctx.fillRect(x - laneW * 0.36, guideTop, laneW * 0.72, Math.max(1, guideBottom - guideTop));
     for (let i = 0; i < 3; i += 1) {
       const chevronY = y + height * 0.34 + i * laneW * 0.24;
       if (chevronY > this.height + 50) continue;
@@ -14381,6 +14502,37 @@ class Renderer {
         ctx.stroke();
       }
     }
+    ctx.restore();
+  }
+
+  drawAirborneRoadShadow() {
+    const run = this.game.run;
+    if (!run || !run.airborne || this.game.screen !== "game") return;
+    const lift = Math.max(0, run.jumpOffset || 0);
+    const liftRatio = clamp(lift / 72, 0, 1);
+    const x = this.laneCenter(run.renderLaneFloat);
+    const airY = this.getPlayerScreenY();
+    const groundY = airY + lift;
+    const size = getPlayerCarDrawSize(run.player.car, {
+      airborne: false,
+      laneWidth: this.road.laneW
+    }, this.game.carSprites);
+    const ctx = this.ctx;
+    ctx.save();
+    ctx.globalAlpha = 0.2 + (1 - liftRatio) * 0.12;
+    ctx.fillStyle = "#000";
+    ctx.beginPath();
+    ctx.ellipse(x, groundY + size.h * 0.36, size.w * (0.42 - liftRatio * 0.08), size.h * (0.09 - liftRatio * 0.02), 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.globalCompositeOperation = "lighter";
+    ctx.globalAlpha = 0.18 + liftRatio * 0.22;
+    ctx.strokeStyle = liftRatio > 0.5 ? "#ffe45e" : "#44ff99";
+    ctx.shadowBlur = 12;
+    ctx.shadowColor = ctx.strokeStyle;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.ellipse(x, groundY + size.h * 0.36, this.road.laneW * (0.2 + liftRatio * 0.12), 8 + liftRatio * 5, 0, 0, Math.PI * 2);
+    ctx.stroke();
     ctx.restore();
   }
 
@@ -14603,6 +14755,17 @@ class Renderer {
       ctx.lineTo(x + offset * 1.8, tailY - i * 18);
       ctx.stroke();
     }
+    ctx.globalAlpha = 0.18 * punch;
+    ctx.strokeStyle = trailColor;
+    ctx.shadowBlur = 12;
+    ctx.shadowColor = trailColor;
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(this.road.x + this.road.laneW * 0.18, headY + 18);
+    ctx.lineTo(this.road.x + this.road.laneW * 0.06, tailY - 8);
+    ctx.moveTo(this.road.x + this.road.w - this.road.laneW * 0.18, headY + 18);
+    ctx.lineTo(this.road.x + this.road.w - this.road.laneW * 0.06, tailY - 8);
+    ctx.stroke();
     ctx.restore();
   }
 
@@ -14658,9 +14821,16 @@ class Renderer {
     ctx.beginPath();
     ctx.ellipse(x, y, this.road.laneW * lerp(0.48, 1.05, progress), 44 + progress * 26, 0, 0, Math.PI * 2);
     ctx.stroke();
-    ctx.globalAlpha = alpha * 0.36;
+    ctx.globalAlpha = alpha * 0.28;
     ctx.fillStyle = "#28f6ff";
     ctx.fillRect(0, 0, this.width, this.height);
+    const flare = ctx.createRadialGradient(x, y, 8, x, y, this.road.laneW * lerp(0.8, 1.45, progress));
+    flare.addColorStop(0, "rgba(246, 251, 255, 0.34)");
+    flare.addColorStop(0.36, "rgba(40, 246, 255, 0.18)");
+    flare.addColorStop(1, "rgba(40, 246, 255, 0)");
+    ctx.globalAlpha = alpha;
+    ctx.fillStyle = flare;
+    ctx.fillRect(x - this.road.laneW * 1.5, y - this.road.laneW * 1.2, this.road.laneW * 3, this.road.laneW * 2.4);
     ctx.restore();
   }
 
@@ -14869,6 +15039,13 @@ class Renderer {
       ctx.globalAlpha = alpha;
       ctx.fillStyle = "#f6fbff";
       ctx.fillRect(0, 0, this.width, this.height);
+      const roadPulse = ctx.createRadialGradient(this.width / 2, this.height * 0.58, 12, this.width / 2, this.height * 0.58, Math.max(260, this.width * 0.5));
+      roadPulse.addColorStop(0, "rgba(255, 228, 94, 0.26)");
+      roadPulse.addColorStop(0.42, "rgba(68, 255, 153, 0.15)");
+      roadPulse.addColorStop(1, "rgba(40, 246, 255, 0)");
+      ctx.globalAlpha = (1 - progress) * 0.7;
+      ctx.fillStyle = roadPulse;
+      ctx.fillRect(0, this.height * 0.12, this.width, this.height * 0.76);
       ctx.globalAlpha = (1 - progress) * 0.9;
       ctx.fillStyle = "#ffe45e";
       ctx.font = `800 ${Math.max(36, Math.min(72, this.width * 0.07))}px Trebuchet MS, Verdana, sans-serif`;
@@ -14888,6 +15065,14 @@ class Renderer {
         ctx.fillStyle = i % 2 ? "#f6fbff" : "#08080d";
         ctx.fillRect(i * cell + (stripeProgress * cell * 3) % (cell * 2), bandY - 12, cell, 24);
       }
+      ctx.globalAlpha = (1 - stripeProgress) * 0.26;
+      ctx.strokeStyle = "#44ff99";
+      ctx.shadowBlur = 18;
+      ctx.shadowColor = "#44ff99";
+      ctx.lineWidth = 4;
+      ctx.beginPath();
+      ctx.ellipse(this.width / 2, bandY + 18, this.width * 0.34 * stripeProgress, 18 + stripeProgress * 28, 0, 0, Math.PI * 2);
+      ctx.stroke();
     }
     ctx.restore();
   }
@@ -14949,9 +15134,24 @@ class Renderer {
     const alpha = clamp(run.crashBeatTimer / 0.72, 0, 1);
     const ctx = this.ctx;
     ctx.save();
-    ctx.globalAlpha = alpha * 0.26;
+    ctx.globalAlpha = alpha * 0.18;
     ctx.fillStyle = "#ff3b58";
     ctx.fillRect(0, 0, this.width, this.height);
+    const impact = ctx.createRadialGradient(this.width / 2, this.height * 0.55, 8, this.width / 2, this.height * 0.55, Math.max(220, this.width * 0.36));
+    impact.addColorStop(0, "rgba(255, 228, 94, 0.24)");
+    impact.addColorStop(0.42, "rgba(255, 51, 76, 0.18)");
+    impact.addColorStop(1, "rgba(0, 0, 0, 0)");
+    ctx.globalAlpha = alpha * 0.9;
+    ctx.fillStyle = impact;
+    ctx.fillRect(0, this.height * 0.16, this.width, this.height * 0.72);
+    ctx.globalAlpha = alpha * 0.32;
+    ctx.strokeStyle = "#ff334c";
+    ctx.shadowBlur = 18;
+    ctx.shadowColor = "#ff334c";
+    ctx.lineWidth = 4;
+    ctx.beginPath();
+    ctx.ellipse(this.width / 2, this.height * 0.55, this.width * (0.08 + (1 - alpha) * 0.16), 22 + (1 - alpha) * 28, 0, 0, Math.PI * 2);
+    ctx.stroke();
     ctx.globalAlpha = Math.min(1, alpha * 1.15);
     ctx.font = `900 ${Math.max(34, Math.min(72, this.width * 0.065))}px Trebuchet MS, Verdana, sans-serif`;
     ctx.textAlign = "center";
@@ -15067,18 +15267,25 @@ class Renderer {
       beamGradient.addColorStop(1, "rgba(0, 0, 0, 0)");
       ctx.fillStyle = beamGradient;
       ctx.fillRect(0, baseY - 160, this.width, 240);
-      const carW = Math.max(54, this.road.w * 0.18);
-      const carH = 18;
-      ctx.globalAlpha = 0.42 + intensity * 0.28;
-      ctx.fillStyle = "rgba(3, 5, 12, 0.88)";
-      ctx.fillRect(centerX - carW / 2, baseY, carW, carH);
-      ctx.shadowBlur = 16 + intensity * 18;
-      ctx.fillStyle = "#ff334c";
-      ctx.shadowColor = "#ff334c";
-      ctx.fillRect(centerX - carW * 0.32, baseY + 3, carW * 0.24, 5);
-      ctx.fillStyle = "#28f6ff";
-      ctx.shadowColor = "#28f6ff";
-      ctx.fillRect(centerX + carW * 0.08, baseY + 3, carW * 0.24, 5);
+      const sweepW = Math.max(96, this.road.w * (0.24 + intensity * 0.12));
+      ctx.shadowBlur = 18 + intensity * 20;
+      for (let i = 0; i < 4; i += 1) {
+        const offset = (i - 1.5) * 18;
+        const color = (i + (pulse > 0.5 ? 1 : 0)) % 2 ? "#28f6ff" : "#ff334c";
+        ctx.globalAlpha = (0.2 + intensity * 0.22) * (1 - i * 0.12);
+        ctx.strokeStyle = color;
+        ctx.shadowColor = color;
+        ctx.lineWidth = Math.max(3, 5 - i * 0.6);
+        ctx.beginPath();
+        ctx.moveTo(centerX - sweepW * 0.5, baseY + offset);
+        ctx.lineTo(centerX + sweepW * 0.5, baseY + offset + (pulse > 0.5 ? 8 : -8));
+        ctx.stroke();
+      }
+      ctx.globalAlpha = 0.22 + intensity * 0.22;
+      ctx.fillStyle = pulse > 0.5 ? "rgba(255, 51, 76, 0.5)" : "rgba(40, 246, 255, 0.48)";
+      ctx.beginPath();
+      ctx.ellipse(centerX, baseY + 28, sweepW * 0.46, 12 + intensity * 8, 0, 0, Math.PI * 2);
+      ctx.fill();
       ctx.restore();
     }
 
@@ -16713,6 +16920,14 @@ function drawTrafficCar(ctx, x, y, type, scale = 1) {
   ctx.save();
   ctx.translate(x, y);
   drawShadow(ctx, w * (isFast ? 0.9 : 0.96), h * 0.96);
+  ctx.globalCompositeOperation = "lighter";
+  ctx.globalAlpha = 0.22;
+  ctx.fillStyle = isFast ? "rgba(255, 51, 76, 0.42)" : "rgba(40, 246, 255, 0.28)";
+  ctx.beginPath();
+  ctx.ellipse(0, h * 0.36, w * 0.42, h * 0.08, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.globalAlpha = 1;
+  ctx.globalCompositeOperation = "source-over";
   ctx.fillStyle = "#070912";
   ctx.fillRect(-w * 0.49, -h * 0.22, w * 0.1, h * 0.23);
   ctx.fillRect(w * 0.39, -h * 0.22, w * 0.1, h * 0.23);
@@ -16774,12 +16989,16 @@ function drawTrafficCar(ctx, x, y, type, scale = 1) {
   ctx.fillRect(-w * 0.34, h * 0.33, w * 0.68, Math.max(1, h * 0.025));
 
   ctx.fillStyle = trim;
+  ctx.shadowBlur = isFast ? 10 : 6;
+  ctx.shadowColor = trim;
   if (isFast) {
     ctx.fillRect(-w * 0.045, -h * 0.35, w * 0.09, h * 0.68);
     ctx.fillRect(-w * 0.28, h * 0.35, w * 0.56, h * 0.045);
   } else {
     ctx.fillRect(-w * 0.33, h * 0.07, w * 0.66, h * 0.045);
+    ctx.fillRect(-w * 0.29, -h * 0.34, w * 0.58, h * 0.035);
   }
+  ctx.shadowBlur = 0;
 
   ctx.fillStyle = "#fff2b0";
   ctx.fillRect(-w * 0.27, -h * 0.46, w * 0.15, h * 0.05);
@@ -16796,6 +17015,14 @@ function drawTruck(ctx, x, y, scale = 1) {
   ctx.save();
   ctx.translate(x, y);
   drawShadow(ctx, w * 1.02, h);
+  ctx.globalCompositeOperation = "lighter";
+  ctx.globalAlpha = 0.2;
+  ctx.fillStyle = "rgba(255, 228, 94, 0.26)";
+  ctx.beginPath();
+  ctx.ellipse(0, h * 0.39, w * 0.52, h * 0.08, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.globalAlpha = 1;
+  ctx.globalCompositeOperation = "source-over";
   ctx.fillStyle = "#070912";
   ctx.fillRect(-w * 0.5, -h * 0.37, w * 0.11, h * 0.3);
   ctx.fillRect(w * 0.39, -h * 0.37, w * 0.11, h * 0.3);
@@ -16830,6 +17057,12 @@ function drawTruck(ctx, x, y, scale = 1) {
   ctx.fillStyle = "rgba(5, 7, 15, 0.24)";
   ctx.fillRect(-w * 0.38, h * 0.05, w * 0.76, Math.max(2, h * 0.035));
   ctx.fillRect(-w * 0.38, h * 0.26, w * 0.76, Math.max(2, h * 0.035));
+  ctx.strokeStyle = "rgba(246, 251, 255, 0.34)";
+  ctx.lineWidth = Math.max(1, 1.4 * scale);
+  ctx.beginPath();
+  ctx.moveTo(-w * 0.34, h * 0.14);
+  ctx.lineTo(w * 0.34, h * 0.14);
+  ctx.stroke();
 
   ctx.fillStyle = "#ffe45e";
   ctx.fillRect(-w * 0.35, -h * 0.48, w * 0.18, h * 0.055);
@@ -16864,6 +17097,14 @@ function drawDeer(ctx, x, y, direction, scale = 1) {
   ctx.translate(x, y);
   ctx.scale(direction >= 0 ? 1 : -1, 1);
   drawShadow(ctx, w, h * 0.7);
+  ctx.globalCompositeOperation = "lighter";
+  ctx.globalAlpha = 0.24;
+  ctx.fillStyle = "rgba(255, 228, 94, 0.48)";
+  ctx.beginPath();
+  ctx.ellipse(-w * 0.05, h * 0.22, w * 0.42, h * 0.12, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.globalAlpha = 1;
+  ctx.globalCompositeOperation = "source-over";
   ctx.fillStyle = "#d6a35a";
   ctx.strokeStyle = "#ffe0a0";
   ctx.lineWidth = Math.max(2, 3 * scale);
@@ -16923,13 +17164,22 @@ function drawOilSlick(ctx, x, y, scale = 1) {
   ctx.restore();
 }
 
-function drawRamp(ctx, x, y, scale = 1) {
+function drawRamp(ctx, x, y, scale = 1, state = {}) {
   const w = 80 * scale;
   const h = 58 * scale;
+  const pulse = clampNumber(state.pulse, 0, 1, 0.5);
   ctx.save();
   ctx.translate(x, y);
   drawShadow(ctx, w, h * 0.5);
-  ctx.shadowBlur = 18;
+  ctx.globalCompositeOperation = "lighter";
+  ctx.globalAlpha = 0.2 + pulse * 0.12;
+  ctx.fillStyle = "rgba(68, 255, 153, 0.42)";
+  ctx.beginPath();
+  ctx.ellipse(0, h * 0.32, w * 0.5, h * 0.15, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.globalAlpha = 1;
+  ctx.globalCompositeOperation = "source-over";
+  ctx.shadowBlur = 18 + pulse * 10;
   ctx.shadowColor = "#44ff99";
   ctx.fillStyle = "#172033";
   ctx.beginPath();
@@ -16941,6 +17191,16 @@ function drawRamp(ctx, x, y, scale = 1) {
   ctx.fill();
   ctx.strokeStyle = "#44ff99";
   ctx.lineWidth = Math.max(2, 3 * scale);
+  ctx.stroke();
+  ctx.shadowBlur = 8;
+  ctx.shadowColor = "#28f6ff";
+  ctx.strokeStyle = "rgba(40, 246, 255, 0.82)";
+  ctx.lineWidth = Math.max(1, 2 * scale);
+  ctx.beginPath();
+  ctx.moveTo(-w * 0.42, h * 0.12);
+  ctx.lineTo(w * 0.3, -h * 0.24);
+  ctx.moveTo(-w * 0.22, h * 0.26);
+  ctx.lineTo(w * 0.48, h * 0.26);
   ctx.stroke();
   ctx.shadowBlur = 10;
   ctx.shadowColor = "#ffe45e";
@@ -16960,49 +17220,85 @@ function drawRamp(ctx, x, y, scale = 1) {
   ctx.lineTo(w * 0.24, h * 0.02);
   ctx.closePath();
   ctx.fill();
+  ctx.fillStyle = "#f6fbff";
+  ctx.globalAlpha = 0.75;
+  ctx.fillRect(-w * 0.46, h * 0.29, w * 0.92, Math.max(2, h * 0.045));
+  ctx.globalAlpha = 1;
   ctx.restore();
 }
 
-function drawBoostPad(ctx, x, y, scale = 1) {
+function drawBoostPad(ctx, x, y, scale = 1, state = {}) {
   const w = 82 * scale;
   const h = 48 * scale;
+  const pulse = clampNumber(state.pulse, 0, 1, 0.5);
+  const speedFeel = clampNumber(state.speedFeel, 0, 1.4, 0);
   ctx.save();
   ctx.translate(x, y);
-  ctx.shadowBlur = 24;
+  ctx.globalCompositeOperation = "lighter";
+  ctx.globalAlpha = 0.18 + pulse * 0.12 + speedFeel * 0.04;
+  ctx.fillStyle = "rgba(40, 246, 255, 0.7)";
+  ctx.beginPath();
+  ctx.ellipse(0, 0, w * (0.58 + pulse * 0.08), h * (0.72 + pulse * 0.08), 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.globalAlpha = 1;
+  ctx.globalCompositeOperation = "source-over";
+  ctx.shadowBlur = 24 + pulse * 14;
   ctx.shadowColor = "#28f6ff";
-  ctx.fillStyle = "rgba(40, 246, 255, 0.36)";
+  const base = ctx.createLinearGradient(-w * 0.5, 0, w * 0.5, 0);
+  base.addColorStop(0, "rgba(40, 246, 255, 0.22)");
+  base.addColorStop(0.5, "rgba(68, 255, 153, 0.38)");
+  base.addColorStop(1, "rgba(40, 246, 255, 0.22)");
+  ctx.fillStyle = base;
   ctx.fillRect(-w * 0.5, -h * 0.5, w, h);
   ctx.strokeStyle = "#28f6ff";
   ctx.lineWidth = Math.max(2, 3 * scale);
   ctx.strokeRect(-w * 0.5, -h * 0.5, w, h);
+  ctx.strokeStyle = "#44ff99";
+  ctx.lineWidth = Math.max(1, 1.6 * scale);
+  ctx.strokeRect(-w * 0.42, -h * 0.36, w * 0.84, h * 0.72);
   ctx.globalAlpha = 0.62;
   ctx.fillStyle = "rgba(246, 251, 255, 0.72)";
-  ctx.fillRect(-w * 0.42, -h * 0.36, w * 0.18, h * 0.72);
-  ctx.fillRect(w * 0.24, -h * 0.36, w * 0.18, h * 0.72);
+  ctx.fillRect(-w * 0.44, -h * 0.36, w * 0.12, h * 0.72);
+  ctx.fillRect(w * 0.32, -h * 0.36, w * 0.12, h * 0.72);
   ctx.globalAlpha = 1;
   ctx.fillStyle = "#ffe45e";
+  ctx.shadowColor = "#ffe45e";
+  ctx.shadowBlur = 10 + pulse * 8;
   ctx.beginPath();
-  ctx.moveTo(-w * 0.22, -h * 0.32);
-  ctx.lineTo(w * 0.24, 0);
-  ctx.lineTo(-w * 0.22, h * 0.32);
+  ctx.moveTo(-w * 0.28, -h * 0.34);
+  ctx.lineTo(w * 0.18, 0);
+  ctx.lineTo(-w * 0.28, h * 0.34);
   ctx.closePath();
   ctx.fill();
   ctx.beginPath();
-  ctx.moveTo(w * 0.04, -h * 0.32);
-  ctx.lineTo(w * 0.5, 0);
-  ctx.lineTo(w * 0.04, h * 0.32);
+  ctx.moveTo(w * 0.02, -h * 0.34);
+  ctx.lineTo(w * 0.48, 0);
+  ctx.lineTo(w * 0.02, h * 0.34);
   ctx.closePath();
   ctx.fill();
+  ctx.shadowBlur = 0;
+  ctx.fillStyle = "rgba(246, 251, 255, 0.78)";
+  ctx.fillRect(-w * 0.36, -h * 0.05, w * 0.72, Math.max(2, h * 0.08));
   ctx.restore();
 }
 
-function drawGasCan(ctx, x, y, scale = 1) {
+function drawGasCan(ctx, x, y, scale = 1, state = {}) {
   const w = 54 * scale;
   const h = 64 * scale;
+  const pulse = clampNumber(state.pulse, 0, 1, 0.5);
+  const urgent = Boolean(state.urgent);
   ctx.save();
   ctx.translate(x, y);
   drawShadow(ctx, w * 0.86, h * 0.72);
-  ctx.shadowBlur = 10;
+  ctx.globalCompositeOperation = "lighter";
+  ctx.globalAlpha = urgent ? 0.24 + pulse * 0.18 : 0.14 + pulse * 0.08;
+  ctx.fillStyle = urgent ? "rgba(255, 228, 94, 0.58)" : "rgba(255, 51, 76, 0.44)";
+  ctx.beginPath();
+  ctx.ellipse(0, h * 0.14, w * 0.5, h * 0.42, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.globalAlpha = 1;
+  ctx.globalCompositeOperation = "source-over";
+  ctx.shadowBlur = urgent ? 18 + pulse * 10 : 10;
   ctx.shadowColor = "#ff334c";
   ctx.fillStyle = "#c91f32";
   pixelPath(ctx, [
@@ -17026,13 +17322,21 @@ function drawGasCan(ctx, x, y, scale = 1) {
   ctx.fillStyle = "#f6fbff";
   ctx.fillRect(-w * 0.22, -h * 0.12, w * 0.44, h * 0.09);
   ctx.fillStyle = "#ffe45e";
+  ctx.shadowBlur = urgent ? 12 : 6;
+  ctx.shadowColor = "#ffe45e";
   ctx.beginPath();
   ctx.moveTo(0, -h * 0.02);
   ctx.bezierCurveTo(w * 0.18, h * 0.12, w * 0.12, h * 0.3, 0, h * 0.3);
   ctx.bezierCurveTo(-w * 0.12, h * 0.3, -w * 0.18, h * 0.12, 0, -h * 0.02);
   ctx.fill();
+  ctx.shadowBlur = 0;
   ctx.fillStyle = "#07101b";
   ctx.fillRect(w * 0.24, -h * 0.34, w * 0.24, h * 0.1);
+  ctx.fillStyle = "#f6fbff";
+  ctx.font = `900 ${Math.max(8, 10 * scale)}px Trebuchet MS, Verdana, sans-serif`;
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillText("GAS", 0, h * 0.12, w * 0.66);
   ctx.restore();
 }
 
@@ -17042,6 +17346,14 @@ function drawBarrier(ctx, x, y, scale = 1) {
   ctx.save();
   ctx.translate(x, y);
   drawShadow(ctx, w, h * 0.82);
+  ctx.globalCompositeOperation = "lighter";
+  ctx.globalAlpha = 0.16;
+  ctx.fillStyle = "rgba(255, 179, 64, 0.36)";
+  ctx.beginPath();
+  ctx.ellipse(0, h * 0.22, w * 0.5, h * 0.13, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.globalAlpha = 1;
+  ctx.globalCompositeOperation = "source-over";
   ctx.fillStyle = "#12131a";
   ctx.fillRect(-w * 0.42, h * 0.18, w * 0.12, h * 0.25);
   ctx.fillRect(w * 0.3, h * 0.18, w * 0.12, h * 0.25);
@@ -17070,8 +17382,11 @@ function drawBarrier(ctx, x, y, scale = 1) {
   ctx.restore();
 
   ctx.fillStyle = "#f3f0d8";
+  ctx.shadowBlur = 8;
+  ctx.shadowColor = "#ffe45e";
   ctx.fillRect(-w * 0.5, -h * 0.38, w, h * 0.08);
   ctx.fillRect(-w * 0.5, h * 0.13, w, h * 0.08);
+  ctx.shadowBlur = 0;
   ctx.fillStyle = "#ff334c";
   ctx.fillRect(-w * 0.49, -h * 0.4, w * 0.14, h * 0.12);
   ctx.fillRect(w * 0.35, -h * 0.4, w * 0.14, h * 0.12);
@@ -17084,6 +17399,14 @@ function drawBranch(ctx, x, y, scale = 1) {
   ctx.save();
   ctx.translate(x, y);
   drawShadow(ctx, w, h);
+  ctx.globalCompositeOperation = "lighter";
+  ctx.globalAlpha = 0.14;
+  ctx.fillStyle = "rgba(255, 228, 94, 0.32)";
+  ctx.beginPath();
+  ctx.ellipse(0, h * 0.1, w * 0.48, h * 0.28, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.globalAlpha = 1;
+  ctx.globalCompositeOperation = "source-over";
   ctx.strokeStyle = "#b56b36";
   ctx.lineWidth = Math.max(5, 7 * scale);
   ctx.lineCap = "square";
@@ -17170,6 +17493,10 @@ function drawShadow(ctx, w, h) {
 function drawTrafficSprite(ctx, x, y, visual) {
   const image = visual.sprite;
   if (!image || !visual.source) return;
+  const type = visual.type || "";
+  const underglow = type === "fastCar"
+    ? "rgba(255, 51, 76, 0.38)"
+    : (type === "truck" ? "rgba(255, 228, 94, 0.28)" : "rgba(40, 246, 255, 0.26)");
   ctx.save();
   const parentAlpha = ctx.globalAlpha;
   ctx.globalAlpha = parentAlpha * 0.28;
@@ -17177,9 +17504,18 @@ function drawTrafficSprite(ctx, x, y, visual) {
   ctx.beginPath();
   ctx.ellipse(x, y + visual.h * 0.34, visual.w * 0.46, visual.h * 0.11, 0, 0, Math.PI * 2);
   ctx.fill();
+  ctx.globalCompositeOperation = "lighter";
+  ctx.globalAlpha = parentAlpha * 0.2;
+  ctx.fillStyle = underglow;
+  ctx.beginPath();
+  ctx.ellipse(x, y + visual.h * 0.34, visual.w * 0.42, visual.h * 0.08, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.globalCompositeOperation = "source-over";
   ctx.globalAlpha = parentAlpha;
   ctx.imageSmoothingEnabled = true;
   ctx.imageSmoothingQuality = "high";
+  ctx.shadowBlur = type === "truck" ? 7 : 9;
+  ctx.shadowColor = type === "fastCar" ? "#ff334c" : (type === "truck" ? "#ffe45e" : "#28f6ff");
   ctx.drawImage(
     image,
     visual.source.x,
@@ -17191,6 +17527,17 @@ function drawTrafficSprite(ctx, x, y, visual) {
     visual.w,
     visual.h
   );
+  ctx.shadowBlur = 0;
+  if (visual.w >= 34 && visual.h >= 46) {
+    ctx.globalCompositeOperation = "lighter";
+    ctx.globalAlpha = parentAlpha * 0.78;
+    ctx.fillStyle = type === "fastCar" ? "#ffe45e" : "#f6fbff";
+    ctx.fillRect(x - visual.w * 0.23, y - visual.h * 0.42, visual.w * 0.12, Math.max(2, visual.h * 0.026));
+    ctx.fillRect(x + visual.w * 0.11, y - visual.h * 0.42, visual.w * 0.12, Math.max(2, visual.h * 0.026));
+    ctx.fillStyle = "#ff334c";
+    ctx.fillRect(x - visual.w * 0.25, y + visual.h * 0.4, visual.w * 0.13, Math.max(2, visual.h * 0.026));
+    ctx.fillRect(x + visual.w * 0.12, y + visual.h * 0.4, visual.w * 0.13, Math.max(2, visual.h * 0.026));
+  }
   ctx.restore();
 }
 
