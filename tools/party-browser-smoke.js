@@ -128,7 +128,7 @@ async function run() {
   await expectText("Party Awards");
   if (!sawRoundShuffle) throw new Error("Random Every Round shuffle message not observed");
 
-  await page.getByRole("button", { name: /Change Players\/Mode/i }).click();
+  await page.getByRole("button", { name: /Change (Players\/Mode|Setup)/i }).click();
   await page.waitForFunction(() => window.neonRoadRally?.screen === "partySetup", null, { timeout: 5000 });
   await page.selectOption("#partyRaceType", "fuelRun");
   await page.selectOption("#partyRoundType", "oneRunEach");
@@ -157,7 +157,7 @@ async function run() {
   await page.selectOption("#preRaceType", "classic");
   await page.selectOption("#preRaceType", "fuelRun");
   await page.selectOption("#preRaceType", "pursuit");
-  await page.getByRole("button", { name: /^Back$/ }).click();
+  await page.getByRole("button", { name: /^Back( to Title)?$/ }).click();
   await page.waitForFunction(() => window.neonRoadRally?.screen === "title", null, { timeout: 5000 });
 
   await clickText("Driver Garage");
