@@ -210,6 +210,25 @@ async function installVisualSmokeHelpers(page) {
       const game = app();
       const run = game.run || {};
       const objects = visibleObjects();
+      const music = (() => {
+        const identity = game.audio?.getMusicIdentityLayer?.();
+        const state = game.audio?.musicState || {};
+        const lastEvent = game.audio?.lastMusicEvent || null;
+        const intensity = Number(identity?.intensity ?? state.intensity ?? 0) || 0;
+        return {
+          id: identity?.id || state.id || "",
+          cueLabel: identity?.cueLabel || state.label || "",
+          mood: identity?.mood || "",
+          intensity: Number(intensity.toFixed(3)),
+          sectionStem: identity?.futureHooks?.sectionStem || "",
+          overlayStem: identity?.futureHooks?.overlayStem || "",
+          active: Boolean(identity?.active),
+          boosted: Boolean(identity?.boosted),
+          airborne: Boolean(identity?.airborne),
+          lastEvent: lastEvent?.id || "",
+          lastEventHook: lastEvent?.futureHook || ""
+        };
+      })();
       return {
         label,
         screen: game.screen,
@@ -222,6 +241,7 @@ async function installVisualSmokeHelpers(page) {
         objects,
         visibleTypes: Array.from(new Set(objects.map((item) => item.type))).sort(),
         canvas: canvasSample(),
+        music,
         boost: {
           padsCollected: run.boostPadsCollected || 0,
           padBoostTimer: Number((run.padBoostTimer || 0).toFixed(3)),
@@ -389,6 +409,7 @@ async function installVisualSmokeHelpers(page) {
           waveLabel: "Visual smoke roadblock"
         });
       });
+      app().updateAudioMusicState();
       return { waveId, safeLane, ahead };
     }
 
@@ -514,7 +535,14 @@ async function installVisualSmokeHelpers(page) {
         screen: game.screen,
         playtestReport: Boolean(document.querySelector(".playtest-report-panel"))
       };
-      return { garage, scoreBoard, timeBoard, report };
+      game.showSettingsScreen();
+      const settings = {
+        screen: game.screen,
+        audioControls: Boolean(document.querySelector("#masterVolume") && document.querySelector("#musicVolume") && document.querySelector("#sfxVolume")),
+        audioTest: Boolean(document.querySelector(".audio-test-panel")),
+        musicSummary: document.querySelector(".audio-test-header span")?.textContent || ""
+      };
+      return { garage, scoreBoard, timeBoard, report, settings };
     }
 
     ensurePlayers();
@@ -597,12 +625,14 @@ async function run() {
     assert(boost.approach.visibleTypes.includes("boostPad"), "Classic boost pad was not visible before pickup", boost.approach);
     assert(boost.collected.boost.padBoostTimer > 0, "Boost-active timer was not visible after pickup", boost.collected.boost);
     assert(boost.collected.boost.flash > 0 && boost.collected.boost.trail > 0, "Boost pickup flash/trail timers were not active", boost.collected.boost);
+    assert(boost.collected.music.boosted || boost.collected.music.lastEvent === "boostAccent", "Boost music identity/accent was not active", boost.collected.music);
     report.observed.classicBoost = {
       boostPadVisible: true,
       collected: boost.collected.boost.padsCollected,
       padBoostTimer: boost.collected.boost.padBoostTimer,
       flash: boost.collected.boost.flash,
-      trail: boost.collected.boost.trail
+      trail: boost.collected.boost.trail,
+      music: boost.collected.music
     };
 
     const ramp = await page.evaluate(() => window.__nrrVisualSmoke.testClassicRamp());
@@ -610,13 +640,18 @@ async function run() {
     assert(ramp.airborne.ramp.airborne && ramp.airborne.ramp.jumpOffset > 0, "Classic ramp airborne state was not observed", ramp.airborne.ramp);
     assert(ramp.landing.ramp.landingPulse > 0, "Classic ramp landing pulse was not observed", ramp.landing.ramp);
     assert(ramp.landing.ramp.targetsCleared >= 1, "Classic ramp target clear was not observed", ramp.landing.ramp);
+    assert(ramp.airborne.music.airborne || ["rampLaunch", "rampLanding", "rampClear"].includes(ramp.landing.music.lastEvent), "Ramp music identity/accent was not observed", {
+      airborne: ramp.airborne.music,
+      landing: ramp.landing.music
+    });
     report.observed.classicRamp = {
       rampApproachVisible: true,
       airborneObserved: true,
       jumpOffset: ramp.airborne.ramp.jumpOffset,
       landingPulse: ramp.landing.ramp.landingPulse,
       targetsCleared: ramp.landing.ramp.targetsCleared,
-      targetStatus: ramp.landing.ramp.targetStatus
+      targetStatus: ramp.landing.ramp.targetStatus,
+      music: ramp.landing.music
     };
 
     const finish = await page.evaluate(() => window.__nrrVisualSmoke.testClassicFinish());
@@ -645,19 +680,22 @@ async function run() {
       after: fuel.collected.fuel.fuel
     });
     assert(fuel.critical.fuel.critical && fuel.critical.fuel.warningPulse > 0, "Fuel Run critical fuel visual was not observed", fuel.critical.fuel);
+    assert(fuel.critical.music.id.includes("fuelCritical") || fuel.critical.music.lastEvent === "fuelCritical", "Fuel critical music identity was not observed", fuel.critical.music);
     report.observed.fuelRun = {
       gasCanVisible: true,
       gasCansCollected: fuel.collected.fuel.gasCansCollected,
       fuelBefore: fuel.beforeFuel,
       fuelAfter: fuel.collected.fuel.fuel,
       criticalFuelObserved: true,
-      warningPulse: fuel.critical.fuel.warningPulse
+      warningPulse: fuel.critical.fuel.warningPulse,
+      music: fuel.critical.music
     };
 
     const pursuit = await page.evaluate(() => window.__nrrVisualSmoke.testPursuitRoadblockAndEscaped());
     assert(pursuit.warning.pursuit.roadblockAhead, "Pursuit roadblock warning was not active", pursuit.warning.pursuit);
     assert(pursuit.warning.objects.some((item) => item.pursuitRoadblock), "Pursuit roadblock gate was not visible", pursuit.warning.objects);
     assert(pursuit.warning.pursuit.escapeLaneCount >= 1, "Pursuit escape-lane guide was not represented", pursuit.warning.pursuit);
+    assert(pursuit.warning.music.id.includes("pursuitPressure") || pursuit.warning.music.cueLabel === "Pursuit Pressure", "Pursuit pressure music identity was not observed", pursuit.warning.music);
     assert(pursuit.cleared.pursuit.roadblocksCleared >= 1, "Pursuit roadblock clear was not observed", pursuit.cleared.pursuit);
     assert(pursuit.escaped.pursuit.escaped && pursuit.escaped.finish.flash > 0, "Pursuit escaped result visual was not observed", pursuit.escaped);
     report.observed.pursuitRoadblockEscaped = {
@@ -666,7 +704,8 @@ async function run() {
       heat: pursuit.warning.pursuit.heat,
       roadblocksCleared: pursuit.cleared.pursuit.roadblocksCleared,
       escaped: pursuit.escaped.pursuit.escaped,
-      finishFlash: pursuit.escaped.finish.flash
+      finishFlash: pursuit.escaped.finish.flash,
+      music: pursuit.warning.music
     };
     report.scoreScreens.pursuitEscaped = await collectScoreScreen(page);
     assert(report.scoreScreens.pursuitEscaped.summary?.pursuitResult === "Escaped", "Pursuit escaped result was not recorded", report.scoreScreens.pursuitEscaped.summary);
@@ -712,6 +751,7 @@ async function run() {
     assert(menu.scoreBoard.screen === "leaderboard" && menu.scoreBoard.scoreAttack, "Score Attack board smoke failed", menu.scoreBoard);
     assert(menu.timeBoard.screen === "leaderboard" && menu.timeBoard.timeAttack, "Time Attack board smoke failed", menu.timeBoard);
     assert(menu.report.screen === "playtestReport" && menu.report.playtestReport, "Playtest Report smoke failed", menu.report);
+    assert(menu.settings.screen === "settings" && menu.settings.audioControls && menu.settings.audioTest, "Settings audio controls smoke failed", menu.settings);
     report.observed.menuAndReports = menu;
 
     assert(consoleIssues.length === 0, "Console warnings/errors observed", { consoleIssues });

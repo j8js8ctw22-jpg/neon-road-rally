@@ -6716,6 +6716,176 @@ const AUDIO_TEST_SFX = [
   { key: "finish", label: "Finish" }
 ];
 
+const MUSIC_IDENTITY_SECTIONS = {
+  menu: {
+    id: "menu",
+    cueLabel: "Menu",
+    mood: "neon idle",
+    pulseRate: 0,
+    pulseStrength: 0,
+    lowEnergy: 0,
+    edgePulse: 0,
+    horizonGlow: 0,
+    accentKey: "",
+    accentVolume: 0,
+    futureStem: "menu-bed"
+  },
+  launch: {
+    id: "launch",
+    cueLabel: "Opening",
+    mood: "song opening",
+    pulseRate: 1.08,
+    pulseStrength: 0.18,
+    lowEnergy: 0.16,
+    edgePulse: 0.12,
+    horizonGlow: 0.12,
+    accentKey: "musicLaunch",
+    accentVolume: 0.16,
+    futureStem: "intro"
+  },
+  groove: {
+    id: "groove",
+    cueLabel: "Groove",
+    mood: "steady drive",
+    pulseRate: 1.38,
+    pulseStrength: 0.2,
+    lowEnergy: 0.22,
+    edgePulse: 0.14,
+    horizonGlow: 0.08,
+    accentKey: "musicGroove",
+    accentVolume: 0.11,
+    futureStem: "rhythm"
+  },
+  pressure: {
+    id: "pressure",
+    cueLabel: "Pressure",
+    mood: "tightened rhythm",
+    pulseRate: 1.72,
+    pulseStrength: 0.28,
+    lowEnergy: 0.3,
+    edgePulse: 0.22,
+    horizonGlow: 0.14,
+    accentKey: "musicPressure",
+    accentVolume: 0.14,
+    futureStem: "tension"
+  },
+  breather: {
+    id: "breather",
+    cueLabel: "Breather",
+    mood: "open air",
+    pulseRate: 0.86,
+    pulseStrength: 0.12,
+    lowEnergy: 0.08,
+    edgePulse: 0.08,
+    horizonGlow: 0.05,
+    accentKey: "musicBreather",
+    accentVolume: 0.1,
+    futureStem: "release"
+  },
+  finalPush: {
+    id: "finalPush",
+    cueLabel: "Final Push",
+    mood: "climax",
+    pulseRate: 2.08,
+    pulseStrength: 0.34,
+    lowEnergy: 0.36,
+    edgePulse: 0.3,
+    horizonGlow: 0.2,
+    accentKey: "musicFinalPush",
+    accentVolume: 0.18,
+    futureStem: "finale"
+  }
+};
+
+const MUSIC_IDENTITY_OVERLAYS = {
+  fuelCritical: {
+    id: "fuelCritical",
+    cueLabel: "Fuel Critical",
+    mood: "empty tank tension",
+    pulseRateBoost: 0.55,
+    pulseStrengthBoost: 0.14,
+    lowEnergyBoost: 0.08,
+    edgePulseBoost: 0.16,
+    horizonGlowBoost: 0.1,
+    color: "#ff334c",
+    accentKey: "musicFuelCritical",
+    accentVolume: 0.15,
+    futureStem: "fuel-tension"
+  },
+  pursuitPressure: {
+    id: "pursuitPressure",
+    cueLabel: "Pursuit Pressure",
+    mood: "chase pressure",
+    pulseRateBoost: 0.42,
+    pulseStrengthBoost: 0.16,
+    lowEnergyBoost: 0.12,
+    edgePulseBoost: 0.18,
+    horizonGlowBoost: 0.12,
+    color: "#28f6ff",
+    accentKey: "musicPursuitPressure",
+    accentVolume: 0.14,
+    futureStem: "pursuit-tension"
+  }
+};
+
+const MUSIC_IDENTITY_EVENT_ACCENTS = {
+  boostAccent: { sfxKey: "musicBoostAccent", cooldownMs: 260, volume: 0.16, futureHook: "event.boost" },
+  rampLaunch: { sfxKey: "musicRampAccent", cooldownMs: 360, volume: 0.13, futureHook: "event.ramp.launch" },
+  rampLanding: { sfxKey: "musicLandingAccent", cooldownMs: 360, volume: 0.11, futureHook: "event.ramp.land" },
+  rampClear: { sfxKey: "musicLandingAccent", cooldownMs: 360, volume: 0.14, futureHook: "event.ramp.clear" },
+  fuelLow: { sfxKey: "musicFuelCritical", cooldownMs: 3000, volume: 0.1, futureHook: "event.fuel.low" },
+  fuelCritical: { sfxKey: "musicFuelCritical", cooldownMs: 2200, volume: 0.13, futureHook: "event.fuel.critical" },
+  pursuitPressure: { sfxKey: "musicPursuitPressure", cooldownMs: 1400, volume: 0.12, futureHook: "event.pursuit.pressure" }
+};
+
+function getMusicIdentitySection(sectionId) {
+  const id = sanitizeName(sectionId || "menu", "menu", 40);
+  return MUSIC_IDENTITY_SECTIONS[id] || MUSIC_IDENTITY_SECTIONS.groove;
+}
+
+function buildMusicIdentityLayer(state = {}) {
+  const sectionId = sanitizeName(state.sectionId || state.id || "menu", "menu", 40);
+  const base = getMusicIdentitySection(sectionId);
+  const overlay = state.fuelCritical
+    ? MUSIC_IDENTITY_OVERLAYS.fuelCritical
+    : (state.pursuitPressure ? MUSIC_IDENTITY_OVERLAYS.pursuitPressure : null);
+  const intensity = clampNumber(state.intensity, 0, 2, 0);
+  const boostLift = state.boosted ? 0.08 : 0;
+  const airborneLift = state.airborne ? 0.05 : 0;
+  const id = overlay ? `${base.id}:${overlay.id}` : base.id;
+  const pulseRate = clampNumber(base.pulseRate + (overlay?.pulseRateBoost || 0) + boostLift + airborneLift, 0, 3, 0);
+  const pulseStrength = clampNumber(base.pulseStrength + (overlay?.pulseStrengthBoost || 0) + (state.boosted ? 0.08 : 0), 0, 0.7, 0);
+  const lowEnergy = clampNumber(base.lowEnergy + (overlay?.lowEnergyBoost || 0), 0, 0.7, 0);
+  const edgePulse = clampNumber(base.edgePulse + (overlay?.edgePulseBoost || 0) + (state.boosted ? 0.08 : 0), 0, 0.8, 0);
+  const horizonGlow = clampNumber(base.horizonGlow + (overlay?.horizonGlowBoost || 0), 0, 0.6, 0);
+  const cueLabel = overlay?.cueLabel || base.cueLabel || state.label || base.id;
+  return {
+    id,
+    sectionId: base.id,
+    cueLabel,
+    mood: overlay?.mood || base.mood || "drive",
+    intensity,
+    pulseRate,
+    pulseStrength,
+    lowEnergy,
+    edgePulse,
+    horizonGlow,
+    color: overlay?.color || (state.boosted ? "#28f6ff" : "#ffe45e"),
+    accentKey: overlay?.accentKey || base.accentKey || "",
+    accentVolume: clampNumber(overlay?.accentVolume ?? base.accentVolume, 0, 0.4, 0),
+    active: Boolean(state.active),
+    boosted: Boolean(state.boosted),
+    airborne: Boolean(state.airborne),
+    futureHooks: {
+      version: "music-identity-v1",
+      sectionStem: base.futureStem || base.id,
+      overlayStem: overlay?.futureStem || "",
+      stemSlots: ["bed", "rhythm", "bass", "lead", "tension", "release"],
+      eventBus: "section-change boost ramp fuel-critical pursuit-pressure"
+    }
+  };
+}
+
 function getAudioTestSfxLabel(key) {
   return AUDIO_TEST_SFX.find((item) => item.key === key)?.label || key;
 }
@@ -6746,9 +6916,19 @@ class AudioManager {
       intensity: 0,
       raceTypeId: "menu",
       trackId: "",
+      active: false,
+      boosted: false,
+      airborne: false,
+      speedRatio: 0,
+      sectionProgress: 0,
       fuelCritical: false,
       pursuitPressure: false
     };
+    this.musicIdentity = buildMusicIdentityLayer(this.musicState);
+    this.lastMusicIdentityId = this.musicIdentity.id;
+    this.lastMusicIdentityAccentAt = -Infinity;
+    this.lastMusicEventAt = {};
+    this.lastMusicEvent = null;
     this.sfxCooldowns = {
       menu: 100,
       countdownBeep: 120,
@@ -6774,7 +6954,17 @@ class AudioManager {
       warning: 1000,
       finish: 600,
       crash: 600,
-      newHighScore: 900
+      newHighScore: 900,
+      musicLaunch: 700,
+      musicGroove: 900,
+      musicPressure: 900,
+      musicBreather: 900,
+      musicFinalPush: 900,
+      musicFuelCritical: 1200,
+      musicPursuitPressure: 1100,
+      musicBoostAccent: 260,
+      musicRampAccent: 360,
+      musicLandingAccent: 360
     };
     this.tracks = {
       title: { path: "audio/title-theme.mp3", audio: null, loaded: "untested" },
@@ -6806,7 +6996,17 @@ class AudioManager {
       countdownBeep: { path: "audio/countdown-beep.wav", audio: null, loaded: "untested", tone: tone([{ type: "square", frequency: 700, endFrequency: 700, duration: 0.08, gain: 0.13 }], 0.1).tone },
       go: { path: "audio/go.wav", audio: null, loaded: "untested", tone: tone([{ type: "triangle", frequency: 320, endFrequency: 840, duration: 0.2, gain: 0.2 }, { type: "sine", frequency: 92, endFrequency: 58, duration: 0.14, gain: 0.14 }], 0.24).tone },
       newHighScore: { path: "audio/new-high-score.wav", audio: null, loaded: "untested", tone: tone([{ type: "triangle", frequency: 520, endFrequency: 1040, duration: 0.18, gain: 0.18 }, { type: "sine", frequency: 780, endFrequency: 1560, start: 0.08, duration: 0.18, gain: 0.14 }], 0.3).tone },
-      warning: { path: "audio/warning.wav", audio: null, loaded: "untested", tone: tone([{ type: "square", frequency: 260, endFrequency: 180, duration: 0.16, gain: 0.14 }], 0.18).tone }
+      warning: { path: "audio/warning.wav", audio: null, loaded: "untested", tone: tone([{ type: "square", frequency: 260, endFrequency: 180, duration: 0.16, gain: 0.14 }], 0.18).tone },
+      musicLaunch: tone([{ type: "triangle", frequency: 130, endFrequency: 196, duration: 0.22, gain: 0.09 }, { type: "sine", frequency: 392, endFrequency: 523, start: 0.08, duration: 0.16, gain: 0.06 }], 0.28),
+      musicGroove: tone([{ type: "triangle", frequency: 196, endFrequency: 196, duration: 0.08, gain: 0.06 }, { type: "triangle", frequency: 294, endFrequency: 294, start: 0.12, duration: 0.08, gain: 0.05 }], 0.22),
+      musicPressure: tone([{ type: "sawtooth", frequency: 146, endFrequency: 123, duration: 0.2, gain: 0.07 }, { type: "triangle", frequency: 392, endFrequency: 330, start: 0.06, duration: 0.16, gain: 0.05 }], 0.26),
+      musicBreather: tone([{ type: "sine", frequency: 330, endFrequency: 392, duration: 0.18, gain: 0.045 }, { type: "triangle", frequency: 247, endFrequency: 294, start: 0.08, duration: 0.18, gain: 0.04 }], 0.3),
+      musicFinalPush: tone([{ type: "sawtooth", frequency: 196, endFrequency: 392, duration: 0.2, gain: 0.08 }, { type: "sine", frequency: 784, endFrequency: 988, start: 0.09, duration: 0.16, gain: 0.055 }], 0.3),
+      musicFuelCritical: tone([{ type: "square", frequency: 110, endFrequency: 92, duration: 0.2, gain: 0.07 }, { type: "triangle", frequency: 330, endFrequency: 262, start: 0.1, duration: 0.16, gain: 0.045 }], 0.34),
+      musicPursuitPressure: tone([{ type: "sawtooth", frequency: 123, endFrequency: 98, duration: 0.24, gain: 0.07 }, { type: "triangle", frequency: 523, endFrequency: 659, start: 0.07, duration: 0.18, gain: 0.05 }], 0.34),
+      musicBoostAccent: tone([{ type: "sawtooth", frequency: 330, endFrequency: 990, duration: 0.12, gain: 0.08 }, { noise: true, duration: 0.12, gain: 0.025 }], 0.16),
+      musicRampAccent: tone([{ type: "triangle", frequency: 220, endFrequency: 660, duration: 0.16, gain: 0.075 }, { type: "sine", frequency: 440, endFrequency: 880, start: 0.06, duration: 0.13, gain: 0.045 }], 0.22),
+      musicLandingAccent: tone([{ type: "triangle", frequency: 196, endFrequency: 98, duration: 0.14, gain: 0.08 }, { noise: true, duration: 0.08, gain: 0.035 }], 0.18)
     };
   }
 
@@ -7200,6 +7400,7 @@ class AudioManager {
 
   updateMusicState(state = {}) {
     const id = sanitizeName(state.id || state.sectionId || "menu", "menu", 40);
+    const previousIdentity = this.musicIdentity || buildMusicIdentityLayer(this.musicState);
     this.musicState = {
       id,
       label: sanitizeName(state.label || id, id, 48),
@@ -7207,15 +7408,86 @@ class AudioManager {
       intensity: clampNumber(state.intensity, 0, 2, 0),
       raceTypeId: sanitizeName(state.raceTypeId || "menu", "menu", 40),
       trackId: sanitizeName(state.trackId || "", "", 40),
+      active: Boolean(state.active),
+      boosted: Boolean(state.boosted),
+      airborne: Boolean(state.airborne),
+      speedRatio: clampNumber(state.speedRatio, 0, 2, 0),
+      sectionProgress: clampNumber(state.sectionProgress, 0, 1, 0),
       fuelCritical: Boolean(state.fuelCritical),
       pursuitPressure: Boolean(state.pursuitPressure)
     };
+    this.musicIdentity = buildMusicIdentityLayer(this.musicState);
+    this.maybePlayMusicIdentityAccent(previousIdentity, this.musicIdentity);
+  }
+
+  getMusicIdentityLayer() {
+    if (!this.musicIdentity) this.musicIdentity = buildMusicIdentityLayer(this.musicState || {});
+    return this.musicIdentity;
+  }
+
+  musicIdentityHooks() {
+    return this.getMusicIdentityLayer().futureHooks;
+  }
+
+  getAudioNowMs() {
+    if (typeof performance !== "undefined" && typeof performance.now === "function") {
+      return performance.now();
+    }
+    return Date.now();
+  }
+
+  maybePlayMusicIdentityAccent(previousIdentity, nextIdentity) {
+    if (!nextIdentity?.active || !nextIdentity.accentKey) return false;
+    const becameActive = Boolean(nextIdentity.active && !previousIdentity?.active);
+    const changed = previousIdentity?.id !== nextIdentity.id || becameActive;
+    if (!changed) return false;
+    const now = this.getAudioNowMs();
+    this.lastMusicIdentityId = nextIdentity.id;
+    this.lastMusicIdentityAccentAt = now;
+    this.lastMusicEvent = {
+      id: `section:${nextIdentity.sectionId}`,
+      sectionId: nextIdentity.sectionId,
+      futureHook: `section.${nextIdentity.futureHooks?.sectionStem || nextIdentity.sectionId}`,
+      intensity: nextIdentity.intensity,
+      at: now
+    };
+    if (this.isMusicSilenced() || this.isSfxSilenced()) return false;
+    return this.playSfx(nextIdentity.accentKey, {
+      cooldownMs: 540,
+      maxInstances: 1,
+      volume: this.sfxVolume * nextIdentity.accentVolume
+    });
+  }
+
+  triggerMusicEvent(eventId, options = {}) {
+    const event = MUSIC_IDENTITY_EVENT_ACCENTS[eventId];
+    if (!event) return false;
+    const now = this.getAudioNowMs();
+    const identity = this.getMusicIdentityLayer();
+    const intensity = clampNumber(options.intensity ?? identity.intensity, 0, 2, identity.intensity || 0);
+    this.lastMusicEvent = {
+      id: eventId,
+      sectionId: sanitizeName(options.sectionId || identity.sectionId || this.musicState?.sectionId || "groove", "groove", 40),
+      futureHook: event.futureHook,
+      intensity,
+      at: now
+    };
+    const last = this.lastMusicEventAt[eventId] || -Infinity;
+    if (now - last < event.cooldownMs) return false;
+    this.lastMusicEventAt[eventId] = now;
+    if (this.isMusicSilenced() || this.isSfxSilenced()) return false;
+    return this.playSfx(event.sfxKey, {
+      cooldownMs: 0,
+      maxInstances: 1,
+      volume: this.sfxVolume * event.volume * clamp(0.72 + intensity * 0.2, 0.65, 1.12)
+    });
   }
 
   musicStateSummary() {
     const state = this.musicState || {};
-    const intensity = Math.round(clampNumber(state.intensity, 0, 2, 0) * 100);
-    return `${state.label || "Menu"} · ${intensity}% intensity`;
+    const identity = this.getMusicIdentityLayer();
+    const intensity = Math.round(clampNumber(identity.intensity ?? state.intensity, 0, 2, 0) * 100);
+    return `${identity.cueLabel || state.label || "Menu"} · ${identity.mood || "drive"} · ${intensity}% intensity`;
   }
 
   musicLoadedStatus() {
@@ -13490,7 +13762,10 @@ class Renderer {
     const visualIntensity = this.getRaceVisualIntensity();
     const speedFeel = this.getSpeedFeelIntensity();
     const theme = this.getCurrentTrackVisualTheme();
-    const glowStrength = clamp(TRACK_VISUALS.horizonGlowStrength * clamp(visualIntensity + speedFeel * 0.16, 0.78, 1.38), 0.45, 1.08);
+    const musicIdentity = this.getMusicIdentityAtmosphere();
+    const musicPulse = this.getMusicPulse(musicIdentity);
+    const musicGlow = musicIdentity ? musicIdentity.horizonGlow * (0.7 + musicPulse * 0.3) : 0;
+    const glowStrength = clamp(TRACK_VISUALS.horizonGlowStrength * clamp(visualIntensity + speedFeel * 0.16 + musicGlow, 0.78, 1.46), 0.45, 1.16);
     const sky = ctx.createLinearGradient(0, 0, 0, h);
     sky.addColorStop(0, theme.skyTop || "#100c2b");
     sky.addColorStop(0.26, theme.skyMid || "#2c0d46");
@@ -13527,6 +13802,7 @@ class Renderer {
       ctx.fillRect(0, horizonY - 132, w, 264);
       ctx.globalAlpha = 1;
     }
+    this.drawMusicHorizonAtmosphere(horizonY, musicIdentity, musicPulse, glowStrength);
 
     this.drawHorizonSilhouettes(horizonY);
     if (theme.citySkyline) this.drawTrackCitySkyline(horizonY, theme);
@@ -13689,6 +13965,38 @@ class Renderer {
     return getSectionNumber({
       visualIntensity: Number.isFinite(run.sectionVisualIntensity) ? run.sectionVisualIntensity : section.visualIntensity
     }, "visualIntensity", 1, 0.65, 1.55);
+  }
+
+  getMusicIdentityAtmosphere() {
+    if (this.game.screen !== "game") return null;
+    const identity = this.game.audio?.getMusicIdentityLayer?.();
+    if (!identity?.active) return null;
+    return identity;
+  }
+
+  getMusicPulse(identity = this.getMusicIdentityAtmosphere()) {
+    if (!identity?.pulseRate) return 0;
+    const run = this.game.run || {};
+    const elapsed = Number.isFinite(run.elapsed) ? run.elapsed : 0;
+    return 0.5 + Math.sin(elapsed * Math.PI * 2 * identity.pulseRate) * 0.5;
+  }
+
+  drawMusicHorizonAtmosphere(horizonY, identity = this.getMusicIdentityAtmosphere(), pulse = this.getMusicPulse(identity), glowStrength = 1) {
+    if (!identity) return;
+    const ctx = this.ctx;
+    const w = this.width;
+    const color = identity.color || "#28f6ff";
+    const strength = clamp((identity.horizonGlow || 0) * (0.55 + pulse * 0.45) * (0.72 + identity.intensity * 0.16), 0, 0.28);
+    if (strength <= 0.01) return;
+    ctx.save();
+    ctx.globalCompositeOperation = "lighter";
+    const glow = ctx.createRadialGradient(w * 0.5, horizonY, 2, w * 0.5, horizonY, Math.max(w * 0.3, 360));
+    glow.addColorStop(0, rgbaFromHex(color, strength * glowStrength * 0.48));
+    glow.addColorStop(0.44, rgbaFromHex(color, strength * 0.18));
+    glow.addColorStop(1, rgbaFromHex(color, 0));
+    ctx.fillStyle = glow;
+    ctx.fillRect(0, horizonY - 180, w, 360);
+    ctx.restore();
   }
 
   drawRoadsideScenery(alpha = 1) {
@@ -14035,6 +14343,7 @@ class Renderer {
     ctx.lineTo(road.x + road.w, road.y + road.h);
     ctx.stroke();
     this.drawRoadEdgeDetails(scrollSource, alpha);
+    this.drawMusicRoadAtmosphere(scrollSource, alpha);
     if (theme.tunnelPanels) this.drawTrackTunnelPanels(scrollSource, alpha, theme);
 
     const dashHeight = 56 + speedFeel * 8;
@@ -14059,6 +14368,52 @@ class Renderer {
     this.drawPlayerLaneFloorGlow(alpha);
     this.drawFuelRoadPulse(alpha);
     this.drawFinalStretchRoadGlow(alpha);
+    ctx.restore();
+  }
+
+  drawMusicRoadAtmosphere(scrollSource, alpha = 1) {
+    const identity = this.getMusicIdentityAtmosphere();
+    if (!identity) return;
+    const ctx = this.ctx;
+    const road = this.road;
+    const pulse = this.getMusicPulse(identity);
+    const color = identity.color || "#28f6ff";
+    const intensity = clampNumber(identity.intensity, 0, 2, 0);
+    const edgeAlpha = clamp((identity.edgePulse || 0) * (0.38 + pulse * 0.44) * (0.72 + intensity * 0.16), 0, 0.22) * alpha;
+    const lowEnergyAlpha = clamp((identity.lowEnergy || 0) * (0.42 + pulse * 0.22) * (0.7 + intensity * 0.12), 0, 0.16) * alpha;
+    if (edgeAlpha <= 0.006 && lowEnergyAlpha <= 0.006) return;
+
+    ctx.save();
+    ctx.globalCompositeOperation = "lighter";
+    if (edgeAlpha > 0.006) {
+      ctx.strokeStyle = rgbaFromHex(color, edgeAlpha);
+      ctx.shadowColor = color;
+      ctx.shadowBlur = 9 + intensity * 7;
+      ctx.lineWidth = 2 + intensity * 0.7;
+      ctx.beginPath();
+      ctx.moveTo(road.x + 10, road.y);
+      ctx.lineTo(road.x + 10, road.y + road.h);
+      ctx.moveTo(road.x + road.w - 10, road.y);
+      ctx.lineTo(road.x + road.w - 10, road.y + road.h);
+      ctx.stroke();
+      ctx.shadowBlur = 0;
+    }
+
+    if (lowEnergyAlpha > 0.006) {
+      const spacing = clamp(156 - (identity.pulseRate || 0) * 22 - intensity * 12, 92, 168);
+      const bandHeight = 3 + intensity * 1.5;
+      const scroll = (scrollSource * (0.12 + (identity.pulseRate || 0) * 0.035)) % spacing;
+      for (let y = road.y - spacing + scroll; y < road.y + road.h + spacing; y += spacing) {
+        const band = ctx.createLinearGradient(road.x, 0, road.x + road.w, 0);
+        band.addColorStop(0, rgbaFromHex(color, 0));
+        band.addColorStop(0.18, rgbaFromHex(color, lowEnergyAlpha * 0.28));
+        band.addColorStop(0.5, rgbaFromHex(color, lowEnergyAlpha * 0.08));
+        band.addColorStop(0.82, rgbaFromHex(color, lowEnergyAlpha * 0.28));
+        band.addColorStop(1, rgbaFromHex(color, 0));
+        ctx.fillStyle = band;
+        ctx.fillRect(road.x, y, road.w, bandHeight);
+      }
+    }
     ctx.restore();
   }
 
@@ -18056,6 +18411,8 @@ class NeonRoadRally {
     }
     const speedRatio = clamp((run.currentSpeed || 0) / Math.max(1, run.track?.maxSpeed || 1), 0, 1.8);
     const boosted = run.boostTimer > 0 || run.padBoostTimer > 0;
+    const active = Boolean(run.raceActive && !run.ended);
+    const airborne = Boolean(run.airborne);
     const fuelCritical = Boolean(isFuelRunRaceType(run.raceTypeId) && run.criticalFuelActive);
     const pursuitPressure = Boolean(isPursuitRaceType(run.raceTypeId) && (run.pursuitRoadblockAhead || run.pursuitHeatStatus === "Heat Rising"));
     let id = run.currentSectionId || "groove";
@@ -18079,6 +18436,11 @@ class NeonRoadRally {
       intensity,
       raceTypeId: run.raceTypeId || DEFAULT_RACE_TYPE_ID,
       trackId: run.track?.id || DEFAULT_TRACK_ID,
+      active,
+      boosted,
+      airborne,
+      speedRatio,
+      sectionProgress: clampNumber(run.sectionProgress, 0, 1, 0),
       fuelCritical,
       pursuitPressure
     };
@@ -18099,6 +18461,10 @@ class NeonRoadRally {
       });
     }
     run.boostAudioActive = true;
+    this.audio.triggerMusicEvent("boostAccent", {
+      intensity: volumeScale,
+      sectionId: run.currentSectionId || ""
+    });
   }
 
   updateBoostAudioState() {
@@ -18379,6 +18745,10 @@ class NeonRoadRally {
           maxInstances: 1,
           volume: this.audio.sfxVolume * (roadblockAhead ? 0.58 : 0.44)
         });
+        this.audio.triggerMusicEvent("pursuitPressure", {
+          intensity: roadblockAhead ? 1 : 0.72,
+          sectionId: run.currentSectionId || ""
+        });
       }
     }
 
@@ -18527,6 +18897,10 @@ class NeonRoadRally {
         cooldownMs: nextState === "critical" ? 2400 : 3800,
         maxInstances: 1,
         volume: this.audio.sfxVolume * (nextState === "critical" ? 0.72 : 0.58)
+      });
+      this.audio.triggerMusicEvent(nextState === "critical" ? "fuelCritical" : "fuelLow", {
+        intensity: nextState === "critical" ? 1 : 0.68,
+        sectionId: run.currentSectionId || ""
       });
     }
   }
@@ -18795,6 +19169,7 @@ class NeonRoadRally {
     if (!run || run.raceActive) return;
     run.raceActive = true;
     this.updateRaceSection(true);
+    this.updateAudioMusicState();
     if (this.input) this.input.clearCountdownInputLocks();
     this.startRaceMusic(true);
     if (isPursuitRaceType(run.raceTypeId) && !run.pursuitStartCalloutShown) {
@@ -19141,6 +19516,10 @@ class NeonRoadRally {
     run.lastRampLandingCleared = false;
     run.biggestJumpDistance = Math.max(run.biggestJumpDistance || 0, clearDistance || 0);
     run.biggestJumpDuration = Math.max(run.biggestJumpDuration || 0, airborneDuration || 0);
+    this.audio.triggerMusicEvent("rampLaunch", {
+      intensity: 0.9,
+      sectionId: run.currentSectionId || ""
+    });
     if (obstacle?.solutionTargetDistance) {
       run.activeRampTarget = {
         id: obstacle.solutionTargetId || "",
@@ -19226,6 +19605,10 @@ class NeonRoadRally {
       cooldownMs: 0,
       maxInstances: 1,
       volume: this.audio.sfxVolume * (cleared ? 0.7 : 0.52)
+    });
+    this.audio.triggerMusicEvent(cleared ? "rampClear" : "rampLanding", {
+      intensity: cleared ? 1 : 0.72,
+      sectionId: run.currentSectionId || ""
     });
   }
 
