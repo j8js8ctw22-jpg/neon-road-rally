@@ -152,7 +152,7 @@ button {
 .party-summary-strip {
   display: grid;
   gap: 10px;
-  grid-template-columns: repeat(auto-fit, minmax(145px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(165px, 1fr));
 }
 
 .title-status-card {
@@ -174,6 +174,7 @@ button {
 
 .title-status-card strong {
   color: var(--text);
+  line-height: 1.05;
   overflow-wrap: anywhere;
 }
 
@@ -206,6 +207,32 @@ button {
   gap: 12px;
 }
 
+.title-menu-section {
+  display: grid;
+  gap: 8px;
+}
+
+.menu-section-label {
+  color: var(--yellow);
+  font-size: 0.72rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.title-primary-actions,
+.title-secondary-actions {
+  display: grid;
+  gap: 10px;
+}
+
+.title-primary-actions {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.title-secondary-actions {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
 .menu-stack,
 .form-stack,
 .score-stack {
@@ -230,6 +257,25 @@ button {
 .menu-button {
   display: grid;
   gap: 4px;
+}
+
+.title-action-card {
+  min-height: 112px;
+  align-content: center;
+}
+
+.title-action-card strong {
+  font-size: 1.12rem;
+}
+
+.menu-button.is-party {
+  border-color: rgba(255, 228, 94, 0.78);
+  background: linear-gradient(90deg, rgba(255, 228, 94, 0.18), rgba(40, 246, 255, 0.12));
+}
+
+.menu-button.is-quiet {
+  border-color: rgba(184, 198, 217, 0.32);
+  background: rgba(5, 8, 20, 0.58);
 }
 
 .menu-button strong {
@@ -647,6 +693,70 @@ button {
     rgba(9, 16, 42, 0.92);
 }
 
+.mode-ladder-note {
+  margin: 0;
+}
+
+.race-type-card-grid {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(auto-fit, minmax(165px, 1fr));
+  margin-top: 8px;
+}
+
+.race-type-card {
+  display: grid;
+  gap: 4px;
+  min-height: 104px;
+  border: 1px solid rgba(40, 246, 255, 0.32);
+  border-radius: 7px;
+  padding: 10px;
+  background: rgba(9, 16, 42, 0.78);
+  color: var(--text);
+  cursor: pointer;
+  text-align: left;
+}
+
+.race-type-card strong,
+.race-type-card span,
+.race-type-card small {
+  display: block;
+}
+
+.race-type-card strong {
+  color: var(--text);
+  font-size: 0.86rem;
+  text-transform: uppercase;
+}
+
+.race-type-card span {
+  color: var(--yellow);
+  font-size: 0.78rem;
+  font-weight: 850;
+  line-height: 1.2;
+}
+
+.race-type-card small {
+  color: var(--muted);
+  font-size: 0.72rem;
+  line-height: 1.25;
+}
+
+.race-type-card:hover,
+.race-type-card:focus-visible {
+  outline: none;
+  border-color: var(--yellow);
+  box-shadow: 0 0 14px rgba(255, 228, 94, 0.18);
+}
+
+.race-type-card.is-selected {
+  border-color: var(--magenta);
+  background:
+    linear-gradient(135deg, rgba(255, 63, 209, 0.22), rgba(40, 246, 255, 0.1)),
+    rgba(9, 16, 42, 0.92);
+  box-shadow: inset 0 0 18px rgba(255, 63, 209, 0.12);
+}
+
 .danger-button {
   border-color: rgba(255, 59, 88, 0.72);
   color: #fff;
@@ -817,6 +927,53 @@ button:disabled {
   gap: 18px;
   grid-template-columns: minmax(240px, 0.85fr) minmax(320px, 1.15fr);
   align-items: start;
+}
+
+.party-setup-hero {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: minmax(0, 1fr) minmax(220px, 0.42fr);
+  align-items: start;
+  border: 1px solid rgba(255, 228, 94, 0.4);
+  border-radius: 8px;
+  padding: 14px;
+  background:
+    linear-gradient(90deg, rgba(255, 228, 94, 0.1), rgba(40, 246, 255, 0.06)),
+    rgba(5, 8, 20, 0.72);
+}
+
+.party-setup-hero h2 {
+  margin-bottom: 6px;
+}
+
+.party-setup-steps {
+  display: grid;
+  gap: 7px;
+}
+
+.party-setup-steps span {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  min-height: 36px;
+  border: 1px solid rgba(40, 246, 255, 0.26);
+  border-radius: 6px;
+  padding: 6px 8px;
+  background: rgba(9, 16, 42, 0.72);
+  color: var(--text);
+  font-size: 0.78rem;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+
+.party-setup-steps strong {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  background: rgba(255, 228, 94, 0.16);
+  color: var(--yellow);
 }
 
 .party-summary-strip {
@@ -2067,6 +2224,45 @@ button:disabled {
   margin-bottom: 18px;
 }
 
+.result-highlight-grid {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  margin: 8px 0 16px;
+}
+
+.result-highlight-card {
+  display: grid;
+  gap: 4px;
+  border: 1px solid rgba(40, 246, 255, 0.34);
+  border-radius: 8px;
+  padding: 11px;
+  background:
+    linear-gradient(135deg, rgba(40, 246, 255, 0.1), rgba(68, 255, 153, 0.06)),
+    rgba(5, 8, 20, 0.72);
+}
+
+.result-highlight-card span {
+  color: var(--yellow);
+  font-size: 0.72rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.result-highlight-card strong {
+  color: var(--green);
+  font-size: 1.32rem;
+  line-height: 1;
+  overflow-wrap: anywhere;
+  text-shadow: 0 0 12px rgba(68, 255, 153, 0.34);
+}
+
+.result-highlight-card small {
+  color: var(--muted);
+  font-size: 0.76rem;
+  line-height: 1.25;
+}
+
 .score-breakdown {
   display: grid;
   gap: 8px;
@@ -2321,6 +2517,48 @@ button:disabled {
   color: #fff7b8;
 }
 
+.party-turn-hero-card {
+  display: grid;
+  gap: 5px;
+  border: 1px solid rgba(255, 228, 94, 0.62);
+  border-radius: 8px;
+  padding: clamp(14px, 2vw, 20px);
+  background:
+    linear-gradient(135deg, rgba(255, 228, 94, 0.18), rgba(255, 63, 209, 0.12)),
+    rgba(5, 8, 20, 0.86);
+  box-shadow: 0 0 18px rgba(255, 228, 94, 0.12);
+}
+
+.party-turn-hero-card span {
+  color: var(--yellow);
+  font-size: 0.78rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.party-turn-hero-card strong {
+  color: #fff;
+  font-size: clamp(2.1rem, 5vw, 4rem);
+  line-height: 0.95;
+  text-transform: uppercase;
+  overflow-wrap: anywhere;
+  text-shadow:
+    0 0 10px rgba(255, 228, 94, 0.42),
+    0 0 22px rgba(255, 63, 209, 0.3);
+}
+
+.party-turn-hero-card em {
+  color: var(--muted);
+  font-style: normal;
+  font-weight: 800;
+  line-height: 1.25;
+  text-transform: uppercase;
+}
+
+.party-turn-action-row {
+  margin-top: -4px;
+}
+
 .party-feedback-strip {
   display: grid;
   gap: 7px;
@@ -2359,11 +2597,46 @@ button:disabled {
   margin-top: 12px;
 }
 
+.party-section-heading {
+  display: grid;
+  gap: 4px;
+  margin: 18px 0 10px;
+  border-left: 4px solid var(--cyan);
+  padding-left: 10px;
+}
+
+.party-section-heading h2 {
+  margin: 0;
+}
+
+.party-section-heading p {
+  margin: 0;
+}
+
+.party-section-heading.is-final-standings {
+  border-left-color: var(--yellow);
+}
+
+.party-awards-header small {
+  display: block;
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: 0.74rem;
+  line-height: 1.25;
+  text-transform: none;
+}
+
 .party-award-card strong {
   color: var(--text);
   font-size: 1rem;
   line-height: 1.1;
   overflow-wrap: anywhere;
+  text-transform: uppercase;
+}
+
+.party-award-card b {
+  color: var(--yellow);
+  font-size: 0.92rem;
   text-transform: uppercase;
 }
 
@@ -2465,6 +2738,8 @@ button:disabled {
   .title-status-grid,
   .title-utility-row,
   .title-dev-row,
+  .title-primary-actions,
+  .title-secondary-actions,
   .title-driver-status,
   .split,
   .garage-hero,
@@ -2473,6 +2748,7 @@ button:disabled {
   .challenge-result-card,
   .party-summary-strip,
   .party-setup-grid,
+  .party-setup-hero,
   .playtest-report-header,
   .playtest-report-columns,
   .score-hero,
@@ -2556,6 +2832,11 @@ button:disabled {
   }
 
   .mode-ladder-card {
+    min-height: 0;
+  }
+
+  .title-action-card,
+  .race-type-card {
     min-height: 0;
   }
 

@@ -36,7 +36,7 @@ async function run() {
   }
 
   async function expectText(text) {
-    await page.getByText(new RegExp(text, "i")).first().waitFor({ timeout: 5000 });
+    await page.getByText(new RegExp(text, "i")).filter({ visible: true }).first().waitFor({ timeout: 5000 });
   }
 
   async function setPartyOption(selector, value, expectedText) {
@@ -101,7 +101,8 @@ async function run() {
   await page.getByRole("button", { name: /Start Party Round/i }).click();
   await page.waitForFunction(() => window.neonRoadRally?.screen === "partyTurn", null, { timeout: 5000 });
   await expectText("Starting Order");
-  await expectText("Turn 1 of 3");
+  await expectText("At the keyboard now");
+  await expectText("Player 1 of 3");
 
   const classicRuns = [
     { score: 140000, nearMisses: 4, manualBoostsUsed: 2, laneMoves: 5 },

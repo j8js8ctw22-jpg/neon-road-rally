@@ -1783,9 +1783,9 @@ const PARTY_SEED_MODES = [
   { id: PARTY_SEED_MODE_NEW_ROUND, label: "New Seed Each Round" }
 ];
 const PARTY_STARTING_ORDER_MODES = [
-  { id: PARTY_STARTING_ORDER_MODE_ROSTER, label: "Roster Order", helper: "Use the selected roster order." },
-  { id: PARTY_STARTING_ORDER_MODE_RANDOM_ONCE, label: "Random Once", helper: "Random order keeps turns fair." },
-  { id: PARTY_STARTING_ORDER_MODE_RANDOM_EVERY_ROUND, label: "Random Every Round", helper: "Shuffle turns at the start of each round." }
+  { id: PARTY_STARTING_ORDER_MODE_ROSTER, label: "Roster Order", helper: "Use the selected roster order every round." },
+  { id: PARTY_STARTING_ORDER_MODE_RANDOM_ONCE, label: "Random Once", helper: "Shuffle once, then keep that order for the whole party." },
+  { id: PARTY_STARTING_ORDER_MODE_RANDOM_EVERY_ROUND, label: "Random Every Round", helper: "Shuffle again at the start of each round." }
 ];
 const PARTY_AWARD_MIN_PROGRESS = 0.25;
 const PARTY_AWARD_MIN_STYLE_PROGRESS = 0.25;
@@ -1907,7 +1907,8 @@ const PARTY_SETUP_HELP_ITEMS = [
   { title: "Total Score", text: "all runs add together." },
   { title: "Fuel Run", text: "collect gas cans and survive to the finish; running out ends the run." },
   { title: "Same Seed", text: "everyone races the same road." },
-  { title: "New Seed Each Round", text: "fresh road each round." }
+  { title: "Random Once", text: "shuffle the first turn order, then keep it." },
+  { title: "Random Every Round", text: "shuffle again before each new round." }
 ];
 const PLAYTEST_REPORT_FILTERS = [
   { id: "all", label: "All Runs" },
@@ -2542,19 +2543,19 @@ const RACE_TYPES = [
     id: DEFAULT_RACE_TYPE_ID,
     label: "Classic",
     shortLabel: "Classic",
-    description: "Full Road Director traffic, boosts, ramps, and finish-line scoring."
+    description: "Race to the finish with traffic, boosts, ramps, and score."
   },
   {
     id: FUEL_RUN_RACE_TYPE_ID,
     label: "Fuel Run",
     shortLabel: "Fuel",
-    description: "Traffic gates, gas can routing, and fuel survival."
+    description: "Fuel drains while you race. Grab gas cans or the run ends."
   },
   {
     id: PURSUIT_RACE_TYPE_ID,
     label: "Pursuit Mode",
     shortLabel: "Pursuit",
-    description: "Dodge roadblocks, manage heat, and reach the Escape Zone."
+    description: "Heat is police pressure. If it fills, you get busted."
   }
 ];
 
@@ -2860,6 +2861,11 @@ const INPUT_CONFIG = {
   laneChangeDurationSeconds: 0.1,
   verticalMoveRatioPerSecond: 0.58,
   inputFlashSeconds: 0.12
+};
+
+const PACE_FEEDBACK_CONFIG = {
+  minProgress: 0.08,
+  deadbandSeconds: 0.015
 };
 
 const TRACK_VISUALS = {
@@ -4626,6 +4632,124 @@ function formatTime(seconds) {
   return `${mins}:${String(secs).padStart(2, "0")}`;
 }
 
+function normalizeOptionalFiniteNumber(value, min = -Number.MAX_SAFE_INTEGER, max = Number.MAX_SAFE_INTEGER) {
+  if (value === null || value === undefined || value === "") return null;
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? clamp(numeric, min, max) : null;
+}
+
+function normalizeFinishTimeMs(value, fallbackSeconds = null) {
+  const direct = normalizeOptionalFiniteNumber(value, 0, 24 * 60 * 60 * 1000);
+  if (direct !== null) return Math.round(direct);
+  const seconds = normalizeOptionalFiniteNumber(fallbackSeconds, 0, 24 * 60 * 60);
+  return seconds === null ? null : Math.round(seconds * 1000);
+}
+
+function getFinishTimeMsFromSeconds(seconds) {
+  return normalizeFinishTimeMs(null, seconds);
+}
+
+function getFinishTimeSecondsPrecise(finishTimeMs) {
+  const ms = normalizeFinishTimeMs(finishTimeMs);
+  return ms === null ? null : Number((ms / 1000).toFixed(3));
+}
+
+function getEntryFinishTimeMs(entry) {
+  if (!entry || normalizeRunStatus(entry.status) !== "finished") return null;
+  return normalizeFinishTimeMs(
+    entry.finishTimeMs,
+    entry.finishTimeSecondsPrecise ?? entry.time ?? entry.elapsedTime
+  );
+}
+
+function formatFinishTimeMs(finishTimeMs) {
+  const seconds = getFinishTimeSecondsPrecise(finishTimeMs);
+  return seconds === null ? "" : `${seconds.toFixed(3)}s`;
+}
+
+function formatRunElapsedTime(entry) {
+  const finishTimeMs = getEntryFinishTimeMs(entry);
+  return finishTimeMs !== null ? formatFinishTimeMs(finishTimeMs) : formatTime(entry?.time ?? entry?.elapsedTime ?? 0);
+}
+
+function formatSignedTimeDeltaSeconds(value, digits = 3) {
+  const numeric = Number(value);
+  const seconds = Number.isFinite(numeric) ? numeric : 0;
+  const sign = seconds > 0 ? "+" : (seconds < 0 ? "-" : "");
+  return `${sign}${Math.abs(seconds).toFixed(digits)}s`;
+}
+
+function formatPaceDeltaSeconds(value) {
+  return formatSignedTimeDeltaSeconds(value, 2);
+}
+
+function getBestTimeKey(trackId, raceTypeId, speedClassId) {
+  return [
+    normalizeTrackId(trackId, DEFAULT_TRACK_ID),
+    normalizeRaceTypeId(raceTypeId, DEFAULT_RACE_TYPE_ID),
+    normalizeSpeedClassId(speedClassId, DEFAULT_SPEED_CLASS_ID)
+  ].join("|");
+}
+
+function normalizeBestTimeRecord(record, key = "") {
+  if (!record || typeof record !== "object") return null;
+  const trackId = normalizeTrackId(record.trackId, DEFAULT_TRACK_ID);
+  const raceTypeId = normalizeRaceTypeId(record.raceTypeId || record.raceType, DEFAULT_RACE_TYPE_ID);
+  const speedClassId = normalizeSpeedClassId(record.speedClassId || record.speedClass || record.raceMode, DEFAULT_SPEED_CLASS_ID);
+  const finishTimeMs = normalizeFinishTimeMs(record.finishTimeMs, record.finishTimeSecondsPrecise ?? record.time ?? record.elapsedTime);
+  if (finishTimeMs === null) return null;
+  const safeKey = key || getBestTimeKey(trackId, raceTypeId, speedClassId);
+  return {
+    key: safeKey,
+    trackId,
+    raceTypeId,
+    speedClassId,
+    finishTimeMs,
+    finishTimeSecondsPrecise: getFinishTimeSecondsPrecise(finishTimeMs),
+    runId: normalizeStorageId(record.runId || record.id, ""),
+    seed: normalizeStoredRoadSeed(record.seed || record.roadSeed, ""),
+    score: normalizeNonNegativeInteger(record.score || record.finalScore, 0, MAX_DISPLAY_SCORE),
+    date: normalizeDateString(record.date || record.timestamp, "")
+  };
+}
+
+function normalizeBestTimeRecords(value) {
+  const result = {};
+  const sourceEntries = Array.isArray(value)
+    ? value.map((record) => [getBestTimeKey(record?.trackId, record?.raceTypeId || record?.raceType, record?.speedClassId || record?.speedClass || record?.raceMode), record])
+    : Object.entries(value && typeof value === "object" ? value : {});
+  sourceEntries.slice(0, 120).forEach(([key, record]) => {
+    const normalized = normalizeBestTimeRecord(record, normalizeStorageId(key, ""));
+    if (!normalized) return;
+    const safeKey = getBestTimeKey(normalized.trackId, normalized.raceTypeId, normalized.speedClassId);
+    const existing = result[safeKey];
+    if (!existing || normalized.finishTimeMs < existing.finishTimeMs) {
+      result[safeKey] = {
+        ...normalized,
+        key: safeKey
+      };
+    }
+  });
+  return result;
+}
+
+function getBoostRouteQuality(collected, missedReachable) {
+  const collectedCount = normalizeNonNegativeInteger(collected, 0, 999);
+  const missedCount = normalizeNonNegativeInteger(missedReachable, 0, 999);
+  if (missedCount <= 0) return "clean";
+  if (collectedCount >= missedCount * 2) return "mostly-clean";
+  if (collectedCount >= missedCount) return "mixed";
+  return "missed";
+}
+
+function getBoostRouteFeedbackText(collected, missedReachable) {
+  const quality = getBoostRouteQuality(collected, missedReachable);
+  if (quality === "clean") return "Clean boost route";
+  if (quality === "mostly-clean") return "Mostly clean boost route";
+  if (quality === "mixed") return "Some boost chances missed";
+  return "Missed boost chances hurt your pace.";
+}
+
 function formatShortDate(value) {
   const date = new Date(value);
   return Number.isFinite(date.getTime()) ? date.toLocaleDateString() : "";
@@ -4753,6 +4877,10 @@ function normalizeLeaderboardEntry(entry) {
   const status = normalizeRunStatus(entry.status);
   const hasSlowdownHits = entry.slowdownHits !== null && entry.slowdownHits !== undefined && entry.slowdownHits !== "";
   const slowdownHits = hasSlowdownHits ? normalizeNonNegativeInteger(entry.slowdownHits, 0, 9999) : null;
+  const time = normalizeNonNegativeNumber(entry.time, 0, 24 * 60 * 60);
+  const finishTimeMs = status === "finished"
+    ? normalizeFinishTimeMs(entry.finishTimeMs, entry.finishTimeSecondsPrecise ?? time)
+    : null;
   return {
     runId: normalizeStorageId(entry.runId || entry.id, ""),
     playerName: sanitizePlayerName(entry.playerName, "PLAYER"),
@@ -4766,7 +4894,9 @@ function normalizeLeaderboardEntry(entry) {
     seed: normalizeStoredRoadSeed(entry.seed, CLASSIC_SEED_LABEL),
     score: normalizeNonNegativeInteger(entry.score),
     status,
-    time: normalizeNonNegativeNumber(entry.time, 0, 24 * 60 * 60),
+    time,
+    finishTimeMs,
+    finishTimeSecondsPrecise: finishTimeMs === null ? null : getFinishTimeSecondsPrecise(finishTimeMs),
     slowdownHits,
     cleanRun: status === "finished" && Boolean(entry.cleanRun === true || entry.clean === true || slowdownHits === 0),
     fuelCollected: normalizeNonNegativeInteger(Number.isFinite(Number(entry.fuelCollected)) ? entry.fuelCollected : entry.gasCansCollected || 0, 0, 999),
@@ -4799,6 +4929,35 @@ function normalizeLeaderboardList(value) {
     .slice(0, LEADERBOARD_MAX_ENTRIES);
 }
 
+function hydratePlayerBestTimesFromLeaderboard(players, leaderboard) {
+  if (!Array.isArray(players) || !Array.isArray(leaderboard)) return;
+  const playersById = new Map(players.map((player) => [normalizeStorageId(player.id, ""), player]).filter(([id]) => id));
+  const playersByName = new Map(players.map((player) => [sanitizePlayerName(player.name, ""), player]).filter(([name]) => name));
+  leaderboard.forEach((entry) => {
+    if (!entry || normalizeRunStatus(entry.status) !== "finished") return;
+    const player = playersById.get(normalizeStorageId(entry.playerId, ""))
+      || playersByName.get(sanitizePlayerName(entry.playerName, ""));
+    if (!player) return;
+    const finishTimeMs = getEntryFinishTimeMs(entry);
+    if (finishTimeMs === null) return;
+    player.bestTimes = normalizeBestTimeRecords(player.bestTimes);
+    const key = getBestTimeKey(entry.trackId, entry.raceType, entry.raceMode || entry.speedClass);
+    const existing = player.bestTimes[key] || null;
+    if (!existing || finishTimeMs < existing.finishTimeMs) {
+      player.bestTimes[key] = normalizeBestTimeRecord({
+        trackId: entry.trackId,
+        raceTypeId: entry.raceType,
+        speedClassId: entry.raceMode || entry.speedClass,
+        finishTimeMs,
+        runId: entry.runId,
+        seed: entry.seed,
+        score: entry.score,
+        date: entry.date
+      }, key);
+    }
+  });
+}
+
 function normalizePlaytestRunSummary(entry) {
   if (!entry || typeof entry !== "object") return null;
   const raceTypeId = normalizeRaceTypeId(entry.raceTypeId || entry.raceType, DEFAULT_RACE_TYPE_ID);
@@ -4809,6 +4968,10 @@ function normalizePlaytestRunSummary(entry) {
   const progressPercent = Number.isFinite(Number(entry.finishProgressPercent))
     ? Number(entry.finishProgressPercent)
     : Number(entry.progress || 0) * 100;
+  const elapsedTime = normalizeNonNegativeNumber(entry.elapsedTime || entry.time, 0, 24 * 60 * 60);
+  const finishTimeMs = status === "finished"
+    ? normalizeFinishTimeMs(entry.finishTimeMs, entry.finishTimeSecondsPrecise ?? elapsedTime)
+    : null;
   return {
     runId: normalizeStorageId(entry.runId || entry.id, uid()),
     timestamp: normalizeDateString(entry.timestamp, new Date().toISOString()),
@@ -4864,12 +5027,19 @@ function normalizePlaytestRunSummary(entry) {
     result: getRunStatusLabel(status),
     status,
     finalScore: normalizeNonNegativeInteger(entry.finalScore || entry.score),
-    elapsedTime: normalizeNonNegativeNumber(entry.elapsedTime || entry.time, 0, 24 * 60 * 60),
+    elapsedTime,
+    finishTimeMs,
+    finishTimeSecondsPrecise: finishTimeMs === null ? null : getFinishTimeSecondsPrecise(finishTimeMs),
+    personalBestTimeDelta: normalizeOptionalFiniteNumber(entry.personalBestTimeDelta, -24 * 60 * 60, 24 * 60 * 60),
+    paceAheadTime: normalizeOptionalFiniteNumber(entry.paceAheadTime, 0, 24 * 60 * 60),
+    paceBehindTime: normalizeOptionalFiniteNumber(entry.paceBehindTime, 0, 24 * 60 * 60),
     distanceCompleted: normalizeNonNegativeNumber(entry.distanceCompleted || entry.distance),
     finishProgressPercent: clampNumber(progressPercent, 0, 100, 0),
     endReason: sanitizeName(entry.endReason || entry.reason, "", DISPLAY_TEXT_MAX_LENGTH),
     boostsUsed: normalizeNonNegativeInteger(entry.boostsUsed || entry.manualBoostsUsed, 0, 99),
     boostPadsCollected: normalizeNonNegativeInteger(entry.boostPadsCollected, 0, 999),
+    boostPadsMissedReachable: normalizeNonNegativeInteger(entry.boostPadsMissedReachable, 0, 999),
+    estimatedBoostRouteQuality: sanitizeName(entry.estimatedBoostRouteQuality, "", DISPLAY_TEXT_MAX_LENGTH),
     rampsUsed: normalizeNonNegativeInteger(entry.rampsUsed, 0, 999),
     nearMisses: normalizeNonNegativeInteger(entry.nearMisses, 0, 999),
     slowdownHits: normalizeNonNegativeInteger(entry.slowdownHits, 0, 999),
@@ -5349,6 +5519,7 @@ class PlayerProfileManager {
           name: sanitizePlayerName(player?.name, `DRIVER ${index + 1}`),
           car: normalizeCarConfig(player?.car),
           bestScore: normalizeNonNegativeInteger(player?.bestScore),
+          bestTimes: normalizeBestTimeRecords(player?.bestTimes || player?.personalBestTimes),
           badges: normalizePlayerBadges(player?.badges),
           badgeStats: normalizePlayerBadgeStats(player?.badgeStats || player?.stats),
           challengeProgress: normalizePlayerChallengeSave(player?.challengeProgress || player?.challengeStats)
@@ -5361,6 +5532,7 @@ class PlayerProfileManager {
       }) : [];
 
     const leaderboard = normalizeLeaderboardList(parsed.leaderboard);
+    hydratePlayerBestTimesFromLeaderboard(players, leaderboard);
 
     const audio = {
       ...fallback.audio,
@@ -5431,6 +5603,7 @@ class PlayerProfileManager {
       name: sanitizePlayerName(name, `DRIVER ${this.data.players.length + 1}`),
       car: normalizeCarConfig(DEFAULT_CAR),
       bestScore: 0,
+      bestTimes: {},
       badges: createDefaultBadgeSave(),
       badgeStats: createDefaultPlayerBadgeStats(),
       challengeProgress: createDefaultPlayerChallengeSave()
@@ -5737,6 +5910,44 @@ class PlayerProfileManager {
     return cleanEntry;
   }
 
+  getBestTimeRecord(playerId, trackId, raceTypeId, speedClassId) {
+    const player = this.getPlayerById(playerId);
+    if (!player) return null;
+    player.bestTimes = normalizeBestTimeRecords(player.bestTimes || player.personalBestTimes);
+    const key = getBestTimeKey(trackId, raceTypeId, speedClassId);
+    return player.bestTimes[key] || null;
+  }
+
+  recordBestFinishTime(summary) {
+    if (!summary?.scoreSaved || summary.status !== "finished" || !summary.playerId) return null;
+    const player = this.getPlayerById(summary.playerId);
+    if (!player) return null;
+    const finishTimeMs = normalizeFinishTimeMs(summary.finishTimeMs, summary.finishTimeSecondsPrecise ?? summary.time);
+    if (finishTimeMs === null) return null;
+    player.bestTimes = normalizeBestTimeRecords(player.bestTimes || player.personalBestTimes);
+    const key = getBestTimeKey(summary.trackId, summary.raceTypeId, summary.speedClass);
+    const existing = player.bestTimes[key] || null;
+    const improved = !existing || finishTimeMs < existing.finishTimeMs;
+    if (improved) {
+      player.bestTimes[key] = normalizeBestTimeRecord({
+        trackId: summary.trackId,
+        raceTypeId: summary.raceTypeId,
+        speedClassId: summary.speedClass,
+        finishTimeMs,
+        runId: summary.runId,
+        seed: summary.seed,
+        score: summary.finalScore,
+        date: new Date().toISOString()
+      }, key);
+      this.save();
+    }
+    return {
+      previous: existing,
+      current: player.bestTimes[key],
+      improved
+    };
+  }
+
   getChallengeProgress(challengeId) {
     const id = String(challengeId || "");
     return this.data.challengeProgress?.progress?.[id] || null;
@@ -5993,15 +6204,22 @@ class PartySession {
     const previousStandings = this.standings();
     const previousLeader = previousStandings[0]?.completedRuns > 0 ? previousStandings[0] : null;
     const previousPlayerStanding = previousStandings.find((standing) => standing.playerId === player.id) || null;
+    const resultStatus = normalizeRunStatus(summary?.status);
+    const resultFinishTimeMs = resultStatus === "finished"
+      ? normalizeFinishTimeMs(summary?.finishTimeMs, summary?.finishTimeSecondsPrecise ?? summary?.time)
+      : null;
     const result = {
       resultId: uid(),
       playerId: player.id,
       playerName: sanitizePlayerName(player.name, "PLAYER"),
       carName: sanitizeCarName(player.car?.name, DEFAULT_CAR.name),
       score: normalizeNonNegativeInteger(summary?.finalScore || 0),
-      status: normalizeRunStatus(summary?.status),
+      status: resultStatus,
       reason: sanitizeName(summary?.reason, "", DISPLAY_TEXT_MAX_LENGTH),
       time: normalizeNonNegativeNumber(summary?.time, 0, 24 * 60 * 60),
+      finishTimeMs: resultFinishTimeMs,
+      finishTimeSecondsPrecise: resultFinishTimeMs === null ? null : getFinishTimeSecondsPrecise(resultFinishTimeMs),
+      personalBestTimeDelta: normalizeOptionalFiniteNumber(summary?.personalBestTimeDelta, -24 * 60 * 60, 24 * 60 * 60),
       raceMode: normalizeSpeedClassId(summary?.speedClass || this.raceMode, this.raceMode),
       raceType: normalizeRaceTypeId(summary?.raceTypeId || summary?.raceType || this.raceType, this.raceType),
       seed: normalizeStoredRoadSeed(summary?.seed || this.currentSeed, this.currentSeed),
@@ -6023,6 +6241,8 @@ class PartySession {
       nearMisses: normalizeNonNegativeInteger(summary?.nearMisses, 0, 999),
       manualBoostsUsed: normalizeNonNegativeInteger(summary?.manualBoostsUsed, 0, 99),
       boostPadsCollected: normalizeNonNegativeInteger(summary?.boostPadsCollected, 0, 999),
+      boostPadsMissedReachable: normalizeNonNegativeInteger(summary?.boostPadsMissedReachable, 0, 999),
+      estimatedBoostRouteQuality: sanitizeName(summary?.estimatedBoostRouteQuality, "clean", DISPLAY_TEXT_MAX_LENGTH),
       rampsUsed: normalizeNonNegativeInteger(summary?.rampsUsed, 0, 999),
       rampTargetsCleared: normalizeNonNegativeInteger(summary?.rampTargetsCleared, 0, 999),
       laneMoves: normalizeNonNegativeInteger(summary?.laneMoves, 0, 9999),
@@ -6102,6 +6322,7 @@ class PartySession {
         latestStatus: latest?.status || "",
         latestReason: latest?.reason || "",
         latestTime: latest?.time || 0,
+        latestFinishTimeMs: latest?.finishTimeMs ?? null,
         latestGasCansCollected: latest?.gasCansCollected || 0,
         latestGasCansSpawned: latest?.gasCansSpawned || 0,
         latestFuelRemaining: latest?.fuelRemaining || 0,
@@ -9805,6 +10026,9 @@ class ObstacleManager {
       if (obstacle.type === "warning") {
         this.maybePlayWarningSfx(obstacle, ahead);
       }
+      if (obstacle.type === "boostPad") {
+        this.trackBoostPadOpportunity(obstacle, ahead);
+      }
       if (obstacle.pursuitRoadblock && !obstacle.pursuitCleared && ahead < -120) {
         obstacle.pursuitCleared = true;
         if (this.game?.recordPursuitRoadblockCleared) {
@@ -9814,6 +10038,22 @@ class ObstacleManager {
       return ahead > -260 && !obstacle.remove;
     });
     this.updateActiveFieldTelemetry(run);
+  }
+
+  trackBoostPadOpportunity(obstacle, ahead) {
+    const run = this.game.run;
+    if (!run || obstacle.hit || obstacle.remove) return;
+    if (!obstacle.boostReachableRecorded && this.canReachRoadObject(obstacle, run, run.distance || 0)) {
+      obstacle.boostReachableRecorded = true;
+      run.boostPadsReachableSeen = Math.max(0, (run.boostPadsReachableSeen || 0) + 1);
+    }
+    if (!obstacle.boostReachableRecorded || obstacle.boostMissRecorded) return;
+    const playerAhead = this.getPlayerZoneAhead(run.distance || 0);
+    if (ahead < playerAhead - 90) {
+      obstacle.boostMissRecorded = true;
+      run.boostPadsMissedReachable = Math.max(0, (run.boostPadsMissedReachable || 0) + 1);
+      run.estimatedBoostRouteQuality = getBoostRouteQuality(run.boostPadsCollected || 0, run.boostPadsMissedReachable || 0);
+    }
   }
 
   getSpawnRevealBuffer(run = this.game.run) {
@@ -11946,6 +12186,11 @@ class CollisionSystem {
 
     if (obstacle.type === "boostPad") {
       run.boostPadsCollected += 1;
+      if (!obstacle.boostReachableRecorded) {
+        obstacle.boostReachableRecorded = true;
+        run.boostPadsReachableSeen = Math.max(0, (run.boostPadsReachableSeen || 0) + 1);
+      }
+      run.estimatedBoostRouteQuality = getBoostRouteQuality(run.boostPadsCollected || 0, run.boostPadsMissedReachable || 0);
       run.padBoostTimer = Math.max(run.padBoostTimer, SPEED_TUNING.padBoostDuration);
       run.boostBurstTimer = Math.max(run.boostBurstTimer || 0, ARCADE_FEEL.boostBurstSeconds);
       run.screenShake = Math.max(run.screenShake || 0, 0.14);
@@ -13730,7 +13975,7 @@ class Renderer {
     }
     return {
       label,
-      meterLabel: "POLICE BAR",
+      meterLabel: "HEAT",
       value: `${Math.ceil(heat)} / ${Math.round(limit)}`,
       detail,
       percent,
@@ -13748,8 +13993,8 @@ class Renderer {
     if (!fuelRun && !pursuitRun) return;
     const state = fuelRun ? this.getFuelRaceState() : this.getPursuitRaceState();
     const ctx = this.ctx;
-    const stripW = Math.min(Math.max(260, this.width - 28), Math.max(260, this.road.w - 24), this.width >= 760 ? 560 : 420);
-    const stripH = this.width >= 620 ? 56 : 50;
+    const stripW = Math.min(Math.max(284, this.width - 24), Math.max(284, this.road.w - 18), this.width >= 760 ? 620 : 460);
+    const stripH = this.width >= 620 ? 64 : 58;
     const x = (this.width - stripW) / 2;
     const y = Math.max(CAMERA_CONFIG.hudHeight + 8, this.road.y + 8);
     const pulse = state.urgent ? 0.5 + Math.sin((run.elapsed || 0) * 12) * 0.5 : 0;
@@ -13769,9 +14014,9 @@ class Renderer {
 
     const pad = this.width >= 620 ? 16 : 12;
     const barX = x + pad;
-    const barY = y + stripH - 22;
+    const barY = y + stripH - 25;
     const barW = stripW - pad * 2;
-    const barH = this.width >= 620 ? 15 : 13;
+    const barH = this.width >= 620 ? 18 : 16;
     ctx.fillStyle = "rgba(255, 255, 255, 0.14)";
     ctx.fillRect(barX, barY, barW, barH);
     const fillW = Math.max(0, (barW - 4) * state.percent);
@@ -13791,18 +14036,18 @@ class Renderer {
     ctx.textBaseline = "top";
     ctx.textAlign = "left";
     ctx.fillStyle = state.color;
-    ctx.font = `900 ${this.width >= 620 ? 16 : 14}px Trebuchet MS, Verdana, sans-serif`;
+    ctx.font = `900 ${this.width >= 620 ? 18 : 15}px Trebuchet MS, Verdana, sans-serif`;
     ctx.fillText(state.label, x + pad, y + 7);
     ctx.fillStyle = "#f6fbff";
-    ctx.font = `900 ${this.width >= 620 ? 13 : 11}px Trebuchet MS, Verdana, sans-serif`;
-    ctx.fillText(callout, x + pad, y + 29, stripW - pad * 2 - 86);
+    ctx.font = `900 ${this.width >= 620 ? 14 : 12}px Trebuchet MS, Verdana, sans-serif`;
+    ctx.fillText(callout, x + pad, y + 32, stripW - pad * 2 - 94);
     ctx.textAlign = "right";
     ctx.fillStyle = "#b8c6d9";
     ctx.font = "800 11px Trebuchet MS, Verdana, sans-serif";
     ctx.fillText(state.meterLabel, x + stripW - pad, y + 8);
     ctx.fillStyle = "#f6fbff";
-    ctx.font = `900 ${this.width >= 620 ? 15 : 13}px Trebuchet MS, Verdana, sans-serif`;
-    ctx.fillText(state.value, x + stripW - pad, y + 25);
+    ctx.font = `900 ${this.width >= 620 ? 16 : 13}px Trebuchet MS, Verdana, sans-serif`;
+    ctx.fillText(state.value, x + stripW - pad, y + 27);
     ctx.restore();
   }
 
@@ -13812,7 +14057,7 @@ class Renderer {
     const label = String((run.raceStateCalloutTimer > 0 && run.raceStateCalloutText) || this.getPursuitRaceState().label || "").toUpperCase();
     if (!label || label === "HEAT DROPPING" && (run.pursuitHeat || 0) <= 2) return;
     const active = run.pursuitRoadblockAhead || (run.pursuitHeatPulseTimer || 0) > 0 || label === "ESCAPE ZONE" || run.raceStateCalloutTimer > 0;
-    if (!active && label !== "POLICE CLOSING") return;
+    if (!active) return;
     const ctx = this.ctx;
     const y = Math.max(136, CAMERA_CONFIG.hudHeight + 78);
     const x = this.width / 2;
@@ -13926,6 +14171,9 @@ class Renderer {
     ctx.font = "700 11px Trebuchet MS, Verdana, sans-serif";
     const sectionLabel = String(run.currentSectionLabel || getTrackSection(run.track, progress).label || "").toUpperCase();
     const contextParts = [`${Math.round(progress * 100)}%`, sectionLabel];
+    if (run.paceFeedbackText && run.comparableBestTimeMs !== null) {
+      contextParts.push(`PB PACE ${String(run.paceFeedbackText).toUpperCase()}`);
+    }
     contextParts.push(raceTypeLabel.toUpperCase());
     if (pursuitRun) contextParts.push(String(run.pursuitStatusText || "Heat Dropping").toUpperCase());
     if (run.challengeMode) contextParts.push(`CHALLENGE ${run.challengeName}`);
@@ -15775,6 +16023,12 @@ class NeonRoadRally {
       sectionPressureMultiplier: getSectionNumber(section, "pressureMultiplier", 1, 0.25, 2.4),
       sectionVisualIntensity: getSectionNumber(section, "visualIntensity", 1, 0.5, 1.8),
       sectionNoticeTimer: 0,
+      comparableBestTimeMs: null,
+      comparableBestTimeSeconds: null,
+      paceDeltaSeconds: null,
+      paceAheadTime: null,
+      paceBehindTime: null,
+      paceFeedbackText: "",
       distance: 0,
       baseScore: 0,
       score: 0,
@@ -15821,6 +16075,9 @@ class NeonRoadRally {
       manualBoosts: 3,
       manualBoostsUsed: 0,
       boostPadsCollected: 0,
+      boostPadsReachableSeen: 0,
+      boostPadsMissedReachable: 0,
+      estimatedBoostRouteQuality: "clean",
       rampsUsed: 0,
       boostTimer: 0,
       padBoostTimer: 0,
@@ -16416,6 +16673,45 @@ class NeonRoadRally {
     });
   }
 
+  updatePaceFeedback() {
+    const run = this.run;
+    const bestMs = normalizeFinishTimeMs(run?.comparableBestTimeMs);
+    if (!run || bestMs === null || run.ended || !run.raceActive) {
+      if (run) {
+        run.paceDeltaSeconds = null;
+        run.paceAheadTime = null;
+        run.paceBehindTime = null;
+        run.paceFeedbackText = "";
+      }
+      return null;
+    }
+    const progress = clamp((run.distance || 0) / Math.max(1, run.track?.distanceToFinish || 1), 0, 1);
+    if (progress < PACE_FEEDBACK_CONFIG.minProgress || !(run.elapsed > 0)) {
+      run.paceDeltaSeconds = null;
+      run.paceAheadTime = null;
+      run.paceBehindTime = null;
+      run.paceFeedbackText = "";
+      return null;
+    }
+    const projectedFinishSeconds = run.elapsed / progress;
+    const deltaSeconds = projectedFinishSeconds - bestMs / 1000;
+    run.paceDeltaSeconds = deltaSeconds;
+    if (deltaSeconds > PACE_FEEDBACK_CONFIG.deadbandSeconds) {
+      run.paceAheadTime = null;
+      run.paceBehindTime = deltaSeconds;
+      run.paceFeedbackText = `${formatPaceDeltaSeconds(deltaSeconds)} behind`;
+    } else if (deltaSeconds < -PACE_FEEDBACK_CONFIG.deadbandSeconds) {
+      run.paceAheadTime = Math.abs(deltaSeconds);
+      run.paceBehindTime = null;
+      run.paceFeedbackText = `${formatPaceDeltaSeconds(deltaSeconds)} ahead`;
+    } else {
+      run.paceAheadTime = 0;
+      run.paceBehindTime = 0;
+      run.paceFeedbackText = "even";
+    }
+    return run.paceDeltaSeconds;
+  }
+
   updateRun(dt) {
     const run = this.run;
     if (this.updatePendingEnd(dt)) return;
@@ -16486,6 +16782,7 @@ class NeonRoadRally {
     const distanceDelta = run.currentSpeed * dt;
     run.lastDistanceDelta = distanceDelta;
     run.distance += distanceDelta;
+    this.updatePaceFeedback();
     this.updateRunTelemetry(dt);
     this.updateRaceSection();
     const distanceScore = distanceDelta * (run.boostTimer > 0 ? 1.6 : 1);
@@ -16796,6 +17093,10 @@ class NeonRoadRally {
     this.updateRaceSection(false);
     const configuredSeed = this.configureRunSeed(challenge ? challenge.seed : (options.seed ?? this.pendingRoadSeed), track, speedClass.id, raceType.id);
     if (partyMode) this.run.partySeed = configuredSeed;
+    const bestTimeRecord = this.profiles.getBestTimeRecord(player.id, track.id, raceType.id, speedClass.id);
+    this.run.comparableBestTimeMs = bestTimeRecord?.finishTimeMs ?? null;
+    this.run.comparableBestTimeSeconds = this.run.comparableBestTimeMs === null ? null : getFinishTimeSecondsPrecise(this.run.comparableBestTimeMs);
+    this.updatePaceFeedback();
     this.pendingRaceTypeId = raceType.id;
     this.pendingTrackId = baseTrack.id;
     if (this.input) this.input.clearGameplayInput();
@@ -17313,11 +17614,18 @@ class NeonRoadRally {
       status: summary.status,
       finalScore: summary.finalScore,
       elapsedTime: summary.time,
+      finishTimeMs: summary.finishTimeMs,
+      finishTimeSecondsPrecise: summary.finishTimeSecondsPrecise,
+      personalBestTimeDelta: summary.personalBestTimeDelta,
+      paceAheadTime: summary.paceAheadTime,
+      paceBehindTime: summary.paceBehindTime,
       distanceCompleted: summary.distance,
       finishProgressPercent: summary.progress * 100,
       endReason: summary.reason,
       boostsUsed: summary.manualBoostsUsed,
       boostPadsCollected: run.boostPadsCollected || 0,
+      boostPadsMissedReachable: run.boostPadsMissedReachable || 0,
+      estimatedBoostRouteQuality: summary.estimatedBoostRouteQuality || getBoostRouteQuality(run.boostPadsCollected || 0, run.boostPadsMissedReachable || 0),
       rampsUsed: run.rampsUsed || 0,
       nearMisses: summary.nearMisses,
       slowdownHits: summary.slowdownHits,
@@ -17511,6 +17819,18 @@ class NeonRoadRally {
     const leaderboard = this.profiles.data.leaderboard || [];
     const topTwentyCutoff = leaderboard.length < LEADERBOARD_MAX_ENTRIES ? -1 : Math.min(...leaderboard.slice(0, LEADERBOARD_MAX_ENTRIES).map((item) => item.score || 0));
     const debugSpeedScaleActive = Math.abs((this.debugSpeedScale || 1) - 1) > 0.001;
+    const finishTimeMs = status === "finished" ? getFinishTimeMsFromSeconds(run.elapsed) : null;
+    const finishTimeSecondsPrecise = finishTimeMs === null ? null : getFinishTimeSecondsPrecise(finishTimeMs);
+    const previousBestTimeRecord = status === "finished"
+      ? this.profiles.getBestTimeRecord(player.id, run.track.id, run.raceTypeId, run.speedClassId)
+      : null;
+    const previousBestTimeMs = previousBestTimeRecord?.finishTimeMs ?? null;
+    const personalBestTimeDelta = finishTimeMs !== null && previousBestTimeMs !== null
+      ? (finishTimeMs - previousBestTimeMs) / 1000
+      : null;
+    const newPersonalBestTime = !debugSpeedScaleActive && finishTimeMs !== null && (previousBestTimeMs === null || finishTimeMs < previousBestTimeMs);
+    const paceAheadTime = personalBestTimeDelta !== null && personalBestTimeDelta < 0 ? Math.abs(personalBestTimeDelta) : (run.paceAheadTime ?? null);
+    const paceBehindTime = personalBestTimeDelta !== null && personalBestTimeDelta > 0 ? personalBestTimeDelta : (run.paceBehindTime ?? null);
     const isNewPersonalBest = !debugSpeedScaleActive && run.score > previousBestScore;
     const entersTopTwenty = !debugSpeedScaleActive && (leaderboard.length < LEADERBOARD_MAX_ENTRIES || run.score > topTwentyCutoff);
     const previousTitleBoard = this.profiles.getTitleBoard();
@@ -17528,6 +17848,8 @@ class NeonRoadRally {
       score: run.score,
       status,
       time: run.elapsed,
+      finishTimeMs,
+      finishTimeSecondsPrecise,
       slowdownHits: run.slowdownHits || 0,
       cleanRun: status === "finished" && (run.slowdownHits || 0) === 0,
       fuelCollected: run.gasCansCollected || 0,
@@ -17600,6 +17922,17 @@ class NeonRoadRally {
       status,
       reason,
       time: run.elapsed,
+      finishTimeMs,
+      finishTimeSecondsPrecise,
+      previousBestTimeMs,
+      bestTimeMs: newPersonalBestTime ? finishTimeMs : previousBestTimeMs,
+      bestTimeSecondsPrecise: (newPersonalBestTime ? finishTimeMs : previousBestTimeMs) === null
+        ? null
+        : getFinishTimeSecondsPrecise(newPersonalBestTime ? finishTimeMs : previousBestTimeMs),
+      newPersonalBestTime,
+      personalBestTimeDelta,
+      paceAheadTime,
+      paceBehindTime,
       averageSpeed,
       maxSpeed: run.maxSpeedObserved || run.currentSpeed || 0,
       bonuses: { ...run.bonuses },
@@ -17608,6 +17941,10 @@ class NeonRoadRally {
       nearMisses: run.nearMisses || 0,
       manualBoostsUsed: run.manualBoostsUsed || 0,
       boostPadsCollected: run.boostPadsCollected || 0,
+      boostPadsReachableSeen: run.boostPadsReachableSeen || 0,
+      boostPadsMissedReachable: run.boostPadsMissedReachable || 0,
+      estimatedBoostRouteQuality: getBoostRouteQuality(run.boostPadsCollected || 0, run.boostPadsMissedReachable || 0),
+      boostRouteFeedback: getBoostRouteFeedbackText(run.boostPadsCollected || 0, run.boostPadsMissedReachable || 0),
       rampsUsed: run.rampsUsed || 0,
       rampTargetsCleared: run.rampTargetsCleared || 0,
       laneMoves: run.laneMoves || 0,
@@ -17674,6 +18011,11 @@ class NeonRoadRally {
           tone: "hot"
         }].concat(summary.medals).slice(0, 3);
       }
+    }
+    const timeUpdate = this.profiles.recordBestFinishTime(summary);
+    if (timeUpdate?.current) {
+      summary.bestTimeMs = timeUpdate.current.finishTimeMs;
+      summary.bestTimeSecondsPrecise = timeUpdate.current.finishTimeSecondsPrecise;
     }
     this.profiles.recordBadgeRunStats(summary);
     summary.newlyEarnedBadges = this.profiles.evaluateRunBadges(summary);
@@ -19967,22 +20309,23 @@ class NeonRoadRally {
     this.audio.playMusic("title", false);
     const player = this.profiles.getCurrentPlayer();
     const selectedSpeedClass = getSpeedClassConfig(this.profiles.data.speedClassId);
-    const playerName = player ? escapeHtml(player.name) : "No Player";
+    const playerName = player ? escapeHtml(player.name) : "Add Driver";
     const badgeProgress = player ? this.profiles.getPlayerBadgeProgress(player) : null;
     const titleCount = player ? this.profiles.getPlayerTitles(player).length : 0;
     const playerDetail = player
       ? `Badges ${badgeProgress.earnedCount}/${badgeProgress.totalCount} - Titles ${titleCount}/${TITLE_DEFINITIONS.length}`
-      : "Create or choose a local driver";
+      : "Create a local profile for badges and scores";
     const audioStatus = `Music ${this.audio.musicMuted ? "Muted" : "On"} / SFX ${this.audio.sfxMuted ? "Muted" : "On"}`;
     this.layer.classList.remove("is-empty");
     this.layer.innerHTML = `
       <section class="panel title-panel show-title-panel">
         <div class="title-block">
-          <div class="eyebrow">Track Select Show Build</div>
+          <div class="eyebrow">Local Arcade Racer</div>
           <h1 class="game-title"><span>Neon</span><span>Road</span><span>Rally</span></h1>
           <p class="subtitle title-tagline">Five lanes. One car. No brakes. Beat the room.</p>
+          <p class="subtitle">Start a solo run, pass the keyboard in Party Mode, or tune your local driver before racing.</p>
           <div class="title-status-grid">
-            <div class="title-status-card title-driver-status">
+            <div class="title-status-card ${player ? "title-driver-status" : ""}">
               <div>
                 <span>Active Driver</span>
                 <strong>${playerName}</strong>
@@ -19991,7 +20334,7 @@ class NeonRoadRally {
               ${player ? this.renderDriverMiniCanvas(player, "title-car-chip") : ""}
             </div>
             <div class="title-status-card">
-              <span>Race Mode</span>
+              <span>Speed Class</span>
               <strong>${escapeHtml(selectedSpeedClass.label)}</strong>
               <small>Score x${selectedSpeedClass.scoreMultiplier.toFixed(2)}</small>
             </div>
@@ -20003,17 +20346,29 @@ class NeonRoadRally {
           </div>
           <p class="keyboard-hints">Enter starts Solo. Arrows/WASD drive. Space boosts. F fullscreen. Backtick opens debug tools.</p>
           ${this.renderNewDriverHint()}
-          ${this.renderWeekendPlaytestPicks({ context: "title", heading: "Recommended Setups", hint: "Pick one setup for quick weekend testing." })}
         </div>
         <div class="title-menu-card">
           <div class="menu-stack main-menu">
-            <button class="menu-button primary" data-action="start"><strong>Solo Race</strong><span>Set a road seed and chase the finish.</span></button>
-            <button class="menu-button" data-action="howToPlay"><strong>How To Play</strong><span>Controls, race types, party rules, rewards, and local saves.</span></button>
-            <button class="menu-button" data-action="challengeMode"><strong>Challenges</strong><span>Fixed seeds, clear objectives, saved bests.</span></button>
-            <button class="menu-button" data-action="partyMode"><strong>Party Mode</strong><span>Pass the keyboard with one-run, best-of-3, or total-score rounds.</span></button>
-            <button class="menu-button" data-action="players"><strong>Driver Garage</strong><span>Switch drivers, rename profiles, style cars, and view badges.</span></button>
-            <button class="menu-button" data-action="leaderboard"><strong>Leaderboard</strong><span>Top 20 local scores.</span></button>
-            <button class="menu-button" data-action="settings"><strong>Settings</strong><span>Audio, race mode, fullscreen.</span></button>
+            <div class="title-menu-section">
+              <span class="menu-section-label">Start Playing</span>
+              <div class="title-primary-actions">
+                <button class="menu-button primary title-action-card" data-action="start"><strong>Solo Race</strong><span>One driver. Choose Classic, Fuel Run, or Pursuit before the road starts.</span></button>
+                <button class="menu-button title-action-card is-party" data-action="partyMode"><strong>Party Mode</strong><span>Local pass-the-keyboard racing for 2-8 drivers.</span></button>
+              </div>
+            </div>
+            <div class="title-menu-section">
+              <span class="menu-section-label">Choose, Learn, Compare</span>
+              <div class="title-secondary-actions">
+                <button class="menu-button" data-action="players"><strong>Driver Garage</strong><span>Create, rename, switch, and style local drivers.</span></button>
+                <button class="menu-button" data-action="challengeMode"><strong>Challenges</strong><span>Fixed seeds with clear objectives.</span></button>
+                <button class="menu-button" data-action="leaderboard"><strong>Leaderboard</strong><span>Top 20 local scores and titles.</span></button>
+                <button class="menu-button" data-action="howToPlay"><strong>How To Play</strong><span>Controls, modes, party rules, and rewards.</span></button>
+              </div>
+            </div>
+            <div class="title-menu-section">
+              <span class="menu-section-label">Options</span>
+              <button class="menu-button is-quiet" data-action="settings"><strong>Settings</strong><span>Audio, default speed class, fullscreen, and Playtest Report.</span></button>
+            </div>
           </div>
           <div class="title-utility-row">
             <button class="small-button" data-action="players">Switch Driver</button>
@@ -20051,15 +20406,15 @@ class NeonRoadRally {
           <div>
             <span class="eyebrow">Show Build Settings</span>
             <h2>Settings</h2>
-            <p class="hint">Audio and default Solo race mode are saved locally in this browser.</p>
+            <p class="hint">Audio and default Solo speed class are saved locally in this browser.</p>
           </div>
           <div class="score-grid">
-            <div class="score-card"><strong>Default Race Mode</strong><span>${escapeHtml(selectedSpeedClass.label)}</span></div>
+            <div class="score-card"><strong>Default Speed Class</strong><span>${escapeHtml(selectedSpeedClass.label)}</span></div>
             <div class="score-card"><strong>Audio</strong><span>${this.audio.musicMuted ? "Music muted" : "Music on"} · ${this.audio.sfxMuted ? "SFX muted" : "SFX on"}</span></div>
           </div>
           <div class="speed-class-panel">
             <div class="speed-class-header">
-              <span>Default Solo Race Mode</span>
+              <span>Default Solo Speed Class</span>
               <strong>${escapeHtml(selectedSpeedClass.label)} · Score x${selectedSpeedClass.scoreMultiplier.toFixed(2)}</strong>
             </div>
             <div class="speed-class-grid">
@@ -20224,6 +20579,7 @@ class NeonRoadRally {
       averageScore: this.averagePlaytestField(runs, "finalScore"),
       averageDuration: this.averagePlaytestField(runs, "elapsedTime"),
       averageBoostsUsed: this.averagePlaytestField(runs, "boostsUsed"),
+      totalBoostPadsMissedReachable: runs.reduce((sum, run) => sum + (Number(run.boostPadsMissedReachable) || 0), 0),
       averageLaneChanges: this.averagePlaytestField(runs, "laneChanges"),
       averageCenterLaneTime: this.averagePlaytestField(runs, "centerLaneTime"),
       totalNewBadges: runs.reduce((sum, run) => sum + (Array.isArray(run.newlyEarnedBadges) ? run.newlyEarnedBadges.length : 0), 0),
@@ -20369,6 +20725,7 @@ class NeonRoadRally {
         outOfFuelCount: aggregate.outOfFuelCount,
         bustedCount: aggregate.bustedCount,
         averageBoostsUsed: Number(aggregate.averageBoostsUsed.toFixed(2)),
+        totalBoostPadsMissedReachable: aggregate.totalBoostPadsMissedReachable,
         averageLaneChanges: Number(aggregate.averageLaneChanges.toFixed(2)),
         averageCenterLaneTimeSeconds: Number(aggregate.averageCenterLaneTime.toFixed(2)),
         totalNewBadges: aggregate.totalNewBadges,
@@ -21156,6 +21513,55 @@ class NeonRoadRally {
     `;
   }
 
+  getRaceTypePlainHelp(raceTypeId) {
+    if (raceTypeId === FUEL_RUN_RACE_TYPE_ID) {
+      return {
+        goal: "Keep fuel above zero.",
+        detail: "Gas cans refill the bar. Empty tank ends the run."
+      };
+    }
+    if (raceTypeId === PURSUIT_RACE_TYPE_ID) {
+      return {
+        goal: "Keep heat from filling.",
+        detail: "Heat is police pressure. Reach the Escape Zone to shake it off."
+      };
+    }
+    return {
+      goal: "Race to the finish.",
+      detail: "Traffic, boosts, ramps, clean driving, and score."
+    };
+  }
+
+  renderRaceTypeExplainCards(track, selectedRaceTypeId, groupName, options = {}) {
+    const selectedId = normalizeRaceTypeId(selectedRaceTypeId, DEFAULT_RACE_TYPE_ID);
+    const raceTypes = options.party
+      ? getPartyRaceTypesForTrack(track, selectedId)
+      : getRaceTypesForTrack(track);
+    return `
+      <div class="race-type-card-grid" aria-label="Race type choices">
+        ${raceTypes.map((raceType) => {
+          const help = this.getRaceTypePlainHelp(raceType.id);
+          const selected = raceType.id === selectedId;
+          const label = raceType.id === DEFAULT_RACE_TYPE_ID && options.party ? "Classic Race" : raceType.label;
+          return `
+            <button class="race-type-card ${selected ? "is-selected" : ""}" type="button" data-race-type-choice="${escapeAttr(groupName)}" data-value="${escapeAttr(raceType.id)}">
+              <strong>${escapeHtml(label)}</strong>
+              <span>${escapeHtml(help.goal)}</span>
+              <small>${escapeHtml(help.detail)}</small>
+            </button>
+          `;
+        }).join("")}
+      </div>
+    `;
+  }
+
+  syncRaceTypeExplainCards(groupName, selectedRaceTypeId) {
+    const selectedId = normalizeRaceTypeId(selectedRaceTypeId, DEFAULT_RACE_TYPE_ID);
+    document.querySelectorAll(`[data-race-type-choice="${groupName}"]`).forEach((card) => {
+      card.classList.toggle("is-selected", card.dataset.value === selectedId);
+    });
+  }
+
   renderRaceTypeOptionsForTrack(track, selectedRaceTypeId) {
     const supported = getRaceTypesForTrack(track);
     const selectedId = supported.some((item) => item.id === selectedRaceTypeId)
@@ -21269,28 +21675,30 @@ class NeonRoadRally {
           <div>
             <span class="eyebrow">Solo / Seeded Run</span>
             <h2>Track Select</h2>
-            <p class="hint">One driver, one seed, one clean run through the selected track.</p>
+            <p class="hint">One driver, one road seed, and one clear race type before the run starts.</p>
           </div>
           <div class="score-grid mode-context-grid">
             <div class="score-card"><strong>Driver</strong><span>${escapeHtml(player.name)}</span></div>
             <div class="score-card"><strong>Race Type</strong><span id="preRaceTypeSummary">${escapeHtml(raceType.label)}</span></div>
-            <div class="score-card"><strong>Race Mode</strong><span id="preRaceModeSummary">${escapeHtml(speedClass.label)} · x${speedClass.scoreMultiplier.toFixed(2)}</span></div>
+            <div class="score-card"><strong>Speed Class</strong><span id="preRaceModeSummary">${escapeHtml(speedClass.label)} · x${speedClass.scoreMultiplier.toFixed(2)}</span></div>
             <div class="score-card"><strong>Track</strong><span id="preRaceTrackSummary">${escapeHtml(track.name)}</span></div>
             <div class="score-card"><strong>Music</strong><span id="preRaceMusicSummary">${escapeHtml(getTrackMusicStatus(track))}</span></div>
             <div class="score-card"><strong>Seed Hash</strong><span id="roadSeedHashValue">${seedHash}</span></div>
-          </div>
-          <div class="field">
-            <label>Track</label>
-            ${this.renderTrackSelect("preRaceTrack", track.id)}
           </div>
           <div class="field">
             <label for="preRaceType">Race Type</label>
             <select id="preRaceType">
               ${this.renderRaceTypeOptionsForTrack(track, raceType.id)}
             </select>
+            ${this.renderRaceTypeExplainCards(track, raceType.id, "preRace")}
           </div>
           <div class="field">
-            <label for="preRaceSpeedClass">Race Mode</label>
+            <label>Track</label>
+            ${this.renderTrackSelect("preRaceTrack", track.id)}
+          </div>
+          <div class="field">
+            <label for="preRaceSpeedClass">Speed Class</label>
+            <p class="hint mode-ladder-note">Arcade is the normal family start. Pro and Turbo are faster. Overdrive and Redline are expert-speed dares.</p>
             ${this.renderSpeedClassLadder(track, speedClass.id)}
             <select id="preRaceSpeedClass">
               ${this.renderSpeedClassOptionsForTrack(track, speedClass.id)}
@@ -21305,8 +21713,8 @@ class NeonRoadRally {
             <input id="roadSeedInput" type="text" maxlength="32" value="${escapeAttr(seed)}" autocomplete="off" spellcheck="false" inputmode="text">
           </div>
           <p class="hint">Same seed + same track + same race speed + same race type repeats the Road Director sequence.</p>
-          <p id="fuelRunBoostHint" class="hint" ${raceType.id === FUEL_RUN_RACE_TYPE_ID ? "" : "hidden"}>Fuel Run: Boost saves fuel.</p>
-          <p id="pursuitModeHint" class="hint" ${raceType.id === PURSUIT_RACE_TYPE_ID ? "" : "hidden"}>Pursuit: Police pressure fills the heat bar. If it fills, you get Busted. Boost, hit ramps, clear roadblocks, and reach the Escape Zone to shake them.</p>
+          <p id="fuelRunBoostHint" class="hint" ${raceType.id === FUEL_RUN_RACE_TYPE_ID ? "" : "hidden"}>Fuel: the bar drains while you race. Grab gas cans; manual boost pauses fuel drain.</p>
+          <p id="pursuitModeHint" class="hint" ${raceType.id === PURSUIT_RACE_TYPE_ID ? "" : "hidden"}>Heat: this is police pressure. If the bar fills, you get busted. Reach the Escape Zone to shake it off.</p>
           <p id="roadSeedHash" class="hint">Seed hash: ${seedHash}</p>
           <div class="row">
             <button class="small-button" data-action="randomSeed">Random Seed</button>
@@ -21358,6 +21766,7 @@ class NeonRoadRally {
       if (raceTypeSummary) {
         raceTypeSummary.textContent = raceType.label;
       }
+      this.syncRaceTypeExplainCards("preRace", raceType.id);
       if (fuelRunBoostHint) {
         fuelRunBoostHint.hidden = raceType.id !== FUEL_RUN_RACE_TYPE_ID;
       }
@@ -21393,6 +21802,14 @@ class NeonRoadRally {
         inputEl.dispatchEvent(new Event("change", { bubbles: true }));
       });
     });
+    document.querySelectorAll('[data-race-type-choice="preRace"]').forEach((card) => {
+      card.addEventListener("click", () => {
+        if (!raceTypeSelect) return;
+        raceTypeSelect.value = normalizeRaceTypeId(card.dataset.value, DEFAULT_RACE_TYPE_ID);
+        this.pendingRaceTypeId = raceTypeSelect.value;
+        updateDisplay();
+      });
+    });
     input.addEventListener("input", updateDisplay);
     input.addEventListener("blur", () => {
       const normalized = normalizeRoadSeed(input.value, "");
@@ -21425,8 +21842,6 @@ class NeonRoadRally {
       });
     }
     syncTrackDependentControls();
-    input.focus();
-    input.select();
   }
 
   handleRandomSeed() {
@@ -21574,13 +21989,23 @@ class NeonRoadRally {
     this.layer.classList.remove("is-empty");
     this.layer.innerHTML = `
       <section class="panel party-panel">
-        <h2>Party Mode</h2>
-        <p class="hint">Pass the keyboard on one local machine. Best of 3 and Total Score use three runs per player. Choose Classic Race or Fuel Run for the whole round.</p>
+        <div class="party-setup-hero">
+          <div>
+            <span class="eyebrow">Local Party Mode</span>
+            <h2>Party Setup</h2>
+            <p class="hint">Pick drivers, choose one race type for everyone, then pass the keyboard. No online accounts, no stat upgrades.</p>
+          </div>
+          <div class="party-setup-steps" aria-label="Party setup steps">
+            <span><strong>1</strong>Drivers</span>
+            <span><strong>2</strong>Race</span>
+            <span><strong>3</strong>Turns</span>
+          </div>
+        </div>
         <div class="party-summary-strip">
           <div class="score-card"><strong>Selected Players</strong><span>${selectedPlayers.length}/${PARTY_MAX_PLAYERS}</span></div>
           <div class="score-card"><strong>Track</strong><span id="partyTrackSummary">${escapeHtml(track.name)}</span></div>
           <div class="score-card"><strong>Race Type</strong><span id="partyRaceTypeSummary">${escapeHtml(partyRaceType.label)}</span></div>
-          <div class="score-card"><strong>Race Mode</strong><span>${escapeHtml(getSpeedClassLabel(setup.raceMode))}</span></div>
+          <div class="score-card"><strong>Speed Class</strong><span>${escapeHtml(getSpeedClassLabel(setup.raceMode))}</span></div>
           <div class="score-card"><strong>Music</strong><span id="partyMusicSummary">${escapeHtml(getTrackMusicStatus(track))}</span></div>
           <div class="score-card"><strong>Shared Seed</strong><span class="is-compact">${escapeHtml(seed)}</span></div>
           <div class="score-card"><strong>Round Type</strong><span id="partyRoundSummary">${escapeHtml(roundTypeConfig.label)}</span></div>
@@ -21657,10 +22082,12 @@ class NeonRoadRally {
               <select id="partyRaceType">
                 ${getPartyRaceTypesForTrack(track, partyRaceType.id).map((raceType) => `<option value="${escapeAttr(raceType.id)}" ${raceType.id === partyRaceType.id ? "selected" : ""}>${raceType.id === DEFAULT_RACE_TYPE_ID ? "Classic Race" : escapeHtml(raceType.label)}</option>`).join("")}
               </select>
-              <p id="partyRaceTypeHint" class="hint">${partyRaceType.id === FUEL_RUN_RACE_TYPE_ID ? "Collect gas cans and survive to the finish. Run out of fuel and your run ends." : "Classic Race: survive, score, and finish."}</p>
+              ${this.renderRaceTypeExplainCards(track, partyRaceType.id, "party", { party: true })}
+              <p id="partyRaceTypeHint" class="hint">${partyRaceType.id === FUEL_RUN_RACE_TYPE_ID ? "Fuel: every player gets the same fuel rules. Grab gas cans; empty tank ends the run." : "Classic Race: every player gets the same road, traffic, boosts, ramps, and finish-line scoring."}</p>
             </div>
             <div class="field">
-              <label for="partyRaceMode">Race Mode</label>
+              <label for="partyRaceMode">Speed Class</label>
+              <p class="hint mode-ladder-note">Arcade is easiest to read in a room. Pro and Turbo are better once everyone has warmed up.</p>
               ${this.renderSpeedClassLadder(track, setup.raceMode)}
               <select id="partyRaceMode">
                 ${this.renderSpeedClassOptionsForTrack(track, setup.raceMode)}
@@ -21754,9 +22181,10 @@ class NeonRoadRally {
       if (raceTypeSummary) raceTypeSummary.textContent = raceTypeConfig.label;
       if (raceTypeHint) {
         raceTypeHint.textContent = selectedRaceType === FUEL_RUN_RACE_TYPE_ID
-          ? "Collect gas cans and survive to the finish. Run out of fuel and your run ends."
-          : "Classic Race: survive, score, and finish.";
+          ? "Fuel: every player gets the same fuel rules. Grab gas cans; empty tank ends the run."
+          : "Classic Race: every player gets the same road, traffic, boosts, ramps, and finish-line scoring.";
       }
+      this.syncRaceTypeExplainCards("party", selectedRaceType);
       if (musicSummary) musicSummary.textContent = getTrackMusicStatus(track);
       if (roundSummary) roundSummary.textContent = getPartyRoundTypeLabel(roundType?.value || this.getPartySetup().roundType);
       if (seedModeSummary) seedModeSummary.textContent = getPartySeedModeLabel(seedMode?.value || this.getPartySetup().seedMode);
@@ -21792,6 +22220,14 @@ class NeonRoadRally {
         if (inputEl.checked) return;
         inputEl.checked = true;
         inputEl.dispatchEvent(new Event("change", { bubbles: true }));
+      });
+    });
+    document.querySelectorAll('[data-race-type-choice="party"]').forEach((card) => {
+      card.addEventListener("click", () => {
+        if (!raceType) return;
+        raceType.value = normalizePartyRaceType(card.dataset.value, this.getSelectedTrackFromInputs("partyTrack", this.getPartySetup().trackId || DEFAULT_TRACK_ID));
+        this.readPartySetupForm();
+        updateSeedDisplay();
       });
     });
     if (input) {
@@ -22005,7 +22441,7 @@ class NeonRoadRally {
         ${standings.length ? standings.map((result, index) => {
           const recent = recentResult && result.playerId === recentResult.playerId && result.resultId === recentResult.resultId;
           const latestMeta = result.completedRuns > 0
-            ? `${escapeHtml(getRunStatusLabel(result.latestStatus, result.latestReason))} · ${formatTime(result.latestTime)} · Round ${result.latestRoundNumber}`
+            ? `${escapeHtml(getRunStatusLabel(result.latestStatus, result.latestReason))} · ${formatRunElapsedTime({ status: result.latestStatus, time: result.latestTime, finishTimeMs: result.latestFinishTimeMs })} · Round ${result.latestRoundNumber}`
             : "Waiting for first run";
           return `
             <li class="leaderboard-item party-standing-row ${final && index === 0 ? "is-winner" : ""} ${recent ? "is-recent" : ""}">
@@ -22106,7 +22542,17 @@ class NeonRoadRally {
         <div class="form-stack">
           <div>
             <span class="eyebrow">Round ${session.roundNumber} of ${session.totalRounds} · Player ${session.currentTurnNumber} of ${session.totalPlayers}</span>
-            <h2>Turn ${session.currentTurnNumber} of ${session.totalPlayers} - ${escapeHtml(player.name)}</h2>
+            <h2>Party Turn</h2>
+          </div>
+          <div class="party-turn-hero-card">
+            <span>At the keyboard now</span>
+            <strong>${escapeHtml(player.name)}</strong>
+            <em>Run ${session.completedRuns + 1} of ${session.totalRuns} · ${escapeHtml(getRaceTypeLabel(session.raceType))} · ${escapeHtml(getSpeedClassLabel(session.raceMode))}</em>
+          </div>
+          <div class="row party-turn-action-row">
+            <button class="small-button primary" data-action="partyStartRun">Start Run</button>
+            <button class="small-button" data-action="partyChangeSetup">Change Players/Mode</button>
+            <button class="small-button" data-action="title">Return to Title</button>
           </div>
           <div class="score-grid">
             <div class="score-card"><strong>Driver</strong><span>${escapeHtml(player.name)}</span></div>
@@ -22114,7 +22560,7 @@ class NeonRoadRally {
             <div class="score-card"><strong>Round</strong><span>${session.roundNumber} of ${session.totalRounds}</span></div>
             <div class="score-card"><strong>Track</strong><span>${escapeHtml(session.track.name)}</span></div>
             <div class="score-card"><strong>Race Type</strong><span>${escapeHtml(getRaceTypeLabel(session.raceType))}</span></div>
-            <div class="score-card"><strong>Race Mode</strong><span>${escapeHtml(getSpeedClassLabel(session.raceMode))}</span></div>
+            <div class="score-card"><strong>Speed Class</strong><span>${escapeHtml(getSpeedClassLabel(session.raceMode))}</span></div>
             <div class="score-card"><strong>Current Seed</strong><span>${escapeHtml(roundSeed)}</span></div>
             <div class="score-card"><strong>Round Type</strong><span>${escapeHtml(getPartyRoundTypeLabel(session.roundType))}</span></div>
             <div class="score-card"><strong>Seed Behavior</strong><span>${escapeHtml(getPartySeedModeLabel(session.seedMode))}</span></div>
@@ -22123,11 +22569,6 @@ class NeonRoadRally {
           ${this.renderPartyTurnOrderPanel(session)}
           <p class="hint">${isFuelRunRaceType(session.raceType) ? "Fuel Run: collect gas cans and survive to the finish. Run out of fuel and the run ends." : "Press Enter or Start Run when this player is at the keyboard."}</p>
           ${badgePrompt ? `<p class="hint party-badge-prompt">${escapeHtml(badgePrompt)}</p>` : ""}
-          <div class="row">
-            <button class="small-button primary" data-action="partyStartRun">Start Run</button>
-            <button class="small-button" data-action="partyChangeSetup">Change Players/Mode</button>
-            <button class="small-button" data-action="title">Return to Title</button>
-          </div>
           <p class="status-line">${escapeHtml(message)}</p>
           ${standings.some((result) => result.completedRuns > 0) ? `
             <h2>Current Standings</h2>
@@ -22509,10 +22950,11 @@ class NeonRoadRally {
     const newBadgeRows = (session.partyNewBadgeAwards || []).filter((entry) => entry.badges?.length);
     return `
       <section class="party-awards-panel">
-        <div class="badge-profile-header">
+        <div class="badge-profile-header party-awards-header">
           <div>
             <span class="eyebrow">Party Awards</span>
-            <strong>Session wins</strong>
+            <strong>Spotlight wins</strong>
+            <small>Side awards recognize the best moments, not just first place.</small>
           </div>
           <span>${awards.length} shown</span>
         </div>
@@ -22524,7 +22966,8 @@ class NeonRoadRally {
               .slice(0, 2);
             return `
               <div class="party-award-card">
-                <span>${escapeHtml(award.label)}</span>
+                <span>Spotlight Award</span>
+                <b>${escapeHtml(award.label)}</b>
                 <strong>${escapeHtml(winnerText)}</strong>
                 <em>${escapeHtml(award.displayValue)}</em>
                 <small>${escapeHtml(award.description)}</small>
@@ -22569,6 +23012,84 @@ class NeonRoadRally {
       callouts.push(`<span class="score-callout">Top 20 Pending</span>`);
     }
     return callouts.join("");
+  }
+
+  renderRunHighlightPanel(summary) {
+    if (!summary) return "";
+    const highlights = [];
+    if (summary.status === "finished" && summary.finishTimeMs !== null && summary.finishTimeMs !== undefined) {
+      highlights.push([
+        "Finished",
+        formatFinishTimeMs(summary.finishTimeMs),
+        summary.bestTimeMs !== null && summary.bestTimeMs !== undefined
+          ? `Best ${formatFinishTimeMs(summary.bestTimeMs)}.`
+          : "First saved time target."
+      ]);
+      if (summary.personalBestTimeDelta !== null && summary.personalBestTimeDelta !== undefined) {
+        highlights.push([
+          summary.newPersonalBestTime ? "New Best Time" : "Behind Best",
+          formatSignedTimeDeltaSeconds(summary.personalBestTimeDelta),
+          summary.newPersonalBestTime
+            ? `Previous ${formatFinishTimeMs(summary.previousBestTimeMs)}.`
+            : `Best ${formatFinishTimeMs(summary.bestTimeMs)}.`
+        ]);
+      } else if (summary.newPersonalBestTime) {
+        highlights.push(["New Best Time", "First mark", "Future runs compare against this pace."]);
+      }
+    }
+    highlights.push([
+      "Boost Route",
+      summary.boostPadsMissedReachable > 0 ? "Missed chances" : "Clean route",
+      `${summary.boostRouteFeedback || getBoostRouteFeedbackText(summary.boostPadsCollected || 0, summary.boostPadsMissedReachable || 0)} ${Math.max(0, summary.boostPadsCollected || 0)} collected / ${Math.max(0, summary.boostPadsMissedReachable || 0)} missed.`
+    ]);
+    if (summary.newPersonalBest) {
+      highlights.push(["Personal Best", formatScore(summary.finalScore), "Your driver profile was updated."]);
+    } else if (summary.scoreSaved) {
+      highlights.push(["Saved Score", formatScore(summary.finalScore), `Personal best ${formatScore(summary.bestScore)}.`]);
+    }
+    if (summary.entersTopTwenty) {
+      highlights.push(["Top 20", `#${summary.topTwentyRank || "?"}`, "Added to the local leaderboard."]);
+    } else if (summary.topTwentyGap > 0) {
+      highlights.push(["Top 20 Gap", formatScore(summary.topTwentyGap), "Points needed to reach the board."]);
+    }
+    if (summary.raceTypeId === FUEL_RUN_RACE_TYPE_ID) {
+      highlights.push([
+        "Fuel",
+        summary.status === "outOfFuel" ? "Out" : `${Math.max(0, summary.fuelRemaining || 0)} left`,
+        `${Math.max(0, summary.gasCansCollected || 0)} gas cans collected.`
+      ]);
+    }
+    if (summary.raceTypeId === PURSUIT_RACE_TYPE_ID) {
+      highlights.push([
+        "Heat",
+        `${Math.round(summary.heatMax || 0)} max`,
+        `${Math.max(0, summary.roadblocksCleared || 0)} roadblocks cleared.`
+      ]);
+    }
+    if (summary.challengeMode) {
+      highlights.push([
+        "Challenge",
+        summary.challengeResult?.completed ? "Complete" : "Try Again",
+        summary.challengeResult?.detail || summary.challengeObjective || "Objective checked."
+      ]);
+    }
+    const badgeCount = Array.isArray(summary.newlyEarnedBadges) ? summary.newlyEarnedBadges.length : 0;
+    if (badgeCount > 0) {
+      highlights.push(["Badges", `${badgeCount} new`, "Saved to this driver."]);
+    }
+    const visible = highlights.slice(0, 5);
+    if (!visible.length) return "";
+    return `
+      <div class="result-highlight-grid">
+        ${visible.map(([label, value, detail]) => `
+          <div class="result-highlight-card">
+            <span>${escapeHtml(label)}</span>
+            <strong>${escapeHtml(value)}</strong>
+            <small>${escapeHtml(detail)}</small>
+          </div>
+        `).join("")}
+      </div>
+    `;
   }
 
   showPartyStandingsScreen(message = "") {
@@ -22620,7 +23141,7 @@ class NeonRoadRally {
             <div>
               <span class="eyebrow">Latest Run</span>
               <strong>${escapeHtml(summary.playerName)}</strong>
-              <span class="meta">${escapeHtml(summary.carName)} · Round ${summary.partyRoundIndex || recentResult?.roundNumber || 1} · Seed ${escapeHtml(summary.partySeed || summary.seed)} · ${escapeHtml(getRunStatusLabel(summary.status, summary.reason))} · ${formatTime(summary.time)}</span>
+              <span class="meta">${escapeHtml(summary.carName)} · Round ${summary.partyRoundIndex || recentResult?.roundNumber || 1} · Seed ${escapeHtml(summary.partySeed || summary.seed)} · ${escapeHtml(getRunStatusLabel(summary.status, summary.reason))} · ${formatRunElapsedTime(summary)}</span>
             </div>
             <div class="party-last-score">
               <span data-tally-value="${escapeAttr(summary.finalScore)}">${formatScore(summary.finalScore)}</span>
@@ -22638,7 +23159,11 @@ class NeonRoadRally {
             ${this.renderBadgeEarnedPanel(summary, true)}
           </div>
         ` : ""}
-        <h2>${final ? "Final Standings" : "Current Standings"}</h2>
+        <div class="party-section-heading ${final ? "is-final-standings" : ""}">
+          <span class="eyebrow">${final ? "Final Standings" : "Current Standings"}</span>
+          <h2>${final ? "Final Standings" : "Current Standings"}</h2>
+          <p class="hint">${final ? "The winner is locked in. Awards below spotlight more drivers from the session." : "Check the table, then pass to the next driver."}</p>
+        </div>
         ${this.renderPartyStandingsList(session, standings, recentResult, final)}
         ${!final ? this.renderPartyTurnOrderPanel(session) : ""}
         ${this.renderPartyAwardsPanel(session)}
@@ -22785,7 +23310,7 @@ class NeonRoadRally {
         <div class="driver-card-body">
           <div class="driver-card-title">
             <strong>${escapeHtml(player.name)}</strong>
-            <small>${escapeHtml(bodyStyle)}${carNickname !== "No nickname" ? ` - ${escapeHtml(carNickname)}` : ""}</small>
+            <small>Car style: ${escapeHtml(bodyStyle)}${carNickname !== "No nickname" ? ` · Nickname: ${escapeHtml(carNickname)}` : ""}</small>
           </div>
           <div class="driver-card-stats">
             <span><b>${formatScore(player.bestScore)}</b><small>Best</small></span>
@@ -22836,7 +23361,7 @@ class NeonRoadRally {
     const carStyle = normalizeCarStyle(car.carStyle);
     const nickname = getOptionalCarNickname(car);
     const activeCopy = player
-      ? `${escapeHtml(player.name)} is the active local driver.`
+      ? `${escapeHtml(player.name)} is the active local driver. Driver name is the identity used for scores, badges, titles, and Party Mode.`
       : "Create a local driver to save badges, titles, car style, and scores.";
     this.audio.playMusic("title", false);
     this.layer.classList.remove("is-empty");
@@ -22858,7 +23383,7 @@ class NeonRoadRally {
           </div>
           <div class="garage-preview-card">
             <canvas id="carPreview" class="car-preview" width="360" height="250" aria-label="Active driver car preview"></canvas>
-            <p class="hint">Cars are cosmetic for fair local competition. Paint, style, and boost trail personalize your driver. Performance classes may come later.</p>
+            <p class="hint">Driver name comes first. Car nickname, paint, style, and boost trail are cosmetic for fair local competition.</p>
           </div>
         </div>
 
@@ -22868,7 +23393,7 @@ class NeonRoadRally {
           <section class="garage-section" id="garageRenameDriver">
             <div class="garage-section-heading">
               <span class="eyebrow">Driver Profile</span>
-              <h3>Rename and Records</h3>
+              <h3>Name, Records, Rewards</h3>
             </div>
             <div class="field">
               <label for="driverRenameName">Driver Name</label>
@@ -22887,7 +23412,7 @@ class NeonRoadRally {
               <span class="eyebrow">Garage</span>
               <h3>Car Style</h3>
             </div>
-            <p class="hint">Car nickname is optional flavor. Driver name is your main identity.</p>
+            <p class="hint">Car nickname is optional flavor. The driver name remains the main identity everywhere.</p>
             <div class="field">
               <label for="carName">Optional Car Nickname</label>
               <input id="carName" type="text" maxlength="${LOCAL_CAR_NAME_MAX_LENGTH}" value="${escapeAttr(nickname)}" placeholder="Optional nickname" ${player ? "" : "disabled"}>
@@ -23280,7 +23805,7 @@ class NeonRoadRally {
               <span class="leaderboard-rank">#${index + 1}</span>
               <span>
                 <strong>${escapeHtml(entry.playerName)}</strong>
-                <span class="meta">${entry.challengeId ? `Challenge: ${escapeHtml(entry.challengeName || entry.challengeId)} · ` : ""}${entry.partyMode ? `Party ${escapeHtml(getPartyRoundTypeLabel(entry.partyRoundType))} R${entry.partyRoundIndex || 1} · ` : ""}${escapeHtml(entry.carName)} · ${escapeHtml(entry.trackName)} · ${escapeHtml(getRaceTypeLabel(entry.raceType))} · ${escapeHtml(getSpeedClassLabel(entry.raceMode || entry.speedClass))} · Seed ${escapeHtml(formatRoadSeed(entry.seed))} · ${escapeHtml(getRunOutcomeLabel(entry))} · ${formatTime(entry.time)}${entry.raceType === FUEL_RUN_RACE_TYPE_ID ? ` · Fuel ${Math.max(0, entry.fuelRemaining || 0)}` : ""}${entry.raceType === PURSUIT_RACE_TYPE_ID ? ` · Heat ${Math.round(entry.heatAtEnd || 0)} · Roadblocks ${Math.max(0, entry.roadblocksCleared || 0)}` : ""}${formatShortDate(entry.date) ? ` · ${escapeHtml(formatShortDate(entry.date))}` : ""}</span>
+                <span class="meta">${entry.challengeId ? `Challenge: ${escapeHtml(entry.challengeName || entry.challengeId)} · ` : ""}${entry.partyMode ? `Party ${escapeHtml(getPartyRoundTypeLabel(entry.partyRoundType))} R${entry.partyRoundIndex || 1} · ` : ""}${escapeHtml(entry.carName)} · ${escapeHtml(entry.trackName)} · ${escapeHtml(getRaceTypeLabel(entry.raceType))} · ${escapeHtml(getSpeedClassLabel(entry.raceMode || entry.speedClass))} · Seed ${escapeHtml(formatRoadSeed(entry.seed))} · ${escapeHtml(getRunOutcomeLabel(entry))} · ${formatRunElapsedTime(entry)}${entry.raceType === FUEL_RUN_RACE_TYPE_ID ? ` · Fuel ${Math.max(0, entry.fuelRemaining || 0)}` : ""}${entry.raceType === PURSUIT_RACE_TYPE_ID ? ` · Heat ${Math.round(entry.heatAtEnd || 0)} · Roadblocks ${Math.max(0, entry.roadblocksCleared || 0)}` : ""}${formatShortDate(entry.date) ? ` · ${escapeHtml(formatShortDate(entry.date))}` : ""}</span>
               </span>
               <span class="leaderboard-score">${formatScore(entry.score)}</span>
             </li>
@@ -23311,6 +23836,16 @@ class NeonRoadRally {
     const personalBestText = summary.newPersonalBest
       ? `New PB: ${formatScore(summary.finalScore)}`
       : `PB: ${formatScore(summary.bestScore)}`;
+    const resultTimeLabel = summary.status === "finished" ? "Finish Time" : "Elapsed";
+    const resultTimeText = summary.status === "finished" && summary.finishTimeMs !== null && summary.finishTimeMs !== undefined
+      ? formatFinishTimeMs(summary.finishTimeMs)
+      : formatTime(summary.time);
+    const bestTimeText = summary.bestTimeMs !== null && summary.bestTimeMs !== undefined
+      ? formatFinishTimeMs(summary.bestTimeMs)
+      : "No saved best";
+    const paceDeltaText = summary.personalBestTimeDelta !== null && summary.personalBestTimeDelta !== undefined
+      ? formatSignedTimeDeltaSeconds(summary.personalBestTimeDelta)
+      : (summary.newPersonalBestTime ? "First mark" : "No comparison");
     const restartLabel = summary.challengeMode ? "Retry Challenge" : (summary.partyMode ? "Run Again" : "Rematch Same Seed");
     this.layer.classList.remove("is-empty");
     this.layer.innerHTML = `
@@ -23330,6 +23865,7 @@ class NeonRoadRally {
         </div>
         ${this.renderBadgeEarnedPanel(summary)}
         ${this.renderMedalChips(summary.medals)}
+        ${this.renderRunHighlightPanel(summary)}
         ${this.renderChallengeResultPanel(summary)}
         <div class="score-grid score-info-grid">
           ${summary.challengeMode ? `
@@ -23356,7 +23892,9 @@ class NeonRoadRally {
             <div class="score-card"><strong>Pursuit Result</strong><span>${escapeHtml(summary.pursuitResult || outcomeText)}</span></div>
           ` : ""}
           <div class="score-card"><strong>Distance</strong><span>${Math.round(summary.distance).toLocaleString()} / ${summary.trackDistance.toLocaleString()}</span></div>
-          <div class="score-card"><strong>Time</strong><span>${formatTime(summary.time)}</span></div>
+          <div class="score-card"><strong>${escapeHtml(resultTimeLabel)}</strong><span>${escapeHtml(resultTimeText)}</span></div>
+          <div class="score-card"><strong>Best Time Pace</strong><span>${escapeHtml(`${bestTimeText} · ${paceDeltaText}`)}</span></div>
+          <div class="score-card"><strong>Boost Route</strong><span class="is-compact">${escapeHtml(summary.boostRouteFeedback || getBoostRouteFeedbackText(summary.boostPadsCollected || 0, summary.boostPadsMissedReachable || 0))}</span></div>
           <div class="score-card"><strong>Personal Best</strong><span>${escapeHtml(personalBestText)}</span></div>
           <div class="score-card"><strong>Top 20</strong><span>${escapeHtml(leaderboardText)}</span></div>
         </div>
@@ -23374,7 +23912,7 @@ class NeonRoadRally {
               <span class="leaderboard-rank">#${index + 1}</span>
               <span>
                 <strong>${escapeHtml(entry.playerName)}</strong>
-                <span class="meta">${entry.challengeId ? `Challenge: ${escapeHtml(entry.challengeName || entry.challengeId)} · ` : ""}${entry.partyMode ? `Party ${escapeHtml(getPartyRoundTypeLabel(entry.partyRoundType))} R${entry.partyRoundIndex || 1} · ` : ""}${escapeHtml(entry.carName)} · ${escapeHtml(entry.trackName)} · ${escapeHtml(getRaceTypeLabel(entry.raceType))} · ${escapeHtml(getSpeedClassLabel(entry.raceMode || entry.speedClass))} · Seed ${escapeHtml(formatRoadSeed(entry.seed))} · ${escapeHtml(getRunOutcomeLabel(entry))} · ${formatTime(entry.time)}${entry.raceType === PURSUIT_RACE_TYPE_ID ? ` · Heat ${Math.round(entry.heatAtEnd || 0)} · Roadblocks ${Math.max(0, entry.roadblocksCleared || 0)}` : ""}</span>
+                <span class="meta">${entry.challengeId ? `Challenge: ${escapeHtml(entry.challengeName || entry.challengeId)} · ` : ""}${entry.partyMode ? `Party ${escapeHtml(getPartyRoundTypeLabel(entry.partyRoundType))} R${entry.partyRoundIndex || 1} · ` : ""}${escapeHtml(entry.carName)} · ${escapeHtml(entry.trackName)} · ${escapeHtml(getRaceTypeLabel(entry.raceType))} · ${escapeHtml(getSpeedClassLabel(entry.raceMode || entry.speedClass))} · Seed ${escapeHtml(formatRoadSeed(entry.seed))} · ${escapeHtml(getRunOutcomeLabel(entry))} · ${formatRunElapsedTime(entry)}${entry.raceType === PURSUIT_RACE_TYPE_ID ? ` · Heat ${Math.round(entry.heatAtEnd || 0)} · Roadblocks ${Math.max(0, entry.roadblocksCleared || 0)}` : ""}</span>
               </span>
               <span class="leaderboard-score">${formatScore(entry.score)}</span>
             </li>
