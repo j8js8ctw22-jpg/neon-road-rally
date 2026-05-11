@@ -191,6 +191,46 @@ async function main() {
 
     const app = Object.create(NeonRoadRally.prototype);
     app.renderer = makeHarnessRenderer();
+    const fuelTrack = createRaceTrackForSpeedClass(getTrackById("sunset-highway"), "arcade", FUEL_RUN_RACE_TYPE_ID);
+    const fuelRegressionRun = {
+      track: fuelTrack,
+      speedClassId: "arcade",
+      raceTypeId: FUEL_RUN_RACE_TYPE_ID,
+      distance: 0,
+      elapsed: 0,
+      currentSpeed: getTrackCruiseSpeed(fuelTrack, 0, "arcade"),
+      targetLane: TRACK_DIRECTOR.centerLane,
+      playerYRatio: PLAYER_START_Y_RATIO,
+      roadSeed: "LANE-57517"
+    };
+    const fuelRegressionManager = new ObstacleManager({
+      run: fuelRegressionRun,
+      renderer: app.renderer,
+      randomFloat: () => 0.5
+    });
+    fuelRegressionManager.reset(fuelTrack);
+    const blockedFuelRoute = [
+      fuelRegressionManager.createObstacle("slowCar", 2, 1000, { waveType: "LANE-57517" }),
+      fuelRegressionManager.createObstacle("truck", 3, 1010, { waveType: "LANE-57517" }),
+      fuelRegressionManager.createObstacle("slowCar", 4, 1020, { waveType: "LANE-57517" })
+    ];
+    const blockedGasCan = fuelRegressionManager.createObstacle("gasCan", 3, 1500, { waveType: "LANE-57517" });
+    const blockedGasResult = fuelRegressionManager.canSpawnObstacle(blockedGasCan, blockedFuelRoute);
+    assert(!blockedGasResult.canSpawn, "LANE-57517-style blocker cluster should reject impossible gas can");
+    assert(blockedGasResult.gasCanReachabilityFailure, "Rejected gas can should be tagged as a reachability prevention");
+    const reachableGasCan = fuelRegressionManager.createObstacle("gasCan", 0, 1500, { waveType: "LANE-57517" });
+    const reachableGasResult = fuelRegressionManager.canSpawnObstacle(reachableGasCan, []);
+    assert(reachableGasResult.canSpawn, "Gas can with a clear side route should remain spawnable");
+    const lane57517Fuel = await app.runSpawnSafetySimulationCore({
+      runs: 1,
+      speedClassIds: ["arcade"],
+      trackId: "sunset-highway",
+      raceTypeId: FUEL_RUN_RACE_TYPE_ID,
+      dt: 0.3,
+      seed: "LANE-57517"
+    });
+    assert.strictEqual(lane57517Fuel.gasCanOverlaps, 0, "LANE-57517 Fuel Run should avoid gas can overlaps");
+    assert.strictEqual(lane57517Fuel.routeReadabilityFailures, 0, "LANE-57517 Fuel Run should preserve readable routes");
     for (const trackId of ["sunset-highway", "redline-run"]) {
       const summary = await app.runSpawnSafetySimulationCore({
         runs: 2,
@@ -271,6 +311,25 @@ async function main() {
     assert.strictEqual(aggregate.paceFeedbackRunCount, 2, "Playtest Report should count pace-feedback runs");
     assert(aggregate.directorIntentRows.length >= 4, "Playtest Report should expose director intent variety");
     assert(aggregate.waveFamilyRows.length >= 4, "Playtest Report should expose wave family variety");
+
+    const fuelRoutePlaytest = normalizePlaytestRunSummary({
+      status: "finished",
+      trackId: "sunset-highway",
+      raceTypeId: FUEL_RUN_RACE_TYPE_ID,
+      raceModeId: "arcade",
+      elapsedTime: 72.4,
+      gasCansSpawned: 5,
+      gasCansCollected: 3,
+      gasCanSpawnRejected: 4,
+      gasCanSpawnRepositioned: 1,
+      gasCanReachabilityFailuresPrevented: 2
+    });
+    assert.strictEqual(fuelRoutePlaytest.gasCanReachabilityFailuresPrevented, 2, "Playtest rows should keep fuel reachability prevention counters");
+    app.playtestReports = { getRuns: () => [fuelRoutePlaytest] };
+    const fuelAggregate = app.buildPlaytestReportAggregate("all");
+    assert.strictEqual(fuelAggregate.fuelSummary.gasCanSpawnRejected, 4, "Playtest Report should aggregate rejected gas can spawn attempts");
+    assert.strictEqual(fuelAggregate.fuelSummary.gasCanSpawnRepositioned, 1, "Playtest Report should aggregate repositioned gas cans");
+    assert.strictEqual(fuelAggregate.fuelSummary.gasCanReachabilityFailuresPrevented, 2, "Playtest Report should aggregate prevented impossible gas cans");
   })()
   `, context, { filename: "road-director-pacing-checks" });
 }

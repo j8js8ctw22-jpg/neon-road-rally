@@ -2672,6 +2672,20 @@ const FUEL_RUN_CONFIG = {
   }
 };
 
+const FUEL_CAN_REACHABILITY_CONFIG = {
+  approachSeconds: 1.08,
+  approachMinDistance: 520,
+  approachMaxDistance: 880,
+  collectClearBefore: 360,
+  collectClearAfter: 170,
+  nearbyClearBefore: 470,
+  nearbyClearAfter: 210,
+  routeSampleStep: 120,
+  routeTimingBufferSeconds: 0.16,
+  maxNearbyHardBlockers: 3,
+  maxLaneNeighborhoodHardBlockers: 2
+};
+
 const PURSUIT_CONFIG = {
   heatLimit: 100,
   startHeat: 14,
@@ -5281,6 +5295,9 @@ function normalizePlaytestRunSummary(entry) {
     hardestPressureObserved: normalizeNonNegativeNumber(entry.hardestPressureObserved, 0, 999),
     gasCansSpawned: normalizeNonNegativeInteger(entry.gasCansSpawned, 0, 9999),
     gasCansCollected: normalizeNonNegativeInteger(entry.gasCansCollected || entry.fuelCollected, 0, 9999),
+    gasCanSpawnRejected: normalizeNonNegativeInteger(entry.gasCanSpawnRejected, 0, 99999),
+    gasCanSpawnRepositioned: normalizeNonNegativeInteger(entry.gasCanSpawnRepositioned, 0, 99999),
+    gasCanReachabilityFailuresPrevented: normalizeNonNegativeInteger(entry.gasCanReachabilityFailuresPrevented, 0, 99999),
     fuelRemaining: normalizeNonNegativeNumber(entry.fuelRemaining, 0, FUEL_RUN_CONFIG.fuelMax),
     fuelSavedByBoost: normalizeNonNegativeNumber(entry.fuelSavedByBoost, 0, FUEL_RUN_CONFIG.fuelMax),
     fuelDrainPausedTime: normalizeNonNegativeNumber(entry.fuelDrainPausedTime, 0, 24 * 60 * 60),
@@ -10055,9 +10072,15 @@ class RoadDirector {
     const lanes = Array.isArray(preferredLanes) ? preferredLanes : [preferredLanes];
     const fallback = shuffle(this.allLanes(), () => this.random());
     const ordered = lanes.concat(fallback).filter((lane, index, list) => Number.isFinite(lane) && lane >= 0 && lane < LANES && list.indexOf(lane) === index);
+    let attempts = 0;
     for (const lane of ordered) {
+      attempts += 1;
       const spawned = this.spawn("gasCan", lane, distance, result, { allowLaneAdjust: false });
       if (spawned) {
+        const run = context.run || this.manager.game.run || {};
+        if (attempts > 1 && isFuelRunRaceType(run.raceTypeId)) {
+          run.gasCanSpawnRepositioned = (run.gasCanSpawnRepositioned || 0) + 1;
+        }
         this.recordFuelPlacement(spawned, context, result, pattern);
         return spawned;
       }
@@ -10914,6 +10937,138 @@ class ObstacleManager {
       || density.maxHardBlockersInTwoSeconds >= budget.maxHardBlockersInTwoSeconds;
   }
 
+  validateGasCanReachability(candidate, existingObstacles = this.getSpawnValidationObstacles(candidate.distance)) {
+    const run = this.game.run || {};
+    if (candidate.type !== "gasCan" || !isFuelRunRaceType(run.raceTypeId)) {
+      return { canSpawn: true, reason: "not fuel reachability" };
+    }
+    const track = this.track || run.track || TRACKS[0];
+    const runDistance = Number.isFinite(run.distance) ? run.distance : 0;
+    const progress = clamp(runDistance / Math.max(1, track.distanceToFinish || 1), 0, 1);
+    const speed = Math.max(1, Number.isFinite(run.currentSpeed)
+      ? run.currentSpeed
+      : getTrackCruiseSpeed(track, progress, this.getSpeedClassId()));
+    const lane = Math.round(clamp(Number.isFinite(candidate.laneFloat) ? candidate.laneFloat : candidate.lane, 0, LANES - 1));
+    const currentLane = Math.round(clamp(Number.isFinite(run.targetLane) ? run.targetLane : TRACK_DIRECTOR.centerLane, 0, LANES - 1));
+    const playerAhead = this.getPlayerZoneAhead(runDistance);
+    const timeToCollect = (candidate.distance - runDistance - playerAhead) / speed;
+    const laneChangeNeed = Math.abs(lane - currentLane) * INPUT_CONFIG.laneChangeDurationSeconds
+      + FUEL_CAN_REACHABILITY_CONFIG.routeTimingBufferSeconds;
+    const fail = (reason, extra = {}) => ({
+      canSpawn: false,
+      invalid: false,
+      maxBlocked: 0,
+      gasCanReachabilityFailure: true,
+      reason,
+      ...extra
+    });
+    if (timeToCollect > 0 && timeToCollect < laneChangeNeed) {
+      return fail("gas can route timing prevented");
+    }
+
+    const approachDistance = clamp(
+      speed * FUEL_CAN_REACHABILITY_CONFIG.approachSeconds,
+      FUEL_CAN_REACHABILITY_CONFIG.approachMinDistance,
+      FUEL_CAN_REACHABILITY_CONFIG.approachMaxDistance
+    );
+    const approachStart = candidate.distance - approachDistance;
+    const collectStart = candidate.distance - FUEL_CAN_REACHABILITY_CONFIG.collectClearBefore;
+    const collectEnd = candidate.distance + FUEL_CAN_REACHABILITY_CONFIG.collectClearAfter;
+    const nearbyStart = candidate.distance - FUEL_CAN_REACHABILITY_CONFIG.nearbyClearBefore;
+    const nearbyEnd = candidate.distance + FUEL_CAN_REACHABILITY_CONFIG.nearbyClearAfter;
+    const nearbyLanes = [lane - 1, lane, lane + 1].filter((item) => item >= 0 && item < LANES);
+    const hardRecords = existingObstacles
+      .filter((obstacle) => HARD_VEHICLE_TYPES.has(obstacle.type) && !obstacle.hit && !obstacle.remove)
+      .map((obstacle) => ({
+        obstacle,
+        distance: obstacle.distance,
+        lanes: this.getWorldLaneCoverage(obstacle, 0.16)
+      }))
+      .filter((record) => record.lanes.length && record.distance >= approachStart - 120 && record.distance <= nearbyEnd + 120);
+    const fuelLaneBlockers = hardRecords.filter((record) => (
+      record.distance >= collectStart
+      && record.distance <= collectEnd
+      && record.lanes.includes(lane)
+    ));
+    if (fuelLaneBlockers.length) {
+      return fail("gas can blocked by hard obstacle in fuel lane");
+    }
+
+    const nearbyHard = hardRecords.filter((record) => (
+      record.distance >= nearbyStart
+      && record.distance <= nearbyEnd
+      && record.lanes.some((item) => nearbyLanes.includes(item))
+    ));
+    const clearApproachLanes = nearbyLanes.filter((approachLane) => {
+      const laneSteps = Math.abs(approachLane - currentLane);
+      const neededSeconds = laneSteps * INPUT_CONFIG.laneChangeDurationSeconds
+        + FUEL_CAN_REACHABILITY_CONFIG.routeTimingBufferSeconds;
+      if (timeToCollect > 0 && timeToCollect < neededSeconds) return false;
+      return !hardRecords.some((record) => (
+        record.distance >= approachStart
+        && record.distance <= candidate.distance - 70
+        && record.lanes.includes(approachLane)
+      ));
+    });
+    if (!clearApproachLanes.length) {
+      return fail("gas can approach lane closed");
+    }
+    if (nearbyHard.length >= FUEL_CAN_REACHABILITY_CONFIG.maxLaneNeighborhoodHardBlockers
+      && clearApproachLanes.length <= 1
+      && !clearApproachLanes.includes(lane)) {
+      return fail("gas can approach blocked by hard obstacle cluster");
+    }
+    if (nearbyHard.length > FUEL_CAN_REACHABILITY_CONFIG.maxNearbyHardBlockers) {
+      return fail("gas can delayed by hard obstacle density");
+    }
+
+    for (let sample = approachStart; sample <= collectEnd; sample += FUEL_CAN_REACHABILITY_CONFIG.routeSampleStep) {
+      const hardLanes = new Set();
+      for (const record of hardRecords) {
+        if (Math.abs(record.distance - sample) > FUEL_CAN_REACHABILITY_CONFIG.routeSampleStep * 0.62) continue;
+        for (const blockerLane of record.lanes) {
+          if (nearbyLanes.includes(blockerLane)) hardLanes.add(blockerLane);
+        }
+      }
+      const openNearby = nearbyLanes.filter((item) => !hardLanes.has(item));
+      if (sample <= candidate.distance && !openNearby.length) {
+        return fail("gas can local route closed");
+      }
+      if (sample >= collectStart && sample <= collectEnd && hardLanes.has(lane)) {
+        return fail("gas can collection lane closed");
+      }
+    }
+
+    const sampleDistance = Math.max(0, candidate.distance - VIEW_DISTANCE * 0.5);
+    const budget = this.getActiveFieldBudget(run);
+    const density = this.getActiveFieldDensity(existingObstacles, sampleDistance);
+    const route = density.visibleHardBlockers >= ACTIVE_FIELD_BUDGET_CONFIG.routeScanMinHardBlockers
+      ? this.getRouteReadability(existingObstacles, sampleDistance)
+      : { invalid: false };
+    if (route.invalid
+      || density.tacticalHardBlockers >= budget.maxTacticalHardBlockers
+      || density.hardBlockersNext3Seconds >= budget.maxHardBlockersNext3Seconds
+      || density.maxHardBlockersInTwoSeconds >= budget.maxHardBlockersInTwoSeconds) {
+      return fail("gas can delayed by active-field density", {
+        activeFieldInvalid: true,
+        activeFieldRouteInvalid: Boolean(route.invalid),
+        supportSuppressedByDensity: true
+      });
+    }
+
+    return {
+      canSpawn: true,
+      invalid: false,
+      maxBlocked: 0,
+      reason: "gas can route reachable",
+      gasCanReachability: {
+        lane,
+        clearApproachLanes,
+        nearbyHardBlockers: nearbyHard.length
+      }
+    };
+  }
+
   getFuelRunContext() {
     const run = this.game.run || {};
     if (!isFuelRunRaceType(run.raceTypeId)) return null;
@@ -11109,6 +11264,12 @@ class ObstacleManager {
     }
     if (result.supportSuppressedByDensity) {
       run.supportObjectsSuppressedByDensity = (run.supportObjectsSuppressedByDensity || 0) + 1;
+    }
+    if (candidate?.type === "gasCan" && isFuelRunRaceType(run.raceTypeId)) {
+      run.gasCanSpawnRejected = (run.gasCanSpawnRejected || 0) + 1;
+      if (result.gasCanReachabilityFailure) {
+        run.gasCanReachabilityFailuresPrevented = (run.gasCanReachabilityFailuresPrevented || 0) + 1;
+      }
     }
     if (result.activeFieldInvalid) {
       run.activeFieldRejectedSpawns = (run.activeFieldRejectedSpawns || 0) + 1;
@@ -12006,6 +12167,16 @@ class ObstacleManager {
   canSpawnObstacle(candidateObstacle, existingObstacles = this.getSpawnValidationObstacles(candidateObstacle.distance)) {
     const overlap = this.wouldOverlapExistingObject(candidateObstacle, existingObstacles);
     if (overlap) {
+      if (candidateObstacle.type === "gasCan" && HARD_VEHICLE_TYPES.has(overlap.obstacle.type)) {
+        return {
+          canSpawn: false,
+          invalid: false,
+          maxBlocked: 0,
+          overlap,
+          gasCanReachabilityFailure: true,
+          reason: `gas can blocked by ${overlap.obstacle.type}`
+        };
+      }
       return {
         canSpawn: false,
         invalid: false,
@@ -12013,6 +12184,10 @@ class ObstacleManager {
         overlap,
         reason: `${candidateObstacle.type} would overlap ${overlap.obstacle.type}`
       };
+    }
+    if (candidateObstacle.type === "gasCan") {
+      const reachability = this.validateGasCanReachability(candidateObstacle, existingObstacles);
+      if (!reachability.canSpawn) return reachability;
     }
     if (!this.isFairnessBlocker(candidateObstacle)) {
       if (this.shouldSuppressSupportForDensity(candidateObstacle, existingObstacles)) {
@@ -13201,9 +13376,8 @@ class Renderer {
     this.drawFuelOutBeat();
     this.drawPursuitBustedBeat();
     this.drawSectionNotice();
-    this.drawPursuitCallout();
     this.drawHud();
-    this.drawRaceStateStrip();
+    this.drawRaceStateGauge();
     if (this.game.debugMode) this.drawDebug();
   }
 
@@ -14185,7 +14359,47 @@ class Renderer {
     };
   }
 
-  drawRaceStateStrip() {
+  getRaceStateGaugeLayout() {
+    const run = this.game.run || {};
+    const visual = this.getPlayerVisualRect();
+    const gaugeW = this.width >= 620 ? 32 : 28;
+    const gaugeH = this.width >= 620 ? 88 : 80;
+    const gap = this.width >= 620 ? 11 : 8;
+    const screenPad = 5;
+    const minX = screenPad;
+    const maxX = Math.max(minX, this.width - gaugeW - screenPad);
+    const minY = CAMERA_CONFIG.hudHeight + 10;
+    const maxY = Math.max(minY, this.height - gaugeH - 10);
+    const y = clamp(visual.centerY - gaugeH * 0.56, minY, maxY);
+    const rawXForSide = (side) => side === "left"
+      ? visual.renderedX - gaugeW - gap
+      : visual.renderedX + visual.renderedWidth + gap;
+    const sideFits = (side) => {
+      const rawX = rawXForSide(side);
+      return rawX >= minX && rawX <= maxX;
+    };
+    let side = run.raceStateGaugeSide === "left" ? "left" : "right";
+    if (!run.raceStateGaugeSide) run.raceStateGaugeSide = side;
+    if (!sideFits(side)) {
+      const alternate = side === "right" ? "left" : "right";
+      const lastSwitch = Number.isFinite(run.raceStateGaugeSideChangedAt) ? run.raceStateGaugeSideChangedAt : -Infinity;
+      const cooldownPassed = (run.elapsed || 0) - lastSwitch >= 0.65;
+      if (sideFits(alternate) && cooldownPassed) {
+        side = alternate;
+        run.raceStateGaugeSide = side;
+        run.raceStateGaugeSideChangedAt = run.elapsed || 0;
+      }
+    }
+    return {
+      side,
+      x: clamp(rawXForSide(side), minX, maxX),
+      y,
+      w: gaugeW,
+      h: gaugeH
+    };
+  }
+
+  drawRaceStateGauge() {
     const run = this.game.run;
     if (!run || this.game.screen !== "game") return;
     const fuelRun = isFuelRunRaceType(run.raceTypeId);
@@ -14193,91 +14407,107 @@ class Renderer {
     if (!fuelRun && !pursuitRun) return;
     const state = fuelRun ? this.getFuelRaceState() : this.getPursuitRaceState();
     const ctx = this.ctx;
-    const stripW = Math.min(Math.max(284, this.width - 24), Math.max(284, this.road.w - 18), this.width >= 760 ? 620 : 460);
-    const stripH = this.width >= 620 ? 64 : 58;
-    const x = (this.width - stripW) / 2;
-    const y = Math.max(CAMERA_CONFIG.hudHeight + 8, this.road.y + 8);
-    const pulse = state.urgent ? 0.5 + Math.sin((run.elapsed || 0) * 12) * 0.5 : 0;
-    const callout = run.raceStateCalloutTimer > 0 && run.raceStateCalloutText
-      ? run.raceStateCalloutText.toUpperCase()
-      : state.detail;
+    const layout = this.getRaceStateGaugeLayout();
+    const x = layout.x;
+    const y = layout.y;
+    const width = layout.w;
+    const height = layout.h;
+    const warningPulse = fuelRun && ARCADE_FEEL.fuelWarningPulseMs > 0
+      ? clamp((run.fuelWarningPulseTimer || 0) / (ARCADE_FEEL.fuelWarningPulseMs / 1000), 0, 1)
+      : 0;
+    const savedPulse = fuelRun && ARCADE_FEEL.fuelSavedPulseMs > 0
+      ? clamp((run.fuelSavedPulseTimer || 0) / (ARCADE_FEEL.fuelSavedPulseMs / 1000), 0, 1)
+      : 0;
+    const heatPulse = pursuitRun ? clamp((run.pursuitHeatPulseTimer || 0) / 0.42, 0, 1) : 0;
+    const urgentPulse = state.urgent ? 0.5 + Math.sin((run.elapsed || 0) * 12) * 0.5 : 0;
+    const pulse = Math.max(warningPulse, savedPulse, heatPulse, urgentPulse);
+    const fuelValue = fuelRun ? Math.ceil(clamp(Number.isFinite(run.fuel) ? run.fuel : 0, 0, run.fuelMax || FUEL_RUN_CONFIG.fuelMax)) : 0;
+    const heatValue = pursuitRun ? Math.ceil(clamp(Number.isFinite(run.pursuitHeat) ? run.pursuitHeat : 0, 0, run.pursuitHeatLimit || PURSUIT_CONFIG.heatLimit)) : 0;
+    const heatStatus = String(run.pursuitHeatStatus || "").toLowerCase();
+    const droppingHeat = pursuitRun && (run.pursuitRecoveryActive || heatStatus.includes("dropping") || heatStatus.includes("escape"));
+    const valueText = String(fuelRun ? fuelValue : heatValue);
+    const barCenterX = x + width * 0.5;
+    const barTop = y + (fuelRun ? 17 : 18);
+    const barBottom = y + height - 19;
+    const barH = Math.max(1, barBottom - barTop);
+    const fillH = Math.max(0, barH * state.percent);
+    const trackWidth = this.width >= 620 ? 5.5 : 5;
+    const fillWidth = trackWidth + (state.urgent ? pulse * 1.6 : 0) + (savedPulse > 0 ? savedPulse * 1.8 : 0);
     ctx.save();
-    ctx.globalAlpha = 0.94;
-    ctx.fillStyle = "rgba(5, 7, 18, 0.88)";
-    ctx.fillRect(x, y, stripW, stripH);
-    ctx.strokeStyle = state.color;
-    ctx.lineWidth = state.urgent ? 3 + pulse * 1.5 : 2;
-    ctx.shadowBlur = state.urgent ? 18 + pulse * 10 : 10;
-    ctx.shadowColor = state.color;
-    ctx.strokeRect(x, y, stripW, stripH);
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+
+    if (pursuitRun) {
+      ctx.fillStyle = "#ff334c";
+      ctx.globalAlpha = 0.72 + heatPulse * 0.24;
+      ctx.fillRect(barCenterX - 8, y + 9, 4, 4);
+      ctx.fillStyle = "#28f6ff";
+      ctx.fillRect(barCenterX + 4, y + 9, 4, 4);
+      ctx.globalAlpha = 1;
+    }
+
+    ctx.strokeStyle = "rgba(5, 7, 18, 0.86)";
+    ctx.lineWidth = trackWidth + 3.5;
+    ctx.shadowBlur = 4;
+    ctx.shadowColor = "rgba(0, 0, 0, 0.75)";
+    ctx.beginPath();
+    ctx.moveTo(barCenterX, barTop);
+    ctx.lineTo(barCenterX, barBottom);
+    ctx.stroke();
     ctx.shadowBlur = 0;
 
-    const pad = this.width >= 620 ? 16 : 12;
-    const barX = x + pad;
-    const barY = y + stripH - 25;
-    const barW = stripW - pad * 2;
-    const barH = this.width >= 620 ? 18 : 16;
-    ctx.fillStyle = "rgba(255, 255, 255, 0.14)";
-    ctx.fillRect(barX, barY, barW, barH);
-    const fillW = Math.max(0, (barW - 4) * state.percent);
-    if (state.fillMode === "heat") {
-      const gradient = ctx.createLinearGradient(barX, barY, barX + barW, barY);
+    ctx.strokeStyle = "rgba(246, 251, 255, 0.2)";
+    ctx.lineWidth = trackWidth + 1.2;
+    ctx.beginPath();
+    ctx.moveTo(barCenterX, barTop);
+    ctx.lineTo(barCenterX, barBottom);
+    ctx.stroke();
+
+    if (pursuitRun) {
+      const gradient = ctx.createLinearGradient(barCenterX, barBottom, barCenterX, barTop);
       gradient.addColorStop(0, "#28f6ff");
       gradient.addColorStop(0.58, "#ffe45e");
       gradient.addColorStop(1, "#ff334c");
-      ctx.fillStyle = gradient;
+      ctx.strokeStyle = gradient;
     } else {
-      ctx.fillStyle = state.color;
+      ctx.strokeStyle = savedPulse > 0.05 ? "#f6fbff" : state.color;
     }
-    ctx.globalAlpha = state.urgent ? 0.84 + pulse * 0.16 : 0.9;
-    ctx.fillRect(barX + 2, barY + 2, fillW, Math.max(1, barH - 4));
+    ctx.globalAlpha = droppingHeat ? 0.72 + heatPulse * 0.12 : (state.urgent ? 0.78 + pulse * 0.22 : 0.9);
+    ctx.lineWidth = fillWidth;
+    ctx.shadowBlur = state.urgent || pulse > 0.12 ? 7 + pulse * 9 : 4;
+    ctx.shadowColor = pursuitRun && droppingHeat ? "#44ff99" : state.color;
+    ctx.beginPath();
+    ctx.moveTo(barCenterX, barBottom);
+    ctx.lineTo(barCenterX, barBottom - fillH);
+    ctx.stroke();
+    if (savedPulse > 0) {
+      ctx.globalAlpha = savedPulse * 0.55;
+      ctx.strokeStyle = "#44ff99";
+      ctx.lineWidth = fillWidth + 3;
+      ctx.shadowBlur = 11;
+      ctx.shadowColor = "#44ff99";
+      ctx.beginPath();
+      ctx.moveTo(barCenterX, barTop + 4);
+      ctx.lineTo(barCenterX, barTop + Math.max(12, barH * 0.22));
+      ctx.stroke();
+    }
     ctx.globalAlpha = 1;
+    ctx.shadowBlur = 0;
 
     ctx.textBaseline = "top";
-    ctx.textAlign = "left";
-    ctx.fillStyle = state.color;
-    ctx.font = `900 ${this.width >= 620 ? 18 : 15}px Trebuchet MS, Verdana, sans-serif`;
-    ctx.fillText(state.label, x + pad, y + 7);
-    ctx.fillStyle = "#f6fbff";
-    ctx.font = `900 ${this.width >= 620 ? 14 : 12}px Trebuchet MS, Verdana, sans-serif`;
-    ctx.fillText(callout, x + pad, y + 32, stripW - pad * 2 - 94);
-    ctx.textAlign = "right";
-    ctx.fillStyle = "#b8c6d9";
-    ctx.font = "800 11px Trebuchet MS, Verdana, sans-serif";
-    ctx.fillText(state.meterLabel, x + stripW - pad, y + 8);
-    ctx.fillStyle = "#f6fbff";
-    ctx.font = `900 ${this.width >= 620 ? 16 : 13}px Trebuchet MS, Verdana, sans-serif`;
-    ctx.fillText(state.value, x + stripW - pad, y + 27);
-    ctx.restore();
-  }
-
-  drawPursuitCallout() {
-    const run = this.game.run;
-    if (!run || !isPursuitRaceType(run.raceTypeId) || this.game.screen !== "game") return;
-    const label = String((run.raceStateCalloutTimer > 0 && run.raceStateCalloutText) || this.getPursuitRaceState().label || "").toUpperCase();
-    if (!label || label === "HEAT DROPPING" && (run.pursuitHeat || 0) <= 2) return;
-    const active = run.pursuitRoadblockAhead || (run.pursuitHeatPulseTimer || 0) > 0 || label === "ESCAPE ZONE" || run.raceStateCalloutTimer > 0;
-    if (!active) return;
-    const ctx = this.ctx;
-    const y = Math.max(136, CAMERA_CONFIG.hudHeight + 78);
-    const x = this.width / 2;
-    const color = label === "ESCAPE ZONE" || label === "HEAT DROPPING" || label.includes("PULLING") || label.includes("ESCAPE!") ? "#44ff99" : (label.includes("ROADBLOCK") || label.includes("SLOWDOWN") || label === "CRITICAL HEAT" ? "#ff334c" : "#ffe45e");
-    ctx.save();
     ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-    ctx.font = "900 14px Trebuchet MS, Verdana, sans-serif";
-    const textWidth = ctx.measureText(label).width;
-    const boxW = Math.min(this.width - 30, Math.max(132, textWidth + 44));
-    ctx.fillStyle = "rgba(5, 7, 18, 0.84)";
-    ctx.fillRect(x - boxW / 2, y - 10, boxW, 20);
-    ctx.strokeStyle = color;
-    ctx.shadowBlur = 12;
-    ctx.shadowColor = color;
-    ctx.lineWidth = 2;
-    ctx.strokeRect(x - boxW / 2, y - 10, boxW, 20);
-    ctx.shadowBlur = 0;
+    ctx.shadowColor = "rgba(0, 0, 0, 0.9)";
+    ctx.shadowBlur = 4;
+    ctx.fillStyle = pursuitRun ? (state.urgent ? "#ffccd3" : "#b8f6ff") : (state.urgent ? state.color : "#f6fbff");
+    ctx.font = `900 ${this.width >= 620 ? 10 : 9}px Trebuchet MS, Verdana, sans-serif`;
+    ctx.fillText(fuelRun ? "F" : "HEAT", barCenterX, y + 1, width + 8);
+    ctx.textBaseline = "bottom";
+    ctx.fillStyle = fuelRun ? "#b8c6d9" : "#9fc0d6";
+    ctx.font = `900 ${this.width >= 620 ? 9 : 8}px Trebuchet MS, Verdana, sans-serif`;
+    ctx.fillText(fuelRun ? "E" : "LO", barCenterX, y + height - 7, width + 6);
     ctx.fillStyle = "#f6fbff";
-    ctx.fillText(label, x, y + 1);
+    ctx.font = `900 ${this.width >= 620 ? 11 : 10}px Trebuchet MS, Verdana, sans-serif`;
+    ctx.fillText(valueText, barCenterX, y + height + (this.width >= 620 ? 7 : 5), width + 10);
     ctx.restore();
   }
 
@@ -14318,8 +14548,6 @@ class Renderer {
     const progress = clamp(run.distance / run.track.distanceToFinish, 0, 1);
     const modeLabel = run.speedClass?.label || getSpeedClassLabel(run.speedClassId);
     const raceTypeLabel = getRaceTypeLabel(run.raceTypeId);
-    const fuelRun = isFuelRunRaceType(run.raceTypeId);
-    const pursuitRun = isPursuitRaceType(run.raceTypeId);
     const hudHeight = CAMERA_CONFIG.hudHeight;
     const hudItems = w >= 760
       ? [
@@ -14358,8 +14586,7 @@ class Renderer {
 
     const barX = 16;
     const barY = 40;
-    const modeGaugeW = (fuelRun || pursuitRun) ? (w >= 760 ? 168 : 124) : 0;
-    const barW = Math.min(w - 32 - ((fuelRun || pursuitRun) && w >= 620 ? modeGaugeW + 22 : 0), w >= 760 ? 460 : 320);
+    const barW = Math.min(w - 32, w >= 760 ? 460 : 320);
     ctx.fillStyle = "rgba(255, 255, 255, 0.14)";
     ctx.fillRect(barX, barY, barW, 8);
     ctx.fillStyle = "#44ff99";
@@ -14374,27 +14601,15 @@ class Renderer {
     if (run.paceFeedbackText && run.comparableBestTimeMs !== null) {
       contextParts.push(`PB PACE ${String(run.paceFeedbackText).toUpperCase()}`);
     }
-    contextParts.push(raceTypeLabel.toUpperCase());
-    if (pursuitRun) contextParts.push(String(run.pursuitStatusText || "Heat Dropping").toUpperCase());
     if (run.challengeMode) contextParts.push(`CHALLENGE ${run.challengeName}`);
     if (run.partyMode) contextParts.push(`PARTY ${run.partyTurnNumber}/${run.partyTotalPlayers}`);
     if (w >= 840) contextParts.push(`SEED ${formatRoadSeed(run.roadSeed)}`);
-    const drawModeGaugeInline = (fuelRun || pursuitRun) && w >= 620;
-    if (drawModeGaugeInline) {
-      if (fuelRun) this.drawFuelGauge(ctx, w - modeGaugeW - 16, 38, modeGaugeW, 14);
-      if (pursuitRun) this.drawPursuitHeatGauge(ctx, w - modeGaugeW - 16, 38, modeGaugeW, 14);
-    }
     const statusX = w >= 760 ? barX + barW + 18 : barX;
     const statusY = w >= 760 ? 38 : 50;
     const statusMaxWidth = w >= 760
-      ? Math.max(80, w - statusX - (drawModeGaugeInline ? modeGaugeW + 30 : 12))
-      : ((fuelRun || pursuitRun) && !drawModeGaugeInline ? Math.max(80, w - modeGaugeW - 54) : w - 32);
+      ? Math.max(80, w - statusX - 12)
+      : w - 32;
     drawFittedText(ctx, contextParts.join("  "), statusX, statusY, statusMaxWidth);
-    if ((fuelRun || pursuitRun) && !drawModeGaugeInline) {
-      const x = Math.max(16, w - modeGaugeW - 16);
-      if (fuelRun) this.drawFuelGauge(ctx, x, 46, modeGaugeW, 11);
-      if (pursuitRun) this.drawPursuitHeatGauge(ctx, x, 46, modeGaugeW, 11);
-    }
     ctx.restore();
   }
 
@@ -16174,6 +16389,9 @@ class NeonRoadRally {
       gasCanGapSamples: [],
       gasCansSpawned: 0,
       gasCansCollected: 0,
+      gasCanSpawnRejected: 0,
+      gasCanSpawnRepositioned: 0,
+      gasCanReachabilityFailuresPrevented: 0,
       fuelCollected: 0,
       fuelSavedByBoost: 0,
       fuelDrainPausedTime: 0,
@@ -16563,6 +16781,9 @@ class NeonRoadRally {
     run.gasCanGapSamples = [];
     run.gasCansSpawned = 0;
     run.gasCansCollected = 0;
+    run.gasCanSpawnRejected = 0;
+    run.gasCanSpawnRepositioned = 0;
+    run.gasCanReachabilityFailuresPrevented = 0;
     run.fuelCollected = 0;
     run.fuelSavedByBoost = 0;
     run.fuelDrainPausedTime = 0;
@@ -17905,6 +18126,9 @@ class NeonRoadRally {
       hardestPressureObserved: run.hardestPressureObserved || 0,
       gasCansSpawned: summary.gasCansSpawned,
       gasCansCollected: summary.gasCansCollected,
+      gasCanSpawnRejected: isFuelRunRaceType(summary.raceTypeId) ? (run.gasCanSpawnRejected || 0) : 0,
+      gasCanSpawnRepositioned: isFuelRunRaceType(summary.raceTypeId) ? (run.gasCanSpawnRepositioned || 0) : 0,
+      gasCanReachabilityFailuresPrevented: isFuelRunRaceType(summary.raceTypeId) ? (run.gasCanReachabilityFailuresPrevented || 0) : 0,
       fuelRemaining: summary.fuelRemaining,
       fuelSavedByBoost: isFuelRunRaceType(summary.raceTypeId) ? (run.fuelSavedByBoost || 0) : 0,
       fuelDrainPausedTime: isFuelRunRaceType(summary.raceTypeId) ? (run.fuelDrainPausedTime || 0) : 0,
@@ -18178,6 +18402,9 @@ class NeonRoadRally {
       gasCansSpawned: run.gasCansSpawned || 0,
       gasCansCollected: run.gasCansCollected || 0,
       fuelCollected: run.gasCansCollected || 0,
+      gasCanSpawnRejected: isFuelRunRaceType(run.raceTypeId) ? (run.gasCanSpawnRejected || 0) : 0,
+      gasCanSpawnRepositioned: isFuelRunRaceType(run.raceTypeId) ? (run.gasCanSpawnRepositioned || 0) : 0,
+      gasCanReachabilityFailuresPrevented: isFuelRunRaceType(run.raceTypeId) ? (run.gasCanReachabilityFailuresPrevented || 0) : 0,
       fuelRemaining: isFuelRunRaceType(run.raceTypeId) ? Math.max(0, Math.round(run.fuel || 0)) : 0,
       lowestFuelReached: isFuelRunRaceType(run.raceTypeId) ? (run.lowestFuelReached || 0) : 0,
       fuelSavedByBoost: isFuelRunRaceType(run.raceTypeId) ? (run.fuelSavedByBoost || 0) : 0,
@@ -18769,6 +18996,9 @@ class NeonRoadRally {
     let spacingSamples = 0;
     let gasCansSpawnedSum = 0;
     let gasCanMaxGapSum = 0;
+    let gasCanSpawnRejected = 0;
+    let gasCanSpawnRepositioned = 0;
+    let gasCanReachabilityFailuresPrevented = 0;
     let longestNoFuelStretch = 0;
     let simulatedOutOfFuelRuns = 0;
     let ignoringGasOutOfFuelRuns = 0;
@@ -19179,6 +19409,9 @@ class NeonRoadRally {
         gasCanOverlaps: 0,
         gasCansSpawnedSum: 0,
         gasCanMaxGapSum: 0,
+        gasCanSpawnRejected: 0,
+        gasCanSpawnRepositioned: 0,
+        gasCanReachabilityFailuresPrevented: 0,
         longestNoFuelStretch: 0,
         simulatedOutOfFuelRuns: 0,
         ignoringGasOutOfFuelRuns: 0,
@@ -19415,9 +19648,15 @@ class NeonRoadRally {
           const maxGasGap = Math.max(simRun.maxTimeBetweenGasCans || 0, simRun.timeSinceLastGasCan || 0);
           gasCansSpawnedSum += gasSpawned;
           gasCanMaxGapSum += maxGasGap;
+          gasCanSpawnRejected += simRun.gasCanSpawnRejected || 0;
+          gasCanSpawnRepositioned += simRun.gasCanSpawnRepositioned || 0;
+          gasCanReachabilityFailuresPrevented += simRun.gasCanReachabilityFailuresPrevented || 0;
           longestNoFuelStretch = Math.max(longestNoFuelStretch, simRun.longestNoFuelStretchSeconds || maxGasGap);
           perSpeedClass[speedClassId].gasCansSpawnedSum += gasSpawned;
           perSpeedClass[speedClassId].gasCanMaxGapSum += maxGasGap;
+          perSpeedClass[speedClassId].gasCanSpawnRejected += simRun.gasCanSpawnRejected || 0;
+          perSpeedClass[speedClassId].gasCanSpawnRepositioned += simRun.gasCanSpawnRepositioned || 0;
+          perSpeedClass[speedClassId].gasCanReachabilityFailuresPrevented += simRun.gasCanReachabilityFailuresPrevented || 0;
           perSpeedClass[speedClassId].longestNoFuelStretch = Math.max(perSpeedClass[speedClassId].longestNoFuelStretch, simRun.longestNoFuelStretchSeconds || maxGasGap);
           if (simRun.simOutOfFuel) {
             simulatedOutOfFuelRuns += 1;
@@ -19714,6 +19953,9 @@ class NeonRoadRally {
       minSameLaneSpacing: Number.isFinite(minSameLaneSpacing) ? minSameLaneSpacing : null,
       averageGasCansSpawned,
       averageMaxTimeBetweenGasCans,
+      gasCanSpawnRejected,
+      gasCanSpawnRepositioned,
+      gasCanReachabilityFailuresPrevented,
       longestNoFuelStretch,
       fuelOpportunitiesBySection,
       simulatedOutOfFuelRisk: fuelRun ? simulatedOutOfFuelRuns / Math.max(1, runs) : 0,
@@ -20944,6 +21186,9 @@ class NeonRoadRally {
         totalFuelSavedByBoost,
         totalFuelDrainPausedTime,
         totalBoostsUsedInFuelRun,
+        gasCanSpawnRejected: fuelRuns.reduce((sum, run) => sum + (Number(run.gasCanSpawnRejected) || 0), 0),
+        gasCanSpawnRepositioned: fuelRuns.reduce((sum, run) => sum + (Number(run.gasCanSpawnRepositioned) || 0), 0),
+        gasCanReachabilityFailuresPrevented: fuelRuns.reduce((sum, run) => sum + (Number(run.gasCanReachabilityFailuresPrevented) || 0), 0),
         averageLowestFuelReached: this.averagePlaytestField(fuelRuns, "lowestFuelReached"),
         averageLowFuelTime: this.averagePlaytestField(fuelRuns, "lowFuelTime"),
         averageCriticalFuelTime: this.averagePlaytestField(fuelRuns, "criticalFuelTime"),
@@ -21753,6 +21998,7 @@ class NeonRoadRally {
           <div class="score-card"><strong>Fuel Saved By Boost</strong><span>${this.formatPlaytestDecimal(aggregate.fuelSummary.totalFuelSavedByBoost)} fuel</span></div>
           <div class="score-card"><strong>Fuel Pause Time</strong><span>${this.formatPlaytestDecimal(aggregate.fuelSummary.totalFuelDrainPausedTime)}s</span></div>
           <div class="score-card"><strong>Fuel Boost Uses</strong><span>${aggregate.fuelSummary.totalBoostsUsedInFuelRun}</span></div>
+          <div class="score-card"><strong>Fuel Route Fixes</strong><span>${aggregate.fuelSummary.gasCanReachabilityFailuresPrevented}</span></div>
           <div class="score-card"><strong>Pursuit Runs</strong><span>${aggregate.pursuitSummary.runs}</span></div>
           <div class="score-card"><strong>Pursuit Escapes</strong><span>${aggregate.pursuitSummary.escaped}/${aggregate.pursuitSummary.runs}</span></div>
           <div class="score-card"><strong>Avg Pursuit Heat</strong><span>${this.formatPlaytestDecimal(aggregate.pursuitSummary.averageHeatAtEnd)} / max ${this.formatPlaytestDecimal(aggregate.pursuitSummary.averageHeatMax)}</span></div>
@@ -21796,7 +22042,7 @@ class NeonRoadRally {
           </section>
         </div>
         <div class="score-grid playtest-detail-grid">
-            <div class="score-card"><strong>Fuel Runs</strong><span class="is-compact">${aggregate.fuelSummary.runs} runs · ${this.formatPlaytestDecimal(aggregate.fuelSummary.averageGasCansSpawned)} gas spawned · ${formatTime(aggregate.fuelSummary.averageLowFuelTime)} low fuel · ${formatTime(aggregate.fuelSummary.averageCriticalFuelTime)} critical</span></div>
+            <div class="score-card"><strong>Fuel Runs</strong><span class="is-compact">${aggregate.fuelSummary.runs} runs · ${this.formatPlaytestDecimal(aggregate.fuelSummary.averageGasCansSpawned)} gas spawned · route fixes ${aggregate.fuelSummary.gasCanReachabilityFailuresPrevented} · repositioned ${aggregate.fuelSummary.gasCanSpawnRepositioned} · ${formatTime(aggregate.fuelSummary.averageLowFuelTime)} low fuel · ${formatTime(aggregate.fuelSummary.averageCriticalFuelTime)} critical</span></div>
             <div class="score-card"><strong>Pacing Summary</strong><span class="is-compact">${finishStats.count} finishes · section avg ${this.formatPlaytestDecimal(aggregate.averageSectionDuration, 1)}s · pace feedback avg ${this.formatPlaytestDecimal(aggregate.averagePaceFeedbackActiveTime, 1)}s · PB delta samples ${aggregate.personalBestTimeDeltaStats.count}</span></div>
             <div class="score-card"><strong>Director Variety</strong><span class="is-compact">intents ${escapeHtml(directorIntentText)} · families ${escapeHtml(waveFamilyText)}</span></div>
             <div class="score-card"><strong>Pursuit Summary</strong><span class="is-compact">${aggregate.pursuitSummary.escaped} escaped · ${aggregate.pursuitSummary.busted} busted · heat critical ${formatTime(aggregate.pursuitSummary.averageHeatCriticalTime)} avg · rising ${formatTime(aggregate.pursuitSummary.averageHeatRisingTime)} · dropping ${formatTime(aggregate.pursuitSummary.averageHeatDroppingTime)} · bonuses ${formatScore(aggregate.pursuitSummary.totalPursuitBonuses)}</span></div>
@@ -23378,78 +23624,56 @@ class NeonRoadRally {
   renderRunHighlightPanel(summary) {
     if (!summary) return "";
     const highlights = [];
-    if (summary.status === "finished" && summary.finishTimeMs !== null && summary.finishTimeMs !== undefined) {
-      highlights.push([
-        "Time Attack",
-        formatFinishTimeMs(summary.finishTimeMs),
-        summary.bestTimeMs !== null && summary.bestTimeMs !== undefined
-          ? `Best ${formatFinishTimeMs(summary.bestTimeMs)}.`
-          : "First saved time target."
-      ]);
-      if (summary.personalBestTimeDelta !== null && summary.personalBestTimeDelta !== undefined) {
-        highlights.push([
-          summary.newPersonalBestTime ? "New Best Time" : "PB Delta",
-          formatSignedTimeDeltaSeconds(summary.personalBestTimeDelta),
-          summary.newPersonalBestTime
-            ? `Previous ${formatFinishTimeMs(summary.previousBestTimeMs)}.`
-            : `Best ${formatFinishTimeMs(summary.bestTimeMs)}.`
-        ]);
-      } else if (summary.newPersonalBestTime) {
-        highlights.push(["New Best Time", "First mark", "Future runs compare against this pace."]);
-      }
+    const status = normalizeRunStatus(summary.status);
+    const progress = clamp((summary.distance || 0) / Math.max(1, summary.trackDistance || 1), 0, 1);
+    const addHighlight = (label, value, detail) => {
+      highlights.push([label, value, detail]);
+    };
+    if (status === "finished" && summary.finishTimeMs !== null && summary.finishTimeMs !== undefined) {
+      const delta = summary.personalBestTimeDelta !== null && summary.personalBestTimeDelta !== undefined
+        ? formatSignedTimeDeltaSeconds(summary.personalBestTimeDelta)
+        : (summary.newPersonalBestTime ? "First mark" : "No PB yet");
+      addHighlight("Time Attack", formatFinishTimeMs(summary.finishTimeMs), summary.newPersonalBestTime ? `New best time · ${delta}` : `PB pace ${delta}`);
+    } else {
+      const reason = summary.reason || summary.endReason || getRunOutcomeLabel(summary);
+      addHighlight("Progress", `${Math.round(progress * 100)}%`, reason);
     }
-    highlights.push([
-      "Boost Route",
-      summary.boostPadsMissedReachable > 0 ? "Missed chances" : "Clean route",
-      `${summary.boostRouteFeedback || getBoostRouteFeedbackText(summary.boostPadsCollected || 0, summary.boostPadsMissedReachable || 0)} ${Math.max(0, summary.boostPadsCollected || 0)} collected / ${Math.max(0, summary.boostPadsMissedReachable || 0)} missed.`
-    ]);
-    if (summary.newPersonalBest) {
-      highlights.push(["Score Attack", formatScore(summary.finalScore), "New personal best score."]);
-    } else if (summary.scoreSaved) {
-      highlights.push(["Score Attack", formatScore(summary.finalScore), `Personal best ${formatScore(summary.bestScore)}.`]);
-    }
-    if (summary.entersTopTwenty) {
-      highlights.push(["Top 20", `#${summary.topTwentyRank || "?"}`, "Added to the local leaderboard."]);
-    } else if (summary.topTwentyGap > 0) {
-      highlights.push(["Top 20 Gap", formatScore(summary.topTwentyGap), "Points needed to reach the board."]);
-    }
+    const scoreDetail = summary.newPersonalBest
+      ? "New score PB"
+      : (summary.topTwentyRank ? `Top 20 #${summary.topTwentyRank}` : (summary.topTwentyGap > 0 ? `${formatScore(summary.topTwentyGap)} from #20` : "Saved score"));
+    addHighlight("Score Attack", formatScore(summary.finalScore), summary.scoreSaved ? scoreDetail : "Debug run not saved");
     if (summary.raceTypeId === FUEL_RUN_RACE_TYPE_ID) {
-      highlights.push([
+      const fuelLeft = Math.max(0, Math.round(summary.fuelRemaining || 0));
+      const gasCollected = Math.max(0, summary.gasCansCollected || 0);
+      const gasMissed = Math.max(0, (summary.gasCansSpawned || 0) - gasCollected);
+      addHighlight(
         "Fuel",
-        summary.status === "outOfFuel" ? "Out" : `${Math.max(0, summary.fuelRemaining || 0)} left`,
-        `${Math.max(0, summary.gasCansCollected || 0)} gas cans collected.`
-      ]);
+        status === "outOfFuel" ? "Out of fuel" : `Fuel left: ${fuelLeft}`,
+        gasMissed > 0 ? `${gasCollected} gas cans collected · Missed fuel chances hurt survival` : `${gasCollected} gas cans collected`
+      );
     }
     if (summary.raceTypeId === PURSUIT_RACE_TYPE_ID) {
-      highlights.push([
+      addHighlight(
         "Heat",
-        `${Math.round(summary.heatMax || 0)} max`,
-        `${Math.max(0, summary.roadblocksCleared || 0)} roadblocks cleared.`
-      ]);
+        status === "busted" ? "Busted" : `${Math.round(summary.heatAtEnd || 0)} / ${PURSUIT_CONFIG.heatLimit}`,
+        `${Math.round(summary.heatMax || 0)} max · ${Math.max(0, summary.roadblocksCleared || 0)} roadblocks`
+      );
     }
     if (summary.challengeMode) {
-      highlights.push([
-        "Challenge",
-        summary.challengeResult?.completed ? "Complete" : "Try Again",
-        summary.challengeResult?.detail || summary.challengeObjective || "Objective checked."
-      ]);
+      addHighlight("Challenge", summary.challengeResult?.completed ? "Complete" : "Try Again", summary.challengeResult?.detail || summary.challengeObjective || "Objective checked");
     }
-    const badgeCount = Array.isArray(summary.newlyEarnedBadges) ? summary.newlyEarnedBadges.length : 0;
-    if (badgeCount > 0) {
-      highlights.push(["Badges", `${badgeCount} new`, "Saved to this driver."]);
-    }
-    const visible = highlights.slice(0, 5);
-    if (!visible.length) return "";
+    const boostText = summary.boostRouteFeedback || getBoostRouteFeedbackText(summary.boostPadsCollected || 0, summary.boostPadsMissedReachable || 0);
     return `
-      <div class="result-highlight-grid">
-        ${visible.map(([label, value, detail]) => `
-          <div class="result-highlight-card">
+      <div class="result-summary-row">
+        ${highlights.slice(0, 4).map(([label, value, detail]) => `
+          <div class="result-summary-chip">
             <span>${escapeHtml(label)}</span>
             <strong>${escapeHtml(value)}</strong>
-            <small>${escapeHtml(detail)}</small>
+            <small>${escapeHtml(detail || "")}</small>
           </div>
         `).join("")}
       </div>
+      <p class="result-boost-note"><strong>Boost Route</strong> ${escapeHtml(boostText)} <span>${Math.max(0, summary.boostPadsCollected || 0)} collected / ${Math.max(0, summary.boostPadsMissedReachable || 0)} missed reachable.</span></p>
     `;
   }
 
@@ -24394,6 +24618,27 @@ class NeonRoadRally {
     const paceDeltaText = summary.personalBestTimeDelta !== null && summary.personalBestTimeDelta !== undefined
       ? formatSignedTimeDeltaSeconds(summary.personalBestTimeDelta)
       : (summary.newPersonalBestTime ? "First mark" : "No comparison");
+    const status = normalizeRunStatus(summary.status);
+    const progressPercent = Math.round(clamp((summary.distance || 0) / Math.max(1, summary.trackDistance || 1), 0, 1) * 100);
+    const resultHeadline = summary.challengeMode
+      ? (summary.challengeResult?.completed ? "Challenge Complete" : "Challenge Failed")
+      : (status === "crashed"
+        ? "Run Over"
+        : summary.raceTypeId === PURSUIT_RACE_TYPE_ID
+        ? outcomeText
+        : (status === "finished" ? "Finished" : (status === "outOfFuel" ? "Out of Fuel" : "Run Over")));
+    const crashReason = summary.reason || summary.endReason || "the road";
+    const outcomeDetail = status === "finished"
+      ? `${summary.raceTypeId === PURSUIT_RACE_TYPE_ID ? "Escaped" : "Finished"} in ${resultTimeText}.`
+      : (status === "outOfFuel"
+        ? `Tank empty at ${progressPercent}% progress.`
+        : (status === "busted"
+          ? `Heat hit the limit at ${progressPercent}% progress.`
+          : `Crashed into ${crashReason} at ${progressPercent}% progress.`));
+    const boardMetricText = summary.scoreSaved ? leaderboardText : "Not saved";
+    const timeMetricLabel = status === "finished" ? "Time" : "Elapsed";
+    const paceMetricLabel = status === "finished" ? "PB Pace" : "Progress";
+    const paceMetricText = status === "finished" ? paceDeltaText : `${progressPercent}%`;
     const restartLabel = summary.challengeMode ? "Retry Challenge" : (summary.partyMode ? "Run Again" : "Rematch Same Seed");
     this.layer.classList.remove("is-empty");
     this.layer.innerHTML = `
@@ -24401,21 +24646,40 @@ class NeonRoadRally {
         <div class="score-hero ${summary.newHighScore ? "is-high-score" : ""}">
           <div>
             <span class="eyebrow">${summary.challengeMode ? "Challenge Run Result" : (summary.partyMode ? "Party Run Result" : "Run Result")}</span>
-            <h2>${summary.challengeMode ? (summary.challengeResult?.completed ? "Challenge Complete" : "Challenge Failed") : (summary.raceTypeId === PURSUIT_RACE_TYPE_ID ? outcomeText : (summary.status === "finished" ? "Track Complete" : (summary.status === "outOfFuel" ? "Out of Fuel" : "Run Over")))}</h2>
+            <h2>${escapeHtml(resultHeadline)}</h2>
+            <p class="result-outcome-line">${escapeHtml(outcomeDetail)}</p>
             <p class="hint">${summary.challengeMode ? `${escapeHtml(summary.challengeName)} · ` : ""}${escapeHtml(summary.trackName)} · ${escapeHtml(summary.raceTypeLabel || getRaceTypeLabel(summary.raceTypeId))} · ${escapeHtml(summary.speedClassLabel)} · Seed ${escapeHtml(summary.seed)}</p>
-            <div class="score-callout-row">${this.renderTitleCallouts(summary)}${this.renderNewBadgeCallouts(summary)}${this.renderChallengeCallouts(summary)}${this.renderLeaderboardContext(summary)}</div>
+            ${this.renderTitleCallouts(summary) || this.renderNewBadgeCallouts(summary) || this.renderChallengeCallouts(summary) ? `<div class="score-callout-row">${this.renderTitleCallouts(summary)}${this.renderNewBadgeCallouts(summary)}${this.renderChallengeCallouts(summary)}</div>` : ""}
           </div>
           <div class="final-score-card">
-            <span>Score Attack</span>
+            <span>Score</span>
             <strong id="finalScoreValue" class="tally-score" data-tally-value="${escapeAttr(summary.finalScore)}">0</strong>
-            <small>${escapeHtml(outcomeText)}</small>
+            <div class="result-hero-metrics">
+              <span><b>${escapeHtml(timeMetricLabel)}</b><em>${escapeHtml(resultTimeText)}</em></span>
+              <span><b>${escapeHtml(paceMetricLabel)}</b><em>${escapeHtml(paceMetricText)}</em></span>
+              <span><b>Board</b><em>${escapeHtml(boardMetricText)}</em></span>
+            </div>
           </div>
         </div>
-        ${this.renderBadgeEarnedPanel(summary)}
-        ${this.renderMedalChips(summary.medals)}
         ${this.renderRunHighlightPanel(summary)}
         ${this.renderChallengeResultPanel(summary)}
-        <div class="score-grid score-info-grid">
+        <div class="row score-action-row">
+          <button class="small-button primary" data-action="restart">${escapeHtml(restartLabel)}</button>
+          <button class="small-button" data-action="leaderboard" data-view="${LEADERBOARD_VIEW_SCORE_ATTACK}">Score Attack Board</button>
+          <button class="small-button" data-action="leaderboard" data-view="${LEADERBOARD_VIEW_TIME_ATTACK}" data-track-id="${escapeAttr(summary.trackId)}" data-race-type-id="${escapeAttr(summary.raceTypeId)}" data-speed-class-id="${escapeAttr(summary.speedClass)}">Time Attack Board</button>
+          <button class="small-button" data-action="title">Return to Title</button>
+        </div>
+        <h2>Score Breakdown</h2>
+        ${this.renderScoreBreakdown(summary)}
+        ${this.renderMedalChips(summary.medals)}
+        ${this.renderBadgeEarnedPanel(summary)}
+        <h2>Score Attack Leaderboard</h2>
+        <p class="hint">Highest score wins. Open Time Attack for the precise finish-time chase on this setup.</p>
+        <ol class="leaderboard-list">
+          ${this.renderScoreAttackRows(leaderboard, summary.scoreEntry)}
+        </ol>
+        <h2>Run Details</h2>
+        <div class="score-grid score-info-grid is-secondary">
           ${summary.challengeMode ? `
             <div class="score-card"><strong>Challenge</strong><span class="is-compact">${escapeHtml(summary.challengeName)}</span></div>
             <div class="score-card"><strong>Objective</strong><span class="is-compact">${escapeHtml(summary.challengeObjective)}</span></div>
@@ -24448,19 +24712,6 @@ class NeonRoadRally {
           <div class="score-card"><strong>Personal Best</strong><span>${escapeHtml(personalBestText)}</span></div>
           <div class="score-card"><strong>Top 20</strong><span>${escapeHtml(leaderboardText)}</span></div>
         </div>
-        <h2>Score Breakdown</h2>
-        ${this.renderScoreBreakdown(summary)}
-        <div class="row score-action-row">
-          <button class="small-button primary" data-action="restart">${escapeHtml(restartLabel)}</button>
-          <button class="small-button" data-action="leaderboard" data-view="${LEADERBOARD_VIEW_SCORE_ATTACK}">Score Attack Board</button>
-          <button class="small-button" data-action="leaderboard" data-view="${LEADERBOARD_VIEW_TIME_ATTACK}" data-track-id="${escapeAttr(summary.trackId)}" data-race-type-id="${escapeAttr(summary.raceTypeId)}" data-speed-class-id="${escapeAttr(summary.speedClass)}">Time Attack Board</button>
-          <button class="small-button" data-action="title">Return to Title</button>
-        </div>
-        <h2>Score Attack Leaderboard</h2>
-        <p class="hint">Highest score wins. Open Time Attack for the precise finish-time chase on this setup.</p>
-        <ol class="leaderboard-list">
-          ${this.renderScoreAttackRows(leaderboard, summary.scoreEntry)}
-        </ol>
       </section>
     `;
     this.bindLayerButtons();
