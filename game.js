@@ -5792,6 +5792,8 @@ class PlayerProfileManager {
       leaderboard: [],
       challengeProgress: createDefaultChallengeSave(),
       audio: {
+        masterMuted: false,
+        masterVolume: 1,
         musicMuted: false,
         sfxMuted: false,
         musicVolume: 0.62,
@@ -5838,8 +5840,10 @@ class PlayerProfileManager {
       ...fallback.audio,
       ...(parsed.audio && typeof parsed.audio === "object" ? parsed.audio : {})
     };
+    audio.masterVolume = clampNumber(audio.masterVolume, 0, 1, fallback.audio.masterVolume);
     audio.musicVolume = clampNumber(audio.musicVolume, 0, 1, fallback.audio.musicVolume);
     audio.sfxVolume = clampNumber(audio.sfxVolume, 0, 1, fallback.audio.sfxVolume);
+    audio.masterMuted = Boolean(audio.masterMuted);
     audio.musicMuted = Boolean(audio.musicMuted);
     audio.sfxMuted = Boolean(audio.sfxMuted);
 
@@ -5947,8 +5951,12 @@ class PlayerProfileManager {
       ...this.data.audio,
       ...settings
     };
+    this.data.audio.masterVolume = clamp(Number(this.data.audio.masterVolume), 0, 1);
     this.data.audio.musicVolume = clamp(Number(this.data.audio.musicVolume), 0, 1);
     this.data.audio.sfxVolume = clamp(Number(this.data.audio.sfxVolume), 0, 1);
+    this.data.audio.masterMuted = Boolean(this.data.audio.masterMuted);
+    this.data.audio.musicMuted = Boolean(this.data.audio.musicMuted);
+    this.data.audio.sfxMuted = Boolean(this.data.audio.sfxMuted);
     this.save();
   }
 
@@ -6687,12 +6695,39 @@ class PartySession {
 // Audio
 // ---------------------------------------------------------------------------
 
+const AUDIO_TEST_SFX = [
+  { key: "countdownBeep", label: "Countdown" },
+  { key: "go", label: "Start" },
+  { key: "boostPickup", label: "Boost" },
+  { key: "boostActive", label: "Boost Active" },
+  { key: "boostEnd", label: "Boost End" },
+  { key: "rampApproach", label: "Ramp Approach" },
+  { key: "rampTakeoff", label: "Jump" },
+  { key: "rampLanding", label: "Landing" },
+  { key: "nearMiss", label: "Near Miss" },
+  { key: "fuelPickup", label: "Gas Can" },
+  { key: "lowFuel", label: "Low Fuel" },
+  { key: "criticalFuel", label: "Critical Fuel" },
+  { key: "pursuitPressure", label: "Pursuit Heat" },
+  { key: "roadblockWarning", label: "Roadblock" },
+  { key: "pursuitEscaped", label: "Escaped" },
+  { key: "pursuitBusted", label: "Busted" },
+  { key: "crash", label: "Crash" },
+  { key: "finish", label: "Finish" }
+];
+
+function getAudioTestSfxLabel(key) {
+  return AUDIO_TEST_SFX.find((item) => item.key === key)?.label || key;
+}
+
 class AudioManager {
   constructor(settings, onChange) {
     this.onChange = onChange;
     this.userActivated = false;
+    this.masterMuted = Boolean(settings.masterMuted);
     this.musicMuted = Boolean(settings.musicMuted);
     this.sfxMuted = Boolean(settings.sfxMuted);
+    this.masterVolume = clampNumber(settings.masterVolume, 0, 1, 1);
     this.musicVolume = clampNumber(settings.musicVolume, 0, 1, 0.62);
     this.sfxVolume = clampNumber(settings.sfxVolume, 0, 1, 0.82);
     this.musicKey = null;
@@ -6704,19 +6739,37 @@ class AudioManager {
     this.sfxActiveCounts = {};
     this.lastPlayedSfx = "none";
     this.audioContext = null;
+    this.musicState = {
+      id: "menu",
+      label: "Menu",
+      sectionId: "menu",
+      intensity: 0,
+      raceTypeId: "menu",
+      trackId: "",
+      fuelCritical: false,
+      pursuitPressure: false
+    };
     this.sfxCooldowns = {
       menu: 100,
       countdownBeep: 120,
       go: 300,
       boost: 200,
       boostPickup: 120,
+      boostActive: 240,
+      boostEnd: 260,
       slowdown: 250,
       oil: 250,
       ramp: 220,
+      rampApproach: 420,
       rampTakeoff: 180,
       rampLanding: 180,
       fuelPickup: 140,
+      lowFuel: 3600,
+      criticalFuel: 2200,
       pursuitPressure: 900,
+      roadblockWarning: 900,
+      pursuitEscaped: 900,
+      pursuitBusted: 900,
       nearMiss: 300,
       warning: 1000,
       finish: 600,
@@ -6727,28 +6780,64 @@ class AudioManager {
       title: { path: "audio/title-theme.mp3", audio: null, loaded: "untested" },
       race: { path: "audio/sunset-highway.mp3", audio: null, loaded: "untested" }
     };
+    const tone = (layers, duration = 0.18) => ({ audio: null, loaded: "generated", tone: { duration, layers } });
     this.sfx = {
-      boost: { path: "audio/boost.wav", audio: null, loaded: "untested" },
-      crash: { path: "audio/crash.wav", audio: null, loaded: "untested" },
-      slowdown: { path: "audio/slowdown.wav", audio: null, loaded: "untested" },
-      finish: { path: "audio/finish.wav", audio: null, loaded: "untested" },
-      menu: { path: "audio/menu-select.wav", audio: null, loaded: "untested" },
-      nearMiss: { path: "audio/near-miss.wav", audio: null, loaded: "untested" },
-      oil: { path: "audio/oil.wav", audio: null, loaded: "untested" },
-      ramp: { path: "audio/ramp.wav", audio: null, loaded: "untested" },
-      boostPickup: { audio: null, loaded: "generated", tone: { type: "sawtooth", frequency: 260, endFrequency: 720, duration: 0.18, gain: 0.34 } },
-      rampTakeoff: { audio: null, loaded: "generated", tone: { type: "triangle", frequency: 220, endFrequency: 520, duration: 0.2, gain: 0.26 } },
-      rampLanding: { audio: null, loaded: "generated", tone: { type: "square", frequency: 150, endFrequency: 92, duration: 0.16, gain: 0.2 } },
-      fuelPickup: { audio: null, loaded: "generated", tone: { type: "sine", frequency: 480, endFrequency: 760, duration: 0.16, gain: 0.22 } },
-      pursuitPressure: { audio: null, loaded: "generated", tone: { type: "sawtooth", frequency: 170, endFrequency: 130, duration: 0.26, gain: 0.18 } },
-      countdownBeep: { path: "audio/countdown-beep.wav", audio: null, loaded: "untested" },
-      go: { path: "audio/go.wav", audio: null, loaded: "untested" },
-      newHighScore: { path: "audio/new-high-score.wav", audio: null, loaded: "untested" },
-      warning: { path: "audio/warning.wav", audio: null, loaded: "untested" }
+      boost: { path: "audio/boost.wav", audio: null, loaded: "untested", tone: tone([{ type: "sawtooth", frequency: 190, endFrequency: 560, duration: 0.18, gain: 0.22 }, { type: "sine", frequency: 80, endFrequency: 58, duration: 0.16, gain: 0.2 }]).tone },
+      crash: { path: "audio/crash.wav", audio: null, loaded: "untested", tone: tone([{ noise: true, duration: 0.2, gain: 0.24 }, { type: "square", frequency: 72, endFrequency: 40, duration: 0.3, gain: 0.28 }], 0.32).tone },
+      slowdown: { path: "audio/slowdown.wav", audio: null, loaded: "untested", tone: tone([{ type: "sawtooth", frequency: 170, endFrequency: 92, duration: 0.18, gain: 0.18 }], 0.2).tone },
+      finish: { path: "audio/finish.wav", audio: null, loaded: "untested", tone: tone([{ type: "triangle", frequency: 440, endFrequency: 880, duration: 0.16, gain: 0.22 }, { type: "sine", frequency: 660, endFrequency: 1320, start: 0.07, duration: 0.18, gain: 0.18 }], 0.28).tone },
+      menu: { path: "audio/menu-select.wav", audio: null, loaded: "untested", tone: tone([{ type: "triangle", frequency: 360, endFrequency: 520, duration: 0.07, gain: 0.12 }], 0.08).tone },
+      nearMiss: { path: "audio/near-miss.wav", audio: null, loaded: "untested", tone: tone([{ type: "sine", frequency: 720, endFrequency: 520, duration: 0.11, gain: 0.16 }, { noise: true, start: 0.02, duration: 0.09, gain: 0.05 }], 0.14).tone },
+      oil: { path: "audio/oil.wav", audio: null, loaded: "untested", tone: tone([{ type: "sawtooth", frequency: 180, endFrequency: 110, duration: 0.16, gain: 0.14 }], 0.16).tone },
+      ramp: { path: "audio/ramp.wav", audio: null, loaded: "untested", tone: tone([{ type: "triangle", frequency: 240, endFrequency: 460, duration: 0.16, gain: 0.18 }], 0.18).tone },
+      boostPickup: tone([{ type: "sawtooth", frequency: 260, endFrequency: 860, duration: 0.18, gain: 0.3 }, { type: "sine", frequency: 620, endFrequency: 1240, start: 0.02, duration: 0.14, gain: 0.18 }], 0.22),
+      boostActive: tone([{ type: "sawtooth", frequency: 180, endFrequency: 420, duration: 0.16, gain: 0.18 }, { noise: true, duration: 0.2, gain: 0.045 }], 0.22),
+      boostEnd: tone([{ type: "triangle", frequency: 360, endFrequency: 180, duration: 0.14, gain: 0.12 }], 0.16),
+      rampApproach: tone([{ type: "triangle", frequency: 260, endFrequency: 340, duration: 0.12, gain: 0.1 }, { type: "triangle", frequency: 390, endFrequency: 500, start: 0.1, duration: 0.12, gain: 0.09 }], 0.24),
+      rampTakeoff: tone([{ type: "triangle", frequency: 220, endFrequency: 560, duration: 0.2, gain: 0.24 }, { noise: true, duration: 0.11, gain: 0.06 }], 0.24),
+      rampLanding: tone([{ type: "square", frequency: 150, endFrequency: 84, duration: 0.16, gain: 0.18 }, { noise: true, duration: 0.1, gain: 0.08 }], 0.2),
+      fuelPickup: tone([{ type: "sine", frequency: 480, endFrequency: 760, duration: 0.16, gain: 0.2 }, { type: "triangle", frequency: 760, endFrequency: 980, start: 0.06, duration: 0.1, gain: 0.12 }], 0.2),
+      lowFuel: tone([{ type: "square", frequency: 220, endFrequency: 180, duration: 0.13, gain: 0.12 }, { type: "square", frequency: 220, endFrequency: 160, start: 0.18, duration: 0.13, gain: 0.1 }], 0.34),
+      criticalFuel: tone([{ type: "square", frequency: 260, endFrequency: 170, duration: 0.12, gain: 0.16 }, { type: "square", frequency: 260, endFrequency: 150, start: 0.14, duration: 0.12, gain: 0.15 }, { type: "sawtooth", frequency: 95, endFrequency: 70, start: 0.02, duration: 0.3, gain: 0.12 }], 0.36),
+      pursuitPressure: tone([{ type: "sawtooth", frequency: 170, endFrequency: 130, duration: 0.26, gain: 0.16 }, { type: "triangle", frequency: 460, endFrequency: 590, start: 0.06, duration: 0.18, gain: 0.1 }], 0.3),
+      roadblockWarning: tone([{ type: "square", frequency: 320, endFrequency: 240, duration: 0.12, gain: 0.15 }, { type: "square", frequency: 430, endFrequency: 330, start: 0.15, duration: 0.13, gain: 0.14 }], 0.32),
+      pursuitEscaped: tone([{ type: "triangle", frequency: 390, endFrequency: 780, duration: 0.18, gain: 0.2 }, { type: "sine", frequency: 780, endFrequency: 1170, start: 0.1, duration: 0.2, gain: 0.15 }], 0.34),
+      pursuitBusted: tone([{ type: "sawtooth", frequency: 210, endFrequency: 92, duration: 0.22, gain: 0.2 }, { noise: true, start: 0.05, duration: 0.22, gain: 0.08 }], 0.3),
+      countdownBeep: { path: "audio/countdown-beep.wav", audio: null, loaded: "untested", tone: tone([{ type: "square", frequency: 700, endFrequency: 700, duration: 0.08, gain: 0.13 }], 0.1).tone },
+      go: { path: "audio/go.wav", audio: null, loaded: "untested", tone: tone([{ type: "triangle", frequency: 320, endFrequency: 840, duration: 0.2, gain: 0.2 }, { type: "sine", frequency: 92, endFrequency: 58, duration: 0.14, gain: 0.14 }], 0.24).tone },
+      newHighScore: { path: "audio/new-high-score.wav", audio: null, loaded: "untested", tone: tone([{ type: "triangle", frequency: 520, endFrequency: 1040, duration: 0.18, gain: 0.18 }, { type: "sine", frequency: 780, endFrequency: 1560, start: 0.08, duration: 0.18, gain: 0.14 }], 0.3).tone },
+      warning: { path: "audio/warning.wav", audio: null, loaded: "untested", tone: tone([{ type: "square", frequency: 260, endFrequency: 180, duration: 0.16, gain: 0.14 }], 0.18).tone }
     };
   }
 
+  isMusicSilenced() {
+    return this.masterMuted || this.musicMuted || this.masterVolume <= 0 || this.musicVolume <= 0;
+  }
+
+  isSfxSilenced() {
+    return this.masterMuted || this.sfxMuted || this.masterVolume <= 0 || this.sfxVolume <= 0;
+  }
+
+  getMusicOutputVolume(channelVolume = this.musicVolume) {
+    if (this.masterMuted || this.musicMuted) return 0;
+    return clampNumber(channelVolume, 0, 1, this.musicVolume) * this.masterVolume;
+  }
+
+  getSfxOutputVolume(channelVolume = this.sfxVolume) {
+    if (this.masterMuted || this.sfxMuted) return 0;
+    return clampNumber(channelVolume, 0, 1, this.sfxVolume) * this.masterVolume;
+  }
+
+  updateMusicElementVolumes() {
+    Object.values(this.tracks).forEach((entry) => {
+      if (entry.audio) entry.audio.volume = this.getMusicOutputVolume();
+    });
+  }
+
   activate() {
+    if (this.audioContext?.state === "suspended" && typeof this.audioContext.resume === "function") {
+      this.audioContext.resume().catch(() => {});
+    }
     if (this.userActivated) return;
     this.userActivated = true;
     this.preloadMusic();
@@ -6760,7 +6849,7 @@ class AudioManager {
     const audio = new Audio();
     audio.preload = "auto";
     audio.loop = Boolean(loop);
-    audio.volume = loop ? this.musicVolume : this.sfxVolume;
+    audio.volume = loop ? this.getMusicOutputVolume() : this.getSfxOutputVolume();
     entry.loaded = "loading";
     audio.addEventListener("loadedmetadata", () => {
       entry.loaded = "loaded";
@@ -6858,7 +6947,7 @@ class AudioManager {
   }
 
   playMusic(key, restart = false) {
-    if (!this.userActivated || this.musicMuted) return;
+    if (!this.userActivated || this.isMusicSilenced()) return;
     const entry = this.tracks[key];
     if (!entry) return;
     const audio = this.createAudio(entry, true);
@@ -6867,7 +6956,7 @@ class AudioManager {
     }
     this.musicKey = key;
     audio.loop = true;
-    audio.volume = this.musicVolume;
+    audio.volume = this.getMusicOutputVolume();
     if (restart) {
       try {
         audio.currentTime = 0;
@@ -6899,7 +6988,7 @@ class AudioManager {
     if (fadeSeconds <= 0) {
       audio.pause();
       audio.currentTime = 0;
-      audio.volume = this.musicVolume;
+      audio.volume = this.getMusicOutputVolume();
       this.musicKey = null;
       return;
     }
@@ -6913,7 +7002,7 @@ class AudioManager {
       } else {
         audio.pause();
         audio.currentTime = 0;
-        audio.volume = this.musicVolume;
+        audio.volume = this.getMusicOutputVolume();
         this.musicKey = null;
         this.fadeId = null;
       }
@@ -6922,9 +7011,11 @@ class AudioManager {
   }
 
   playSfx(key, options = {}) {
-    if (!this.userActivated || this.sfxMuted) return false;
+    if (!this.userActivated || this.isSfxSilenced()) return false;
     const entry = this.sfx[key];
-    if (!entry || entry.loaded === "missing") return false;
+    if (!entry) return false;
+    const useGenerated = Boolean(entry.tone && (!entry.path || entry.loaded === "missing"));
+    if (!useGenerated && entry.loaded === "missing") return false;
     const now = performance.now();
     const cooldownMs = options.cooldownMs ?? this.sfxCooldowns[key] ?? 0;
     const last = this.sfxLastPlayed[key] || -Infinity;
@@ -6932,14 +7023,22 @@ class AudioManager {
     const activeCount = this.sfxActiveCounts[key] || 0;
     const maxInstances = options.maxInstances ?? 3;
     if (activeCount >= maxInstances) return false;
-    if (entry.tone && !entry.path) {
+    if (useGenerated) {
       this.sfxLastPlayed[key] = now;
       this.sfxActiveCounts[key] = activeCount + 1;
       this.lastPlayedSfx = key;
       return this.playGeneratedSfx(key, entry, options);
     }
     const source = this.createAudio(entry, false);
-    if (entry.loaded === "missing") return false;
+    if (entry.loaded === "missing") {
+      if (entry.tone) {
+        this.sfxLastPlayed[key] = now;
+        this.sfxActiveCounts[key] = activeCount + 1;
+        this.lastPlayedSfx = key;
+        return this.playGeneratedSfx(key, entry, options);
+      }
+      return false;
+    }
     let audio;
     try {
       audio = source.cloneNode(true);
@@ -6947,7 +7046,7 @@ class AudioManager {
       audio = new Audio(entry.path);
     }
     audio.loop = false;
-    audio.volume = clampNumber(options.volume ?? this.sfxVolume, 0, 1, this.sfxVolume);
+    audio.volume = this.getSfxOutputVolume(options.volume ?? this.sfxVolume);
     this.sfxLastPlayed[key] = now;
     this.sfxActiveCounts[key] = activeCount + 1;
     this.lastPlayedSfx = key;
@@ -6987,25 +7086,55 @@ class AudioManager {
       }
       const tone = entry.tone || {};
       const now = context.currentTime;
-      const duration = clampNumber(tone.duration, 0.05, 0.65, 0.16);
-      const oscillator = context.createOscillator();
-      const gain = context.createGain();
-      const volume = clampNumber(options.volume ?? this.sfxVolume, 0, 1, this.sfxVolume);
-      const startFrequency = Math.max(20, tone.frequency || 220);
-      const endFrequency = Math.max(20, tone.endFrequency || startFrequency);
-      oscillator.type = tone.type || "sine";
-      oscillator.frequency.setValueAtTime(startFrequency, now);
-      oscillator.frequency.exponentialRampToValueAtTime(endFrequency, now + duration);
-      gain.gain.setValueAtTime(0.0001, now);
-      gain.gain.exponentialRampToValueAtTime(Math.max(0.0001, volume * (tone.gain || 0.24)), now + 0.018);
-      gain.gain.exponentialRampToValueAtTime(0.0001, now + duration);
-      oscillator.connect(gain);
-      gain.connect(context.destination);
-      oscillator.start(now);
-      oscillator.stop(now + duration + 0.02);
-      oscillator.addEventListener("ended", () => {
+      const channelVolume = options.volume ?? this.sfxVolume;
+      const volume = this.getSfxOutputVolume(channelVolume);
+      const layers = Array.isArray(tone.layers) && tone.layers.length ? tone.layers : [tone];
+      let totalDuration = clampNumber(tone.duration, 0.05, 0.75, 0.16);
+      layers.forEach((layer) => {
+        const startOffset = clampNumber(layer.start, 0, 0.6, 0);
+        const duration = clampNumber(layer.duration ?? tone.duration, 0.04, 0.7, totalDuration);
+        totalDuration = Math.max(totalDuration, startOffset + duration);
+        const startAt = now + startOffset;
+        const gain = context.createGain();
+        const layerGain = clampNumber(layer.gain ?? tone.gain, 0.01, 0.5, 0.2);
+        const attack = Math.min(clampNumber(layer.attack ?? tone.attack, 0.004, 0.05, 0.012), duration * 0.45);
+        gain.gain.setValueAtTime(0.0001, startAt);
+        gain.gain.exponentialRampToValueAtTime(Math.max(0.0001, volume * layerGain), startAt + attack);
+        gain.gain.exponentialRampToValueAtTime(0.0001, startAt + duration);
+        gain.connect(context.destination);
+        if (layer.noise) {
+          const sampleCount = Math.max(1, Math.ceil(context.sampleRate * duration));
+          const buffer = context.createBuffer(1, sampleCount, context.sampleRate);
+          const data = buffer.getChannelData(0);
+          for (let i = 0; i < sampleCount; i += 1) {
+            const fade = 1 - i / sampleCount;
+            data[i] = (Math.random() * 2 - 1) * fade;
+          }
+          const source = context.createBufferSource();
+          source.buffer = buffer;
+          source.connect(gain);
+          source.start(startAt);
+          return;
+        }
+        const oscillator = context.createOscillator();
+        const startFrequency = Math.max(20, layer.frequency || tone.frequency || 220);
+        const endFrequency = Math.max(20, layer.endFrequency || tone.endFrequency || startFrequency);
+        oscillator.type = layer.type || tone.type || "sine";
+        oscillator.frequency.setValueAtTime(startFrequency, startAt);
+        oscillator.frequency.exponentialRampToValueAtTime(endFrequency, startAt + duration);
+        oscillator.connect(gain);
+        oscillator.start(startAt);
+        oscillator.stop(startAt + duration + 0.02);
+      });
+      const finish = () => {
         this.sfxActiveCounts[key] = Math.max(0, (this.sfxActiveCounts[key] || 1) - 1);
-      }, { once: true });
+      };
+      const timeout = Math.ceil((totalDuration + 0.05) * 1000);
+      if (typeof window !== "undefined" && typeof window.setTimeout === "function") {
+        window.setTimeout(finish, timeout);
+      } else {
+        setTimeout(finish, timeout);
+      }
       return true;
     } catch (error) {
       this.sfxActiveCounts[key] = Math.max(0, (this.sfxActiveCounts[key] || 1) - 1);
@@ -7016,8 +7145,10 @@ class AudioManager {
 
   setMusicMuted(value) {
     this.musicMuted = Boolean(value);
-    if (this.musicMuted) {
+    if (this.musicMuted || this.masterMuted) {
       this.stopMusic(0);
+    } else {
+      this.updateMusicElementVolumes();
     }
     this.reportSettings();
   }
@@ -7027,11 +7158,25 @@ class AudioManager {
     this.reportSettings();
   }
 
+  setMasterMuted(value) {
+    this.masterMuted = Boolean(value);
+    if (this.masterMuted) {
+      this.stopMusic(0);
+    } else {
+      this.updateMusicElementVolumes();
+    }
+    this.reportSettings();
+  }
+
+  setMasterVolume(value) {
+    this.masterVolume = clampNumber(value, 0, 1, this.masterVolume);
+    this.updateMusicElementVolumes();
+    this.reportSettings();
+  }
+
   setMusicVolume(value) {
     this.musicVolume = clampNumber(value, 0, 1, this.musicVolume);
-    Object.values(this.tracks).forEach((entry) => {
-      if (entry.audio) entry.audio.volume = this.musicVolume;
-    });
+    this.updateMusicElementVolumes();
     this.reportSettings();
   }
 
@@ -7043,12 +7188,34 @@ class AudioManager {
   reportSettings() {
     if (this.onChange) {
       this.onChange({
+        masterMuted: this.masterMuted,
+        masterVolume: this.masterVolume,
         musicMuted: this.musicMuted,
         sfxMuted: this.sfxMuted,
         musicVolume: this.musicVolume,
         sfxVolume: this.sfxVolume
       });
     }
+  }
+
+  updateMusicState(state = {}) {
+    const id = sanitizeName(state.id || state.sectionId || "menu", "menu", 40);
+    this.musicState = {
+      id,
+      label: sanitizeName(state.label || id, id, 48),
+      sectionId: sanitizeName(state.sectionId || id, id, 40),
+      intensity: clampNumber(state.intensity, 0, 2, 0),
+      raceTypeId: sanitizeName(state.raceTypeId || "menu", "menu", 40),
+      trackId: sanitizeName(state.trackId || "", "", 40),
+      fuelCritical: Boolean(state.fuelCritical),
+      pursuitPressure: Boolean(state.pursuitPressure)
+    };
+  }
+
+  musicStateSummary() {
+    const state = this.musicState || {};
+    const intensity = Math.round(clampNumber(state.intensity, 0, 2, 0) * 100);
+    return `${state.label || "Menu"} · ${intensity}% intensity`;
   }
 
   musicLoadedStatus() {
@@ -10762,7 +10929,7 @@ class ObstacleManager {
     if (ahead <= VIEW_DISTANCE + 40 && ahead > -120) {
       obstacle.sfxPlayed = true;
       const pursuitPressure = obstacle.warningType === "roadblock" && isPursuitRaceType(run.raceTypeId);
-      this.game.audio.playSfx(pursuitPressure ? "pursuitPressure" : "warning", {
+      this.game.audio.playSfx(pursuitPressure ? "roadblockWarning" : "warning", {
         cooldownMs: pursuitPressure ? 900 : undefined,
         maxInstances: 1,
         volume: this.game.audio.sfxVolume * (pursuitPressure ? 0.78 : 1)
@@ -12962,6 +13129,7 @@ class CollisionSystem {
       run.boostStreakPunchTimer = Math.max(run.boostStreakPunchTimer || 0, ARCADE_FEEL.boostStreakPunchMs / 1000);
       run.boostTrailPunchTimer = Math.max(run.boostTrailPunchTimer || 0, ARCADE_FEEL.boostTrailPunchMs / 1000);
       run.screenShake = Math.max(run.screenShake || 0, 0.24);
+      this.game.startBoostAudioCue(0.64);
       const now = Number.isFinite(run.elapsed) ? run.elapsed : 0;
       if (now - (run.lastBoostCalloutAt || -Infinity) >= ARCADE_FEEL.boostCalloutCooldownSeconds) {
         const perfectRoute = (run.bestBoostPadChain || 0) >= 3 && (run.boostPadsMissedReachable || 0) === 0;
@@ -17190,6 +17358,7 @@ class NeonRoadRally {
       pursuitLastCalloutDirection: "",
       pursuitLastCalloutAt: -Infinity,
       pursuitLastWindowState: "",
+      pursuitAudioWindowState: "",
       pursuitPressureWindows: 0,
       pursuitRecoveryWindows: 0,
       pursuitRecoveryWindowTimer: 0,
@@ -17426,6 +17595,7 @@ class NeonRoadRally {
       boostFlashTimer: 0,
       boostStreakPunchTimer: 0,
       boostTrailPunchTimer: 0,
+      boostAudioActive: false,
       finishFlashTimer: 0,
       finishStripeTimer: 0,
       crashBeatTimer: 0,
@@ -17532,6 +17702,95 @@ class NeonRoadRally {
     }
   }
 
+  getRaceAudioMusicState() {
+    const run = this.run;
+    if (!run || this.screen !== "game") {
+      return { id: "menu", label: "Menu", sectionId: "menu", intensity: 0, raceTypeId: "menu" };
+    }
+    const speedRatio = clamp((run.currentSpeed || 0) / Math.max(1, run.track?.maxSpeed || 1), 0, 1.8);
+    const boosted = run.boostTimer > 0 || run.padBoostTimer > 0;
+    const fuelCritical = Boolean(isFuelRunRaceType(run.raceTypeId) && run.criticalFuelActive);
+    const pursuitPressure = Boolean(isPursuitRaceType(run.raceTypeId) && (run.pursuitRoadblockAhead || run.pursuitHeatStatus === "Heat Rising"));
+    let id = run.currentSectionId || "groove";
+    let label = run.currentSectionLabel || id;
+    let intensity = clampNumber(run.sectionVisualIntensity, 0, 1.8, 1);
+    intensity = Math.max(intensity, speedRatio * 0.7);
+    if (boosted) intensity = Math.max(intensity, 1.35);
+    if (fuelCritical) {
+      id = "fuelCritical";
+      label = "Fuel Critical";
+      intensity = Math.max(intensity, 1.55);
+    } else if (pursuitPressure) {
+      id = "pursuitPressure";
+      label = "Pursuit Pressure";
+      intensity = Math.max(intensity, 1.5);
+    }
+    return {
+      id,
+      label,
+      sectionId: run.currentSectionId || id,
+      intensity,
+      raceTypeId: run.raceTypeId || DEFAULT_RACE_TYPE_ID,
+      trackId: run.track?.id || DEFAULT_TRACK_ID,
+      fuelCritical,
+      pursuitPressure
+    };
+  }
+
+  updateAudioMusicState() {
+    this.audio.updateMusicState(this.getRaceAudioMusicState());
+  }
+
+  startBoostAudioCue(volumeScale = 0.68) {
+    const run = this.run;
+    if (!run) return;
+    if (!run.boostAudioActive) {
+      this.audio.playSfx("boostActive", {
+        cooldownMs: 0,
+        maxInstances: 1,
+        volume: this.audio.sfxVolume * volumeScale
+      });
+    }
+    run.boostAudioActive = true;
+  }
+
+  updateBoostAudioState() {
+    const run = this.run;
+    if (!run) return;
+    const boosting = run.raceActive && !run.ended && (run.boostTimer > 0 || run.padBoostTimer > 0);
+    if (!boosting && run.boostAudioActive) {
+      run.boostAudioActive = false;
+      this.audio.playSfx("boostEnd", {
+        cooldownMs: 0,
+        maxInstances: 1,
+        volume: this.audio.sfxVolume * 0.42
+      });
+    }
+  }
+
+  maybePlayRampApproachSfx() {
+    const run = this.run;
+    if (!run || !run.raceActive || run.ended || run.paused || run.airborne) return;
+    const lane = Math.round(clamp(Number.isFinite(run.renderLaneFloat) ? run.renderLaneFloat : run.targetLane, 0, LANES - 1));
+    const speed = Math.max(1, Number.isFinite(run.currentSpeed) ? run.currentSpeed : run.baseCruiseSpeed || 1);
+    const leadDistance = clamp(speed * 0.9, 180, 420);
+    const ramp = this.obstacles.obstacles
+      .filter((obstacle) => {
+        if (obstacle.type !== "ramp" || obstacle.hit || obstacle.remove || obstacle.approachSfxPlayed) return false;
+        const obstacleLane = Math.round(clamp(Number.isFinite(obstacle.laneFloat) ? obstacle.laneFloat : obstacle.lane, 0, LANES - 1));
+        const ahead = obstacle.distance - run.distance;
+        return obstacleLane === lane && ahead > 70 && ahead <= leadDistance;
+      })
+      .sort((a, b) => a.distance - b.distance)[0];
+    if (!ramp) return;
+    ramp.approachSfxPlayed = true;
+    this.audio.playSfx("rampApproach", {
+      cooldownMs: 420,
+      maxInstances: 1,
+      volume: this.audio.sfxVolume * 0.4
+    });
+  }
+
   showRaceStateCallout(text, tone = "info", seconds = 1.25, options = {}) {
     const run = this.run;
     const clean = sanitizeName(text, "", DISPLAY_TEXT_MAX_LENGTH);
@@ -17619,6 +17878,7 @@ class NeonRoadRally {
     run.pursuitLastCalloutDirection = "";
     run.pursuitLastCalloutAt = -Infinity;
     run.pursuitLastWindowState = "";
+    run.pursuitAudioWindowState = "";
     run.pursuitPressureWindows = 0;
     run.pursuitRecoveryWindows = 0;
     run.pursuitRecoveryWindowTimer = 0;
@@ -17764,6 +18024,16 @@ class NeonRoadRally {
       if (windowState === "recovery") run.pursuitRecoveryWindows = (run.pursuitRecoveryWindows || 0) + 1;
       run.pursuitLastWindowState = windowState;
     }
+    if (run.pursuitAudioWindowState !== windowState) {
+      run.pursuitAudioWindowState = windowState;
+      if (windowState === "pressure") {
+        this.audio.playSfx("pursuitPressure", {
+          cooldownMs: 1800,
+          maxInstances: 1,
+          volume: this.audio.sfxVolume * (roadblockAhead ? 0.58 : 0.44)
+        });
+      }
+    }
 
       this.applyPursuitHeat(baseDelta, getPursuitHeatCallout(baseCause, baseDelta > 0), {
         cause: baseCause,
@@ -17906,7 +18176,7 @@ class NeonRoadRally {
         : FUEL_RUN_CONFIG.warningCooldownSeconds;
       run.fuelWarningPulseTimer = Math.max(run.fuelWarningPulseTimer || 0, ARCADE_FEEL.fuelWarningPulseMs / 1000);
       this.showRaceStateCallout(nextState === "critical" ? "CRITICAL FUEL" : "LOW FUEL", "danger", nextState === "critical" ? 1.4 : 1.15, { replace: true });
-      this.audio.playSfx("warning", {
+      this.audio.playSfx(nextState === "critical" ? "criticalFuel" : "lowFuel", {
         cooldownMs: nextState === "critical" ? 2400 : 3800,
         maxInstances: 1,
         volume: this.audio.sfxVolume * (nextState === "critical" ? 0.72 : 0.58)
@@ -18045,6 +18315,7 @@ class NeonRoadRally {
     run.oilTimer = Math.max(0, run.oilTimer - dt);
     run.slowdownTimer = Math.max(0, run.slowdownTimer - dt);
     run.raceStateCalloutTimer = Math.max(0, (run.raceStateCalloutTimer || 0) - dt);
+    this.updateBoostAudioState();
 
     if (run.verticalInput !== 0) {
       const verticalSpeed = INPUT_CONFIG.verticalMoveRatioPerSecond;
@@ -18104,6 +18375,7 @@ class NeonRoadRally {
     }
     this.updateRunTelemetry(dt);
     this.updateRaceSection();
+    this.updateAudioMusicState();
     if (run.sectionDurations) {
       const sectionId = run.currentSectionId || FALLBACK_TRACK_SECTION.id;
       run.sectionDurations[sectionId] = Math.max(0, (run.sectionDurations[sectionId] || 0) + dt);
@@ -18127,8 +18399,10 @@ class NeonRoadRally {
     }
 
     this.obstacles.update(dt);
+    this.maybePlayRampApproachSfx();
     this.collision.update();
     this.updatePursuitRun(dt);
+    this.updateAudioMusicState();
     if (run.ended) return;
 
     if (run.distance >= run.track.distanceToFinish && !run.ended) {
@@ -18185,7 +18459,7 @@ class NeonRoadRally {
 
   startRaceMusic(restart = false) {
     const run = this.run;
-    if (!run || this.audio.musicMuted) return;
+    if (!run || this.audio.masterMuted || this.audio.musicMuted) return;
     if (restart && run.raceMusicStarted) return;
     run.raceMusicStarted = true;
     this.audio.setRaceMusicTrack(run.track || TRACKS[0]);
@@ -18420,6 +18694,7 @@ class NeonRoadRally {
     this.configureFuelForRun(this.run);
     this.configurePursuitForRun(this.run);
     this.updateRaceSection(false);
+    this.updateAudioMusicState();
     const configuredSeed = this.configureRunSeed(challenge ? challenge.seed : (options.seed ?? this.pendingRoadSeed), track, speedClass.id, raceType.id);
     if (partyMode) this.run.partySeed = configuredSeed;
     const bestTimeRecord = this.profiles.getBestTimeRecord(player.id, track.id, raceType.id, speedClass.id);
@@ -18474,6 +18749,7 @@ class NeonRoadRally {
     run.boostStreakPunchTimer = Math.max(run.boostStreakPunchTimer || 0, ARCADE_FEEL.boostStreakPunchMs / 1000);
     run.boostTrailPunchTimer = Math.max(run.boostTrailPunchTimer || 0, ARCADE_FEEL.boostTrailPunchMs / 1000);
     run.screenShake = Math.max(run.screenShake || 0, 0.24);
+    this.startBoostAudioCue(0.68);
     this.addFloatingScoreText("BOOST!", {
       color: "#28f6ff",
       size: 21,
@@ -19163,19 +19439,19 @@ class NeonRoadRally {
           this.addBaseScore(run.bonuses.heatSurvivor);
         }
       }
-      this.audio.playSfx("finish");
+      this.audio.playSfx(isPursuitRaceType(run.raceTypeId) ? "pursuitEscaped" : "finish");
     } else if (status === "outOfFuel") {
       run.fuel = 0;
       run.lowFuelActive = true;
       run.criticalFuelActive = true;
       run.screenShake = Math.max(run.screenShake || 0, 0.42);
-      this.audio.playSfx("warning", { cooldownMs: 1200, maxInstances: 1, volume: this.audio.sfxVolume * 0.72 });
+      this.audio.playSfx("criticalFuel", { cooldownMs: 1200, maxInstances: 1, volume: this.audio.sfxVolume * 0.72 });
     } else if (status === "busted") {
       run.pursuitHeat = run.pursuitHeatLimit || PURSUIT_CONFIG.heatLimit;
       run.pursuitStatusText = "Busted";
       run.pursuitBustedBeatTimer = Math.max(run.pursuitBustedBeatTimer || 0, 0.82);
       run.screenShake = Math.max(run.screenShake || 0, 0.38);
-      this.audio.playSfx("warning", { cooldownMs: 1200, maxInstances: 1, volume: this.audio.sfxVolume * 0.72 });
+      this.audio.playSfx("pursuitBusted", { cooldownMs: 1200, maxInstances: 1, volume: this.audio.sfxVolume * 0.76 });
     } else {
       if (!run.crashSfxPlayed) {
         this.audio.playSfx("crash", {
@@ -21823,6 +22099,7 @@ class NeonRoadRally {
     this.partySession = null;
     this.partySetup = null;
     this.setScreen("title");
+    this.audio.updateMusicState({ id: "menu", label: "Menu", sectionId: "menu", intensity: 0, raceTypeId: "menu" });
     this.audio.stopMusic(0);
     this.audio.playMusic("title", false);
     const player = this.profiles.getCurrentPlayer();
@@ -21833,7 +22110,7 @@ class NeonRoadRally {
     const playerDetail = player
       ? `Badges ${badgeProgress.earnedCount}/${badgeProgress.totalCount} - Titles ${titleCount}/${TITLE_DEFINITIONS.length}`
       : "Create a local profile for badges and scores";
-    const audioStatus = `Music ${this.audio.musicMuted ? "Muted" : "On"} / SFX ${this.audio.sfxMuted ? "Muted" : "On"}`;
+    const audioStatus = `${this.audio.masterMuted ? "Audio Muted" : "Audio On"} / Music ${this.audio.musicMuted ? "Muted" : "On"} / SFX ${this.audio.sfxMuted ? "Muted" : "On"}`;
     this.layer.classList.remove("is-empty");
     this.layer.innerHTML = `
       <section class="panel title-panel show-title-panel">
@@ -21890,6 +22167,7 @@ class NeonRoadRally {
           </div>
           <div class="title-utility-row">
             <button class="small-button" data-action="players">Switch Driver</button>
+            <button class="small-button" data-action="toggleMasterAudio">Audio: ${this.audio.masterMuted ? "Muted" : "On"}</button>
             <button class="small-button" data-action="toggleMusic">Music: ${this.audio.musicMuted ? "Muted" : "On"}</button>
             <button class="small-button" data-action="toggleSfx">SFX: ${this.audio.sfxMuted ? "Muted" : "On"}</button>
             <button class="small-button" data-action="fullscreen">Fullscreen</button>
@@ -21913,8 +22191,25 @@ class NeonRoadRally {
     this.renderDriverMiniPreviews();
   }
 
+  renderAudioTestControls() {
+    return `
+      <div class="audio-test-panel">
+        <div class="audio-test-header">
+          <strong>Audio Test</strong>
+          <span>${escapeHtml(this.audio.musicStateSummary())}</span>
+        </div>
+        <div class="audio-test-grid">
+          ${AUDIO_TEST_SFX.map((item) => `
+            <button class="small-button audio-test-button" data-action="testSfx" data-sfx="${escapeAttr(item.key)}">${escapeHtml(item.label)}</button>
+          `).join("")}
+        </div>
+      </div>
+    `;
+  }
+
   showSettingsScreen(message = "") {
     this.setScreen("settings");
+    this.audio.updateMusicState({ id: "menu", label: "Menu", sectionId: "menu", intensity: 0, raceTypeId: "menu" });
     this.audio.playMusic("title", false);
     const selectedSpeedClass = getSpeedClassConfig(this.profiles.data.speedClassId);
     this.layer.classList.remove("is-empty");
@@ -21928,7 +22223,7 @@ class NeonRoadRally {
           </div>
           <div class="score-grid">
             <div class="score-card"><strong>Default Speed Class</strong><span>${escapeHtml(selectedSpeedClass.label)}</span></div>
-            <div class="score-card"><strong>Audio</strong><span>${this.audio.musicMuted ? "Music muted" : "Music on"} · ${this.audio.sfxMuted ? "SFX muted" : "SFX on"}</span></div>
+            <div class="score-card"><strong>Audio</strong><span>${this.audio.masterMuted ? "Muted" : "On"} · Music ${this.audio.musicMuted ? "muted" : "on"} · SFX ${this.audio.sfxMuted ? "muted" : "on"}</span></div>
           </div>
           <div class="speed-class-panel">
             <div class="speed-class-header">
@@ -21947,6 +22242,10 @@ class NeonRoadRally {
           </div>
           <div class="audio-grid">
             <div class="field">
+              <label for="masterVolume">Master volume</label>
+              <input id="masterVolume" type="range" min="0" max="1" step="0.05" value="${this.audio.masterVolume}">
+            </div>
+            <div class="field">
               <label for="musicVolume">Music volume</label>
               <input id="musicVolume" type="range" min="0" max="1" step="0.05" value="${this.audio.musicVolume}">
             </div>
@@ -21955,8 +22254,10 @@ class NeonRoadRally {
               <input id="sfxVolume" type="range" min="0" max="1" step="0.05" value="${this.audio.sfxVolume}">
             </div>
           </div>
+          ${this.renderAudioTestControls()}
           ${this.renderResetCleanupReminder()}
           <div class="row">
+            <button class="small-button" data-action="toggleMasterAudio">Mute All: ${this.audio.masterMuted ? "On" : "Off"}</button>
             <button class="small-button" data-action="toggleMusic">Music: ${this.audio.musicMuted ? "Muted" : "On"}</button>
             <button class="small-button" data-action="toggleSfx">SFX: ${this.audio.sfxMuted ? "Muted" : "On"}</button>
             <button class="small-button" data-action="fullscreen">Fullscreen</button>
@@ -25961,8 +26262,8 @@ class NeonRoadRally {
     this.layer.querySelectorAll("button[data-action]").forEach((button) => {
       button.addEventListener("click", () => {
         this.audio.activate();
-        this.audio.playSfx("menu");
         const action = button.dataset.action;
+        if (action !== "testSfx") this.audio.playSfx("menu");
         if (oneShotActions.has(action)) {
           if (button.dataset.busy === "true") return;
           button.dataset.busy = "true";
@@ -26013,6 +26314,8 @@ class NeonRoadRally {
         else if (action === "partyChangeSetup") this.handlePartyChangeSetup();
         else if (action === "toggleMusic") this.toggleMusic(true);
         else if (action === "toggleSfx") this.toggleSfx(true);
+        else if (action === "toggleMasterAudio") this.toggleMasterAudio(true);
+        else if (action === "testSfx") this.handleTestSfx(button.dataset.sfx);
         else if (action === "runSimulation") this.runSpawnSafetySimulation();
         else if (action === "runFuelSimulation") this.runSpawnSafetySimulation({ raceTypeId: FUEL_RUN_RACE_TYPE_ID });
         else if (action === "runTargetedDirectorChecks") this.runTargetedDirectorChecks();
@@ -26041,8 +26344,14 @@ class NeonRoadRally {
   }
 
   bindTitleAudioControls() {
+    const masterVolume = document.getElementById("masterVolume");
     const musicVolume = document.getElementById("musicVolume");
     const sfxVolume = document.getElementById("sfxVolume");
+    if (masterVolume) {
+      masterVolume.addEventListener("input", () => {
+        this.audio.setMasterVolume(masterVolume.value);
+      });
+    }
     if (musicVolume) {
       musicVolume.addEventListener("input", () => {
         this.audio.setMusicVolume(musicVolume.value);
@@ -26052,6 +26361,28 @@ class NeonRoadRally {
       sfxVolume.addEventListener("input", () => {
         this.audio.setSfxVolume(sfxVolume.value);
       });
+    }
+  }
+
+  handleTestSfx(key) {
+    const sfxKey = sanitizeName(key, "", 40);
+    const statusLine = this.layer.querySelector(".status-line");
+    if (!this.audio.sfx[sfxKey]) {
+      if (statusLine) statusLine.textContent = "Sound not found.";
+      return;
+    }
+    const played = this.audio.playSfx(sfxKey, {
+      cooldownMs: 0,
+      maxInstances: 4,
+      volume: this.audio.sfxVolume * 0.9
+    });
+    if (!statusLine) return;
+    if (played) {
+      statusLine.textContent = `${getAudioTestSfxLabel(sfxKey)} preview.`;
+    } else if (this.audio.masterMuted || this.audio.sfxMuted) {
+      statusLine.textContent = "Unmute audio to preview sounds.";
+    } else {
+      statusLine.textContent = "Sound preview is unavailable in this browser.";
     }
   }
 
@@ -26198,6 +26529,10 @@ class NeonRoadRally {
     const confirmed = window.confirm("Reset Neon Road Rally local data in this browser? This deletes only the neonRoadRally.v1 key: local players, badges, car settings, scores, challenge progress, and audio/default race settings.");
     if (!confirmed) return;
     this.profiles.resetAll();
+    this.audio.setMasterMuted(false);
+    this.audio.setMasterVolume(this.profiles.data.audio.masterVolume);
+    this.audio.setMusicVolume(this.profiles.data.audio.musicVolume);
+    this.audio.setSfxVolume(this.profiles.data.audio.sfxVolume);
     this.audio.setMusicMuted(false);
     this.audio.setSfxMuted(false);
     this.showTitle();
@@ -26241,9 +26576,19 @@ class NeonRoadRally {
     this.showPlaytestReportScreen("Playtest reports cleared.");
   }
 
+  toggleMasterAudio(refreshTitle = false) {
+    this.audio.setMasterMuted(!this.audio.masterMuted);
+    if (!this.audio.masterMuted && !this.audio.musicMuted) {
+      if (this.screen === "game" && !this.run.paused && this.run.raceActive) this.startRaceMusic(false);
+      else if (this.screen !== "game") this.audio.playMusic("title", false);
+    }
+    if (this.screen === "settings") this.showSettingsScreen();
+    if ((refreshTitle || this.screen === "title") && this.screen === "title") this.showTitle();
+  }
+
   toggleMusic(refreshTitle = false) {
     this.audio.setMusicMuted(!this.audio.musicMuted);
-    if (!this.audio.musicMuted) {
+    if (!this.audio.masterMuted && !this.audio.musicMuted) {
       if (this.screen === "game" && !this.run.paused && this.run.raceActive) this.startRaceMusic(false);
       else if (this.screen !== "game") this.audio.playMusic("title", false);
     }

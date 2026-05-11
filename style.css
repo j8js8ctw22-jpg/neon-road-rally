@@ -2877,7 +2877,46 @@ button:disabled {
 .audio-grid {
   display: grid;
   gap: 10px;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.audio-test-panel {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  background: rgba(2, 6, 18, 0.34);
+}
+
+.audio-test-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: baseline;
+}
+
+.audio-test-header strong {
+  color: #f6fbff;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.audio-test-header span {
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.audio-test-grid {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.audio-test-button {
+  min-height: 36px;
+  padding-inline: 8px;
+  white-space: normal;
 }
 
 .car-preview {
@@ -2951,6 +2990,7 @@ button:disabled {
   .score-grid,
   .track-select-grid,
   .audio-grid,
+  .audio-test-grid,
   .speed-class-grid,
   .setup-step-strip,
   .mode-ladder {
