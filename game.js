@@ -2256,8 +2256,8 @@ const TRACKS = [
       modeCadenceMultipliers: {
         sunday: { cadenceScale: 1.18, spacingScale: 1.12, recoveryScale: 1.22 },
         rookie: { cadenceScale: 1.14, spacingScale: 1.1, recoveryScale: 1.2 },
-        arcade: { cadenceScale: 1.1, spacingScale: 1.08, recoveryScale: 1.16 },
-        pro: { cadenceScale: 1.06, spacingScale: 1.06, recoveryScale: 1.12 },
+        arcade: { cadenceScale: 0.96, spacingScale: 0.96, recoveryScale: 1.16 },
+        pro: { cadenceScale: 1.02, spacingScale: 1.02, recoveryScale: 1.12 },
         turbo: { cadenceScale: 1.02, spacingScale: 1.05, recoveryScale: 1.08 },
         overdrive: { cadenceScale: 1.04, spacingScale: 1.1, recoveryScale: 1.14 },
         redline: { cadenceScale: 1.08, spacingScale: 1.16, recoveryScale: 1.22 }
@@ -7637,13 +7637,17 @@ class RoadDirector {
     this.track = track;
     this.currentWave = null;
     this.lastWaveType = "";
+    this.lastWaveFamily = "";
     this.sameWaveStreak = 0;
+    this.sameWaveFamilyStreak = 0;
     this.recentWaves = [];
     this.centerLaneHoldSeconds = 0;
     this.centerSafeSeconds = 0;
     this.decisionSafeSeconds = 0;
     this.timeSinceWaveSeconds = 0;
     this.timeSinceMeaningfulWaveSeconds = 0;
+    this.timeSinceRewardWaveSeconds = 0;
+    this.timeSinceRecoveryWaveSeconds = 0;
     this.activeEmptySeconds = 0;
     this.deadScreenSeconds = 0;
     this.lastActivitySnapshot = null;
@@ -7668,8 +7672,11 @@ class RoadDirector {
       nonOpeningCenterBlockedWaves: 0,
       blockedLaneSum: 0,
       repeatedPatternCount: 0,
+      repeatedWaveFamilyCount: 0,
+      maxWaveFamilyStreak: 0,
       hardWaveCount: 0,
       recoveryWaveCount: 0,
+      rewardWaveCount: 0,
       fairnessFailures: 0,
       pressureBudgetFailures: 0,
       pressureCounts: { 0: 0, 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 },
@@ -7716,9 +7723,13 @@ class RoadDirector {
       centerChallengeGapSeconds: [],
       waveGapSeconds: [],
       meaningfulWaveGapSeconds: [],
+      rewardGapSeconds: [],
+      recoveryGapSeconds: [],
       longestCenterSafeSeconds: 0,
       longestWaveGapSeconds: 0,
       longestMeaningfulWaveGapSeconds: 0,
+      longestRewardGapSeconds: 0,
+      longestRecoveryGapSeconds: 0,
       longestActiveEmptySeconds: 0,
       meaningfulWaveCount: 0,
       rampUsefulCount: 0,
@@ -7738,7 +7749,10 @@ class RoadDirector {
       blockedLaneSum: 0,
       hardWaveCount: 0,
       recoveryWaveCount: 0,
+      rewardWaveCount: 0,
       meaningfulWaveCount: 0,
+      repeatedWaveFamilyCount: 0,
+      maxWaveFamilyStreak: 0,
       fairnessFailures: 0,
       pressureBudgetFailures: 0,
       pressureSum: 0,
@@ -7747,6 +7761,12 @@ class RoadDirector {
       waveGapSum: 0,
       meaningfulWaveGapCount: 0,
       meaningfulWaveGapSum: 0,
+      rewardGapCount: 0,
+      rewardGapSum: 0,
+      recoveryGapCount: 0,
+      recoveryGapSum: 0,
+      longestRewardGapSeconds: 0,
+      longestRecoveryGapSeconds: 0,
       longestActiveEmptySeconds: 0,
       gasCanCount: 0,
       fuelPatternCounts: {},
@@ -7809,6 +7829,8 @@ class RoadDirector {
     this.decisionSafeSeconds += dt;
     this.timeSinceWaveSeconds += dt;
     this.timeSinceMeaningfulWaveSeconds += dt;
+    this.timeSinceRewardWaveSeconds += dt;
+    this.timeSinceRecoveryWaveSeconds += dt;
     const activitySnapshot = this.manager.getRoadActivitySnapshot
       ? this.manager.getRoadActivitySnapshot(run, this.manager.obstacles, run.distance || 0)
       : null;
@@ -8459,6 +8481,26 @@ class RoadDirector {
       return "pursuitRecoveryGap";
     }
     const pursuit = context.pursuit || {};
+    const familyStreakLength = this.lastWaveFamily ? this.sameWaveFamilyStreak + 1 : 0;
+    if (this.lastWaveFamily === "pursuit-pressure" && familyStreakLength >= 4) {
+      return weightedChoice([
+        { value: "leftRightSweep", weight: context.progress > 0.34 ? 1.18 : 0.28 },
+        { value: "offsetPair", weight: context.progress > 0.16 ? 0.95 : 0.42 },
+        { value: "rampEscape", weight: context.progress > 0.2 ? 0.88 : 0.18 },
+        { value: "boostTemptation", weight: context.progress > 0.18 ? 0.78 : 0.24 },
+        { value: "pursuitRecoveryGap", weight: 0.42 },
+        { value: "recoveryGap", weight: 0.18 }
+      ].map((item) => ({
+        ...item,
+        weight: this.isWaveAllowed(item.value, context)
+          ? item.weight
+            * this.getSectionWaveWeight(item.value, context)
+            * this.getTrackWaveWeight(item.value, context, "pursuitWaveWeightMultipliers")
+            * this.getDirectorIntentWeight(item.value, context)
+            * this.getVarietyWeight(item.value, context)
+          : 0
+      })), () => this.random()) || "leftRightSweep";
+    }
     if (pursuit.escapeZone || pursuit.heatHigh || context.section?.id === "breather") {
       return weightedChoice([
         { value: "pursuitRecoveryGap", weight: 2.6 },
@@ -8535,7 +8577,30 @@ class RoadDirector {
     const overdue = pastOpeningGrace && timeSinceGas >= maxGap;
     const due = pastOpeningGrace && timeSinceGas >= targetGap;
     const canSpawnFuel = pastOpeningGrace && timeSinceGas >= minGap && context.progress < 0.97;
+    const familyStreakLength = this.lastWaveFamily ? this.sameWaveFamilyStreak + 1 : 0;
+    const needsFuelFamilyBreak = (this.lastWaveFamily === "fuel-route" || this.lastWaveFamily === "fuel-pressure")
+      && familyStreakLength >= 4;
+    const breatherRecovery = context.section?.id === "breather";
+    const canUseRecoveryGap = context.progress > 0.12
+      && context.progress < 0.98
+      && (!low || timeSinceGas >= minGap)
+      && (!overdue || canSpawnFuel);
+    const recoveryGapWeight = canUseRecoveryGap
+      ? (breatherRecovery ? 1.15 : (needsFuelFamilyBreak ? 0.72 : 0.16))
+      : 0;
+    const scoreFuelChoice = (item) => ({
+      ...item,
+      weight: this.isWaveAllowed(item.value, context)
+        ? item.weight
+          * this.getTrackWaveWeight(item.value, context, "fuelWaveWeightMultipliers")
+          * this.getDirectorIntentWeight(item.value, context)
+          * this.getVarietyWeight(item.value, context)
+        : 0
+    });
 
+    if (needsFuelFamilyBreak && recoveryGapWeight > 0 && this.isWaveAllowed("recoveryGap", context)) {
+      return "recoveryGap";
+    }
     if (critical && canSpawnFuel && (overdue || this.random() < 0.82)) {
       return "fuelLowRescue";
     }
@@ -8545,14 +8610,9 @@ class RoadDirector {
         { value: "fuelSideTemptation", weight: 1.65 },
         { value: "fuelAfterPressure", weight: 1.25 },
         { value: "fuelSplit", weight: context.progress > 0.26 ? 0.85 : 0.18 },
-        { value: "fuelLowRescue", weight: critical ? 2.2 : 0.35 }
-      ].map((item) => ({
-        ...item,
-        weight: item.weight
-          * this.getTrackWaveWeight(item.value, context, "fuelWaveWeightMultipliers")
-          * this.getDirectorIntentWeight(item.value, context)
-          * this.getVarietyWeight(item.value, context)
-      })), () => this.random()) || "fuelTrafficGate";
+        { value: "fuelLowRescue", weight: critical ? 2.2 : 0.35 },
+        { value: "recoveryGap", weight: recoveryGapWeight * 0.62 }
+      ].map(scoreFuelChoice), () => this.random()) || "fuelTrafficGate";
     }
     if ((low || overdue) && canSpawnFuel) {
       return weightedChoice([
@@ -8561,27 +8621,16 @@ class RoadDirector {
         { value: "fuelSideTemptation", weight: low ? 1.25 : 1.55 },
         { value: "fuelSplit", weight: context.progress > 0.28 ? 0.55 : 0.12 },
         { value: "fuelLowRescue", weight: critical ? 1.6 : 0.28 }
-      ].map((item) => ({
-        ...item,
-        weight: item.weight
-          * this.getTrackWaveWeight(item.value, context, "fuelWaveWeightMultipliers")
-          * this.getDirectorIntentWeight(item.value, context)
-          * this.getVarietyWeight(item.value, context)
-      })), () => this.random()) || "fuelTrafficGate";
+      ].map(scoreFuelChoice), () => this.random()) || "fuelTrafficGate";
     }
     if (due && canSpawnFuel && this.random() < 0.72) {
       return weightedChoice([
         { value: "fuelSideTemptation", weight: 1.7 },
         { value: "fuelTrafficGate", weight: 1.55 },
         { value: "fuelAfterPressure", weight: 1.1 },
-        { value: "fuelSplit", weight: context.progress > 0.24 ? 0.48 : 0.08 }
-      ].map((item) => ({
-        ...item,
-        weight: item.weight
-          * this.getTrackWaveWeight(item.value, context, "fuelWaveWeightMultipliers")
-          * this.getDirectorIntentWeight(item.value, context)
-          * this.getVarietyWeight(item.value, context)
-      })), () => this.random()) || "fuelSideTemptation";
+        { value: "fuelSplit", weight: context.progress > 0.24 ? 0.48 : 0.08 },
+        { value: "recoveryGap", weight: recoveryGapWeight * 0.48 }
+      ].map(scoreFuelChoice), () => this.random()) || "fuelSideTemptation";
     }
 
     const supportWeight = context.progress > 0.18 && context.progress < 0.88 ? 1.7 : 0.72;
@@ -8590,14 +8639,9 @@ class RoadDirector {
       { value: "fuelTrafficGate", weight: canSpawnFuel ? (context.centerNeedsChallenge || context.needsMovementChallenge ? 1.8 : 1.05) : 0 },
       { value: "fuelSideTemptation", weight: canSpawnFuel ? 0.55 : 0 },
       { value: "fuelSupport", weight: supportWeight },
-      { value: "fuelAfterPressure", weight: canSpawnFuel ? 0.36 : 0 }
-    ].map((item) => ({
-      ...item,
-      weight: item.weight
-        * this.getTrackWaveWeight(item.value, context, "fuelWaveWeightMultipliers")
-        * this.getDirectorIntentWeight(item.value, context)
-        * this.getVarietyWeight(item.value, context)
-    })), () => this.random()) || "fuelTrafficPressure";
+      { value: "fuelAfterPressure", weight: canSpawnFuel ? 0.36 : 0 },
+      { value: "recoveryGap", weight: recoveryGapWeight }
+    ].map(scoreFuelChoice), () => this.random()) || "fuelTrafficPressure";
   }
 
   isWaveAllowed(type, context) {
@@ -8942,6 +8986,16 @@ class RoadDirector {
     } else {
       this.sameWaveStreak = 0;
     }
+    if (this.lastWaveFamily === family) {
+      this.sameWaveFamilyStreak += 1;
+      stats.repeatedWaveFamilyCount += 1;
+      sectionStats.repeatedWaveFamilyCount = (sectionStats.repeatedWaveFamilyCount || 0) + 1;
+    } else {
+      this.sameWaveFamilyStreak = 0;
+    }
+    const familyStreakLength = this.sameWaveFamilyStreak + 1;
+    stats.maxWaveFamilyStreak = Math.max(stats.maxWaveFamilyStreak || 0, familyStreakLength);
+    sectionStats.maxWaveFamilyStreak = Math.max(sectionStats.maxWaveFamilyStreak || 0, familyStreakLength);
 
     if (result.centerBlocked) {
       stats.centerBlockedWaves += 1;
@@ -8959,6 +9013,8 @@ class RoadDirector {
     const activePressureRunDistance = context.seedLocked ? this.manager.getSafetyRunDistance(context.distance) : undefined;
     const activePressureObstacles = context.seedLocked ? this.manager.getSpawnValidationObstacles(context.distance) : undefined;
     const rewardCount = result.boostLanes.length + result.rampLanes.length + result.gasCanLanes.length;
+    const rewardWave = rewardCount > 0 || metadata.family === "reward" || metadata.family === "solution" || Boolean(metadata.rewardType);
+    const recoveryWave = result.type === "recoveryGap" || result.type === "pursuitRecoveryGap";
     const solutionWave = metadata.family === "solution" && (result.rampSolutions.length || result.rampLanes.length);
     const fuelRouteWave = context.fuelRun && metadata.rewardType === "gas" && result.gasCanLanes.length > 0;
     const rewardTemptationWave = metadata.family === "reward" && rewardCount > 0;
@@ -8980,6 +9036,24 @@ class RoadDirector {
     } else {
       stats.supportWaveCount += 1;
       sectionStats.supportWaveCount = (sectionStats.supportWaveCount || 0) + 1;
+    }
+    if (rewardWave) {
+      stats.rewardWaveCount += 1;
+      stats.rewardGapSeconds.push(this.timeSinceRewardWaveSeconds);
+      stats.longestRewardGapSeconds = Math.max(stats.longestRewardGapSeconds || 0, this.timeSinceRewardWaveSeconds);
+      sectionStats.rewardWaveCount = (sectionStats.rewardWaveCount || 0) + 1;
+      sectionStats.rewardGapCount = (sectionStats.rewardGapCount || 0) + 1;
+      sectionStats.rewardGapSum = (sectionStats.rewardGapSum || 0) + this.timeSinceRewardWaveSeconds;
+      sectionStats.longestRewardGapSeconds = Math.max(sectionStats.longestRewardGapSeconds || 0, this.timeSinceRewardWaveSeconds);
+      this.timeSinceRewardWaveSeconds = 0;
+    }
+    if (recoveryWave) {
+      stats.recoveryGapSeconds.push(this.timeSinceRecoveryWaveSeconds);
+      stats.longestRecoveryGapSeconds = Math.max(stats.longestRecoveryGapSeconds || 0, this.timeSinceRecoveryWaveSeconds);
+      sectionStats.recoveryGapCount = (sectionStats.recoveryGapCount || 0) + 1;
+      sectionStats.recoveryGapSum = (sectionStats.recoveryGapSum || 0) + this.timeSinceRecoveryWaveSeconds;
+      sectionStats.longestRecoveryGapSeconds = Math.max(sectionStats.longestRecoveryGapSeconds || 0, this.timeSinceRecoveryWaveSeconds);
+      this.timeSinceRecoveryWaveSeconds = 0;
     }
     const inFirstWindow = (context.run?.elapsed || 0) <= LAUNCH_PACING_CONFIG.firstWindowSeconds;
     if (inFirstWindow) {
@@ -9104,6 +9178,7 @@ class RoadDirector {
     }
     this.lastFairnessPassed = result.fairnessPassed;
     this.lastWaveType = result.type;
+    this.lastWaveFamily = family;
     this.recentWaves.push(this.currentWave);
     if (this.recentWaves.length > 10) this.recentWaves.shift();
 
@@ -9262,8 +9337,11 @@ class RoadDirector {
       blockedLaneSum: section.blockedLaneSum,
       hardWaveCount: section.hardWaveCount,
       recoveryWaveCount: section.recoveryWaveCount,
+      rewardWaveCount: section.rewardWaveCount || 0,
       meaningfulWaveCount: section.meaningfulWaveCount,
       supportWaveCount: section.supportWaveCount || 0,
+      repeatedWaveFamilyCount: section.repeatedWaveFamilyCount || 0,
+      maxWaveFamilyStreak: section.maxWaveFamilyStreak || 0,
       fairnessFailures: section.fairnessFailures,
       pressureBudgetFailures: section.pressureBudgetFailures,
       pressureSum: section.pressureSum,
@@ -9272,6 +9350,12 @@ class RoadDirector {
       waveGapSum: section.waveGapSum,
       meaningfulWaveGapCount: section.meaningfulWaveGapCount,
       meaningfulWaveGapSum: section.meaningfulWaveGapSum,
+      rewardGapCount: section.rewardGapCount || 0,
+      rewardGapSum: section.rewardGapSum || 0,
+      recoveryGapCount: section.recoveryGapCount || 0,
+      recoveryGapSum: section.recoveryGapSum || 0,
+      longestRewardGapSeconds: section.longestRewardGapSeconds || 0,
+      longestRecoveryGapSeconds: section.longestRecoveryGapSeconds || 0,
       longestActiveEmptySeconds: section.longestActiveEmptySeconds,
       gasCanCount: section.gasCanCount || 0,
       rampSolutionCount: section.rampSolutionCount || 0,
@@ -9287,10 +9371,13 @@ class RoadDirector {
       centerBlockedPercent: section.totalWaves ? section.centerBlockedWaves / section.totalWaves : 0,
       hardWavePercent: section.totalWaves ? section.hardWaveCount / section.totalWaves : 0,
       recoveryWavePercent: section.totalWaves ? section.recoveryWaveCount / section.totalWaves : 0,
+      rewardWavePercent: section.totalWaves ? (section.rewardWaveCount || 0) / section.totalWaves : 0,
       meaningfulWavePercent: section.totalWaves ? section.meaningfulWaveCount / section.totalWaves : 0,
       supportWavePercent: section.totalWaves ? (section.supportWaveCount || 0) / section.totalWaves : 0,
       averageWaveGapSeconds: section.waveGapCount ? section.waveGapSum / section.waveGapCount : null,
-      averageMeaningfulWaveGapSeconds: section.meaningfulWaveGapCount ? section.meaningfulWaveGapSum / section.meaningfulWaveGapCount : null
+      averageMeaningfulWaveGapSeconds: section.meaningfulWaveGapCount ? section.meaningfulWaveGapSum / section.meaningfulWaveGapCount : null,
+      averageRewardGapSeconds: section.rewardGapCount ? section.rewardGapSum / section.rewardGapCount : null,
+      averageRecoveryGapSeconds: section.recoveryGapCount ? section.recoveryGapSum / section.recoveryGapCount : null
     }]));
   }
 
@@ -9308,8 +9395,11 @@ class RoadDirector {
       centerBlockedWaves: stats.centerBlockedWaves,
       nonOpeningCenterBlockedWaves: stats.nonOpeningCenterBlockedWaves,
       repeatedPatternCount: stats.repeatedPatternCount,
+      repeatedWaveFamilyCount: stats.repeatedWaveFamilyCount || 0,
+      maxWaveFamilyStreak: stats.maxWaveFamilyStreak || 0,
       hardWaveCount: stats.hardWaveCount,
       recoveryWaveCount: stats.recoveryWaveCount,
+      rewardWaveCount: stats.rewardWaveCount || 0,
       meaningfulWaveCount: stats.meaningfulWaveCount,
       supportWaveCount: stats.supportWaveCount,
       wavesFirst10Seconds: stats.wavesFirst10Seconds,
@@ -9350,10 +9440,18 @@ class RoadDirector {
       waveGapSum: gapSum(stats.waveGapSeconds),
       meaningfulWaveGapCount: stats.meaningfulWaveGapSeconds.length,
       meaningfulWaveGapSum: gapSum(stats.meaningfulWaveGapSeconds),
+      rewardGapCount: stats.rewardGapSeconds.length,
+      rewardGapSum: gapSum(stats.rewardGapSeconds),
+      recoveryGapCount: stats.recoveryGapSeconds.length,
+      recoveryGapSum: gapSum(stats.recoveryGapSeconds),
       averageWaveGapSeconds: averageGap(stats.waveGapSeconds),
       averageMeaningfulWaveGapSeconds: averageGap(stats.meaningfulWaveGapSeconds),
+      averageRewardGapSeconds: averageGap(stats.rewardGapSeconds),
+      averageRecoveryGapSeconds: averageGap(stats.recoveryGapSeconds),
       longestWaveGapSeconds: Math.max(stats.longestWaveGapSeconds, this.timeSinceWaveSeconds),
       longestMeaningfulWaveGapSeconds: Math.max(stats.longestMeaningfulWaveGapSeconds, this.timeSinceMeaningfulWaveSeconds),
+      longestRewardGapSeconds: Math.max(stats.longestRewardGapSeconds || 0, this.timeSinceRewardWaveSeconds),
+      longestRecoveryGapSeconds: Math.max(stats.longestRecoveryGapSeconds || 0, this.timeSinceRecoveryWaveSeconds),
       longestActiveEmptySeconds: Math.max(stats.longestActiveEmptySeconds, this.activeEmptySeconds),
       pressureCounts: { ...stats.pressureCounts },
       waveCounts: { ...stats.waveCounts },
@@ -10367,7 +10465,13 @@ class RoadDirector {
   }
 
   waveRecoveryGap(distance, context, result) {
-    if (context.fuelRun && context.fuel?.timeSinceLastGasCan >= (context.fuel?.targetGasGapSeconds || 16)) {
+    if (context.fuelRun) {
+      const fuel = context.fuel || {};
+      const fuelUrgent = Boolean(fuel.low || fuel.critical);
+      const fuelRecoveryGap = fuelUrgent
+        ? (fuel.minGasGapSeconds || 8)
+        : (fuel.targetGasGapSeconds || 16);
+      if (fuel.timeSinceLastGasCan < fuelRecoveryGap) return;
       const lane = this.pickFuelCanLane(context, [], { preferSide: true, allowFreeCenter: false });
       this.trySpawnFuelCan([lane], distance + clamp(context.cruiseSpeed * 0.24, 240, 390), context, result, "recoveryFuel");
       return;
@@ -19896,8 +20000,11 @@ class NeonRoadRally {
         nonOpeningCenterBlockedWaves: 0,
         blockedLaneSum: 0,
         repeatedPatternCount: 0,
+        repeatedWaveFamilyCount: 0,
+        maxWaveFamilyStreak: 0,
         hardWaveCount: 0,
         recoveryWaveCount: 0,
+        rewardWaveCount: 0,
         meaningfulWaveCount: 0,
         rampUsefulCount: 0,
         rampSolutionCount: 0,
@@ -19912,12 +20019,18 @@ class NeonRoadRally {
         waveGapSum: 0,
         meaningfulWaveGapCount: 0,
         meaningfulWaveGapSum: 0,
+        rewardGapCount: 0,
+        rewardGapSum: 0,
+        recoveryGapCount: 0,
+        recoveryGapSum: 0,
         gasCanGapCount: 0,
         gasCanGapSum: 0,
         longestGasCanGapSeconds: 0,
         longestCenterSafeSeconds: 0,
         longestWaveGapSeconds: 0,
         longestMeaningfulWaveGapSeconds: 0,
+        longestRewardGapSeconds: 0,
+        longestRecoveryGapSeconds: 0,
         longestActiveEmptySeconds: 0,
         pressureBudgetSum: 0,
         pressureSum: 0,
@@ -19975,7 +20088,10 @@ class NeonRoadRally {
         blockedLaneSum: 0,
         hardWaveCount: 0,
         recoveryWaveCount: 0,
+        rewardWaveCount: 0,
         meaningfulWaveCount: 0,
+        repeatedWaveFamilyCount: 0,
+        maxWaveFamilyStreak: 0,
         fairnessFailures: 0,
         pressureBudgetFailures: 0,
         pressureSum: 0,
@@ -19984,6 +20100,12 @@ class NeonRoadRally {
         waveGapSum: 0,
         meaningfulWaveGapCount: 0,
         meaningfulWaveGapSum: 0,
+        rewardGapCount: 0,
+        rewardGapSum: 0,
+        recoveryGapCount: 0,
+        recoveryGapSum: 0,
+        longestRewardGapSeconds: 0,
+        longestRecoveryGapSeconds: 0,
         longestActiveEmptySeconds: 0,
         gasCanCount: 0,
         rampSolutionCount: 0,
@@ -20008,7 +20130,10 @@ class NeonRoadRally {
       target.blockedLaneSum += source.blockedLaneSum || 0;
       target.hardWaveCount += source.hardWaveCount || 0;
       target.recoveryWaveCount += source.recoveryWaveCount || 0;
+      target.rewardWaveCount += source.rewardWaveCount || 0;
       target.meaningfulWaveCount += source.meaningfulWaveCount || 0;
+      target.repeatedWaveFamilyCount += source.repeatedWaveFamilyCount || 0;
+      target.maxWaveFamilyStreak = Math.max(target.maxWaveFamilyStreak || 0, source.maxWaveFamilyStreak || 0);
       target.fairnessFailures += source.fairnessFailures || 0;
       target.pressureBudgetFailures += source.pressureBudgetFailures || 0;
       target.pressureSum += source.pressureSum || 0;
@@ -20017,6 +20142,12 @@ class NeonRoadRally {
       target.waveGapSum += source.waveGapSum || 0;
       target.meaningfulWaveGapCount += source.meaningfulWaveGapCount || 0;
       target.meaningfulWaveGapSum += source.meaningfulWaveGapSum || 0;
+      target.rewardGapCount += source.rewardGapCount || 0;
+      target.rewardGapSum += source.rewardGapSum || 0;
+      target.recoveryGapCount += source.recoveryGapCount || 0;
+      target.recoveryGapSum += source.recoveryGapSum || 0;
+      target.longestRewardGapSeconds = Math.max(target.longestRewardGapSeconds || 0, source.longestRewardGapSeconds || 0);
+      target.longestRecoveryGapSeconds = Math.max(target.longestRecoveryGapSeconds || 0, source.longestRecoveryGapSeconds || 0);
       target.longestActiveEmptySeconds = Math.max(target.longestActiveEmptySeconds, source.longestActiveEmptySeconds || 0);
       target.gasCanCount += source.gasCanCount || 0;
       target.rampSolutionCount += source.rampSolutionCount || 0;
@@ -20052,15 +20183,22 @@ class NeonRoadRally {
           centerBlockedPercent: stats.totalWaves ? stats.centerBlockedWaves / stats.totalWaves : 0,
           hardWavePercent: stats.totalWaves ? stats.hardWaveCount / stats.totalWaves : 0,
           recoveryWavePercent: stats.totalWaves ? stats.recoveryWaveCount / stats.totalWaves : 0,
+          rewardWavePercent: stats.totalWaves ? (stats.rewardWaveCount || 0) / stats.totalWaves : 0,
           meaningfulWavePercent: stats.totalWaves ? stats.meaningfulWaveCount / stats.totalWaves : 0,
+          repeatedWaveFamilyPercent: stats.totalWaves ? (stats.repeatedWaveFamilyCount || 0) / stats.totalWaves : 0,
+          maxWaveFamilyStreak: stats.maxWaveFamilyStreak || 0,
           gasCanCount: stats.gasCanCount || 0,
           rampSolutionCount: stats.rampSolutionCount || 0,
           minorHazardCount: stats.minorHazardCount || 0,
           averageMinorHazardsPerWave: stats.totalWaves ? (stats.minorHazardCount || 0) / stats.totalWaves : 0,
           fuelPatternCounts: { ...(stats.fuelPatternCounts || {}) },
           longestActiveEmptySeconds: stats.longestActiveEmptySeconds,
+          longestRewardGapSeconds: stats.longestRewardGapSeconds || 0,
+          longestRecoveryGapSeconds: stats.longestRecoveryGapSeconds || 0,
           averageWaveGapSeconds: stats.waveGapCount ? stats.waveGapSum / stats.waveGapCount : null,
           averageMeaningfulWaveGapSeconds: stats.meaningfulWaveGapCount ? stats.meaningfulWaveGapSum / stats.meaningfulWaveGapCount : null,
+          averageRewardGapSeconds: stats.rewardGapCount ? stats.rewardGapSum / stats.rewardGapCount : null,
+          averageRecoveryGapSeconds: stats.recoveryGapCount ? stats.recoveryGapSum / stats.recoveryGapCount : null,
           pressureCounts: { ...stats.pressureCounts },
           waveCounts: { ...stats.waveCounts },
           waveFamilyCounts: { ...(stats.waveFamilyCounts || {}) },
@@ -20113,8 +20251,11 @@ class NeonRoadRally {
       target.nonOpeningCenterBlockedWaves += stats.nonOpeningCenterBlockedWaves;
       target.blockedLaneSum += stats.blockedLaneSum;
       target.repeatedPatternCount += stats.repeatedPatternCount;
+      target.repeatedWaveFamilyCount += stats.repeatedWaveFamilyCount || 0;
+      target.maxWaveFamilyStreak = Math.max(target.maxWaveFamilyStreak || 0, stats.maxWaveFamilyStreak || 0);
       target.hardWaveCount += stats.hardWaveCount;
       target.recoveryWaveCount += stats.recoveryWaveCount;
+      target.rewardWaveCount += stats.rewardWaveCount || 0;
       target.meaningfulWaveCount += stats.meaningfulWaveCount;
       target.rampUsefulCount += stats.rampUsefulCount;
       target.rampSolutionCount += stats.rampSolutionCount || 0;
@@ -20129,12 +20270,18 @@ class NeonRoadRally {
       target.waveGapSum += stats.waveGapSum;
       target.meaningfulWaveGapCount += stats.meaningfulWaveGapCount;
       target.meaningfulWaveGapSum += stats.meaningfulWaveGapSum;
+      target.rewardGapCount += stats.rewardGapCount || 0;
+      target.rewardGapSum += stats.rewardGapSum || 0;
+      target.recoveryGapCount += stats.recoveryGapCount || 0;
+      target.recoveryGapSum += stats.recoveryGapSum || 0;
       target.gasCanGapCount += stats.gasCanGapCount || 0;
       target.gasCanGapSum += stats.gasCanGapSum || 0;
       target.longestGasCanGapSeconds = Math.max(target.longestGasCanGapSeconds, stats.longestGasCanGapSeconds || 0);
       target.longestCenterSafeSeconds = Math.max(target.longestCenterSafeSeconds, stats.longestCenterSafeSeconds);
       target.longestWaveGapSeconds = Math.max(target.longestWaveGapSeconds, stats.longestWaveGapSeconds);
       target.longestMeaningfulWaveGapSeconds = Math.max(target.longestMeaningfulWaveGapSeconds, stats.longestMeaningfulWaveGapSeconds);
+      target.longestRewardGapSeconds = Math.max(target.longestRewardGapSeconds || 0, stats.longestRewardGapSeconds || 0);
+      target.longestRecoveryGapSeconds = Math.max(target.longestRecoveryGapSeconds || 0, stats.longestRecoveryGapSeconds || 0);
       target.longestActiveEmptySeconds = Math.max(target.longestActiveEmptySeconds, stats.longestActiveEmptySeconds);
       target.pressureBudgetSum += stats.pressureBudgetSum;
       target.pressureSum += stats.pressureSum || 0;
@@ -20191,14 +20338,21 @@ class NeonRoadRally {
         averageCenterChallengeGapSeconds: aggregate.centerChallengeGapCount ? aggregate.centerChallengeGapSum / aggregate.centerChallengeGapCount : null,
         averageWaveGapSeconds: aggregate.waveGapCount ? aggregate.waveGapSum / aggregate.waveGapCount : null,
         averageMeaningfulWaveGapSeconds: aggregate.meaningfulWaveGapCount ? aggregate.meaningfulWaveGapSum / aggregate.meaningfulWaveGapCount : null,
+        averageRewardGapSeconds: aggregate.rewardGapCount ? aggregate.rewardGapSum / aggregate.rewardGapCount : null,
+        averageRecoveryGapSeconds: aggregate.recoveryGapCount ? aggregate.recoveryGapSum / aggregate.recoveryGapCount : null,
         averageGasCanGapSeconds: aggregate.gasCanGapCount ? aggregate.gasCanGapSum / aggregate.gasCanGapCount : null,
         longestGasCanGapSeconds: aggregate.longestGasCanGapSeconds,
         longestWaveGapSeconds: aggregate.longestWaveGapSeconds,
         longestMeaningfulWaveGapSeconds: aggregate.longestMeaningfulWaveGapSeconds,
+        longestRewardGapSeconds: aggregate.longestRewardGapSeconds || 0,
+        longestRecoveryGapSeconds: aggregate.longestRecoveryGapSeconds || 0,
         longestActiveEmptySeconds: aggregate.longestActiveEmptySeconds,
         repeatedPatternPercent: aggregate.totalWaves ? aggregate.repeatedPatternCount / aggregate.totalWaves : 0,
+        repeatedWaveFamilyPercent: aggregate.totalWaves ? (aggregate.repeatedWaveFamilyCount || 0) / aggregate.totalWaves : 0,
+        maxWaveFamilyStreak: aggregate.maxWaveFamilyStreak || 0,
         hardWavePercent: aggregate.totalWaves ? aggregate.hardWaveCount / aggregate.totalWaves : 0,
         recoveryWavePercent: aggregate.totalWaves ? aggregate.recoveryWaveCount / aggregate.totalWaves : 0,
+        rewardWavePercent: aggregate.totalWaves ? (aggregate.rewardWaveCount || 0) / aggregate.totalWaves : 0,
         meaningfulWavePercent: aggregate.totalWaves ? aggregate.meaningfulWaveCount / aggregate.totalWaves : 0,
         rampUsefulPercent: aggregate.rampLaneCounts.reduce((sum, count) => sum + count, 0)
           ? aggregate.rampUsefulCount / aggregate.rampLaneCounts.reduce((sum, count) => sum + count, 0)

@@ -331,6 +331,171 @@ async function main() {
       assert(Object.keys(summary.director.directorIntentCounts || {}).length >= 4, trackId + " should produce varied director intents");
     }
 
+    function roundMetric(value, digits = 2) {
+      return Number.isFinite(value) ? Number(value.toFixed(digits)) : value;
+    }
+
+    function earlyDeathRiskWindows(summary) {
+      return Object.values(summary.perSpeedClass || {}).reduce((sum, item) => {
+        const launch = item.sectionSafety?.launch || {};
+        return sum
+          + (launch.invalidWalls || 0)
+          + (launch.hardBlockerWalls || 0)
+          + (launch.flatHardBlockerFourRows || 0)
+          + (launch.flatHardBlockerFiveRows || 0)
+          + (launch.routeReadabilityFailures || 0)
+          + (launch.unsafeRampLandings || 0);
+      }, 0);
+    }
+
+    function finishPacingBySpeed(trackId, raceTypeId, speedClassIds) {
+      return Object.fromEntries(speedClassIds.map((speedClassId) => [
+        speedClassId,
+        roundMetric(simulateFinishTime(trackId, speedClassId, raceTypeId), 2)
+      ]));
+    }
+
+    function compactFeelSummary(summary, trackId) {
+      const director = summary.director || {};
+      return {
+        trackId,
+        raceTypeId: summary.raceTypeId,
+        sampledSeeds: summary.runs,
+        finishSeconds: finishPacingBySpeed(trackId, summary.raceTypeId, summary.speedClassIds),
+        deadScreenMax: roundMetric(summary.longestDeadScreenSeconds),
+        meaningfulGapMax: roundMetric(director.longestMeaningfulWaveGapSeconds),
+        decisionGapMax: roundMetric(summary.upcomingDecisionGapMax),
+        hardBlockerDensity: {
+          maxHardBlocked: summary.maxHardBlocked,
+          fourLaneSamplePercent: roundMetric(summary.hardBlockerFourLaneSamplePercent, 4),
+          hardWavePercent: roundMetric(director.hardWavePercent)
+        },
+        failures: {
+          invalidWalls: summary.invalidWalls,
+          hardBlockerWalls: summary.hardBlockerWalls,
+          routeReadabilityFailures: summary.routeReadabilityFailures,
+          overlaps: summary.sameLaneOverlaps + summary.boostObjectOverlaps + summary.rampObjectOverlaps + summary.gasCanOverlaps,
+          earlyDeathRiskWindows: earlyDeathRiskWindows(summary)
+        },
+        activeField: {
+          preventedUnsafeSpawns: summary.preventedUnsafeSpawns,
+          underActivityCorrections: summary.underActivityCorrections,
+          overActivityDelays: summary.overActivityDelays,
+          visibleSpawnViolations: summary.visibleSpawnViolations
+        },
+        placementFairness: {
+          boostCenterShare: roundMetric(director.boostLaneDistribution?.[TRACK_DIRECTOR.centerLane] || 0),
+          gasCenterShare: roundMetric(director.gasCanLaneDistribution?.[TRACK_DIRECTOR.centerLane] || 0),
+          rampUsefulTargetPercent: roundMetric(summary.rampUsefulTargetPercent),
+          averageGasCansSpawned: roundMetric(summary.averageGasCansSpawned),
+          longestGasCanGap: roundMetric(summary.averageMaxTimeBetweenGasCans)
+        },
+        variety: {
+          familyCounts: { ...(director.waveFamilyCounts || {}) },
+          familyCount: Object.keys(director.waveFamilyCounts || {}).length,
+          intentCount: Object.keys(director.directorIntentCounts || {}).length,
+          maxFamilyStreak: director.maxWaveFamilyStreak || 0,
+          repeatedTypePercent: roundMetric(director.repeatedPatternPercent),
+          repeatedFamilyPercent: roundMetric(director.repeatedWaveFamilyPercent)
+        },
+        spacing: {
+          averageRewardGap: roundMetric(director.averageRewardGapSeconds),
+          longestRewardGap: roundMetric(director.longestRewardGapSeconds),
+          averageRecoveryGap: roundMetric(director.averageRecoveryGapSeconds),
+          longestRecoveryGap: roundMetric(director.longestRecoveryGapSeconds)
+        },
+        sectionShape: Object.fromEntries(Object.entries(director.sectionStats || {}).map(([sectionId, section]) => [
+          sectionId,
+          {
+            waves: section.totalWaves || 0,
+            pressure: roundMetric(section.averagePressure),
+            meaningful: roundMetric(section.meaningfulWavePercent),
+            reward: roundMetric(section.rewardWavePercent),
+            recovery: roundMetric(section.recoveryWavePercent)
+          }
+        ])),
+        pursuitRhythm: {
+          roadblocks: summary.pursuitRoadblockCount || 0,
+          pressureWaves: summary.pursuitPressureWaveCount || 0,
+          recoveryWaves: summary.pursuitRecoveryWaveCount || 0,
+          averageHeatMax: roundMetric(summary.pursuitHeatMaxAverage)
+        },
+        perSpeed: Object.fromEntries(Object.entries(summary.perSpeedClass || {}).map(([speedClassId, item]) => [
+          speedClassId,
+          {
+            deadScreenMax: roundMetric(item.director?.longestDeadScreenSeconds),
+            meaningfulGapMax: roundMetric(item.director?.longestMeaningfulWaveGapSeconds),
+            decisionGapMax: roundMetric(item.director?.upcomingDecisionGapMax),
+            maxFamilyStreak: item.director?.maxWaveFamilyStreak || 0,
+            hardWavePercent: roundMetric(item.director?.hardWavePercent),
+            familyCount: Object.keys(item.director?.waveFamilyCounts || {}).length
+          }
+        ]))
+      };
+    }
+
+    function assertFeelSafety(summary, label) {
+      const director = summary.director || {};
+      assert.strictEqual(summary.invalidWalls, 0, label + " should have no impossible walls");
+      assert.strictEqual(summary.hardBlockerWalls, 0, label + " should have no hard-blocker walls");
+      assert.strictEqual(summary.routeReadabilityFailures, 0, label + " should preserve readable routes");
+      assert.strictEqual(summary.minorOnlyOpenLaneEvents, 0, label + " should not leave only minor-hazard escape lanes");
+      assert.strictEqual(summary.visibleSpawnViolations, 0, label + " should avoid visible spawn violations");
+      assert(summary.maxWavesSpawnedInSingleFrame <= 1, label + " should keep one scheduled wave per frame");
+      assert(summary.flatHardBlockerFourRows === 0 && summary.flatHardBlockerFiveRows === 0, label + " should avoid flat four/five-lane hard rows");
+      assert(summary.sameLaneOverlaps + summary.boostObjectOverlaps + summary.rampObjectOverlaps + summary.gasCanOverlaps === 0, label + " should avoid gameplay overlaps");
+      assert(earlyDeathRiskWindows(summary) === 0, label + " should avoid cheap launch risk windows");
+      assert((director.longestDeadScreenSeconds || 0) <= 3.6, label + " should avoid long dead screens");
+      assert((director.longestMeaningfulWaveGapSeconds || 0) <= 8, label + " should avoid long gaps between meaningful choices");
+      assert(Object.keys(director.waveFamilyCounts || {}).length >= 4, label + " should use at least four wave families");
+      assert(Object.keys(director.directorIntentCounts || {}).length >= 4, label + " should use at least four director intents");
+      assert((director.maxWaveFamilyStreak || 0) <= 6, label + " should avoid obvious wave-family spam");
+      assert((director.boostLaneDistribution?.[TRACK_DIRECTOR.centerLane] || 0) <= 0.42, label + " should not over-center boost rewards");
+      if (summary.raceTypeId === FUEL_RUN_RACE_TYPE_ID) {
+        assert(summary.averageGasCansSpawned >= 3.2, label + " should offer enough gas routes");
+        assert((summary.averageMaxTimeBetweenGasCans || 0) <= 28, label + " should avoid long gas droughts");
+        assert((director.gasCanLaneDistribution?.[TRACK_DIRECTOR.centerLane] || 0) <= 0.48, label + " should not make fuel cans free center pickups");
+      }
+      if (summary.raceTypeId === PURSUIT_RACE_TYPE_ID) {
+        assert((summary.pursuitRoadblockCount || 0) > 0, label + " should spawn pursuit roadblocks");
+        assert((summary.pursuitPressureWaveCount || 0) > 0, label + " should include pursuit pressure waves");
+        assert((summary.pursuitRecoveryWaveCount || 0) > 0, label + " should include pursuit recovery windows");
+      }
+    }
+
+    const matrixSpeedClasses = ["arcade", "pro", "turbo", "overdrive", "redline"];
+    const feelMatrix = [];
+    for (const trackId of ["sunset-highway", "redline-run"]) {
+      for (const raceTypeId of [DEFAULT_RACE_TYPE_ID, FUEL_RUN_RACE_TYPE_ID]) {
+        const summary = await app.runSpawnSafetySimulationCore({
+          runs: 4,
+          speedClassIds: matrixSpeedClasses,
+          trackId,
+          raceTypeId,
+          dt: 0.5,
+          seed: "road-director-feel-matrix"
+        });
+        const compact = compactFeelSummary(summary, trackId);
+        feelMatrix.push(compact);
+        console.log("ROAD_DIRECTOR_FEEL_SAMPLE " + JSON.stringify(compact));
+        assertFeelSafety(summary, trackId + " " + raceTypeId);
+      }
+      const pursuitSummary = await app.runSpawnSafetySimulationCore({
+        runs: 4,
+        speedClassIds: matrixSpeedClasses,
+        trackId,
+        raceTypeId: PURSUIT_RACE_TYPE_ID,
+        dt: 0.5,
+        seed: "road-director-feel-matrix"
+      });
+      const compactPursuit = compactFeelSummary(pursuitSummary, trackId);
+      feelMatrix.push(compactPursuit);
+      console.log("ROAD_DIRECTOR_FEEL_SAMPLE " + JSON.stringify(compactPursuit));
+      assertFeelSafety(pursuitSummary, trackId + " pursuit");
+    }
+
+    console.log("ROAD_DIRECTOR_FEEL_MATRIX " + JSON.stringify(feelMatrix));
+
     const playtestRows = [
       normalizePlaytestRunSummary({
         status: "finished",
