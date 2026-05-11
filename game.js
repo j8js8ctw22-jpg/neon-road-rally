@@ -1910,7 +1910,7 @@ const WEEKEND_PLAYTEST_CHECKLIST = [
   "Try Party Best of 3",
   "Check badges/title callouts",
   "Check if ramps feel useful",
-  "After playing, copy Playtest Report"
+  "After playing, copy Playtest Report from Settings"
 ];
 const PARTY_SETUP_HELP_ITEMS = [
   { title: "Best of 3", text: "each player gets 3 tries; best score wins." },
@@ -7930,7 +7930,8 @@ class InputManager {
 
     if (keyId === "enter" && this.game.screen === "title") {
       this.game.audio.playSfx("menu");
-      this.game.startRaceFromTitle();
+      if (this.game.profiles.getCurrentPlayer()) this.game.startRaceFromTitle();
+      else this.game.showPlayerScreen("Add a driver, then start your first run.");
     } else if (keyId === "enter" && this.game.screen === "preRace") {
       this.game.audio.playSfx("menu");
       this.game.handleStartSeededRace();
@@ -16034,10 +16035,22 @@ class Renderer {
     if (w >= 840) contextParts.push(`SEED ${formatRoadSeed(run.roadSeed)}`);
     const statusX = w >= 760 ? barX + barW + 18 : barX;
     const statusY = w >= 760 ? 38 : 50;
+    const showAudioHint = w >= 760;
+    const audioHintWidth = showAudioHint ? 132 : 0;
     const statusMaxWidth = w >= 760
-      ? Math.max(80, w - statusX - 12)
+      ? Math.max(80, w - statusX - audioHintWidth - 20)
       : w - 32;
     drawFittedText(ctx, contextParts.join("  "), statusX, statusY, statusMaxWidth);
+    if (showAudioHint) {
+      const audioHint = this.game.audio.masterMuted
+        ? "AUDIO MUTED"
+        : `${this.game.audio.musicMuted ? "MUSIC MUTED" : "M MUSIC"}  ${this.game.audio.sfxMuted ? "SFX MUTED" : "N SFX"}`;
+      ctx.textAlign = "right";
+      ctx.fillStyle = this.game.audio.masterMuted ? "#ffe45e" : "rgba(184, 198, 217, 0.88)";
+      ctx.font = "800 10px Trebuchet MS, Verdana, sans-serif";
+      drawFittedText(ctx, audioHint, w - 14, statusY, audioHintWidth);
+      ctx.textAlign = "left";
+    }
     ctx.restore();
   }
 
@@ -19221,7 +19234,7 @@ class NeonRoadRally {
 
   startRaceFromTitle() {
     if (!this.profiles.getCurrentPlayer()) {
-      this.showPlayerScreen("Create or choose a player before the first run.");
+      this.showPlayerScreen("Add a driver, then start your first run.");
       return;
     }
     this.showPreRaceScreen();
@@ -22440,6 +22453,7 @@ class NeonRoadRally {
         <section class="panel pause-card">
           <h2>Paused</h2>
           <p class="hint">Esc resumes. Restart uses the same current setup.</p>
+          <p class="hint">Audio: M toggles music. N toggles SFX. Full audio controls are in Settings.</p>
           <div class="row" style="justify-content:center">
             <button class="small-button" data-action="resume">Resume</button>
             <button class="small-button" data-action="restart">Restart Run</button>
@@ -22737,7 +22751,7 @@ class NeonRoadRally {
           points: [
             "Start with First Arcade Race or Family Arcade before jumping to Redline Dare.",
             "Use Party Starter when the room wants pass-the-keyboard competition.",
-            "After the session, open Playtest Report, copy it, and paste it into ChatGPT for tuning notes."
+            "After the session, open Playtest Tools in Settings, copy the report, and share it for tuning notes."
           ]
         }
       ]
@@ -22833,6 +22847,7 @@ class NeonRoadRally {
     this.audio.stopMusic(0);
     this.audio.playMusic("title", false);
     const player = this.profiles.getCurrentPlayer();
+    const hasDriver = Boolean(player);
     const selectedSpeedClass = getSpeedClassConfig(this.profiles.data.speedClassId);
     const playerName = player ? escapeHtml(player.name) : "Add Driver";
     const badgeProgress = player ? this.profiles.getPlayerBadgeProgress(player) : null;
@@ -22840,6 +22855,14 @@ class NeonRoadRally {
     const playerDetail = player
       ? `Badges ${badgeProgress.earnedCount}/${badgeProgress.totalCount} - Titles ${titleCount}/${TITLE_DEFINITIONS.length}`
       : "Create a local profile for badges and scores";
+    const soloAction = hasDriver ? "start" : "players";
+    const soloActionLabel = hasDriver ? "Start Solo Race" : "Add Driver & Start";
+    const soloActionHelp = hasDriver
+      ? "One driver. Choose race type, track, speed, and seed."
+      : "Create a local driver first, then choose race type, track, speed, and seed.";
+    const keyboardHint = hasDriver
+      ? "Enter starts Solo. Arrows/WASD drive. Space boosts. F toggles fullscreen."
+      : "Enter opens Driver Garage. Add a driver, then start a solo race.";
     const audioStatus = `${this.audio.masterMuted ? "Audio Muted" : "Audio On"} / Music ${this.audio.musicMuted ? "Muted" : "On"} / SFX ${this.audio.sfxMuted ? "Muted" : "On"}`;
     this.layer.classList.remove("is-empty");
     this.layer.innerHTML = `
@@ -22869,7 +22892,7 @@ class NeonRoadRally {
               <small>Change in Settings</small>
             </div>
           </div>
-          <p class="keyboard-hints">Enter starts Solo. Arrows/WASD drive. Space boosts. F toggles fullscreen.</p>
+          <p class="keyboard-hints">${escapeHtml(keyboardHint)}</p>
           ${this.renderNewDriverHint()}
         </div>
         <div class="title-menu-card">
@@ -22877,7 +22900,7 @@ class NeonRoadRally {
             <div class="title-menu-section">
               <span class="menu-section-label">Start Playing</span>
               <div class="title-primary-actions">
-                <button class="menu-button primary title-action-card" data-action="start"><strong>Start Solo Race</strong><span>One driver. Choose race type, track, speed, and seed.</span></button>
+                <button class="menu-button primary title-action-card" data-action="${escapeAttr(soloAction)}"><strong>${escapeHtml(soloActionLabel)}</strong><span>${escapeHtml(soloActionHelp)}</span></button>
                 <button class="menu-button title-action-card is-party" data-action="partyMode"><strong>Start Party Mode</strong><span>2-8 local drivers take turns on the same computer.</span></button>
               </div>
             </div>
@@ -22892,11 +22915,11 @@ class NeonRoadRally {
             </div>
             <div class="title-menu-section">
               <span class="menu-section-label">Options</span>
-              <button class="menu-button is-quiet" data-action="settings"><strong>Settings</strong><span>Audio, default speed class, fullscreen, and Playtest Report.</span></button>
+              <button class="menu-button is-quiet" data-action="settings"><strong>Settings</strong><span>Audio, default speed class, fullscreen, and Playtest Tools.</span></button>
             </div>
           </div>
           <div class="title-utility-row">
-            <button class="small-button" data-action="players">Switch Driver</button>
+            <button class="small-button" data-action="players">${hasDriver ? "Switch Driver" : "Add Driver"}</button>
             <button class="small-button" data-action="toggleMasterAudio">Audio: ${this.audio.masterMuted ? "Muted" : "On"}</button>
             <button class="small-button" data-action="toggleMusic">Music: ${this.audio.musicMuted ? "Muted" : "On"}</button>
             <button class="small-button" data-action="toggleSfx">SFX: ${this.audio.sfxMuted ? "Muted" : "On"}</button>
@@ -22908,7 +22931,7 @@ class NeonRoadRally {
               <button class="small-button" data-action="runSimulation">Classic Simulation</button>
               <button class="small-button" data-action="runFuelSimulation">Fuel Run Simulation</button>
               <button class="small-button" data-action="runTargetedDirectorChecks">Targeted Director Checks</button>
-              <button class="small-button" data-action="showPlaytestReport">Playtest Report</button>
+              <button class="small-button" data-action="showPlaytestReport">Playtest Tools</button>
               <button class="small-button" data-action="roadDirectorLab">Road Director Lab</button>
               <button class="small-button" data-action="vehicleScaleDebug">Vehicle Scale Check</button>
             </div>
@@ -22949,7 +22972,7 @@ class NeonRoadRally {
           <div>
             <span class="eyebrow">Game Settings</span>
             <h2>Settings</h2>
-            <p class="hint">Audio and default Solo speed class are saved locally in this browser.</p>
+            <p class="hint">Audio, default Solo speed class, fullscreen, and Playtest Tools live here.</p>
           </div>
           <div class="score-grid">
             <div class="score-card"><strong>Default Speed Class</strong><span>${escapeHtml(selectedSpeedClass.label)}</span></div>
@@ -24045,7 +24068,7 @@ class NeonRoadRally {
       <section class="panel playtest-report-panel">
         <div class="playtest-report-header">
           <div>
-            <span class="eyebrow">Local Development Only</span>
+            <span class="eyebrow">Playtest Tools</span>
             <h2>Playtest Report</h2>
             <p class="hint">Run summaries are stored only in this browser under ${escapeHtml(PLAYTEST_REPORT_STORAGE_KEY)}.</p>
           </div>
@@ -24056,7 +24079,7 @@ class NeonRoadRally {
         </div>
         <div class="playtest-session-cta">
           <strong>After a family play session</strong>
-          <span>Tap Copy Playtest Report and paste it into ChatGPT for tuning.</span>
+          <span>Copy this report when you want tuning notes from a reviewer or assistant.</span>
           <small>Local only: the report is generated from runs saved in this browser.</small>
         </div>
         ${this.renderWeekendPlaytestChecklist({ compact: true })}
@@ -24415,6 +24438,14 @@ class NeonRoadRally {
             <div class="score-card"><strong>Speed Class</strong><span id="preRaceModeSummary">${escapeHtml(speedClass.label)} · x${speedClass.scoreMultiplier.toFixed(2)}</span></div>
             <div class="score-card"><strong>Road Seed</strong><span id="preRaceSeedSummary" class="is-compact">${escapeHtml(seed)}</span></div>
           </div>
+          <div class="setup-sticky-action solo-setup-action" aria-label="Start current solo setup">
+            <div>
+              <span class="eyebrow">Ready To Race</span>
+              <strong id="soloSetupActionSummary">${escapeHtml(raceType.label)} · ${escapeHtml(track.name)} · ${escapeHtml(speedClass.label)}</strong>
+              <small id="soloSetupActionSeed">Seed ${escapeHtml(seed)}</small>
+            </div>
+            <button class="small-button primary" data-action="startSeededRace">Start Race</button>
+          </div>
           <div class="setup-section-heading">
             <span class="eyebrow">Race Type</span>
             <strong>Choose the rules for this run.</strong>
@@ -24487,6 +24518,8 @@ class NeonRoadRally {
     const trackSummary = document.getElementById("preRaceTrackSummary");
     const seedSummary = document.getElementById("preRaceSeedSummary");
     const musicSummary = document.getElementById("preRaceMusicSummary");
+    const soloSetupActionSummary = document.getElementById("soloSetupActionSummary");
+    const soloSetupActionSeed = document.getElementById("soloSetupActionSeed");
     if (!input || !display) return;
     const updateDisplay = () => {
       const normalized = normalizeRoadSeed(input.value, "");
@@ -24516,6 +24549,12 @@ class NeonRoadRally {
       }
       if (trackSummary) {
         trackSummary.textContent = track.name;
+      }
+      if (soloSetupActionSummary) {
+        soloSetupActionSummary.textContent = `${raceType.label} · ${track.name} · ${speedClass.label}`;
+      }
+      if (soloSetupActionSeed) {
+        soloSetupActionSeed.textContent = `Seed ${normalized || "Random on start"}`;
       }
       if (musicSummary) {
         musicSummary.textContent = getTrackMusicStatus(track);
@@ -24750,6 +24789,14 @@ class NeonRoadRally {
           <div class="score-card"><strong>Order</strong><span id="partyStartingOrderSummary">${escapeHtml(startingOrderLabel)}</span></div>
           <div class="score-card"><strong>Seed</strong><span id="partySeedSummary" class="is-compact">${escapeHtml(seed)}</span></div>
         </div>
+        <div class="setup-sticky-action party-start-action" aria-label="Start current party setup">
+          <div>
+            <span class="eyebrow">Drivers -> Race -> Turns -> Start</span>
+            <strong id="partySetupActionSummary">${selectedPlayers.length} drivers · ${escapeHtml(partyRaceType.label)} · ${escapeHtml(track.name)} · ${escapeHtml(getSpeedClassLabel(setup.raceMode))}</strong>
+            <small id="partySetupActionSeed">${escapeHtml(roundTypeConfig.label)} · ${escapeHtml(startingOrderLabel)} · Seed ${escapeHtml(seed)}</small>
+          </div>
+          <button class="small-button primary" data-action="partyStartRound" ${selectedPlayers.length < PARTY_MIN_PLAYERS ? "disabled" : ""}>Start Party Round</button>
+        </div>
         <div class="party-setup-grid">
           <div class="form-stack">
             <div class="garage-section-heading">
@@ -24908,6 +24955,8 @@ class NeonRoadRally {
     const seedModeHint = document.getElementById("partySeedModeHint");
     const startingOrderSummary = document.getElementById("partyStartingOrderSummary");
     const startingOrderHint = document.getElementById("partyStartingOrderHint");
+    const partySetupActionSummary = document.getElementById("partySetupActionSummary");
+    const partySetupActionSeed = document.getElementById("partySetupActionSeed");
     const updateSeedDisplay = () => {
       if (!input || !display) return;
       const normalized = normalizeRoadSeed(input.value, "");
@@ -24940,6 +24989,12 @@ class NeonRoadRally {
       }
       if (startingOrderSummary) startingOrderSummary.textContent = getPartyStartingOrderLabel(startingOrder?.value || this.getPartySetup().startingOrderMode);
       if (startingOrderHint) startingOrderHint.textContent = getPartyStartingOrderHelperText(startingOrder?.value || this.getPartySetup().startingOrderMode);
+      if (partySetupActionSummary) {
+        partySetupActionSummary.textContent = `${this.getPartySetupSelectedPlayers().length} drivers · ${raceTypeConfig.label} · ${track.name} · ${getSpeedClassLabel(mode)}`;
+      }
+      if (partySetupActionSeed) {
+        partySetupActionSeed.textContent = `${getPartyRoundTypeLabel(roundType?.value || this.getPartySetup().roundType)} · ${getPartyStartingOrderLabel(startingOrder?.value || this.getPartySetup().startingOrderMode)} · Seed ${normalized || "Random on start"}`;
+      }
     };
     const syncTrackDependentControls = () => {
       const setup = this.readPartySetupForm();
@@ -26893,17 +26948,19 @@ class NeonRoadRally {
           <button class="small-button" data-action="players">Driver Garage</button>
           <button class="small-button" data-action="title">Back to Title</button>
         </div>
-        <h2>Score Breakdown</h2>
-        ${this.renderScoreBreakdown(summary)}
-        ${this.renderMedalChips(summary.medals)}
-        ${this.renderBadgeEarnedPanel(summary)}
-        <h2>Score Attack Leaderboard</h2>
-        <p class="hint">Highest score wins. Open Time Attack for the precise finish-time chase on this setup.</p>
-        <ol class="leaderboard-list">
-          ${this.renderScoreAttackRows(leaderboard, summary.scoreEntry)}
-        </ol>
-        <h2>Run Details</h2>
-        <div class="score-grid score-info-grid is-secondary">
+        <details class="result-details-block">
+          <summary>Run Details, Badges, and Boards</summary>
+          <h2>Score Breakdown</h2>
+          ${this.renderScoreBreakdown(summary)}
+          ${this.renderMedalChips(summary.medals)}
+          ${this.renderBadgeEarnedPanel(summary)}
+          <h2>Score Attack Leaderboard</h2>
+          <p class="hint">Highest score wins. Open Time Attack for the precise finish-time chase on this setup.</p>
+          <ol class="leaderboard-list">
+            ${this.renderScoreAttackRows(leaderboard, summary.scoreEntry)}
+          </ol>
+          <h2>Run Details</h2>
+          <div class="score-grid score-info-grid is-secondary">
           ${summary.challengeMode ? `
             <div class="score-card"><strong>Challenge</strong><span class="is-compact">${escapeHtml(summary.challengeName)}</span></div>
             <div class="score-card"><strong>Objective</strong><span class="is-compact">${escapeHtml(summary.challengeObjective)}</span></div>
@@ -26937,7 +26994,8 @@ class NeonRoadRally {
           <div class="score-card"><strong>Boost Route</strong><span class="is-compact">${escapeHtml(summary.boostRouteFeedback || getBoostRouteFeedbackText(summary.boostPadsCollected || 0, summary.boostPadsMissedReachable || 0))}</span></div>
           <div class="score-card"><strong>Personal Best</strong><span>${escapeHtml(personalBestText)}</span></div>
           <div class="score-card"><strong>Top 20</strong><span>${escapeHtml(leaderboardText)}</span></div>
-        </div>
+          </div>
+        </details>
       </section>
     `;
     this.bindLayerButtons();

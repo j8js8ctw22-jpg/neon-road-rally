@@ -187,6 +187,47 @@ button {
   color: var(--yellow);
 }
 
+.setup-sticky-action {
+  position: sticky;
+  top: 0;
+  z-index: 8;
+  display: grid;
+  gap: 12px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  margin: 4px 0 14px;
+  border: 1px solid rgba(255, 228, 94, 0.5);
+  border-radius: 8px;
+  padding: 11px 12px;
+  background:
+    linear-gradient(90deg, rgba(255, 228, 94, 0.16), rgba(40, 246, 255, 0.08)),
+    rgba(5, 8, 20, 0.94);
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.22), 0 0 14px rgba(255, 228, 94, 0.12);
+  backdrop-filter: blur(8px);
+}
+
+.setup-sticky-action strong {
+  display: block;
+  color: #fff;
+  font-size: 0.98rem;
+  line-height: 1.12;
+  overflow-wrap: anywhere;
+  text-transform: uppercase;
+}
+
+.setup-sticky-action small {
+  display: block;
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: 0.76rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.setup-sticky-action .primary {
+  min-width: 148px;
+}
+
 .setup-section-heading,
 .leaderboard-section-heading {
   display: grid;
@@ -1869,6 +1910,31 @@ button:disabled {
   overflow-wrap: anywhere;
 }
 
+.result-details-block {
+  margin-top: 14px;
+  border: 1px solid rgba(40, 246, 255, 0.32);
+  border-radius: 8px;
+  padding: 10px 12px 14px;
+  background: rgba(5, 8, 20, 0.6);
+}
+
+.result-details-block > summary {
+  cursor: pointer;
+  color: var(--yellow);
+  font-size: 0.86rem;
+  font-weight: 900;
+  list-style-position: inside;
+  text-transform: uppercase;
+}
+
+.result-details-block > summary::marker {
+  color: var(--cyan);
+}
+
+.result-details-block h2 {
+  margin-top: 16px;
+}
+
 .party-winner-banner {
   display: inline-flex;
   flex-wrap: wrap;
@@ -2991,6 +3057,7 @@ button:disabled {
   .track-select-grid,
   .audio-grid,
   .audio-test-grid,
+  .setup-sticky-action,
   .speed-class-grid,
   .setup-step-strip,
   .mode-ladder {
@@ -3073,6 +3140,14 @@ button:disabled {
 
   .mode-ladder-card {
     min-height: 0;
+  }
+
+  .setup-sticky-action {
+    position: static;
+  }
+
+  .setup-sticky-action .primary {
+    width: 100%;
   }
 
   .title-action-card,

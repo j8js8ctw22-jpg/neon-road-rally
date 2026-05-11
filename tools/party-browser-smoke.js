@@ -98,7 +98,7 @@ async function run() {
   await setPartyOption("#partyStartingOrder", "randomOnce", "Random Once");
   await setPartyOption("#partyStartingOrder", "randomEveryRound", "Random Every Round");
   await page.selectOption("#partyRoundType", "bestOf3");
-  await page.getByRole("button", { name: /Start Party Round/i }).click();
+  await page.getByRole("button", { name: /Start Party Round/i }).first().click();
   await page.waitForFunction(() => window.neonRoadRally?.screen === "partyTurn", null, { timeout: 5000 });
   await expectText("Starting Order");
   await expectText("At the keyboard now");
@@ -133,7 +133,7 @@ async function run() {
   await page.selectOption("#partyRaceType", "fuelRun");
   await page.selectOption("#partyRoundType", "oneRunEach");
   await page.selectOption("#partyStartingOrder", "randomOnce");
-  await page.getByRole("button", { name: /Start Party Round/i }).click();
+  await page.getByRole("button", { name: /Start Party Round/i }).first().click();
   await page.waitForFunction(() => window.neonRoadRally?.screen === "partyTurn", null, { timeout: 5000 });
 
   const fuelRuns = [
@@ -150,7 +150,7 @@ async function run() {
   await expectText("Fuel Saver");
   await expectText("Gas Grabber");
 
-  await page.getByRole("button", { name: /Return to Title/i }).click();
+  await page.getByRole("button", { name: /(Return|Back) to Title/i }).click();
   await page.waitForFunction(() => window.neonRoadRally?.screen === "title", null, { timeout: 5000 });
   await clickText("Solo Race");
   await page.waitForFunction(() => window.neonRoadRally?.screen === "preRace", null, { timeout: 5000 });
