@@ -2172,6 +2172,10 @@ button:disabled {
   grid-column: 1 / -1;
 }
 
+.party-last-run-card > .party-feedback-strip {
+  grid-column: 1 / -1;
+}
+
 .party-last-run-card strong {
   display: block;
   color: var(--text);
@@ -2255,6 +2259,131 @@ button:disabled {
   color: var(--muted);
   font-size: 0.74rem;
   text-transform: uppercase;
+}
+
+.party-turn-order-panel,
+.party-awards-panel {
+  margin: 14px 0;
+  border: 1px solid rgba(40, 246, 255, 0.34);
+  border-radius: 8px;
+  padding: 12px;
+  background: rgba(5, 8, 20, 0.72);
+}
+
+.party-turn-order-list {
+  display: grid;
+  gap: 7px;
+  grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+  margin: 10px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.party-turn-order-list li {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  min-height: 38px;
+  border: 1px solid rgba(184, 198, 217, 0.22);
+  border-radius: 6px;
+  padding: 7px 8px;
+  background: rgba(9, 16, 42, 0.72);
+}
+
+.party-turn-order-list li.is-current {
+  border-color: var(--yellow);
+  background: rgba(255, 228, 94, 0.12);
+  box-shadow: 0 0 14px rgba(255, 228, 94, 0.18);
+}
+
+.party-turn-order-list strong {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  background: rgba(40, 246, 255, 0.18);
+  color: var(--cyan);
+  font-size: 0.72rem;
+}
+
+.party-turn-order-list span {
+  color: var(--text);
+  font-size: 0.82rem;
+  font-weight: 800;
+  overflow-wrap: anywhere;
+  text-transform: uppercase;
+}
+
+.party-badge-prompt {
+  border-left: 3px solid var(--yellow);
+  padding-left: 10px;
+  color: #fff7b8;
+}
+
+.party-feedback-strip {
+  display: grid;
+  gap: 7px;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  margin-top: 8px;
+}
+
+.party-feedback-strip span,
+.party-award-card {
+  display: grid;
+  gap: 3px;
+  border: 1px solid rgba(40, 246, 255, 0.22);
+  border-radius: 6px;
+  padding: 8px 9px;
+  background: rgba(9, 16, 42, 0.68);
+}
+
+.party-feedback-strip strong,
+.party-award-card span {
+  color: var(--yellow);
+  font-size: 0.68rem;
+  text-transform: uppercase;
+}
+
+.party-feedback-strip em {
+  color: var(--text);
+  font-style: normal;
+  font-weight: 800;
+  overflow-wrap: anywhere;
+}
+
+.party-award-grid {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  margin-top: 12px;
+}
+
+.party-award-card strong {
+  color: var(--text);
+  font-size: 1rem;
+  line-height: 1.1;
+  overflow-wrap: anywhere;
+  text-transform: uppercase;
+}
+
+.party-award-card em {
+  color: var(--green);
+  font-style: normal;
+  font-weight: 900;
+}
+
+.party-award-card small {
+  color: var(--muted);
+  font-size: 0.72rem;
+}
+
+.party-award-card .party-award-progress {
+  color: #fff7b8;
+}
+
+.party-new-badge-panel {
+  margin-top: 12px;
 }
 
 .party-action-row {
