@@ -354,6 +354,379 @@ const BADGE_DEFINITIONS = [
     difficulty: "Hard",
     hidden: false,
     icon: "RCH"
+  },
+  {
+    id: "first_escape",
+    name: "First Escape",
+    description: "Escape one Pursuit run.",
+    category: "pursuit",
+    difficulty: "Normal",
+    hidden: false,
+    icon: "ESC"
+  },
+  {
+    id: "heat_survivor",
+    name: "Heat Survivor",
+    description: "Escape Pursuit after heat reaches 80%.",
+    category: "pursuit",
+    difficulty: "Hard",
+    hidden: false,
+    icon: "H80"
+  },
+  {
+    id: "clean_getaway",
+    name: "Clean Getaway",
+    description: "Escape Pursuit with zero slowdown hits.",
+    category: "pursuit",
+    difficulty: "Hard",
+    hidden: false,
+    icon: "GET"
+  },
+  {
+    id: "roadblock_dodger",
+    name: "Roadblock Dodger",
+    description: "Clear 5 roadblock gates in one Pursuit run.",
+    category: "pursuit",
+    difficulty: "Hard",
+    hidden: false,
+    icon: "RB5"
+  },
+  {
+    id: "redline_escape",
+    name: "Redline Escape",
+    description: "Escape Pursuit on Redline Run.",
+    category: "pursuit",
+    difficulty: "Hard",
+    hidden: false,
+    icon: "RES"
+  },
+  {
+    id: "no_boost_escape",
+    name: "No-Boost Escape",
+    description: "Escape Pursuit without manual boost.",
+    category: "pursuit",
+    difficulty: "Very Hard",
+    hidden: false,
+    icon: "NBE"
+  },
+  {
+    id: "mastery_near_miss_10",
+    name: "Near Miss Rookie",
+    description: "Reach 10 total near misses.",
+    category: "mastery",
+    difficulty: "Progress",
+    hidden: false,
+    icon: "NM1",
+    progressStat: "totalNearMisses",
+    progressTarget: 10
+  },
+  {
+    id: "mastery_near_miss_50",
+    name: "Near Miss Pro",
+    description: "Reach 50 total near misses.",
+    category: "mastery",
+    difficulty: "Progress",
+    hidden: false,
+    icon: "NM2",
+    progressStat: "totalNearMisses",
+    progressTarget: 50
+  },
+  {
+    id: "mastery_near_miss_100",
+    name: "Near Miss Legend",
+    description: "Reach 100 total near misses.",
+    category: "mastery",
+    difficulty: "Progress",
+    hidden: false,
+    icon: "NM3",
+    progressStat: "totalNearMisses",
+    progressTarget: 100
+  },
+  {
+    id: "mastery_near_miss_250",
+    name: "Near Miss Champion",
+    description: "Reach 250 total near misses.",
+    category: "mastery",
+    difficulty: "Progress",
+    hidden: false,
+    icon: "NM4",
+    progressStat: "totalNearMisses",
+    progressTarget: 250
+  },
+  {
+    id: "mastery_near_miss_500",
+    name: "Near Miss Master",
+    description: "Reach 500 total near misses.",
+    category: "mastery",
+    difficulty: "Progress",
+    hidden: false,
+    icon: "NM5",
+    progressStat: "totalNearMisses",
+    progressTarget: 500
+  },
+  {
+    id: "mastery_ramp_10",
+    name: "Ramp Rider I",
+    description: "Use 10 total ramps.",
+    category: "mastery",
+    difficulty: "Progress",
+    hidden: false,
+    icon: "RR1",
+    progressStat: "totalRampsUsed",
+    progressTarget: 10
+  },
+  {
+    id: "mastery_ramp_50",
+    name: "Ramp Rider II",
+    description: "Use 50 total ramps.",
+    category: "mastery",
+    difficulty: "Progress",
+    hidden: false,
+    icon: "RR2",
+    progressStat: "totalRampsUsed",
+    progressTarget: 50
+  },
+  {
+    id: "mastery_ramp_100",
+    name: "Ramp Rider III",
+    description: "Use 100 total ramps.",
+    category: "mastery",
+    difficulty: "Progress",
+    hidden: false,
+    icon: "RR3",
+    progressStat: "totalRampsUsed",
+    progressTarget: 100
+  },
+  {
+    id: "mastery_ramp_250",
+    name: "Ramp Rider Legend",
+    description: "Use 250 total ramps.",
+    category: "mastery",
+    difficulty: "Progress",
+    hidden: false,
+    icon: "RR4",
+    progressStat: "totalRampsUsed",
+    progressTarget: 250
+  },
+  {
+    id: "mastery_finish_5",
+    name: "Finish Rookie",
+    description: "Finish 5 total runs.",
+    category: "mastery",
+    difficulty: "Progress",
+    hidden: false,
+    icon: "FN1",
+    progressStat: "totalFinishes",
+    progressTarget: 5
+  },
+  {
+    id: "mastery_finish_25",
+    name: "Finish Pro",
+    description: "Finish 25 total runs.",
+    category: "mastery",
+    difficulty: "Progress",
+    hidden: false,
+    icon: "FN2",
+    progressStat: "totalFinishes",
+    progressTarget: 25
+  },
+  {
+    id: "mastery_finish_50",
+    name: "Finish Champion",
+    description: "Finish 50 total runs.",
+    category: "mastery",
+    difficulty: "Progress",
+    hidden: false,
+    icon: "FN3",
+    progressStat: "totalFinishes",
+    progressTarget: 50
+  },
+  {
+    id: "mastery_finish_100",
+    name: "Finish Legend",
+    description: "Finish 100 total runs.",
+    category: "mastery",
+    difficulty: "Progress",
+    hidden: false,
+    icon: "FN4",
+    progressStat: "totalFinishes",
+    progressTarget: 100
+  },
+  {
+    id: "mastery_speed_turbo_5",
+    name: "Turbo Finisher I",
+    description: "Finish 5 Turbo or faster runs.",
+    category: "mastery",
+    difficulty: "Progress",
+    hidden: false,
+    icon: "TB5",
+    progressStat: "totalTurboPlusFinishes",
+    progressTarget: 5
+  },
+  {
+    id: "mastery_speed_overdrive_10",
+    name: "Overdrive Finisher I",
+    description: "Finish 10 Overdrive or faster runs.",
+    category: "mastery",
+    difficulty: "Progress",
+    hidden: false,
+    icon: "OD10",
+    progressStat: "totalOverdrivePlusFinishes",
+    progressTarget: 10
+  },
+  {
+    id: "mastery_speed_redline_10",
+    name: "Redline Finisher I",
+    description: "Finish 10 Redline speed runs.",
+    category: "mastery",
+    difficulty: "Progress",
+    hidden: false,
+    icon: "RL10",
+    progressStat: "totalRedlineFinishes",
+    progressTarget: 10
+  },
+  {
+    id: "mastery_party_10",
+    name: "Party Regular I",
+    description: "Complete 10 total Party runs.",
+    category: "mastery",
+    difficulty: "Progress",
+    hidden: false,
+    icon: "PT1",
+    progressStat: "totalPartyRuns",
+    progressTarget: 10
+  },
+  {
+    id: "mastery_party_25",
+    name: "Party Regular II",
+    description: "Complete 25 total Party runs.",
+    category: "mastery",
+    difficulty: "Progress",
+    hidden: false,
+    icon: "PT2",
+    progressStat: "totalPartyRuns",
+    progressTarget: 25
+  },
+  {
+    id: "mastery_party_50",
+    name: "Party Host",
+    description: "Complete 50 total Party runs.",
+    category: "mastery",
+    difficulty: "Progress",
+    hidden: false,
+    icon: "PT3",
+    progressStat: "totalPartyRuns",
+    progressTarget: 50
+  },
+  {
+    id: "mastery_party_100",
+    name: "Party Legend",
+    description: "Complete 100 total Party runs.",
+    category: "mastery",
+    difficulty: "Progress",
+    hidden: false,
+    icon: "PT4",
+    progressStat: "totalPartyRuns",
+    progressTarget: 100
+  },
+  {
+    id: "mastery_fuel_gas_10",
+    name: "Gas Grabber I",
+    description: "Collect 10 total gas cans.",
+    category: "mastery",
+    difficulty: "Progress",
+    hidden: false,
+    icon: "GG1",
+    progressStat: "totalGasCansCollected",
+    progressTarget: 10
+  },
+  {
+    id: "mastery_fuel_gas_50",
+    name: "Gas Grabber II",
+    description: "Collect 50 total gas cans.",
+    category: "mastery",
+    difficulty: "Progress",
+    hidden: false,
+    icon: "GG2",
+    progressStat: "totalGasCansCollected",
+    progressTarget: 50
+  },
+  {
+    id: "mastery_fuel_gas_100",
+    name: "Gas Grabber III",
+    description: "Collect 100 total gas cans.",
+    category: "mastery",
+    difficulty: "Progress",
+    hidden: false,
+    icon: "GG3",
+    progressStat: "totalGasCansCollected",
+    progressTarget: 100
+  },
+  {
+    id: "mastery_fuel_finish_25",
+    name: "Fuel Survivor Mastery",
+    description: "Finish 25 total Fuel Runs.",
+    category: "mastery",
+    difficulty: "Progress",
+    hidden: false,
+    icon: "FF25",
+    progressStat: "totalFuelRunFinishes",
+    progressTarget: 25
+  },
+  {
+    id: "mastery_pursuit_escape_5",
+    name: "Escape Artist I",
+    description: "Escape 5 total Pursuit runs.",
+    category: "mastery",
+    difficulty: "Progress",
+    hidden: false,
+    icon: "EA1",
+    progressStat: "totalPursuitEscapes",
+    progressTarget: 5
+  },
+  {
+    id: "mastery_pursuit_escape_25",
+    name: "Escape Artist II",
+    description: "Escape 25 total Pursuit runs.",
+    category: "mastery",
+    difficulty: "Progress",
+    hidden: false,
+    icon: "EA2",
+    progressStat: "totalPursuitEscapes",
+    progressTarget: 25
+  },
+  {
+    id: "mastery_pursuit_roadblock_10",
+    name: "Roadblock Breaker I",
+    description: "Clear 10 total roadblocks.",
+    category: "mastery",
+    difficulty: "Progress",
+    hidden: false,
+    icon: "RB1",
+    progressStat: "totalRoadblocksCleared",
+    progressTarget: 10
+  },
+  {
+    id: "mastery_pursuit_roadblock_50",
+    name: "Roadblock Breaker II",
+    description: "Clear 50 total roadblocks.",
+    category: "mastery",
+    difficulty: "Progress",
+    hidden: false,
+    icon: "RB2",
+    progressStat: "totalRoadblocksCleared",
+    progressTarget: 50
+  },
+  {
+    id: "mastery_pursuit_heat_10",
+    name: "Heat Survivor Mastery",
+    description: "Escape 10 heat-heavy Pursuit runs.",
+    category: "mastery",
+    difficulty: "Progress",
+    hidden: false,
+    icon: "H10",
+    progressStat: "totalHeatHeavyPursuitRuns",
+    progressTarget: 10
   }
 ];
 const BADGE_DEFINITION_BY_ID = Object.fromEntries(BADGE_DEFINITIONS.map((badge) => [badge.id, badge]));
@@ -365,6 +738,8 @@ const BADGE_CATEGORY_FILTERS = [
   { id: "skill", label: "Skill" },
   { id: "track", label: "Track" },
   { id: "fuel", label: "Fuel" },
+  { id: "pursuit", label: "Pursuit" },
+  { id: "mastery", label: "Mastery" },
   { id: "challenge", label: "Challenge" }
 ];
 const BADGE_CATEGORY_LABELS = Object.fromEntries(BADGE_CATEGORY_FILTERS.map((filter) => [filter.id, filter.label]));
@@ -711,6 +1086,21 @@ const ACTIVE_FIELD_BUDGET_CONFIG = {
     maxVisibleHardWaveOverlap: 2,
     spawnDelayVisibleHardBlockers: 5,
     spikeVisibleHardBlockers: 6
+  },
+  pursuit: {
+    minVisibleMeaningful: 2,
+    targetVisibleMeaningful: 4,
+    maxUpcomingDecisionGapSeconds: 1.2,
+    deadScreenLimitSeconds: 1.1,
+    lonelyObjectLimitSeconds: 0.9,
+    maxVisibleHardBlockers: 6,
+    maxTacticalHardBlockers: 6,
+    maxHardBlockersNext3Seconds: 5,
+    maxHardBlockersInTwoSeconds: 4,
+    maxHardBlockersInThreeLaneNeighborhood: 4,
+    maxVisibleHardWaveOverlap: 2,
+    spawnDelayVisibleHardBlockers: 5,
+    spikeVisibleHardBlockers: 7
   }
 };
 const ROAD_DIRECTOR_ACTIVITY_CONFIG = {
@@ -933,6 +1323,54 @@ const ROAD_DIRECTOR_WAVE_METADATA = {
     trackAffinity: ["redline-run"],
     sectionAffinity: ["pressure", "finalPush"]
   },
+  pursuitPressureLanes: {
+    id: "pursuitPressureLanes",
+    displayName: "Pursuit Pressure Lanes",
+    family: "pursuit-pressure",
+    intent: "make the chase close in without a roadblock",
+    requiredAction: "leave the pressured lanes",
+    routeType: "forced lane-change escape",
+    rewardType: "",
+    pressureRating: 3,
+    trackAffinity: ["sunset-highway", "redline-run"],
+    sectionAffinity: ["groove", "pressure", "finalPush"]
+  },
+  pursuitRoadblock: {
+    id: "pursuitRoadblock",
+    displayName: "Roadblock Gate",
+    family: "pursuit-roadblock",
+    intent: "warn then close several lanes with a readable escape gap",
+    requiredAction: "commit to the escape gap",
+    routeType: "roadblock escape gap",
+    rewardType: "heat drop",
+    pressureRating: 4,
+    trackAffinity: ["sunset-highway", "redline-run"],
+    sectionAffinity: ["groove", "pressure", "finalPush"]
+  },
+  pursuitHardRoadblock: {
+    id: "pursuitHardRoadblock",
+    displayName: "Hard Roadblock Gate",
+    family: "pursuit-roadblock",
+    intent: "late chase peak with a clear escape gap",
+    requiredAction: "commit early to the safe lane",
+    routeType: "hard roadblock escape gap",
+    rewardType: "heat drop",
+    pressureRating: 5,
+    trackAffinity: ["sunset-highway", "redline-run"],
+    sectionAffinity: ["pressure", "finalPush"]
+  },
+  pursuitRecoveryGap: {
+    id: "pursuitRecoveryGap",
+    displayName: "Pursuit Recovery Gap",
+    family: "pursuit-recovery",
+    intent: "let heat drop after pressure",
+    requiredAction: "reset and breathe",
+    routeType: "open road",
+    rewardType: "heat drop",
+    pressureRating: 0,
+    trackAffinity: ["sunset-highway", "redline-run"],
+    sectionAffinity: ["breather", "launch"]
+  },
   fuelTrafficPressure: {
     id: "fuelTrafficPressure",
     displayName: "Fuel Traffic Pressure",
@@ -1037,6 +1475,9 @@ const ROAD_DIRECTOR_INTENT_LABELS = {
   rewardTemptation: "Create Reward Temptation",
   rampSolution: "Create Ramp Solution",
   gasRoute: "Create Gas Route",
+  pursuitRoadblock: "Warn Roadblock",
+  pursuitPressure: "Build Pursuit Pressure",
+  pursuitRecovery: "Drop Pursuit Heat",
   nearMissOpportunity: "Create Near-Miss Opportunity",
   recovery: "Provide Short Recovery",
   escalateSection: "Escalate Section",
@@ -1091,6 +1532,34 @@ const ROAD_DIRECTOR_INTENT_WAVE_WEIGHTS = {
     fuelTrafficPressure: 0.75,
     recoveryGap: 0.25
   },
+  pursuitRoadblock: {
+    pursuitRoadblock: 2.55,
+    pursuitHardRoadblock: 1.55,
+    pursuitPressureLanes: 0.95,
+    pursuitRecoveryGap: 0.08,
+    rampEscape: 0.45,
+    boostTemptation: 0.38,
+    recoveryGap: 0.08
+  },
+  pursuitPressure: {
+    pursuitPressureLanes: 2.25,
+    pursuitRoadblock: 1.18,
+    centerBlock: 0.9,
+    offsetPair: 0.86,
+    leftRightSweep: 0.92,
+    rampEscape: 0.48,
+    boostTemptation: 0.54,
+    pursuitRecoveryGap: 0.18
+  },
+  pursuitRecovery: {
+    pursuitRecoveryGap: 2.8,
+    recoveryGap: 1.8,
+    boostTemptation: 0.72,
+    rampEscape: 0.72,
+    pursuitPressureLanes: 0.12,
+    pursuitRoadblock: 0,
+    pursuitHardRoadblock: 0
+  },
   nearMissOpportunity: {
     nearMissCorridor: 2.2,
     expressConvoy: 1.8,
@@ -1132,6 +1601,7 @@ const FOUR_LANE_PRESSURE_COOLDOWN = 9000;
 const DEFAULT_SPEED_CLASS_ID = "arcade";
 const DEFAULT_RACE_TYPE_ID = "classic";
 const FUEL_RUN_RACE_TYPE_ID = "fuelRun";
+const PURSUIT_RACE_TYPE_ID = "pursuit";
 const DEFAULT_TRACK_ID = "sunset-highway";
 const ROAD_SEED_PREFIXES = ["SUNSET", "TURBO", "ROAD", "NEON", "RALLY", "LANE", "BOOST"];
 const DEFAULT_ROAD_SEED = "ROAD-52819";
@@ -1148,6 +1618,7 @@ const PARTY_ROUND_TYPES = [
   { id: PARTY_ROUND_TYPE_BEST_OF_3, label: "Best of 3", totalRounds: 3, scoringLabel: "Best Score" },
   { id: PARTY_ROUND_TYPE_TOTAL_SCORE, label: "Total Score", totalRounds: 3, scoringLabel: "Total Score" }
 ];
+const PARTY_RACE_TYPE_IDS = [DEFAULT_RACE_TYPE_ID, FUEL_RUN_RACE_TYPE_ID];
 const PARTY_SEED_MODES = [
   { id: PARTY_SEED_MODE_SAME_ROUND, label: "Same Seed for Round" },
   { id: PARTY_SEED_MODE_NEW_ROUND, label: "New Seed Each Round" }
@@ -1200,6 +1671,16 @@ const WEEKEND_PLAYTEST_PICKS = [
     note: "Redline Run is a good second Fuel Run test."
   },
   {
+    id: "sunset-pursuit",
+    title: "Sunset Pursuit",
+    trackId: DEFAULT_TRACK_ID,
+    trackLabel: "Sunset Highway",
+    raceTypeId: PURSUIT_RACE_TYPE_ID,
+    speedClassId: "arcade",
+    suggestedUse: "first chase-pressure test",
+    note: "Dodge roadblocks, manage heat, and reach the Escape Zone."
+  },
+  {
     id: "party-starter",
     title: "Party Starter",
     trackId: DEFAULT_TRACK_ID,
@@ -1216,6 +1697,7 @@ const WEEKEND_PLAYTEST_CHECKLIST = [
   "Try Family Arcade",
   "Try Redline Dare",
   "Try Fuel Run",
+  "Try Pursuit Mode",
   "Try Party Best of 3",
   "Check badges/title callouts",
   "Check if ramps feel useful",
@@ -1224,6 +1706,7 @@ const WEEKEND_PLAYTEST_CHECKLIST = [
 const PARTY_SETUP_HELP_ITEMS = [
   { title: "Best of 3", text: "each player gets 3 tries; best score wins." },
   { title: "Total Score", text: "all runs add together." },
+  { title: "Fuel Run", text: "collect gas cans and survive to the finish; running out ends the run." },
   { title: "Same Seed", text: "everyone races the same road." },
   { title: "New Seed Each Round", text: "fresh road each round." }
 ];
@@ -1231,6 +1714,7 @@ const PLAYTEST_REPORT_FILTERS = [
   { id: "all", label: "All Runs" },
   { id: "classic", label: "Classic Only" },
   { id: "fuelRun", label: "Fuel Run Only" },
+  { id: "pursuit", label: "Pursuit Only" },
   { id: "challenge", label: "Challenge Runs" },
   { id: "party", label: "Party Runs" },
   { id: "turbo", label: "Turbo Only" }
@@ -1244,8 +1728,9 @@ const TRACKS = [
     music: "audio/sunset-highway.mp3",
     musicFallback: "audio/sunset-highway.mp3",
     musicStatus: "Dedicated track music included.",
-    recommendedModes: ["Solo / Seeded Run", "Fuel Run", "Party Mode", "Challenge Mode"],
+    recommendedModes: ["Solo / Seeded Run", "Fuel Run", "Pursuit Mode", "Party Mode", "Challenge Mode"],
     fuelRunSupport: true,
+    pursuitSupport: true,
     targetDurationSeconds: 115,
     speedScale: 1,
     distanceMultiplierByMode: {},
@@ -1308,7 +1793,11 @@ const TRACKS = [
           boostTemptation: 1.18,
           nearMissCorridor: 0,
           fourLaneSpike: 0,
-          recoveryGap: 0.95
+          recoveryGap: 0.95,
+          pursuitPressureLanes: 0.72,
+          pursuitRoadblock: 0,
+          pursuitHardRoadblock: 0,
+          pursuitRecoveryGap: 1.05
         }
       },
       {
@@ -1333,7 +1822,11 @@ const TRACKS = [
           boostTemptation: 1.08,
           nearMissCorridor: 0.72,
           fourLaneSpike: 0,
-          recoveryGap: 1
+          recoveryGap: 1,
+          pursuitPressureLanes: 1.25,
+          pursuitRoadblock: 1.18,
+          pursuitHardRoadblock: 0.18,
+          pursuitRecoveryGap: 0.95
         }
       },
       {
@@ -1358,7 +1851,11 @@ const TRACKS = [
           boostTemptation: 0.78,
           nearMissCorridor: 1.36,
           fourLaneSpike: 0.55,
-          recoveryGap: 0.72
+          recoveryGap: 0.72,
+          pursuitPressureLanes: 1.3,
+          pursuitRoadblock: 1.55,
+          pursuitHardRoadblock: 0.72,
+          pursuitRecoveryGap: 0.82
         }
       },
       {
@@ -1383,7 +1880,11 @@ const TRACKS = [
           boostTemptation: 1.65,
           nearMissCorridor: 0.18,
           fourLaneSpike: 0,
-          recoveryGap: 1.55
+          recoveryGap: 1.55,
+          pursuitPressureLanes: 0.7,
+          pursuitRoadblock: 0.64,
+          pursuitHardRoadblock: 0.15,
+          pursuitRecoveryGap: 1.8
         }
       },
       {
@@ -1408,7 +1909,11 @@ const TRACKS = [
           boostTemptation: 0.72,
           nearMissCorridor: 1.62,
           fourLaneSpike: 1.9,
-          recoveryGap: 0.58
+          recoveryGap: 0.58,
+          pursuitPressureLanes: 1.38,
+          pursuitRoadblock: 1.7,
+          pursuitHardRoadblock: 1.2,
+          pursuitRecoveryGap: 0.72
         }
       }
     ],
@@ -1447,8 +1952,9 @@ const TRACKS = [
     musicFallback: "audio/sunset-highway.mp3",
     musicOptional: true,
     musicStatus: "Uses Redline Run music; falls back safely if missing.",
-    recommendedModes: ["Solo / Seeded Run", "Fuel Run", "Party Mode", "Pro / Turbo"],
+    recommendedModes: ["Solo / Seeded Run", "Fuel Run", "Pursuit Mode", "Party Mode", "Pro / Turbo"],
     fuelRunSupport: true,
+    pursuitSupport: true,
     targetDurationSeconds: 78,
     distanceToFinish: 165000,
     distanceMultiplierByMode: {
@@ -1566,6 +2072,15 @@ const TRACKS = [
         fuelAfterPressure: 0.86,
         recoveryGap: 1.28
       },
+      pursuitWaveWeightMultipliers: {
+        pursuitPressureLanes: 1.2,
+        pursuitRoadblock: 1.26,
+        pursuitHardRoadblock: 0.92,
+        pursuitRecoveryGap: 1.06,
+        rampEscape: 0.72,
+        boostTemptation: 1.24,
+        recoveryGap: 0.82
+      },
       extraWaveWeightsByBand: {
         opening: {
           redlineSlalom: 0.52,
@@ -1642,7 +2157,11 @@ const TRACKS = [
           expressConvoy: 0.3,
           neonChicane: 0,
           rampOverpass: 0.1,
-          needleThread: 0
+          needleThread: 0,
+          pursuitPressureLanes: 0.82,
+          pursuitRoadblock: 0,
+          pursuitHardRoadblock: 0,
+          pursuitRecoveryGap: 1.12
         }
       },
       {
@@ -1673,7 +2192,11 @@ const TRACKS = [
           expressConvoy: 1.05,
           neonChicane: 0.45,
           rampOverpass: 0.75,
-          needleThread: 0.45
+          needleThread: 0.45,
+          pursuitPressureLanes: 1.38,
+          pursuitRoadblock: 1.25,
+          pursuitHardRoadblock: 0.28,
+          pursuitRecoveryGap: 1.08
         }
       },
       {
@@ -1704,7 +2227,11 @@ const TRACKS = [
           expressConvoy: 1.35,
           neonChicane: 0.95,
           rampOverpass: 0.8,
-          needleThread: 1.2
+          needleThread: 1.2,
+          pursuitPressureLanes: 1.44,
+          pursuitRoadblock: 1.52,
+          pursuitHardRoadblock: 0.88,
+          pursuitRecoveryGap: 0.9
         }
       },
       {
@@ -1735,7 +2262,11 @@ const TRACKS = [
           expressConvoy: 0.45,
           neonChicane: 0.18,
           rampOverpass: 0.5,
-          needleThread: 0.18
+          needleThread: 0.18,
+          pursuitPressureLanes: 0.68,
+          pursuitRoadblock: 0.7,
+          pursuitHardRoadblock: 0.16,
+          pursuitRecoveryGap: 1.76
         }
       },
       {
@@ -1766,7 +2297,11 @@ const TRACKS = [
           expressConvoy: 1.25,
           neonChicane: 0.65,
           rampOverpass: 0.6,
-          needleThread: 1.55
+          needleThread: 1.55,
+          pursuitPressureLanes: 1.42,
+          pursuitRoadblock: 1.7,
+          pursuitHardRoadblock: 1.22,
+          pursuitRecoveryGap: 0.72
         }
       }
     ],
@@ -1815,6 +2350,12 @@ const RACE_TYPES = [
     label: "Fuel Run",
     shortLabel: "Fuel",
     description: "Traffic gates, gas can routing, and fuel survival."
+  },
+  {
+    id: PURSUIT_RACE_TYPE_ID,
+    label: "Pursuit Mode",
+    shortLabel: "Pursuit",
+    description: "Dodge roadblocks, manage heat, and reach the Escape Zone."
   }
 ];
 
@@ -1873,6 +2414,44 @@ const FUEL_RUN_CONFIG = {
     overdrive: 19,
     redline: 19
   }
+};
+
+const PURSUIT_CONFIG = {
+  heatLimit: 100,
+  startHeat: 14,
+  criticalThreshold: 80,
+  escapeZoneProgress: 0.9,
+  noRoadblockElapsedSeconds: 6,
+  noRoadblockProgress: 0.08,
+  roadblockWarningLeadSeconds: 2.35,
+  heatRisePerSecond: {
+    sunday: 2.6,
+    rookie: 3.1,
+    arcade: 3.9,
+    pro: 5.2,
+    turbo: 6.2,
+    overdrive: 6,
+    redline: 6.4
+  },
+  pressureHeatRisePerSecond: {
+    sunday: 4.2,
+    rookie: 5,
+    arcade: 6.3,
+    pro: 7.9,
+    turbo: 9.2,
+    overdrive: 9,
+    redline: 9.6
+  },
+  recoveryDropPerSecond: 8.5,
+  escapeDropPerSecond: 12,
+  boostDropPerSecond: 3.2,
+  rampDropPerSecond: 4.6,
+  roadblockClearDrop: 13,
+  slowdownHeatAdd: 10,
+  roadblockDodgeScore: 650,
+  escapeBonus: 3200,
+  cleanGetawayBonus: 1500,
+  heatSurvivorBonus: 900
 };
 
 const CHALLENGE_SAVE_VERSION = 1;
@@ -2555,6 +3134,27 @@ function isFuelRunRaceType(value) {
   return normalizeRaceTypeId(value) === FUEL_RUN_RACE_TYPE_ID;
 }
 
+function isPursuitRaceType(value) {
+  return normalizeRaceTypeId(value) === PURSUIT_RACE_TYPE_ID;
+}
+
+function normalizePartyRaceType(value, track = TRACKS[0]) {
+  const id = normalizeRaceTypeId(value, DEFAULT_RACE_TYPE_ID);
+  if (!PARTY_RACE_TYPE_IDS.includes(id)) return DEFAULT_RACE_TYPE_ID;
+  return trackSupportsRaceType(track, id) ? id : DEFAULT_RACE_TYPE_ID;
+}
+
+function getPartyRaceTypesForTrack(track = TRACKS[0], selectedId = DEFAULT_RACE_TYPE_ID) {
+  const types = PARTY_RACE_TYPE_IDS
+    .map((id) => getRaceTypeConfig(id))
+    .filter((raceType) => trackSupportsRaceType(track, raceType.id));
+  const selected = normalizePartyRaceType(selectedId, track);
+  if (!types.some((raceType) => raceType.id === selected)) {
+    types.unshift(getRaceTypeConfig(DEFAULT_RACE_TYPE_ID));
+  }
+  return types;
+}
+
 function normalizePartyRoundType(value, fallback = PARTY_ROUND_TYPE_ONE_RUN) {
   const id = String(value || "").trim();
   return PARTY_ROUND_TYPES.some((item) => item.id === id) ? id : fallback;
@@ -2627,7 +3227,8 @@ function trackSupportsRaceType(track = TRACKS[0], raceTypeId = DEFAULT_RACE_TYPE
   const id = normalizeRaceTypeId(raceTypeId);
   if (id === DEFAULT_RACE_TYPE_ID) return true;
   if (id === FUEL_RUN_RACE_TYPE_ID) return track?.fuelRunSupport !== false;
-  return true;
+  if (id === PURSUIT_RACE_TYPE_ID) return track?.pursuitSupport === true;
+  return false;
 }
 
 function getRaceTypesForTrack(track = TRACKS[0]) {
@@ -2743,7 +3344,11 @@ function getScoreEventLabel(type, points) {
     boostPad: "BOOST PAD",
     ramp: "RAMP",
     gasCan: "FUEL",
-    finish: "FINISH"
+    finish: "FINISH",
+    pursuitEscape: "ESCAPE",
+    roadblockDodge: "ROADBLOCK DODGE",
+    cleanGetaway: "CLEAN GETAWAY",
+    heatSurvivor: "HEAT SURVIVOR"
   };
   return `${labels[type] || "BONUS"} ${amount}`;
 }
@@ -2754,6 +3359,7 @@ function getScoreEventColor(type) {
   if (type === "ramp") return "#ffe45e";
   if (type === "gasCan") return "#ff4d3d";
   if (type === "finish") return "#f6fbff";
+  if (["pursuitEscape", "roadblockDodge", "cleanGetaway", "heatSurvivor"].includes(type)) return "#28f6ff";
   return "#ffe45e";
 }
 
@@ -3014,6 +3620,18 @@ function createDefaultPlayerBadgeStats() {
     version: PLAYER_BADGE_STATS_VERSION,
     totalRuns: 0,
     partyRuns: 0,
+    totalNearMisses: 0,
+    totalRampsUsed: 0,
+    totalFinishes: 0,
+    totalTurboPlusFinishes: 0,
+    totalOverdrivePlusFinishes: 0,
+    totalRedlineFinishes: 0,
+    totalPartyRuns: 0,
+    totalGasCansCollected: 0,
+    totalFuelRunFinishes: 0,
+    totalPursuitEscapes: 0,
+    totalRoadblocksCleared: 0,
+    totalHeatHeavyPursuitRuns: 0,
     partyWins: 0,
     bestOf3Wins: 0
   };
@@ -3022,13 +3640,48 @@ function createDefaultPlayerBadgeStats() {
 function normalizePlayerBadgeStats(value) {
   const fallback = createDefaultPlayerBadgeStats();
   const source = value && typeof value === "object" ? value : {};
+  const partyRuns = normalizeNonNegativeInteger(source.totalPartyRuns ?? source.partyRuns, 0, 999999);
   return {
     ...fallback,
     totalRuns: normalizeNonNegativeInteger(source.totalRuns || source.runs, 0, 999999),
-    partyRuns: normalizeNonNegativeInteger(source.partyRuns, 0, 999999),
+    partyRuns,
+    totalNearMisses: normalizeNonNegativeInteger(source.totalNearMisses, 0, 999999),
+    totalRampsUsed: normalizeNonNegativeInteger(source.totalRampsUsed, 0, 999999),
+    totalFinishes: normalizeNonNegativeInteger(source.totalFinishes, 0, 999999),
+    totalTurboPlusFinishes: normalizeNonNegativeInteger(source.totalTurboPlusFinishes, 0, 999999),
+    totalOverdrivePlusFinishes: normalizeNonNegativeInteger(source.totalOverdrivePlusFinishes, 0, 999999),
+    totalRedlineFinishes: normalizeNonNegativeInteger(source.totalRedlineFinishes, 0, 999999),
+    totalPartyRuns: partyRuns,
+    totalGasCansCollected: normalizeNonNegativeInteger(source.totalGasCansCollected, 0, 999999),
+    totalFuelRunFinishes: normalizeNonNegativeInteger(source.totalFuelRunFinishes, 0, 999999),
+    totalPursuitEscapes: normalizeNonNegativeInteger(source.totalPursuitEscapes, 0, 999999),
+    totalRoadblocksCleared: normalizeNonNegativeInteger(source.totalRoadblocksCleared, 0, 999999),
+    totalHeatHeavyPursuitRuns: normalizeNonNegativeInteger(source.totalHeatHeavyPursuitRuns, 0, 999999),
     partyWins: normalizeNonNegativeInteger(source.partyWins, 0, 999999),
     bestOf3Wins: normalizeNonNegativeInteger(source.bestOf3Wins, 0, 999999)
   };
+}
+
+function getBadgeDefinitionProgress(definition, badgeStats) {
+  const stat = normalizeStorageId(definition?.progressStat, "");
+  const target = normalizeNonNegativeInteger(definition?.progressTarget, 0, 999999);
+  if (!stat || target <= 0) return null;
+  const stats = normalizePlayerBadgeStats(badgeStats);
+  const current = normalizeNonNegativeInteger(stats[stat], 0, 999999);
+  return {
+    stat,
+    current,
+    target,
+    complete: current >= target,
+    text: `${Math.min(current, target).toLocaleString()} / ${target.toLocaleString()}`
+  };
+}
+
+function getEarnedMasteryBadgeIds(badgeStats) {
+  return getVisibleBadgeDefinitions()
+    .filter((definition) => definition.category === "mastery")
+    .filter((definition) => getBadgeDefinitionProgress(definition, badgeStats)?.complete)
+    .map((definition) => definition.id);
 }
 
 function getBadgeProgress(player) {
@@ -3393,6 +4046,7 @@ function normalizeRunStatus(value) {
   const status = String(value || "").trim();
   if (status === "finished") return "finished";
   if (status === "outOfFuel" || status === "out-of-fuel" || /^out of fuel$/i.test(status)) return "outOfFuel";
+  if (status === "busted" || /^busted$/i.test(status)) return "busted";
   return "crashed";
 }
 
@@ -3400,7 +4054,18 @@ function getRunStatusLabel(status, reason = "") {
   const normalized = normalizeRunStatus(status);
   if (normalized === "finished") return "Finished";
   if (normalized === "outOfFuel") return "Out of Fuel";
+  if (normalized === "busted") return "Busted";
   return reason ? `Crashed: ${reason}` : "Crashed";
+}
+
+function getRunOutcomeLabel(entry = {}) {
+  const raceType = normalizeRaceTypeId(entry.raceType || entry.raceTypeId, DEFAULT_RACE_TYPE_ID);
+  const status = normalizeRunStatus(entry.status);
+  if (raceType === PURSUIT_RACE_TYPE_ID) {
+    if (status === "finished") return "Escaped";
+    if (status === "busted") return "Busted";
+  }
+  return getRunStatusLabel(status, entry.reason || entry.endReason || "");
 }
 
 function getFuelRunTuning(speedClassId) {
@@ -3414,6 +4079,40 @@ function getFuelRunTuning(speedClassId) {
     minGasGapSeconds: FUEL_RUN_CONFIG.minGasGapSeconds[id] ?? FUEL_RUN_CONFIG.minGasGapSeconds[DEFAULT_SPEED_CLASS_ID],
     targetGasGapSeconds: FUEL_RUN_CONFIG.targetGasGapSeconds[id] ?? FUEL_RUN_CONFIG.targetGasGapSeconds[DEFAULT_SPEED_CLASS_ID],
     maxGasGapSeconds: FUEL_RUN_CONFIG.maxGasGapSeconds[id] ?? FUEL_RUN_CONFIG.maxGasGapSeconds[DEFAULT_SPEED_CLASS_ID]
+  };
+}
+
+function getPursuitTuning(speedClassId, track = TRACKS[0]) {
+  const id = normalizeSpeedClassId(speedClassId, DEFAULT_SPEED_CLASS_ID);
+  const redline = (track?.id || "") === "redline-run";
+  return {
+    heatLimit: PURSUIT_CONFIG.heatLimit,
+    startHeat: redline ? PURSUIT_CONFIG.startHeat + 3 : PURSUIT_CONFIG.startHeat,
+    criticalThreshold: PURSUIT_CONFIG.criticalThreshold,
+    escapeZoneProgress: PURSUIT_CONFIG.escapeZoneProgress,
+    noRoadblockElapsedSeconds: redline
+      ? PURSUIT_CONFIG.noRoadblockElapsedSeconds + 1.2
+      : PURSUIT_CONFIG.noRoadblockElapsedSeconds,
+    noRoadblockProgress: redline
+      ? PURSUIT_CONFIG.noRoadblockProgress + 0.02
+      : PURSUIT_CONFIG.noRoadblockProgress,
+    minRoadblockGapSeconds: redline ? 6.5 : 5.5,
+    targetRoadblockGapSeconds: redline ? 10 : 8.8,
+    roadblockWarningLeadSeconds: redline
+      ? PURSUIT_CONFIG.roadblockWarningLeadSeconds + 0.15
+      : PURSUIT_CONFIG.roadblockWarningLeadSeconds,
+    heatRisePerSecond: PURSUIT_CONFIG.heatRisePerSecond[id] ?? PURSUIT_CONFIG.heatRisePerSecond[DEFAULT_SPEED_CLASS_ID],
+    pressureHeatRisePerSecond: PURSUIT_CONFIG.pressureHeatRisePerSecond[id] ?? PURSUIT_CONFIG.pressureHeatRisePerSecond[DEFAULT_SPEED_CLASS_ID],
+    recoveryDropPerSecond: PURSUIT_CONFIG.recoveryDropPerSecond,
+    escapeDropPerSecond: PURSUIT_CONFIG.escapeDropPerSecond,
+    boostDropPerSecond: PURSUIT_CONFIG.boostDropPerSecond,
+    rampDropPerSecond: PURSUIT_CONFIG.rampDropPerSecond,
+    roadblockClearDrop: PURSUIT_CONFIG.roadblockClearDrop,
+    slowdownHeatAdd: PURSUIT_CONFIG.slowdownHeatAdd,
+    roadblockDodgeScore: PURSUIT_CONFIG.roadblockDodgeScore,
+    escapeBonus: PURSUIT_CONFIG.escapeBonus,
+    cleanGetawayBonus: PURSUIT_CONFIG.cleanGetawayBonus,
+    heatSurvivorBonus: PURSUIT_CONFIG.heatSurvivorBonus
   };
 }
 
@@ -3578,6 +4277,11 @@ function normalizeLeaderboardEntry(entry) {
     fuelCollected: normalizeNonNegativeInteger(Number.isFinite(Number(entry.fuelCollected)) ? entry.fuelCollected : entry.gasCansCollected || 0, 0, 999),
     fuelRemaining: normalizeNonNegativeInteger(entry.fuelRemaining, 0, FUEL_RUN_CONFIG.fuelMax),
     fuelBonus: normalizeNonNegativeInteger(entry.fuelBonus),
+    pursuitResult: sanitizeName(entry.pursuitResult, "", DISPLAY_TEXT_MAX_LENGTH),
+    heatAtEnd: normalizeNonNegativeNumber(entry.heatAtEnd, 0, PURSUIT_CONFIG.heatLimit),
+    heatMax: normalizeNonNegativeNumber(entry.heatMax, 0, PURSUIT_CONFIG.heatLimit),
+    roadblocksCleared: normalizeNonNegativeInteger(entry.roadblocksCleared, 0, 999),
+    roadblocksSpawned: normalizeNonNegativeInteger(entry.roadblocksSpawned, 0, 999),
     date: normalizeDateString(entry.date, ""),
     partyMode: Boolean(entry.partyMode),
     partySessionId: normalizeStorageId(entry.partySessionId, ""),
@@ -3724,7 +4428,26 @@ function normalizePlaytestRunSummary(entry) {
     longestNoFuelStretch: normalizeNonNegativeNumber(entry.longestNoFuelStretch, 0, 24 * 60 * 60),
     lowFuelTime: normalizeNonNegativeNumber(entry.lowFuelTime, 0, 24 * 60 * 60),
     criticalFuelTime: normalizeNonNegativeNumber(entry.criticalFuelTime, 0, 24 * 60 * 60),
-    outOfFuelOccurred: Boolean(entry.outOfFuelOccurred || status === "outOfFuel")
+    outOfFuelOccurred: Boolean(entry.outOfFuelOccurred || status === "outOfFuel"),
+    heatMax: normalizeNonNegativeNumber(entry.heatMax || entry.pursuitHeatMax, 0, PURSUIT_CONFIG.heatLimit),
+    heatAtEnd: normalizeNonNegativeNumber(entry.heatAtEnd || entry.pursuitHeatAtEnd, 0, PURSUIT_CONFIG.heatLimit),
+    heatCriticalTime: normalizeNonNegativeNumber(entry.heatCriticalTime || entry.pursuitHeatCriticalTime, 0, 24 * 60 * 60),
+    heatRisingTime: normalizeNonNegativeNumber(entry.heatRisingTime || entry.pursuitHeatRisingTime, 0, 24 * 60 * 60),
+    heatDroppingTime: normalizeNonNegativeNumber(entry.heatDroppingTime || entry.pursuitHeatDroppingTime, 0, 24 * 60 * 60),
+    roadblocksSpawned: normalizeNonNegativeInteger(entry.roadblocksSpawned, 0, 9999),
+    roadblocksCleared: normalizeNonNegativeInteger(entry.roadblocksCleared, 0, 9999),
+    roadblockWarnings: normalizeNonNegativeInteger(entry.roadblockWarnings, 0, 9999),
+    bustedOccurred: Boolean(entry.bustedOccurred || status === "busted"),
+    escapeReached: Boolean(entry.escapeReached || (raceTypeId === PURSUIT_RACE_TYPE_ID && status === "finished")),
+    pursuitResult: sanitizeName(entry.pursuitResult, raceTypeId === PURSUIT_RACE_TYPE_ID ? getRunOutcomeLabel({ raceTypeId, status }) : "", DISPLAY_TEXT_MAX_LENGTH),
+    pursuitBonuses: entry.pursuitBonuses && typeof entry.pursuitBonuses === "object"
+      ? {
+        escapeBonus: normalizeNonNegativeInteger(entry.pursuitBonuses.escapeBonus),
+        roadblockDodge: normalizeNonNegativeInteger(entry.pursuitBonuses.roadblockDodge),
+        cleanGetaway: normalizeNonNegativeInteger(entry.pursuitBonuses.cleanGetaway),
+        heatSurvivor: normalizeNonNegativeInteger(entry.pursuitBonuses.heatSurvivor)
+      }
+      : {}
   };
 }
 
@@ -4258,13 +4981,16 @@ class PlayerProfileManager {
   getBadgeViewModels(playerOrId) {
     const player = typeof playerOrId === "string" ? this.getPlayerById(playerOrId) : playerOrId;
     const badges = normalizePlayerBadges(player?.badges);
+    const badgeStats = normalizePlayerBadgeStats(player?.badgeStats);
     return getVisibleBadgeDefinitions().map((definition) => {
       const earnedEntry = badges.earned[definition.id] || null;
+      const progress = getBadgeDefinitionProgress(definition, badgeStats);
       return {
         ...definition,
         categoryLabel: getBadgeCategoryLabel(definition.category),
         earned: Boolean(earnedEntry),
-        earnedAt: earnedEntry?.earnedAt || ""
+        earnedAt: earnedEntry?.earnedAt || "",
+        progress
       };
     });
   }
@@ -4327,8 +5053,34 @@ class PlayerProfileManager {
     const player = this.getPlayerById(summary?.playerId);
     if (!player || summary?.scoreSaved === false) return createDefaultPlayerBadgeStats();
     player.badgeStats = normalizePlayerBadgeStats(player.badgeStats);
+    const speedClass = normalizeSpeedClassId(summary.speedClass, DEFAULT_SPEED_CLASS_ID);
+    const finished = summary.status === "finished";
     player.badgeStats.totalRuns += 1;
-    if (summary.partyMode) player.badgeStats.partyRuns += 1;
+    player.badgeStats.totalNearMisses += normalizeNonNegativeInteger(summary.nearMisses, 0, 999);
+    player.badgeStats.totalRampsUsed += normalizeNonNegativeInteger(summary.rampsUsed, 0, 999);
+    if (finished) {
+      player.badgeStats.totalFinishes += 1;
+      if (isSpeedClassAtLeast(speedClass, "turbo")) player.badgeStats.totalTurboPlusFinishes += 1;
+      if (isSpeedClassAtLeast(speedClass, "overdrive")) player.badgeStats.totalOverdrivePlusFinishes += 1;
+      if (speedClass === "redline") player.badgeStats.totalRedlineFinishes += 1;
+    }
+    if (summary.partyMode) {
+      player.badgeStats.partyRuns += 1;
+      player.badgeStats.totalPartyRuns += 1;
+    }
+    if (summary.raceTypeId === FUEL_RUN_RACE_TYPE_ID) {
+      player.badgeStats.totalGasCansCollected += normalizeNonNegativeInteger(summary.gasCansCollected || summary.fuelCollected, 0, 999);
+      if (finished) player.badgeStats.totalFuelRunFinishes += 1;
+    }
+    if (summary.raceTypeId === PURSUIT_RACE_TYPE_ID) {
+      player.badgeStats.totalRoadblocksCleared += normalizeNonNegativeInteger(summary.roadblocksCleared, 0, 999);
+      if (finished) {
+        player.badgeStats.totalPursuitEscapes += 1;
+        if ((summary.heatMax || 0) >= PURSUIT_CONFIG.criticalThreshold) {
+          player.badgeStats.totalHeatHeavyPursuitRuns += 1;
+        }
+      }
+    }
     this.save();
     return player.badgeStats;
   }
@@ -4370,6 +5122,14 @@ class PlayerProfileManager {
       if (summary.raceTypeId === FUEL_RUN_RACE_TYPE_ID && (summary.fuelRemaining || 0) <= 10) badgeIds.push("fuel_clutch");
       if (summary.raceTypeId === FUEL_RUN_RACE_TYPE_ID && (summary.fuelRemaining || 0) >= 40) badgeIds.push("fuel_hoarder");
       if (summary.raceTypeId === FUEL_RUN_RACE_TYPE_ID && (summary.lowestFuelReached || FUEL_RUN_CONFIG.fuelMax) <= 25) badgeIds.push("comeback_finish");
+      if (summary.raceTypeId === PURSUIT_RACE_TYPE_ID) {
+        badgeIds.push("first_escape");
+        if ((summary.heatMax || 0) >= PURSUIT_CONFIG.criticalThreshold) badgeIds.push("heat_survivor");
+        if ((summary.slowdownHits || 0) === 0) badgeIds.push("clean_getaway");
+        if ((summary.roadblocksCleared || 0) >= 5) badgeIds.push("roadblock_dodger");
+        if (summary.trackId === "redline-run") badgeIds.push("redline_escape");
+        if ((summary.manualBoostsUsed || 0) === 0) badgeIds.push("no_boost_escape");
+      }
     }
     if ((summary.nearMisses || 0) >= 5) badgeIds.push("near_miss_streak");
     if ((summary.nearMisses || 0) >= 10) badgeIds.push("near_miss_10");
@@ -4378,6 +5138,7 @@ class PlayerProfileManager {
     if (summary.raceTypeId === FUEL_RUN_RACE_TYPE_ID && (summary.gasCansCollected || 0) >= 5) badgeIds.push("gas_gremlin");
     if (summary.raceTypeId === FUEL_RUN_RACE_TYPE_ID && (summary.fuelSavedByBoost || 0) >= 10) badgeIds.push("boost_saver");
     if (summary.partyMode && badgeStats.partyRuns >= 5) badgeIds.push("party_regular");
+    badgeIds.push(...getEarnedMasteryBadgeIds(badgeStats));
     if (summary.challengeMode && summary.challengeResult?.completed && summary.challengeResult?.saved !== false) {
       badgeIds.push("first_challenge");
       const challenge = getChallengeById(summary.challengeId);
@@ -4568,7 +5329,7 @@ class PartySession {
     this.sharedSeed = normalizeRoadSeed(options.sharedSeed, DEFAULT_ROAD_SEED);
     this.track = getTrackById(options.track?.id || options.trackId || DEFAULT_TRACK_ID);
     this.raceMode = normalizeSpeedClassId(options.raceMode, DEFAULT_SPEED_CLASS_ID);
-    this.raceType = normalizeRaceTypeId(options.raceType || options.raceTypeId, DEFAULT_RACE_TYPE_ID);
+    this.raceType = normalizePartyRaceType(options.raceType || options.raceTypeId, this.track);
     this.results = Array.isArray(options.results) ? options.results.slice() : [];
     const nextRunIndex = Math.max(0, Math.min(this.results.length, this.totalPlayers * this.totalRounds));
     this.currentRoundIndex = clampNumber(options.currentRoundIndex ?? Math.floor(nextRunIndex / Math.max(1, this.totalPlayers)), 0, Math.max(0, this.totalRounds - 1), 0);
@@ -4651,9 +5412,13 @@ class PartySession {
       totalRounds: this.totalRounds,
       turnNumber: this.currentTurnNumber,
       totalPlayers: this.totalPlayers,
-      fuelCollected: normalizeNonNegativeInteger(summary?.fuelCollected || 0, 0, 999),
+      gasCansCollected: normalizeNonNegativeInteger(summary?.gasCansCollected || summary?.fuelCollected || 0, 0, 999),
+      gasCansSpawned: normalizeNonNegativeInteger(summary?.gasCansSpawned || 0, 0, 999),
+      fuelCollected: normalizeNonNegativeInteger(summary?.fuelCollected || summary?.gasCansCollected || 0, 0, 999),
       fuelRemaining: normalizeNonNegativeInteger(summary?.fuelRemaining || 0, 0, FUEL_RUN_CONFIG.fuelMax),
+      lowestFuelReached: normalizeNonNegativeInteger(summary?.lowestFuelReached || 0, 0, FUEL_RUN_CONFIG.fuelMax),
       fuelBonus: normalizeNonNegativeInteger(summary?.fuelBonus || 0),
+      outOfFuel: summary?.status === "outOfFuel",
       scoreSaved: summary?.scoreSaved !== false,
       leaderboardRank: Number.isFinite(summary?.topTwentyRank) ? summary.topTwentyRank : null,
       medals: Array.isArray(summary?.medals) ? summary.medals.slice(0, 3) : [],
@@ -4716,6 +5481,12 @@ class PartySession {
         latestStatus: latest?.status || "",
         latestReason: latest?.reason || "",
         latestTime: latest?.time || 0,
+        latestGasCansCollected: latest?.gasCansCollected || 0,
+        latestGasCansSpawned: latest?.gasCansSpawned || 0,
+        latestFuelRemaining: latest?.fuelRemaining || 0,
+        latestLowestFuelReached: latest?.lowestFuelReached || 0,
+        latestOutOfFuel: Boolean(latest?.outOfFuel),
+        totalGasCansCollected: playerResults.reduce((sum, result) => sum + normalizeNonNegativeInteger(result.gasCansCollected || result.fuelCollected), 0),
         raceMode: latest?.raceMode || this.raceMode,
         raceType: latest?.raceType || this.raceType,
         seed: latest?.seed || this.currentSeed,
@@ -5956,6 +6727,8 @@ class RoadDirector {
       raceTypeId,
       fuelRun: isFuelRunRaceType(raceTypeId),
       fuel: this.manager.getFuelRunContext(distance),
+      pursuitRun: isPursuitRaceType(raceTypeId),
+      pursuit: this.manager.getPursuitContext(distance),
       cadence,
       modeIntensity,
       playerLane,
@@ -5986,7 +6759,8 @@ class RoadDirector {
     const result = this.createWaveResult(waveType, context);
     this.applyWave(waveType, distance, context, result);
 
-    if (!result.spawned.length && waveType !== "recoveryGap") {
+    const recoveryLikeWave = waveType === "recoveryGap" || waveType === "pursuitRecoveryGap";
+    if (!result.spawned.length && !recoveryLikeWave) {
       this.applyWave("singleBlocker", distance + 40, context, result);
       result.fallbackUsed = true;
     }
@@ -6089,6 +6863,19 @@ class RoadDirector {
       if (underActivity && gasDue) return this.makeDirectorIntent("gasRoute", "fuel route can carry activity");
       if (gasDue && this.random() < 0.76) return this.makeDirectorIntent("gasRoute", "fuel route due");
     }
+    if (context.pursuitRun) {
+      const pursuit = context.pursuit || {};
+      const roadblockDue = Boolean(pursuit.canSpawnRoadblock)
+        && (pursuit.timeSinceLastRoadblock >= pursuit.targetRoadblockGapSeconds || context.forceMeaningful);
+      if (pursuit.escapeZone || pursuit.heatHigh || sectionId === "breather") {
+        return this.makeDirectorIntent("pursuitRecovery", pursuit.escapeZone ? "escape zone heat drop" : "pursuit recovery window");
+      }
+      if (underActivity && roadblockDue) return this.makeDirectorIntent("pursuitRoadblock", "roadblock can carry activity");
+      if (roadblockDue && this.random() < 0.7) return this.makeDirectorIntent("pursuitRoadblock", "roadblock cadence due");
+      if (context.centerNeedsChallenge || context.needsMovementChallenge || sectionId === "pressure" || sectionId === "finalPush") {
+        return this.makeDirectorIntent("pursuitPressure", "pursuit lane pressure");
+      }
+    }
     if (underActivity) {
       if (sectionId === "breather") {
         return weightedChoice([
@@ -6155,6 +6942,12 @@ class RoadDirector {
     if (context.activity?.underActivity && metadata.family === "recovery") weight *= 0.08;
     if (context.activity?.overDensity && metadata.pressureRating >= 3) weight *= 0.18;
     if (context.fuelRun && intentId === "gasRoute" && metadata.rewardType !== "gas") weight *= 0.45;
+    if (context.pursuitRun) {
+      if (metadata.family === "fuel-route" || metadata.family === "fuel-pressure") weight = 0;
+      if (metadata.family === "pursuit-roadblock" && !context.pursuit?.canSpawnRoadblock) weight = 0;
+      if (intentId === "pursuitRoadblock" && metadata.family !== "pursuit-roadblock") weight *= 0.42;
+      if (intentId === "pursuitRecovery" && metadata.family !== "pursuit-recovery" && type !== "recoveryGap") weight *= 0.22;
+    }
     if (context.track?.id === "redline-run" && Array.isArray(metadata.trackAffinity) && metadata.trackAffinity.includes("redline-run")) {
       weight *= 1.12;
     }
@@ -6186,6 +6979,9 @@ class RoadDirector {
   }
 
   chooseWaveType(context) {
+    if (context.pursuitRun) {
+      return this.choosePursuitWaveType(context);
+    }
     if (context.fuelRun) {
       return this.chooseFuelRunWaveType(context);
     }
@@ -6433,6 +7229,70 @@ class RoadDirector {
     return weightedChoice(weights, () => this.random()) || "doubleGate";
   }
 
+  choosePursuitWaveType(context) {
+    if (this.forceRecoveryNext) {
+      this.forceRecoveryNext = false;
+      return "pursuitRecoveryGap";
+    }
+    const pursuit = context.pursuit || {};
+    if (pursuit.escapeZone || pursuit.heatHigh || context.section?.id === "breather") {
+      return weightedChoice([
+        { value: "pursuitRecoveryGap", weight: 2.6 },
+        { value: "recoveryGap", weight: 1.1 },
+        { value: "rampEscape", weight: context.progress > 0.2 ? 0.62 : 0.15 },
+        { value: "boostTemptation", weight: context.progress > 0.18 ? 0.5 : 0.12 }
+      ].map((item) => ({
+        ...item,
+        weight: this.isWaveAllowed(item.value, context)
+          ? item.weight * this.getSectionWaveWeight(item.value, context) * this.getVarietyWeight(item.value, context)
+          : 0
+      })), () => this.random()) || "pursuitRecoveryGap";
+    }
+
+    const roadblockDue = Boolean(pursuit.canSpawnRoadblock)
+      && (pursuit.timeSinceLastRoadblock >= pursuit.targetRoadblockGapSeconds || context.forceMeaningful);
+    if (context.directorIntent?.id === "pursuitRoadblock" && roadblockDue) {
+      return weightedChoice([
+        { value: "pursuitRoadblock", weight: 2.2 },
+        { value: "pursuitHardRoadblock", weight: context.progress > 0.48 ? 1.05 : 0 },
+        { value: "pursuitPressureLanes", weight: 0.52 }
+      ].map((item) => ({
+        ...item,
+        weight: this.isWaveAllowed(item.value, context)
+          ? item.weight
+            * this.getSectionWaveWeight(item.value, context)
+            * this.getTrackWaveWeight(item.value, context, "pursuitWaveWeightMultipliers")
+            * this.getDirectorIntentWeight(item.value, context)
+            * this.getVarietyWeight(item.value, context)
+          : 0
+      })), () => this.random()) || "pursuitRoadblock";
+    }
+
+    const weights = [
+      { value: "pursuitPressureLanes", weight: context.forceMeaningful ? 2.25 : 1.45 },
+      { value: "pursuitRoadblock", weight: pursuit.canSpawnRoadblock && context.progress > 0.18 ? 0.9 : 0 },
+      { value: "pursuitHardRoadblock", weight: pursuit.canSpawnRoadblock && context.progress > 0.58 ? 0.38 : 0 },
+      { value: "offsetPair", weight: 0.62 },
+      { value: "centerBlock", weight: context.centerNeedsChallenge ? 0.85 : 0.34 },
+      { value: "leftRightSweep", weight: context.progress > 0.36 ? 0.58 : 0.22 },
+      { value: "rampEscape", weight: context.progress > 0.18 ? 0.46 : 0.12 },
+      { value: "boostTemptation", weight: context.progress > 0.16 ? 0.42 : 0.16 },
+      { value: "pursuitRecoveryGap", weight: pursuit.timeSinceLastRoadblock < 4 ? 0.95 : 0.18 }
+    ];
+    weights.forEach((item) => {
+      item.weight *= this.getSectionWaveWeight(item.value, context);
+      item.weight *= this.getTrackWaveWeight(item.value, context, "pursuitWaveWeightMultipliers");
+      item.weight *= this.getDirectorIntentWeight(item.value, context);
+      item.weight *= this.getVarietyWeight(item.value, context);
+      if (!this.isWaveAllowed(item.value, context)) item.weight = 0;
+      const expectedPressure = this.getExpectedWavePressure(item.value, context);
+      if (expectedPressure > context.pressureBudget + context.pressureBudgetAllowance) {
+        item.weight *= 0.56;
+      }
+    });
+    return weightedChoice(weights, () => this.random()) || "pursuitPressureLanes";
+  }
+
   chooseFuelRunWaveType(context) {
     if (this.forceRecoveryNext) {
       this.forceRecoveryNext = false;
@@ -6519,6 +7379,21 @@ class RoadDirector {
   isWaveAllowed(type, context) {
     if (REDLINE_TEMPLATE_WAVE_TYPES.has(type) && !this.hasTrackSpecificWave(type, context)) return false;
     if (this.getTrackWaveWeight(type, context) <= 0) return false;
+    const pursuitWave = ["pursuitPressureLanes", "pursuitRoadblock", "pursuitHardRoadblock", "pursuitRecoveryGap"].includes(type);
+    if (pursuitWave && !context.pursuitRun) return false;
+    if (context.pursuitRun) {
+      if (String(type).startsWith("fuel")) return false;
+      const pursuit = context.pursuit || {};
+      if ((type === "pursuitRoadblock" || type === "pursuitHardRoadblock") && !pursuit.canSpawnRoadblock) return false;
+      if (type === "pursuitHardRoadblock") {
+        if (context.progress < 0.46) return false;
+        if (context.speedClassId === "sunday" || context.speedClassId === "rookie") return false;
+      }
+      if (type === "fourLaneSpike") return false;
+      if (type === "deerCrossing") return false;
+    } else if (pursuitWave) {
+      return false;
+    }
     if (type === "deerCrossing" && this.getTrackObjectWeight("deer", context) <= 0) return false;
     if (type === "fourLaneSpike") {
       if (context.progress < TRACK_DIRECTOR.fourLaneMinProgress) return false;
@@ -6561,7 +7436,11 @@ class RoadDirector {
       expressConvoy: context.speedClassId === "turbo" ? 3.2 : 2.55,
       neonChicane: 2.65,
       rampOverpass: 1.85,
-      needleThread: context.speedClassId === "turbo" ? 3.65 : 3.15
+      needleThread: context.speedClassId === "turbo" ? 3.65 : 3.15,
+      pursuitPressureLanes: context.speedClassId === "sunday" ? 1.9 : 2.8,
+      pursuitRoadblock: context.progress > 0.55 ? 3.45 : 2.65,
+      pursuitHardRoadblock: 4.15,
+      pursuitRecoveryGap: 0
     };
     return (estimates[type] ?? 2) + difficultyBonus;
   }
@@ -6595,6 +7474,14 @@ class RoadDirector {
     };
   }
 
+  retagWaveResult(result, type) {
+    if (!result) return;
+    const metadata = this.getWaveMetadata(type);
+    result.type = type;
+    result.label = metadata.displayName || this.getWaveLabel(type);
+    result.metadata = metadata;
+  }
+
   getWaveLabel(type) {
     return ROAD_DIRECTOR_WAVE_METADATA[type]?.displayName || type;
   }
@@ -6625,6 +7512,10 @@ class RoadDirector {
       fuelSplit: () => this.waveFuelSplit(distance, context, result),
       fuelLowRescue: () => this.waveFuelLowRescue(distance, context, result),
       fuelSupport: () => this.waveFuelSupport(distance, context, result),
+      pursuitPressureLanes: () => this.wavePursuitPressureLanes(distance, context, result),
+      pursuitRoadblock: () => this.wavePursuitRoadblock(distance, context, result, false),
+      pursuitHardRoadblock: () => this.wavePursuitRoadblock(distance, context, result, true),
+      pursuitRecoveryGap: () => this.wavePursuitRecoveryGap(distance, context, result),
       recoveryGap: () => this.waveRecoveryGap(distance, context, result)
     };
     (handlers[type] || handlers.singleBlocker)();
@@ -6808,11 +7699,11 @@ class RoadDirector {
     sectionStats.pressureBudgetSum += context.pressureBudget;
     sectionStats.pressureSum += result.pressure;
     if (result.hard) stats.hardWaveCount += 1;
-    if (result.type === "recoveryGap") stats.recoveryWaveCount += 1;
+    if (result.type === "recoveryGap" || result.type === "pursuitRecoveryGap") stats.recoveryWaveCount += 1;
     if (!result.fairnessPassed) stats.fairnessFailures += 1;
     if (!result.pressureBudgetPassed) stats.pressureBudgetFailures += 1;
     if (result.hard) sectionStats.hardWaveCount += 1;
-    if (result.type === "recoveryGap") sectionStats.recoveryWaveCount += 1;
+    if (result.type === "recoveryGap" || result.type === "pursuitRecoveryGap") sectionStats.recoveryWaveCount += 1;
     if (!result.fairnessPassed) sectionStats.fairnessFailures += 1;
     if (!result.pressureBudgetPassed) sectionStats.pressureBudgetFailures += 1;
     stats.waveGapSeconds.push(waveGapSeconds);
@@ -6847,7 +7738,7 @@ class RoadDirector {
     const solutionWave = metadata.family === "solution" && (result.rampSolutions.length || result.rampLanes.length);
     const fuelRouteWave = context.fuelRun && metadata.rewardType === "gas" && result.gasCanLanes.length > 0;
     const rewardTemptationWave = metadata.family === "reward" && rewardCount > 0;
-    const meaningfulWave = result.type !== "recoveryGap" && (
+    const meaningfulWave = result.type !== "recoveryGap" && result.type !== "pursuitRecoveryGap" && (
       blockedCount > 0
       || solutionWave
       || fuelRouteWave
@@ -7045,7 +7936,11 @@ class RoadDirector {
       fuelAfterPressure: 1.02,
       fuelSplit: 1.06,
       fuelLowRescue: 0.72,
-      fuelSupport: 0.96
+      fuelSupport: 0.96,
+      pursuitPressureLanes: 0.9,
+      pursuitRoadblock: 1.08,
+      pursuitHardRoadblock: 1.18,
+      pursuitRecoveryGap: 1.24
     };
     const recoveryScale = result.type === "recoveryGap" ? (cadence.recoveryScale ?? 1) : 1;
     return (multipliers[result.type] || 1)
@@ -7093,6 +7988,12 @@ class RoadDirector {
       gasCansCollected: Math.max(0, Math.round(run.gasCansCollected || 0)),
       lowFuelActive: Boolean(run.lowFuelActive),
       criticalFuelActive: Boolean(run.criticalFuelActive),
+      pursuitHeat: Number.isFinite(run.pursuitHeat) ? run.pursuitHeat : 0,
+      pursuitStatus: run.pursuitStatusText || run.pursuitHeatStatus || "unknown",
+      pursuitRoadblockAhead: Boolean(run.pursuitRoadblockAhead),
+      roadblocksSpawned: Math.max(0, Math.round(run.roadblocksSpawned || 0)),
+      roadblocksCleared: Math.max(0, Math.round(run.roadblocksCleared || 0)),
+      roadblockWarnings: Math.max(0, Math.round(run.roadblockWarnings || 0)),
       seedHash: Number.isFinite(run.roadSeedHash) ? run.roadSeedHash : 0,
       rngState: Number.isFinite(run.roadRngState) ? run.roadRngState : 0,
       band: current.band || getTrackDirectorBand(this.manager.game.run?.distance / Math.max(1, this.manager.track?.distanceToFinish || 1)).label,
@@ -7934,6 +8835,139 @@ class RoadDirector {
     }
   }
 
+  choosePursuitBlockerType(context, heavyChance = 0.28) {
+    const barrierWeight = Math.max(0.25, heavyChance) * this.getTrackObjectWeight("barrier", context);
+    const choices = [
+      { value: "barrier", weight: barrierWeight },
+      { value: "slowCar", weight: 1.35 * this.getTrackObjectWeight("slowCar", context) },
+      { value: "truck", weight: (0.3 + context.difficulty * 0.35) * this.getTrackObjectWeight("truck", context) },
+      { value: "fastCar", weight: ((context.track?.id || "") === "redline-run" ? 0.92 : 0.45) * this.getTrackObjectWeight("fastCar", context) }
+    ];
+    if (context.speedClassId === "sunday" || context.speedClassId === "rookie") {
+      choices.find((item) => item.value === "truck").weight *= 0.35;
+      choices.find((item) => item.value === "barrier").weight *= 0.68;
+    }
+    return weightedChoice(choices, () => this.random()) || "slowCar";
+  }
+
+  warnPursuitRoadblock(distance, safeLane, context) {
+    const run = context.run || this.manager.game.run;
+    const tuning = context.pursuit?.tuning || getPursuitTuning(context.speedClassId, context.track);
+    const lead = Math.max(
+      context.track?.obstacleSettings?.warningLead ?? 520,
+      context.cruiseSpeed * tuning.roadblockWarningLeadSeconds
+    );
+    const warningDistance = Math.max(80, distance - lead);
+    this.manager.addWarning(warningDistance + lead, safeLane, "roadblock", {
+      leadDistance: lead
+    });
+    if (run && isPursuitRaceType(run.raceTypeId)) {
+      run.roadblockWarnings = (run.roadblockWarnings || 0) + 1;
+      run.pursuitRoadblockAhead = true;
+      run.pursuitWarningTimer = Math.max(run.pursuitWarningTimer || 0, 1.55);
+      run.pursuitStatusText = "Roadblock pressure!";
+      if (this.manager.game?.showRaceStateCallout) {
+        this.manager.game.showRaceStateCallout("Roadblock pressure!", "danger", 1.35, { replace: true });
+      }
+      run.nextRoadblockSafeLane = safeLane;
+    }
+  }
+
+  recordPursuitRoadblockWave(result, context, safeLane, blockedCount) {
+    const run = context.run || this.manager.game.run;
+    if (!run || !isPursuitRaceType(run.raceTypeId)) return;
+    run.roadblocksSpawned = Math.max(0, (run.roadblocksSpawned || 0) + 1);
+    run.lastRoadblockDistance = context.distance;
+    run.timeSinceLastRoadblock = 0;
+    run.lastRoadblockWaveId = result.waveId;
+    run.lastRoadblockSafeLane = safeLane;
+    run.lastRoadblockBlockedLanes = blockedCount;
+  }
+
+  wavePursuitPressureLanes(distance, context, result) {
+    const safeLane = this.pickWaveSafeLane(context, {
+      centerSafeChance: context.centerRestChance * 0.55,
+      preferSide: context.centerNeedsChallenge || context.speedClassId === "turbo"
+    });
+    this.recordIntendedRoute(result, safeLane, "forced lane-change escape");
+    const lanes = this.orderPressureLanes(context, shuffle(this.lanesExcept(safeLane), () => this.random()));
+    const count = context.speedClassId === "sunday" ? 2 : (context.progress > 0.55 ? 3 : 2);
+    const step = this.staggerDistance(context, 0.11, 125, 225);
+    for (let i = 0; i < count; i += 1) {
+      const lane = lanes[i];
+      if (!Number.isFinite(lane)) continue;
+      const type = i === 0 ? this.choosePursuitBlockerType(context, 0.18) : (this.random() < 0.58 ? "slowCar" : this.choosePursuitBlockerType(context, 0.2));
+      if (this.canAddPressure(result, type, context, 0.28)) {
+        this.spawn(type, lane, distance + i * step, result, {
+          pursuitMarker: true
+        });
+      }
+    }
+  }
+
+  wavePursuitRoadblock(distance, context, result, hard = false) {
+    const preferSide = hard || context.track?.id === "redline-run" || context.speedClassId === "turbo";
+    const safeLane = this.pickWaveSafeLane(context, {
+      preferSide,
+      centerSafeChance: hard ? context.centerRestChance * 0.18 : context.centerRestChance * 0.38
+    });
+    this.recordIntendedRoute(result, safeLane, hard ? "hard roadblock escape gap" : "roadblock escape gap");
+    const laneOrder = this.orderPressureLanes(context, shuffle(this.lanesExcept(safeLane), () => this.random()));
+    const maxCount = hard ? 4 : (context.progress > 0.5 ? 3 : 2);
+    const blockedCount = context.speedClassId === "sunday"
+      ? 2
+      : Math.min(maxCount, context.progress > 0.72 && hard ? 4 : (context.progress > 0.32 ? 3 : 2));
+    const step = blockedCount >= 4
+      ? this.staggerDistance(context, 0.1, 115, 210)
+      : this.staggerDistance(context, 0.06, 70, 135);
+    const roadblockPressureAllowance = blockedCount >= 4 ? 5.8 : 4.4;
+    for (let i = 0; i < blockedCount; i += 1) {
+      const lane = laneOrder[i];
+      if (!Number.isFinite(lane)) continue;
+      const type = i === 0 && hard
+        ? this.choosePursuitBlockerType(context, 0.46)
+        : (i % 2 === 0 ? "barrier" : this.choosePursuitBlockerType(context, 0.24));
+      if (this.canAddPressure(result, type, context, roadblockPressureAllowance)) {
+        this.spawn(type, lane, distance + i * step, result, {
+          pursuitRoadblock: true,
+          pursuitMarker: true,
+          pursuitEscapeLane: safeLane,
+          allowFourLanePressure: blockedCount >= 4,
+          roadblockWaveId: result.waveId
+        });
+      }
+    }
+    const roadblockObjects = result.spawned.filter((obstacle) => obstacle.pursuitRoadblock);
+    if (roadblockObjects.length < 2) {
+      roadblockObjects.forEach((obstacle) => this.removePlacement(obstacle, result));
+      result.routeLanes = [];
+      this.retagWaveResult(result, "pursuitPressureLanes");
+      this.wavePursuitPressureLanes(distance, context, result);
+      return;
+    }
+    this.warnPursuitRoadblock(distance, safeLane, context);
+    const rewardChance = hard ? 0.48 : 0.32;
+    if (context.progress > 0.22 && this.random() < rewardChance) {
+      const supportType = this.random() < 0.55 ? "boostPad" : "ramp";
+      this.spawn(supportType, safeLane, distance + clamp(context.cruiseSpeed * 0.32, 330, 540), result);
+    }
+    this.recordPursuitRoadblockWave(result, context, safeLane, roadblockObjects.length);
+    this.forceRecoveryNext = true;
+  }
+
+  wavePursuitRecoveryGap(distance, context, result) {
+    const run = context.run || this.manager.game.run;
+    if (run && isPursuitRaceType(run.raceTypeId)) {
+      run.pursuitRecoveryActive = true;
+      run.pursuitStatusText = "Heat Dropping";
+    }
+    if (context.progress > 0.18 && this.random() < 0.48) {
+      const lane = this.pickRewardLane(context);
+      const supportType = this.random() < 0.72 ? "boostPad" : "ramp";
+      this.spawn(supportType, lane, distance + clamp(context.cruiseSpeed * 0.25, 250, 420), result);
+    }
+  }
+
   chooseFuelBlockerType(context, heavyChance = 0.22) {
     const difficulty = context.difficulty;
     const options = [
@@ -8147,6 +9181,12 @@ class ObstacleManager {
       if (obstacle.type === "warning") {
         this.maybePlayWarningSfx(obstacle, ahead);
       }
+      if (obstacle.pursuitRoadblock && !obstacle.pursuitCleared && ahead < -120) {
+        obstacle.pursuitCleared = true;
+        if (this.game?.recordPursuitRoadblockCleared) {
+          this.game.recordPursuitRoadblockCleared(obstacle);
+        }
+      }
       return ahead > -260 && !obstacle.remove;
     });
     this.updateActiveFieldTelemetry(run);
@@ -8232,6 +9272,14 @@ class ObstacleManager {
       const fuelLow = Boolean(run.lowFuelActive || run.criticalFuelActive);
       const gasDue = (run.timeSinceLastGasCan || 0) >= (run.targetGasGapSeconds || getFuelRunTuning(run.speedClassId).targetGasGapSeconds);
       if (fuelLow || gasDue) return "gasRoute";
+    }
+    if (isPursuitRaceType(run?.raceTypeId)) {
+      const tuning = getPursuitTuning(run.speedClassId, this.track || run.track);
+      const roadblockDue = (run.elapsed || 0) >= tuning.noRoadblockElapsedSeconds
+        && ((run.timeSinceLastRoadblock || 0) >= (run.targetRoadblockGapSeconds || 9));
+      if ((run.pursuitHeat || 0) >= tuning.criticalThreshold || sectionId === "breather") return "pursuitRecovery";
+      if (roadblockDue) return "pursuitRoadblock";
+      return "pursuitPressure";
     }
     if (activity?.visibleRewards + activity?.upcomingRewards <= 0 && sectionId === "breather") return "rewardTemptation";
     if ((this.track?.id || "") === "redline-run") return "forceLaneChange";
@@ -8431,10 +9479,12 @@ class ObstacleManager {
     const speedClassId = normalizeSpeedClassId(run?.speedClassId, this.getSpeedClassId());
     const modeBudget = ACTIVE_FIELD_BUDGET_CONFIG[speedClassId] || ACTIVE_FIELD_BUDGET_CONFIG.default;
     const fuelBudget = isFuelRunRaceType(run?.raceTypeId) ? ACTIVE_FIELD_BUDGET_CONFIG.fuelRun : {};
+    const pursuitBudget = isPursuitRaceType(run?.raceTypeId) ? ACTIVE_FIELD_BUDGET_CONFIG.pursuit : {};
     return {
       ...ACTIVE_FIELD_BUDGET_CONFIG.default,
       ...modeBudget,
-      ...fuelBudget
+      ...fuelBudget,
+      ...pursuitBudget
     };
   }
 
@@ -8822,6 +9872,37 @@ class ObstacleManager {
     };
   }
 
+  getPursuitContext() {
+    const run = this.game.run || {};
+    if (!isPursuitRaceType(run.raceTypeId)) return null;
+    const track = this.track || run.track || TRACKS[0];
+    const tuning = getPursuitTuning(run.speedClassId, track);
+    const progress = clamp((run.distance || 0) / Math.max(1, track.distanceToFinish || 1), 0, 1);
+    const timeSinceLastRoadblock = Number.isFinite(run.timeSinceLastRoadblock)
+      ? run.timeSinceLastRoadblock
+      : tuning.targetRoadblockGapSeconds;
+    const canSpawnRoadblock = (run.elapsed || 0) >= tuning.noRoadblockElapsedSeconds
+      && progress >= tuning.noRoadblockProgress
+      && progress < tuning.escapeZoneProgress
+      && timeSinceLastRoadblock >= (run.minRoadblockGapSeconds || 5.5);
+    return {
+      heat: Number.isFinite(run.pursuitHeat) ? run.pursuitHeat : tuning.startHeat,
+      heatLimit: tuning.heatLimit,
+      heatPercent: clamp((Number.isFinite(run.pursuitHeat) ? run.pursuitHeat : tuning.startHeat) / Math.max(1, tuning.heatLimit), 0, 1),
+      heatHigh: (run.pursuitHeat || 0) >= tuning.criticalThreshold,
+      statusText: run.pursuitStatusText || "Heat Dropping",
+      roadblockAhead: Boolean(run.pursuitRoadblockAhead),
+      roadblocksSpawned: Math.max(0, Math.round(run.roadblocksSpawned || 0)),
+      roadblocksCleared: Math.max(0, Math.round(run.roadblocksCleared || 0)),
+      warnings: Math.max(0, Math.round(run.roadblockWarnings || 0)),
+      timeSinceLastRoadblock,
+      targetRoadblockGapSeconds: run.targetRoadblockGapSeconds || 9,
+      canSpawnRoadblock,
+      escapeZone: progress >= tuning.escapeZoneProgress,
+      tuning
+    };
+  }
+
   getPatternSpacing(progress, difficulty, cruiseSpeed) {
     const settings = this.track.obstacleSettings;
     const cadence = getTrackDirectorCadence(this.getSpeedClassId(), this.track);
@@ -8993,6 +10074,11 @@ class ObstacleManager {
       relativeSpeed: HARD_VEHICLE_TYPES.has(type) ? TRAFFIC_MOTION_CONFIG.vehicleRelativeSpeed : 0,
       rampTarget: Boolean(options.rampTarget),
       rampSolution: Boolean(options.rampSolution),
+      pursuitRoadblock: Boolean(options.pursuitRoadblock),
+      pursuitMarker: Boolean(options.pursuitMarker),
+      pursuitEscapeLane: Number.isFinite(options.pursuitEscapeLane) ? options.pursuitEscapeLane : null,
+      pursuitCleared: false,
+      roadblockWaveId: options.roadblockWaveId || options.waveId || "",
       solutionTargetDistance: Number.isFinite(options.solutionTargetDistance) ? options.solutionTargetDistance : null,
       solutionTargetType: options.solutionTargetType || "",
       solutionTargetId: options.solutionTargetId || "",
@@ -10092,14 +11178,16 @@ class ObstacleManager {
     };
   }
 
-  addWarning(distance, lane, warningType) {
+  addWarning(distance, lane, warningType, options = {}) {
     const progress = distance / this.track.distanceToFinish;
     const cruiseSpeed = getTrackCruiseSpeed(this.track, progress, this.getSpeedClassId());
     const settings = this.track.obstacleSettings;
-    const leadDistance = Math.max(
-      settings.warningLead ?? 520,
-      cruiseSpeed * (settings.warningLeadSeconds ?? 1.75)
-    );
+    const leadDistance = Number.isFinite(options.leadDistance)
+      ? Math.max(260, options.leadDistance)
+      : Math.max(
+        settings.warningLead ?? 520,
+        cruiseSpeed * (settings.warningLeadSeconds ?? 1.75)
+      );
     this.addObstacle("warning", lane, Math.max(80, distance - leadDistance), {
       warningType
     });
@@ -11035,14 +12123,18 @@ class Renderer {
     this.drawBumpFlash();
     if (this.game.debugMode) this.drawHitboxOverlay();
     ctx.restore();
+    this.drawPursuitPressureOverlay();
     this.drawBoostFlash();
     this.drawFinishFlash();
     this.drawFloatingTexts();
     this.drawCountdown();
     this.drawCrashBeat();
     this.drawFuelOutBeat();
+    this.drawPursuitBustedBeat();
     this.drawSectionNotice();
+    this.drawPursuitCallout();
     this.drawHud();
+    this.drawRaceStateStrip();
     if (this.game.debugMode) this.drawDebug();
   }
 
@@ -11307,7 +12399,8 @@ class Renderer {
     ctx.font = `900 ${Math.max(12, 18 * scale)}px Trebuchet MS, Verdana, sans-serif`;
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
-    ctx.fillText(theme.finishLabel || "SUNSET", road.x + road.w / 2, topY - 2 * scale);
+    const label = isPursuitRaceType(this.game.run?.raceTypeId) ? "ESCAPE" : (theme.finishLabel || "SUNSET");
+    ctx.fillText(label, road.x + road.w / 2, topY - 2 * scale);
     for (let i = 0; i < 6; i += 1) {
       const x = lerp(leftX + 38 * scale, rightX - 38 * scale, i / 5);
       ctx.fillStyle = i % 2 ? (theme.edgeAltColor || "#ff3fd1") : (theme.reflectorColor || "#44ff99");
@@ -11322,6 +12415,9 @@ class Renderer {
     const visual = this.getObstacleVisualSize(obstacle.type, scale, obstacle);
     if (visual.sprite) {
       drawTrafficSprite(ctx, x, y, visual);
+      if (obstacle.pursuitMarker || obstacle.pursuitRoadblock) {
+        this.drawPursuitObstacleMarker(ctx, x, y, visual.w, visual.h, scale, obstacle);
+      }
       return;
     }
     const drawScale = visual.drawScale;
@@ -11348,6 +12444,34 @@ class Renderer {
     } else if (obstacle.type === "warning") {
       drawRoadSign(ctx, x, y, obstacle.warningType || "work", drawScale);
     }
+    if (obstacle.pursuitMarker || obstacle.pursuitRoadblock) {
+      this.drawPursuitObstacleMarker(ctx, x, y, visual.w, visual.h, scale, obstacle);
+    }
+  }
+
+  drawPursuitObstacleMarker(ctx, x, y, width, height, scale, obstacle) {
+    if (!obstacle || obstacle.type === "warning") return;
+    const pulse = 0.5 + Math.sin(((this.game.run?.elapsed || 0) * 12) + x * 0.01) * 0.5;
+    const lightY = y - height * 0.38;
+    const lightW = Math.max(24 * scale, width * 0.34);
+    const lightH = Math.max(6 * scale, height * 0.07);
+    ctx.save();
+    ctx.globalAlpha = obstacle.pursuitRoadblock ? 0.94 : 0.72;
+    ctx.shadowBlur = 12 + pulse * 8;
+    ctx.shadowColor = pulse > 0.5 ? "#28f6ff" : "#ff334c";
+    ctx.fillStyle = "#111523";
+    ctx.fillRect(x - lightW / 2, lightY - lightH / 2, lightW, lightH);
+    ctx.fillStyle = "#ff334c";
+    ctx.fillRect(x - lightW / 2, lightY - lightH / 2, lightW / 2, lightH);
+    ctx.fillStyle = "#28f6ff";
+    ctx.fillRect(x, lightY - lightH / 2, lightW / 2, lightH);
+    ctx.globalAlpha = 0.26 + pulse * 0.22;
+    ctx.strokeStyle = pulse > 0.5 ? "#28f6ff" : "#ff334c";
+    ctx.lineWidth = Math.max(2, 3 * scale);
+    ctx.beginPath();
+    ctx.ellipse(x, y + height * 0.33, width * 0.46, height * 0.1, 0, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
   }
 
   drawPlayer() {
@@ -11757,7 +12881,7 @@ class Renderer {
       ctx.textBaseline = "middle";
       ctx.shadowBlur = 24;
       ctx.shadowColor = "#ffe45e";
-      ctx.fillText("FINISH!", this.width / 2, this.height * 0.32);
+      ctx.fillText(isPursuitRaceType(run.raceTypeId) ? "ESCAPED!" : "FINISH!", this.width / 2, this.height * 0.32);
     }
     if (run.finishStripeTimer > 0) {
       const stripeDuration = ARCADE_FEEL.finishStripeMs / 1000;
@@ -11870,6 +12994,224 @@ class Renderer {
     ctx.restore();
   }
 
+  drawPursuitPressureOverlay() {
+    const run = this.game.run;
+    if (!run || !isPursuitRaceType(run.raceTypeId) || this.game.screen !== "game") return;
+    const heatPercent = clamp((run.pursuitHeat || 0) / Math.max(1, run.pursuitHeatLimit || PURSUIT_CONFIG.heatLimit), 0, 1);
+    const warning = run.pursuitRoadblockAhead || (run.pursuitWarningTimer || 0) > 0;
+    const pulse = 0.5 + Math.sin((run.elapsed || 0) * (warning ? 14 : 8)) * 0.5;
+    const alpha = warning ? 0.18 + pulse * 0.1 : (heatPercent >= 0.8 ? 0.1 + pulse * 0.06 : heatPercent * 0.05);
+    if (alpha <= 0.01) return;
+    const ctx = this.ctx;
+    const road = this.road;
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    const leftColor = pulse > 0.5 ? "#ff334c" : "#28f6ff";
+    const rightColor = pulse > 0.5 ? "#28f6ff" : "#ff334c";
+    ctx.shadowBlur = 18;
+    ctx.lineWidth = Math.max(5, 8 * (0.7 + heatPercent * 0.5));
+    ctx.strokeStyle = leftColor;
+    ctx.shadowColor = leftColor;
+    ctx.beginPath();
+    ctx.moveTo(road.x - 10, road.y);
+    ctx.lineTo(road.x - 10, road.y + road.h);
+    ctx.stroke();
+    ctx.strokeStyle = rightColor;
+    ctx.shadowColor = rightColor;
+    ctx.beginPath();
+    ctx.moveTo(road.x + road.w + 10, road.y);
+    ctx.lineTo(road.x + road.w + 10, road.y + road.h);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  drawPursuitBustedBeat() {
+    const run = this.game.run;
+    if (!ARCADE_FEEL.enabled || !run || !isPursuitRaceType(run.raceTypeId) || run.pursuitBustedBeatTimer <= 0) return;
+    const alpha = clamp(run.pursuitBustedBeatTimer / 0.82, 0, 1);
+    const ctx = this.ctx;
+    ctx.save();
+    ctx.globalAlpha = alpha * 0.18;
+    ctx.fillStyle = "#ff334c";
+    ctx.fillRect(0, 0, this.width, this.height);
+    ctx.globalAlpha = Math.min(1, alpha * 1.12);
+    ctx.font = `900 ${Math.max(34, Math.min(72, this.width * 0.065))}px Trebuchet MS, Verdana, sans-serif`;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.lineWidth = 7;
+    ctx.strokeStyle = "rgba(0, 0, 0, 0.82)";
+    ctx.strokeText("BUSTED", this.width / 2, this.height * 0.38);
+    ctx.shadowBlur = 22;
+    ctx.shadowColor = "#28f6ff";
+    ctx.fillStyle = "#f6fbff";
+    ctx.fillText("BUSTED", this.width / 2, this.height * 0.38);
+    ctx.restore();
+  }
+
+  getFuelRaceState() {
+    const run = this.game.run;
+    const max = Math.max(1, run.fuelMax || FUEL_RUN_CONFIG.fuelMax);
+    const fuel = clamp(Number.isFinite(run.fuel) ? run.fuel : 0, 0, max);
+    const percent = clamp(fuel / max, 0, 1);
+    const critical = run.criticalFuelActive || fuel <= (run.criticalFuelThreshold || max * 0.18);
+    const low = run.lowFuelActive || fuel <= (run.lowFuelThreshold || max * 0.33);
+    const label = critical ? "CRITICAL FUEL" : (low ? "LOW FUEL" : "FUEL");
+    return {
+      label,
+      meterLabel: "FUEL",
+      value: `${Math.ceil(fuel)} / ${Math.round(max)}`,
+      detail: critical ? "GRAB GAS NOW" : (low ? "FIND A GAS CAN" : "GAS KEEPS YOU ALIVE"),
+      percent,
+      color: critical ? "#ff334c" : (low ? "#ffe45e" : "#44ff99"),
+      fillMode: "fuel",
+      urgent: critical || low
+    };
+  }
+
+  getPursuitRaceState() {
+    const run = this.game.run;
+    const limit = Math.max(1, run.pursuitHeatLimit || PURSUIT_CONFIG.heatLimit);
+    const heat = clamp(Number.isFinite(run.pursuitHeat) ? run.pursuitHeat : 0, 0, limit);
+    const percent = clamp(heat / limit, 0, 1);
+    const status = String(run.pursuitStatusText || run.pursuitHeatStatus || "").toLowerCase();
+    const progress = clamp((run.distance || 0) / Math.max(1, run.track?.distanceToFinish || 1), 0, 1);
+    const tuning = getPursuitTuning(run.speedClassId, run.track || TRACKS[0]);
+    const escapeZone = progress >= tuning.escapeZoneProgress || run.escapeReached;
+    const critical = heat >= tuning.criticalThreshold;
+    let label = "SHAKE THEM";
+    let detail = "BUSTED IF FULL";
+    let color = "#28f6ff";
+    if (run.ended && run.bustedOccurred) {
+      label = "BUSTED";
+      color = "#ff334c";
+    } else if (escapeZone) {
+      label = "ESCAPE ZONE";
+      detail = "SHAKE THEM HERE";
+      color = "#44ff99";
+    } else if (critical) {
+      label = "CRITICAL HEAT";
+      detail = "BUSTED IF FULL";
+      color = "#ff334c";
+    } else if (run.pursuitRoadblockAhead || status.includes("roadblock")) {
+      label = "SHAKE THEM";
+      detail = "ROADBLOCK PRESSURE";
+      color = "#ffe45e";
+    } else if (run.pursuitRecoveryActive || status.includes("escape")) {
+      label = "HEAT DROPPING";
+      detail = "YOU'RE PULLING AWAY";
+      color = "#44ff99";
+    } else if (status.includes("closing") || status.includes("rising") || status.includes("pressure")) {
+      label = "POLICE CLOSING";
+      color = "#ffe45e";
+    }
+    return {
+      label,
+      meterLabel: "POLICE BAR",
+      value: `${Math.ceil(heat)} / ${Math.round(limit)}`,
+      detail,
+      percent,
+      color,
+      fillMode: "heat",
+      urgent: critical || run.pursuitRoadblockAhead
+    };
+  }
+
+  drawRaceStateStrip() {
+    const run = this.game.run;
+    if (!run || this.game.screen !== "game") return;
+    const fuelRun = isFuelRunRaceType(run.raceTypeId);
+    const pursuitRun = isPursuitRaceType(run.raceTypeId);
+    if (!fuelRun && !pursuitRun) return;
+    const state = fuelRun ? this.getFuelRaceState() : this.getPursuitRaceState();
+    const ctx = this.ctx;
+    const stripW = Math.min(Math.max(260, this.width - 28), Math.max(260, this.road.w - 24), this.width >= 760 ? 560 : 420);
+    const stripH = this.width >= 620 ? 56 : 50;
+    const x = (this.width - stripW) / 2;
+    const y = Math.max(CAMERA_CONFIG.hudHeight + 8, this.road.y + 8);
+    const pulse = state.urgent ? 0.5 + Math.sin((run.elapsed || 0) * 12) * 0.5 : 0;
+    const callout = run.raceStateCalloutTimer > 0 && run.raceStateCalloutText
+      ? run.raceStateCalloutText.toUpperCase()
+      : state.detail;
+    ctx.save();
+    ctx.globalAlpha = 0.94;
+    ctx.fillStyle = "rgba(5, 7, 18, 0.88)";
+    ctx.fillRect(x, y, stripW, stripH);
+    ctx.strokeStyle = state.color;
+    ctx.lineWidth = state.urgent ? 3 + pulse * 1.5 : 2;
+    ctx.shadowBlur = state.urgent ? 18 + pulse * 10 : 10;
+    ctx.shadowColor = state.color;
+    ctx.strokeRect(x, y, stripW, stripH);
+    ctx.shadowBlur = 0;
+
+    const pad = this.width >= 620 ? 16 : 12;
+    const barX = x + pad;
+    const barY = y + stripH - 22;
+    const barW = stripW - pad * 2;
+    const barH = this.width >= 620 ? 15 : 13;
+    ctx.fillStyle = "rgba(255, 255, 255, 0.14)";
+    ctx.fillRect(barX, barY, barW, barH);
+    const fillW = Math.max(0, (barW - 4) * state.percent);
+    if (state.fillMode === "heat") {
+      const gradient = ctx.createLinearGradient(barX, barY, barX + barW, barY);
+      gradient.addColorStop(0, "#28f6ff");
+      gradient.addColorStop(0.58, "#ffe45e");
+      gradient.addColorStop(1, "#ff334c");
+      ctx.fillStyle = gradient;
+    } else {
+      ctx.fillStyle = state.color;
+    }
+    ctx.globalAlpha = state.urgent ? 0.84 + pulse * 0.16 : 0.9;
+    ctx.fillRect(barX + 2, barY + 2, fillW, Math.max(1, barH - 4));
+    ctx.globalAlpha = 1;
+
+    ctx.textBaseline = "top";
+    ctx.textAlign = "left";
+    ctx.fillStyle = state.color;
+    ctx.font = `900 ${this.width >= 620 ? 16 : 14}px Trebuchet MS, Verdana, sans-serif`;
+    ctx.fillText(state.label, x + pad, y + 7);
+    ctx.fillStyle = "#f6fbff";
+    ctx.font = `900 ${this.width >= 620 ? 13 : 11}px Trebuchet MS, Verdana, sans-serif`;
+    ctx.fillText(callout, x + pad, y + 29, stripW - pad * 2 - 86);
+    ctx.textAlign = "right";
+    ctx.fillStyle = "#b8c6d9";
+    ctx.font = "800 11px Trebuchet MS, Verdana, sans-serif";
+    ctx.fillText(state.meterLabel, x + stripW - pad, y + 8);
+    ctx.fillStyle = "#f6fbff";
+    ctx.font = `900 ${this.width >= 620 ? 15 : 13}px Trebuchet MS, Verdana, sans-serif`;
+    ctx.fillText(state.value, x + stripW - pad, y + 25);
+    ctx.restore();
+  }
+
+  drawPursuitCallout() {
+    const run = this.game.run;
+    if (!run || !isPursuitRaceType(run.raceTypeId) || this.game.screen !== "game") return;
+    const label = String((run.raceStateCalloutTimer > 0 && run.raceStateCalloutText) || this.getPursuitRaceState().label || "").toUpperCase();
+    if (!label || label === "HEAT DROPPING" && (run.pursuitHeat || 0) <= 2) return;
+    const active = run.pursuitRoadblockAhead || (run.pursuitHeatPulseTimer || 0) > 0 || label === "ESCAPE ZONE" || run.raceStateCalloutTimer > 0;
+    if (!active && label !== "POLICE CLOSING") return;
+    const ctx = this.ctx;
+    const y = Math.max(136, CAMERA_CONFIG.hudHeight + 78);
+    const x = this.width / 2;
+    const color = label === "ESCAPE ZONE" || label === "HEAT DROPPING" || label.includes("PULLING") || label.includes("ESCAPE!") ? "#44ff99" : (label.includes("ROADBLOCK") || label.includes("SLOWDOWN") || label === "CRITICAL HEAT" ? "#ff334c" : "#ffe45e");
+    ctx.save();
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.font = "900 14px Trebuchet MS, Verdana, sans-serif";
+    const textWidth = ctx.measureText(label).width;
+    const boxW = Math.min(this.width - 30, Math.max(132, textWidth + 44));
+    ctx.fillStyle = "rgba(5, 7, 18, 0.84)";
+    ctx.fillRect(x - boxW / 2, y - 10, boxW, 20);
+    ctx.strokeStyle = color;
+    ctx.shadowBlur = 12;
+    ctx.shadowColor = color;
+    ctx.lineWidth = 2;
+    ctx.strokeRect(x - boxW / 2, y - 10, boxW, 20);
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = "#f6fbff";
+    ctx.fillText(label, x, y + 1);
+    ctx.restore();
+  }
+
   drawSectionNotice() {
     const run = this.game.run;
     if (!ARCADE_FEEL.enabled || !run || run.sectionNoticeTimer <= 0 || this.game.screen !== "game") return;
@@ -11908,6 +13250,7 @@ class Renderer {
     const modeLabel = run.speedClass?.label || getSpeedClassLabel(run.speedClassId);
     const raceTypeLabel = getRaceTypeLabel(run.raceTypeId);
     const fuelRun = isFuelRunRaceType(run.raceTypeId);
+    const pursuitRun = isPursuitRaceType(run.raceTypeId);
     const hudHeight = CAMERA_CONFIG.hudHeight;
     const hudItems = w >= 760
       ? [
@@ -11946,8 +13289,8 @@ class Renderer {
 
     const barX = 16;
     const barY = 40;
-    const fuelGaugeW = fuelRun ? (w >= 760 ? 168 : 124) : 0;
-    const barW = Math.min(w - 32 - (fuelRun && w >= 620 ? fuelGaugeW + 22 : 0), w >= 760 ? 460 : 320);
+    const modeGaugeW = (fuelRun || pursuitRun) ? (w >= 760 ? 168 : 124) : 0;
+    const barW = Math.min(w - 32 - ((fuelRun || pursuitRun) && w >= 620 ? modeGaugeW + 22 : 0), w >= 760 ? 460 : 320);
     ctx.fillStyle = "rgba(255, 255, 255, 0.14)";
     ctx.fillRect(barX, barY, barW, 8);
     ctx.fillStyle = "#44ff99";
@@ -11960,21 +13303,25 @@ class Renderer {
     const sectionLabel = String(run.currentSectionLabel || getTrackSection(run.track, progress).label || "").toUpperCase();
     const contextParts = [`${Math.round(progress * 100)}%`, sectionLabel];
     contextParts.push(raceTypeLabel.toUpperCase());
+    if (pursuitRun) contextParts.push(String(run.pursuitStatusText || "Heat Dropping").toUpperCase());
     if (run.challengeMode) contextParts.push(`CHALLENGE ${run.challengeName}`);
     if (run.partyMode) contextParts.push(`PARTY ${run.partyTurnNumber}/${run.partyTotalPlayers}`);
     if (w >= 840) contextParts.push(`SEED ${formatRoadSeed(run.roadSeed)}`);
-    const drawFuelInline = fuelRun && w >= 620;
-    if (drawFuelInline) {
-      this.drawFuelGauge(ctx, w - fuelGaugeW - 16, 38, fuelGaugeW, 14);
+    const drawModeGaugeInline = (fuelRun || pursuitRun) && w >= 620;
+    if (drawModeGaugeInline) {
+      if (fuelRun) this.drawFuelGauge(ctx, w - modeGaugeW - 16, 38, modeGaugeW, 14);
+      if (pursuitRun) this.drawPursuitHeatGauge(ctx, w - modeGaugeW - 16, 38, modeGaugeW, 14);
     }
     const statusX = w >= 760 ? barX + barW + 18 : barX;
     const statusY = w >= 760 ? 38 : 50;
     const statusMaxWidth = w >= 760
-      ? Math.max(80, w - statusX - (drawFuelInline ? fuelGaugeW + 30 : 12))
-      : (fuelRun && !drawFuelInline ? Math.max(80, w - fuelGaugeW - 54) : w - 32);
+      ? Math.max(80, w - statusX - (drawModeGaugeInline ? modeGaugeW + 30 : 12))
+      : ((fuelRun || pursuitRun) && !drawModeGaugeInline ? Math.max(80, w - modeGaugeW - 54) : w - 32);
     drawFittedText(ctx, contextParts.join("  "), statusX, statusY, statusMaxWidth);
-    if (fuelRun && !drawFuelInline) {
-      this.drawFuelGauge(ctx, Math.max(16, w - fuelGaugeW - 16), 46, fuelGaugeW, 11);
+    if ((fuelRun || pursuitRun) && !drawModeGaugeInline) {
+      const x = Math.max(16, w - modeGaugeW - 16);
+      if (fuelRun) this.drawFuelGauge(ctx, x, 46, modeGaugeW, 11);
+      if (pursuitRun) this.drawPursuitHeatGauge(ctx, x, 46, modeGaugeW, 11);
     }
     ctx.restore();
   }
@@ -12022,6 +13369,41 @@ class Renderer {
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
     ctx.fillText(`FUEL ${Math.ceil(run.fuel || 0)}`, x + width / 2, y + height / 2 + 0.5);
+    ctx.restore();
+  }
+
+  drawPursuitHeatGauge(ctx, x, y, width, height) {
+    const run = this.game.run;
+    if (!run || !isPursuitRaceType(run.raceTypeId)) return;
+    const heat = clamp(Number.isFinite(run.pursuitHeat) ? run.pursuitHeat : 0, 0, run.pursuitHeatLimit || PURSUIT_CONFIG.heatLimit);
+    const percent = clamp(heat / Math.max(1, run.pursuitHeatLimit || PURSUIT_CONFIG.heatLimit), 0, 1);
+    const critical = heat >= PURSUIT_CONFIG.criticalThreshold;
+    const warning = run.pursuitRoadblockAhead;
+    const color = critical ? "#ff334c" : (warning ? "#ffe45e" : "#28f6ff");
+    const pulse = critical || warning ? 0.55 + Math.sin((run.elapsed || 0) * 12) * 0.28 : 0.18;
+    const heatPulse = clamp((run.pursuitHeatPulseTimer || 0) / 0.42, 0, 1);
+    ctx.save();
+    ctx.fillStyle = "rgba(5, 7, 18, 0.92)";
+    ctx.fillRect(x, y, width, height);
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 2 + heatPulse * 1.2;
+    ctx.shadowBlur = (critical || warning ? 14 : 8) + heatPulse * 8;
+    ctx.shadowColor = color;
+    ctx.strokeRect(x, y, width, height);
+    ctx.shadowBlur = 0;
+    const gradient = ctx.createLinearGradient(x, y, x + width, y);
+    gradient.addColorStop(0, "#28f6ff");
+    gradient.addColorStop(0.55, "#ffe45e");
+    gradient.addColorStop(1, "#ff334c");
+    ctx.fillStyle = gradient;
+    ctx.globalAlpha = critical || warning ? clamp(pulse + 0.45, 0.45, 1) : 0.9;
+    ctx.fillRect(x + 3, y + 3, Math.max(0, (width - 6) * percent), Math.max(1, height - 6));
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = critical ? "#f6fbff" : "#07101b";
+    ctx.font = `900 ${Math.max(9, Math.min(12, height - 2))}px Trebuchet MS, Verdana, sans-serif`;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(`HEAT ${Math.ceil(heat)}`, x + width / 2, y + height / 2 + 0.5);
     ctx.restore();
   }
 
@@ -12169,6 +13551,7 @@ class Renderer {
       `vertical: ${(run.playerYRatio * 100).toFixed(1)}% input ${run.verticalInput}`,
       `distance: ${run.distance.toFixed(0)}`,
       `fuel: ${isFuelRunRaceType(run.raceTypeId) ? `${directorDebug.fuelAmount.toFixed(1)}/${(run.fuelMax || 0).toFixed(0)} drain ${directorDebug.fuelDrainPerSecond.toFixed(2)}/s` : "hidden"}`,
+      `pursuit: ${isPursuitRaceType(run.raceTypeId) ? `heat ${(directorDebug.pursuitHeat || 0).toFixed(1)}/${(run.pursuitHeatLimit || 0).toFixed(0)} status ${directorDebug.pursuitStatus || "unknown"} roadblocks ${directorDebug.roadblocksCleared || 0}/${directorDebug.roadblocksSpawned || 0}` : "hidden"}`,
       `gas cans: ${directorDebug.gasCansCollected}/${run.gasCansSpawned || 0} last ${directorDebug.timeSinceLastGasCan.toFixed(1)}s`,
       `fuel status: low ${directorDebug.lowFuelActive ? "yes" : "no"} critical ${directorDebug.criticalFuelActive ? "yes" : "no"} mix ${directorDebug.fuelRunObjectMixActive ? "fuel" : "classic"}`,
       `obstacles: ${this.game.obstacles.obstacles.length}`,
@@ -13517,7 +14900,8 @@ function drawRoadSign(ctx, x, y, signType, scale = 1) {
   ctx.shadowColor = "#ffe45e";
   ctx.fillStyle = "#2b2441";
   ctx.fillRect(-w * 0.06, -h * 0.02, w * 0.12, h * 0.52);
-  ctx.fillStyle = "#ffe45e";
+  const roadblock = signType === "roadblock";
+  ctx.fillStyle = roadblock ? "#ff334c" : "#ffe45e";
   ctx.fillRect(-w * 0.42, -h * 0.46, w * 0.84, h * 0.48);
   ctx.strokeStyle = "#111";
   ctx.lineWidth = Math.max(2, 3 * scale);
@@ -13526,7 +14910,12 @@ function drawRoadSign(ctx, x, y, signType, scale = 1) {
   ctx.font = `${Math.max(10, 14 * scale)}px Trebuchet MS, Verdana, sans-serif`;
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
-  ctx.fillText(signType === "deer" ? "DEER" : "WORK", 0, -h * 0.22);
+  ctx.fillText(signType === "deer" ? "DEER" : (roadblock ? "ROAD" : "WORK"), 0, -h * 0.29);
+  if (roadblock) {
+    ctx.fillStyle = "#f6fbff";
+    ctx.font = `900 ${Math.max(8, 10 * scale)}px Trebuchet MS, Verdana, sans-serif`;
+    ctx.fillText("BLOCK", 0, -h * 0.14);
+  }
   ctx.restore();
 }
 
@@ -13698,6 +15087,9 @@ class NeonRoadRally {
       criticalFuelActive: false,
       fuelWarningCooldown: 0,
       fuelWarningState: "none",
+      raceStateCalloutText: "",
+      raceStateCalloutTone: "info",
+      raceStateCalloutTimer: 0,
       fuelRunObjectMixActive: false,
       timeSinceLastGasCan: 0,
       longestNoFuelStretchSeconds: 0,
@@ -13719,6 +15111,35 @@ class NeonRoadRally {
       gasCansSpawnedBySection: {},
       gasCansCollectedBySection: {},
       simulatedFuelRestored: 0,
+      pursuitHeatLimit: 0,
+      pursuitHeat: 0,
+      pursuitHeatMax: 0,
+      pursuitHeatStatus: "Heat Dropping",
+      pursuitStatusText: "",
+      pursuitWarningTimer: 0,
+      pursuitHeatPulseTimer: 0,
+      pursuitBustedBeatTimer: 0,
+      pursuitRoadblockAhead: false,
+      pursuitRecoveryActive: false,
+      pursuitBonuses: {},
+      pursuitResult: "",
+      pursuitHeatRisingTime: 0,
+      pursuitHeatDroppingTime: 0,
+      pursuitHeatCriticalTime: 0,
+      timeSinceLastRoadblock: 99,
+      minRoadblockGapSeconds: 5.5,
+      targetRoadblockGapSeconds: 9,
+      roadblocksSpawned: 0,
+      roadblocksCleared: 0,
+      roadblockWarnings: 0,
+      nextRoadblockSafeLane: null,
+      lastRoadblockDistance: -Infinity,
+      lastRoadblockWaveId: "",
+      lastRoadblockSafeLane: null,
+      lastRoadblockBlockedLanes: 0,
+      pursuitClearedWaveIds: new Set(),
+      bustedOccurred: false,
+      escapeReached: false,
       roadSeed: DEFAULT_ROAD_SEED,
       roadSeedSource: getRunRandomSeedSource(DEFAULT_ROAD_SEED, track, speedClass.id, DEFAULT_RACE_TYPE_ID),
       roadSeedHash: hashSeed(getRunRandomSeedSource(DEFAULT_ROAD_SEED, track, speedClass.id, DEFAULT_RACE_TYPE_ID)),
@@ -13817,7 +15238,11 @@ class NeonRoadRally {
         boostPad: 0,
         ramp: 0,
         gasCan: 0,
-        fuelBonus: 0
+        fuelBonus: 0,
+        pursuitEscape: 0,
+        roadblockDodge: 0,
+        cleanGetaway: 0,
+        heatSurvivor: 0
       },
       scoreBreakdown: {
         distance: 0,
@@ -13831,7 +15256,11 @@ class NeonRoadRally {
         boostPad: 0,
         ramp: 0,
         gasCan: 0,
-        fuelBonus: 0
+        fuelBonus: 0,
+        pursuitEscape: 0,
+        roadblockDodge: 0,
+        cleanGetaway: 0,
+        heatSurvivor: 0
       },
       lastCollision: "clear",
       crashCollisionType: "",
@@ -13910,6 +15339,7 @@ class NeonRoadRally {
       crashBeatTimer: 0,
       crashSparkTimer: 0,
       fuelOutBeatTimer: 0,
+      pursuitBustedBeatTimer: 0,
       rampLaunchPulseTimer: 0,
       rampLandingPulseTimer: 0,
       rampClearSparkTimer: 0,
@@ -13967,6 +15397,9 @@ class NeonRoadRally {
     run.crashBeatTimer = Math.max(0, (run.crashBeatTimer || 0) - dt);
     run.crashSparkTimer = Math.max(0, (run.crashSparkTimer || 0) - dt);
     run.fuelOutBeatTimer = Math.max(0, (run.fuelOutBeatTimer || 0) - dt);
+    run.pursuitBustedBeatTimer = Math.max(0, (run.pursuitBustedBeatTimer || 0) - dt);
+    run.pursuitHeatPulseTimer = Math.max(0, (run.pursuitHeatPulseTimer || 0) - dt);
+    run.pursuitWarningTimer = Math.max(0, (run.pursuitWarningTimer || 0) - dt);
     run.rampLaunchPulseTimer = Math.max(0, (run.rampLaunchPulseTimer || 0) - dt);
     run.rampLandingPulseTimer = Math.max(0, (run.rampLandingPulseTimer || 0) - dt);
     run.rampClearSparkTimer = Math.max(0, (run.rampClearSparkTimer || 0) - dt);
@@ -14007,6 +15440,17 @@ class NeonRoadRally {
     }
   }
 
+  showRaceStateCallout(text, tone = "info", seconds = 1.25, options = {}) {
+    const run = this.run;
+    const clean = sanitizeName(text, "", DISPLAY_TEXT_MAX_LENGTH);
+    if (!run || !clean) return;
+    const replace = options.replace !== false || !run.raceStateCalloutText || run.raceStateCalloutTimer <= 0;
+    if (!replace && run.raceStateCalloutText !== clean) return;
+    run.raceStateCalloutText = clean;
+    run.raceStateCalloutTone = sanitizeName(tone, "info", 16);
+    run.raceStateCalloutTimer = Math.max(run.raceStateCalloutTimer || 0, seconds);
+  }
+
   configureFuelForRun(run) {
     if (!run) return;
     const fuelRun = isFuelRunRaceType(run.raceTypeId);
@@ -14042,6 +15486,147 @@ class NeonRoadRally {
     run.gasCansSpawnedBySection = {};
     run.gasCansCollectedBySection = {};
     run.simulatedFuelRestored = 0;
+  }
+
+  configurePursuitForRun(run) {
+    if (!run) return;
+    const pursuitRun = isPursuitRaceType(run.raceTypeId);
+    const tuning = getPursuitTuning(run.speedClassId, run.track || TRACKS[0]);
+    run.pursuitHeatLimit = pursuitRun ? tuning.heatLimit : 0;
+    run.pursuitHeat = pursuitRun ? tuning.startHeat : 0;
+    run.pursuitHeatMax = pursuitRun ? tuning.startHeat : 0;
+    run.pursuitHeatStatus = pursuitRun ? "Heat Dropping" : "";
+    run.pursuitStatusText = pursuitRun ? "Heat Dropping" : "";
+    run.pursuitWarningTimer = 0;
+    run.pursuitHeatPulseTimer = 0;
+    run.pursuitBustedBeatTimer = 0;
+    run.pursuitRoadblockAhead = false;
+    run.pursuitRecoveryActive = false;
+    run.pursuitBonuses = {};
+    run.pursuitResult = "";
+    run.pursuitHeatRisingTime = 0;
+    run.pursuitHeatDroppingTime = 0;
+    run.pursuitHeatCriticalTime = 0;
+    run.timeSinceLastRoadblock = pursuitRun ? tuning.targetRoadblockGapSeconds : 99;
+    run.minRoadblockGapSeconds = pursuitRun ? tuning.minRoadblockGapSeconds : 0;
+    run.targetRoadblockGapSeconds = pursuitRun ? tuning.targetRoadblockGapSeconds : 0;
+    run.roadblocksSpawned = 0;
+    run.roadblocksCleared = 0;
+    run.roadblockWarnings = 0;
+    run.nextRoadblockSafeLane = null;
+    run.lastRoadblockDistance = -Infinity;
+    run.lastRoadblockWaveId = "";
+    run.lastRoadblockSafeLane = null;
+    run.lastRoadblockBlockedLanes = 0;
+    run.pursuitClearedWaveIds = new Set();
+    run.bustedOccurred = false;
+    run.escapeReached = false;
+  }
+
+  applyPursuitHeat(delta, reason = "") {
+    const run = this.run;
+    if (!run || !isPursuitRaceType(run.raceTypeId)) return;
+    const limit = run.pursuitHeatLimit || PURSUIT_CONFIG.heatLimit;
+    const before = Number.isFinite(run.pursuitHeat) ? run.pursuitHeat : 0;
+    const after = clamp(before + delta, 0, limit);
+    run.pursuitHeat = after;
+    run.pursuitHeatMax = Math.max(run.pursuitHeatMax || 0, after);
+    if (Math.abs(after - before) >= 0.05) {
+      run.pursuitHeatStatus = after > before ? "Heat Rising" : "Heat Dropping";
+      run.pursuitStatusText = reason || run.pursuitHeatStatus;
+      if (after > before) {
+        run.pursuitHeatPulseTimer = Math.max(run.pursuitHeatPulseTimer || 0, 0.42);
+        const callout = /slowdown/i.test(reason)
+          ? "Slowdown hit - heat up!"
+          : (/roadblock/i.test(reason) ? "Roadblock pressure!" : "Police closing!");
+        this.showRaceStateCallout(callout, "danger", 1.25, { replace: false });
+      } else {
+        const callout = /ramp/i.test(reason)
+          ? "Ramp escape!"
+          : (/boost/i.test(reason) ? "Boost escape!" : (/heat dropping/i.test(reason) ? "You're pulling away!" : (reason || "Heat dropping!")));
+        this.showRaceStateCallout(callout, "good", 1.1, { replace: false });
+      }
+    }
+  }
+
+  updatePursuitRun(dt) {
+    const run = this.run;
+    if (!run || !isPursuitRaceType(run.raceTypeId) || run.ended || !run.raceActive || dt <= 0) return;
+    const tuning = getPursuitTuning(run.speedClassId, run.track || TRACKS[0]);
+    const progress = clamp(run.distance / Math.max(1, run.track?.distanceToFinish || 1), 0, 1);
+    run.timeSinceLastRoadblock = Math.max(0, (run.timeSinceLastRoadblock || 0) + dt);
+    run.pursuitWarningTimer = Math.max(0, (run.pursuitWarningTimer || 0) - dt);
+    run.pursuitHeatPulseTimer = Math.max(0, (run.pursuitHeatPulseTimer || 0) - dt);
+
+    const roadblockAhead = this.obstacles.obstacles.some((obstacle) => {
+      if (!obstacle.pursuitRoadblock || obstacle.hit || obstacle.remove) return false;
+      const ahead = obstacle.distance - run.distance;
+      return ahead > -60 && ahead < VIEW_DISTANCE * 1.08;
+    });
+    const density = this.obstacles.getActiveFieldDensity(this.obstacles.obstacles, run.distance || 0);
+    const sectionId = run.currentSectionId || "";
+    const escapeZone = progress >= tuning.escapeZoneProgress;
+    const pressureSection = sectionId === "pressure" || sectionId === "finalPush";
+    const dangerActive = roadblockAhead || density.hardBlockersNext3Seconds >= 3 || density.tacticalHardBlockers >= 4;
+    let heatDelta = 0;
+    let status = "Heat Dropping";
+
+    if (escapeZone) {
+      heatDelta -= tuning.escapeDropPerSecond * dt;
+      status = "Escape Zone";
+      run.escapeReached = true;
+    } else if (dangerActive) {
+      heatDelta += tuning.pressureHeatRisePerSecond * dt * (roadblockAhead ? 1.08 : 0.86);
+      status = roadblockAhead ? "Roadblock pressure!" : "Police closing!";
+    } else if (pressureSection) {
+      heatDelta += tuning.heatRisePerSecond * dt * (sectionId === "finalPush" ? 1.1 : 1);
+      status = "Police closing!";
+    } else {
+      heatDelta -= tuning.recoveryDropPerSecond * dt * (sectionId === "breather" ? 1.25 : 0.9);
+    }
+
+    if (run.boostTimer > 0 || run.padBoostTimer > 0) {
+      heatDelta -= tuning.boostDropPerSecond * dt;
+      status = heatDelta < -0.05 ? "Boost escape!" : status;
+    }
+    if (run.airborne) {
+      heatDelta -= tuning.rampDropPerSecond * dt;
+      status = heatDelta < -0.05 ? "Ramp escape!" : status;
+    }
+
+    run.pursuitRoadblockAhead = roadblockAhead || (run.pursuitWarningTimer || 0) > 0;
+    run.pursuitRecoveryActive = heatDelta < -0.05;
+    this.applyPursuitHeat(heatDelta, status);
+    if (run.pursuitRoadblockAhead) run.pursuitStatusText = "Roadblock pressure!";
+    else if (escapeZone) run.pursuitStatusText = "Escape Zone";
+    else run.pursuitStatusText = run.pursuitRecoveryActive ? "Heat Dropping" : "Police closing!";
+
+    if (run.pursuitHeatStatus === "Heat Rising") run.pursuitHeatRisingTime = (run.pursuitHeatRisingTime || 0) + dt;
+    if (run.pursuitHeatStatus === "Heat Dropping") run.pursuitHeatDroppingTime = (run.pursuitHeatDroppingTime || 0) + dt;
+    if ((run.pursuitHeat || 0) >= tuning.criticalThreshold) {
+      run.pursuitHeatCriticalTime = (run.pursuitHeatCriticalTime || 0) + dt;
+    }
+    if ((run.pursuitHeat || 0) >= tuning.heatLimit && !run.ended) {
+      this.endRace("busted", "Heat Overwhelmed");
+    }
+  }
+
+  recordPursuitRoadblockCleared(obstacle) {
+    const run = this.run;
+    if (!run || !isPursuitRaceType(run.raceTypeId) || !obstacle?.roadblockWaveId) return;
+    if (!(run.pursuitClearedWaveIds instanceof Set)) run.pursuitClearedWaveIds = new Set();
+    const waveId = obstacle.roadblockWaveId;
+    if (run.pursuitClearedWaveIds.has(waveId)) return;
+    run.pursuitClearedWaveIds.add(waveId);
+    run.roadblocksCleared = Math.max(0, (run.roadblocksCleared || 0) + 1);
+    this.applyPursuitHeat(-getPursuitTuning(run.speedClassId, run.track).roadblockClearDrop, "Heat dropping!");
+    this.addScoreEvent("roadblockDodge", PURSUIT_CONFIG.roadblockDodgeScore);
+    this.addFloatingScoreText("ROADBLOCK DODGE", {
+      color: "#28f6ff",
+      size: 17,
+      life: 0.78,
+      yOffset: -104
+    });
   }
 
   updateRunTelemetry(dt) {
@@ -14122,6 +15707,7 @@ class NeonRoadRally {
         ? FUEL_RUN_CONFIG.criticalWarningCooldownSeconds
         : FUEL_RUN_CONFIG.warningCooldownSeconds;
       run.fuelWarningPulseTimer = Math.max(run.fuelWarningPulseTimer || 0, ARCADE_FEEL.fuelWarningPulseMs / 1000);
+      this.showRaceStateCallout(nextState === "critical" ? "CRITICAL FUEL" : "LOW FUEL", "danger", nextState === "critical" ? 1.4 : 1.15, { replace: true });
       this.audio.playSfx("warning", {
         cooldownMs: nextState === "critical" ? 2400 : 3800,
         maxInstances: 1,
@@ -14152,6 +15738,13 @@ class NeonRoadRally {
     run.criticalFuelActive = run.fuel <= run.criticalFuelThreshold;
     if (!run.lowFuelActive) run.fuelWarningState = "none";
     this.addScoreEvent("gasCan", FUEL_RUN_CONFIG.gasCanScore);
+    this.showRaceStateCallout(`GAS CAN! FUEL +${Math.round(run.fuel - before)}`, "good", 1.35, { replace: true });
+    this.addFloatingScoreText("GAS CAN!", {
+      color: "#ffe45e",
+      size: 22,
+      life: 0.82,
+      yOffset: -126
+    });
     this.addFloatingScoreText(`FUEL +${Math.round(run.fuel - before)}`, {
       color: "#ff4d3d",
       size: 20,
@@ -14214,6 +15807,7 @@ class NeonRoadRally {
     run.padBoostTimer = Math.max(0, run.padBoostTimer - dt);
     run.oilTimer = Math.max(0, run.oilTimer - dt);
     run.slowdownTimer = Math.max(0, run.slowdownTimer - dt);
+    run.raceStateCalloutTimer = Math.max(0, (run.raceStateCalloutTimer || 0) - dt);
 
     if (run.verticalInput !== 0) {
       const verticalSpeed = INPUT_CONFIG.verticalMoveRatioPerSecond;
@@ -14288,6 +15882,8 @@ class NeonRoadRally {
 
     this.obstacles.update(dt);
     this.collision.update();
+    this.updatePursuitRun(dt);
+    if (run.ended) return;
 
     if (run.distance >= run.track.distanceToFinish && !run.ended) {
       this.endRace("finished", "Finish Line");
@@ -14523,8 +16119,10 @@ class NeonRoadRally {
     const track = createRaceTrackForSpeedClass(baseTrack, speedClass.id);
     const requestedRaceTypeId = challenge
       ? (challenge.raceType || DEFAULT_RACE_TYPE_ID)
-      : (partyMode ? DEFAULT_RACE_TYPE_ID : (options.raceTypeId || options.raceType || this.pendingRaceTypeId || DEFAULT_RACE_TYPE_ID));
-    const safeRaceTypeId = trackSupportsRaceType(baseTrack, requestedRaceTypeId) ? requestedRaceTypeId : DEFAULT_RACE_TYPE_ID;
+      : (partyMode ? (options.raceTypeId || options.raceType || this.partySession?.raceType || DEFAULT_RACE_TYPE_ID) : (options.raceTypeId || options.raceType || this.pendingRaceTypeId || DEFAULT_RACE_TYPE_ID));
+    const safeRaceTypeId = partyMode
+      ? normalizePartyRaceType(requestedRaceTypeId, baseTrack)
+      : (trackSupportsRaceType(baseTrack, requestedRaceTypeId) ? requestedRaceTypeId : DEFAULT_RACE_TYPE_ID);
     const raceType = getRaceTypeConfig(safeRaceTypeId);
     if (this.scoreTallyFrame) {
       cancelAnimationFrame(this.scoreTallyFrame);
@@ -14566,6 +16164,7 @@ class NeonRoadRally {
     this.run.speedCapped = false;
     this.run.debugSpeedScale = this.debugSpeedScale || 1;
     this.configureFuelForRun(this.run);
+    this.configurePursuitForRun(this.run);
     this.updateRaceSection(false);
     const configuredSeed = this.configureRunSeed(challenge ? challenge.seed : (options.seed ?? this.pendingRoadSeed), track, speedClass.id, raceType.id);
     if (partyMode) this.run.partySeed = configuredSeed;
@@ -14770,6 +16369,9 @@ class NeonRoadRally {
     run.lastCollision = reason;
     run.bumpFlashTimer = Math.max(run.bumpFlashTimer || 0, ARCADE_FEEL.bumpFlashSeconds);
     run.screenShake = Math.max(run.screenShake || 0, ARCADE_FEEL.bumpShake);
+    if (isPursuitRaceType(run.raceTypeId)) {
+      this.applyPursuitHeat(getPursuitTuning(run.speedClassId, run.track).slowdownHeatAdd, "Slowdown hit - heat up!");
+    }
     this.addFloatingScoreText(`${Math.round(penalty)}`, {
       color: "#ff3b58",
       size: 19,
@@ -14847,6 +16449,10 @@ class NeonRoadRally {
       ramp: safeScore(raw.ramp || run.bonuses?.ramp),
       gasCan: safeScore(raw.gasCan || run.bonuses?.gasCan),
       fuelBonus: safeScore(raw.fuelBonus || run.bonuses?.fuelBonus),
+      pursuitEscape: safeScore(raw.pursuitEscape || run.bonuses?.pursuitEscape),
+      roadblockDodge: safeScore(raw.roadblockDodge || run.bonuses?.roadblockDodge),
+      cleanGetaway: safeScore(raw.cleanGetaway || run.bonuses?.cleanGetaway),
+      heatSurvivor: safeScore(raw.heatSurvivor || run.bonuses?.heatSurvivor),
       preMultiplierTotal: Math.max(0, Math.round(run.baseScore || 0)),
       multiplier: run.scoreMultiplier || 1,
       finalScore: Math.max(0, Math.round(run.score || 0))
@@ -14876,6 +16482,15 @@ class NeonRoadRally {
     }
     if (summary.status === "finished" && summary.raceTypeId === FUEL_RUN_RACE_TYPE_ID) {
       add("Fuel Run Finish", `${summary.fuelRemaining || 0} fuel left`, "hot");
+    }
+    if (summary.status === "finished" && summary.raceTypeId === PURSUIT_RACE_TYPE_ID) {
+      add("Escaped", `${Math.round(summary.heatAtEnd || 0)} heat at finish`, "hot");
+    }
+    if (summary.status === "busted") {
+      add("Busted", `${Math.round(summary.progress * 100)}% reached`, "danger");
+    }
+    if (summary.raceTypeId === PURSUIT_RACE_TYPE_ID && (summary.roadblocksCleared || 0) > 0) {
+      add("Roadblock Dodge", `${summary.roadblocksCleared} cleared`, "cool");
     }
     if (summary.status === "outOfFuel") {
       add("Out of Fuel", `${Math.round(summary.progress * 100)}% reached`, "danger");
@@ -15095,7 +16710,19 @@ class NeonRoadRally {
       longestNoFuelStretch: isFuelRunRaceType(summary.raceTypeId) ? (run.longestNoFuelStretchSeconds || 0) : 0,
       lowFuelTime: isFuelRunRaceType(summary.raceTypeId) ? (run.lowFuelSeconds || 0) : 0,
       criticalFuelTime: isFuelRunRaceType(summary.raceTypeId) ? (run.criticalFuelSeconds || 0) : 0,
-      outOfFuelOccurred: summary.status === "outOfFuel"
+      outOfFuelOccurred: summary.status === "outOfFuel",
+      heatMax: isPursuitRaceType(summary.raceTypeId) ? (summary.heatMax || run.pursuitHeatMax || 0) : 0,
+      heatAtEnd: isPursuitRaceType(summary.raceTypeId) ? (summary.heatAtEnd || run.pursuitHeat || 0) : 0,
+      heatCriticalTime: isPursuitRaceType(summary.raceTypeId) ? (summary.heatCriticalTime || run.pursuitHeatCriticalTime || 0) : 0,
+      heatRisingTime: isPursuitRaceType(summary.raceTypeId) ? (summary.heatRisingTime || run.pursuitHeatRisingTime || 0) : 0,
+      heatDroppingTime: isPursuitRaceType(summary.raceTypeId) ? (summary.heatDroppingTime || run.pursuitHeatDroppingTime || 0) : 0,
+      roadblocksSpawned: isPursuitRaceType(summary.raceTypeId) ? (summary.roadblocksSpawned || run.roadblocksSpawned || 0) : 0,
+      roadblocksCleared: isPursuitRaceType(summary.raceTypeId) ? (summary.roadblocksCleared || run.roadblocksCleared || 0) : 0,
+      roadblockWarnings: isPursuitRaceType(summary.raceTypeId) ? (summary.roadblockWarnings || run.roadblockWarnings || 0) : 0,
+      bustedOccurred: isPursuitRaceType(summary.raceTypeId) ? Boolean(summary.bustedOccurred || summary.status === "busted") : false,
+      escapeReached: isPursuitRaceType(summary.raceTypeId) ? Boolean(summary.escapeReached || summary.status === "finished") : false,
+      pursuitResult: isPursuitRaceType(summary.raceTypeId) ? (summary.pursuitResult || getRunOutcomeLabel(summary)) : "",
+      pursuitBonuses: isPursuitRaceType(summary.raceTypeId) ? (summary.pursuitBonuses || {}) : {}
     };
   }
 
@@ -15118,6 +16745,11 @@ class NeonRoadRally {
     run.ended = true;
     run.finished = status === "finished";
     run.endReason = reason;
+    if (isPursuitRaceType(run.raceTypeId)) {
+      run.bustedOccurred = status === "busted";
+      run.escapeReached = status === "finished" || run.escapeReached;
+      run.pursuitResult = status === "finished" ? "Escaped" : (status === "busted" ? "Busted" : "Crashed");
+    }
     run.crashCollisionType = status === "crashed"
       ? sanitizeName(reason || run.lastCollision, "Unknown", DISPLAY_TEXT_MAX_LENGTH)
       : "";
@@ -15151,12 +16783,34 @@ class NeonRoadRally {
         run.scoreBreakdown.fuelBonus = run.bonuses.fuelBonus;
         this.addBaseScore(run.bonuses.fuelBonus);
       }
+      if (isPursuitRaceType(run.raceTypeId)) {
+        const tuning = getPursuitTuning(run.speedClassId, run.track);
+        run.bonuses.pursuitEscape = tuning.escapeBonus;
+        run.scoreBreakdown.pursuitEscape = run.bonuses.pursuitEscape;
+        this.addBaseScore(run.bonuses.pursuitEscape);
+        if ((run.slowdownHits || 0) === 0) {
+          run.bonuses.cleanGetaway = tuning.cleanGetawayBonus;
+          run.scoreBreakdown.cleanGetaway = run.bonuses.cleanGetaway;
+          this.addBaseScore(run.bonuses.cleanGetaway);
+        }
+        if ((run.pursuitHeatMax || 0) >= tuning.criticalThreshold) {
+          run.bonuses.heatSurvivor = tuning.heatSurvivorBonus;
+          run.scoreBreakdown.heatSurvivor = run.bonuses.heatSurvivor;
+          this.addBaseScore(run.bonuses.heatSurvivor);
+        }
+      }
       this.audio.playSfx("finish");
     } else if (status === "outOfFuel") {
       run.fuel = 0;
       run.lowFuelActive = true;
       run.criticalFuelActive = true;
       run.screenShake = Math.max(run.screenShake || 0, 0.42);
+      this.audio.playSfx("warning", { cooldownMs: 1200, maxInstances: 1, volume: this.audio.sfxVolume * 0.72 });
+    } else if (status === "busted") {
+      run.pursuitHeat = run.pursuitHeatLimit || PURSUIT_CONFIG.heatLimit;
+      run.pursuitStatusText = "Busted";
+      run.pursuitBustedBeatTimer = Math.max(run.pursuitBustedBeatTimer || 0, 0.82);
+      run.screenShake = Math.max(run.screenShake || 0, 0.38);
       this.audio.playSfx("warning", { cooldownMs: 1200, maxInstances: 1, volume: this.audio.sfxVolume * 0.72 });
     } else {
       if (!run.crashSfxPlayed) {
@@ -15202,6 +16856,11 @@ class NeonRoadRally {
       fuelCollected: run.gasCansCollected || 0,
       fuelRemaining: isFuelRunRaceType(run.raceTypeId) ? Math.max(0, Math.round(run.fuel || 0)) : 0,
       fuelBonus: run.bonuses.fuelBonus || 0,
+      pursuitResult: isPursuitRaceType(run.raceTypeId) ? (run.pursuitResult || getRunOutcomeLabel({ raceTypeId: run.raceTypeId, status })) : "",
+      heatAtEnd: isPursuitRaceType(run.raceTypeId) ? Math.round(run.pursuitHeat || 0) : 0,
+      heatMax: isPursuitRaceType(run.raceTypeId) ? Math.round(run.pursuitHeatMax || 0) : 0,
+      roadblocksCleared: isPursuitRaceType(run.raceTypeId) ? (run.roadblocksCleared || 0) : 0,
+      roadblocksSpawned: isPursuitRaceType(run.raceTypeId) ? (run.roadblocksSpawned || 0) : 0,
       partyMode: Boolean(run.partyMode),
       partySessionId: run.partyMode ? run.partySessionId : "",
       partyRoundType: run.partyMode ? run.partyRoundType : PARTY_ROUND_TYPE_ONE_RUN,
@@ -15290,6 +16949,23 @@ class NeonRoadRally {
       gasCanRestoreAmount: run.gasCanRestoreAmount || 0,
       lowFuelThreshold: run.lowFuelThreshold || 0,
       criticalFuelThreshold: run.criticalFuelThreshold || 0,
+      pursuitResult: isPursuitRaceType(run.raceTypeId) ? (run.pursuitResult || getRunOutcomeLabel({ raceTypeId: run.raceTypeId, status })) : "",
+      heatMax: isPursuitRaceType(run.raceTypeId) ? Math.round(run.pursuitHeatMax || 0) : 0,
+      heatAtEnd: isPursuitRaceType(run.raceTypeId) ? Math.round(run.pursuitHeat || 0) : 0,
+      heatCriticalTime: isPursuitRaceType(run.raceTypeId) ? (run.pursuitHeatCriticalTime || 0) : 0,
+      heatRisingTime: isPursuitRaceType(run.raceTypeId) ? (run.pursuitHeatRisingTime || 0) : 0,
+      heatDroppingTime: isPursuitRaceType(run.raceTypeId) ? (run.pursuitHeatDroppingTime || 0) : 0,
+      roadblocksSpawned: isPursuitRaceType(run.raceTypeId) ? (run.roadblocksSpawned || 0) : 0,
+      roadblocksCleared: isPursuitRaceType(run.raceTypeId) ? (run.roadblocksCleared || 0) : 0,
+      roadblockWarnings: isPursuitRaceType(run.raceTypeId) ? (run.roadblockWarnings || 0) : 0,
+      bustedOccurred: isPursuitRaceType(run.raceTypeId) ? Boolean(run.bustedOccurred) : false,
+      escapeReached: isPursuitRaceType(run.raceTypeId) ? Boolean(run.escapeReached || status === "finished") : false,
+      pursuitBonuses: isPursuitRaceType(run.raceTypeId) ? {
+        escapeBonus: run.bonuses.pursuitEscape || 0,
+        roadblockDodge: run.bonuses.roadblockDodge || 0,
+        cleanGetaway: run.bonuses.cleanGetaway || 0,
+        heatSurvivor: run.bonuses.heatSurvivor || 0
+      } : {},
       scoreBreakdown,
       bestScore: debugSpeedScaleActive ? previousBestScore : (updatedProfilePlayer.bestScore || run.score),
       previousBestScore,
@@ -15355,7 +17031,7 @@ class NeonRoadRally {
       } else {
         this.showScoreScreen();
       }
-    }, status === "crashed" || status === "outOfFuel" ? ARCADE_FEEL.crashScoreDelayMs : ARCADE_FEEL.finishScoreDelayMs);
+    }, status === "crashed" || status === "outOfFuel" || status === "busted" ? ARCADE_FEEL.crashScoreDelayMs : ARCADE_FEEL.finishScoreDelayMs);
   }
 
   getPartyDebugInfo() {
@@ -15448,7 +17124,9 @@ class NeonRoadRally {
       { trackId: "redline-run", raceTypeId: DEFAULT_RACE_TYPE_ID, speedClassId: "arcade" },
       { trackId: "redline-run", raceTypeId: DEFAULT_RACE_TYPE_ID, speedClassId: "turbo" },
       { trackId: "sunset-highway", raceTypeId: FUEL_RUN_RACE_TYPE_ID, speedClassId: "arcade" },
-      { trackId: "sunset-highway", raceTypeId: FUEL_RUN_RACE_TYPE_ID, speedClassId: "turbo" }
+      { trackId: "sunset-highway", raceTypeId: FUEL_RUN_RACE_TYPE_ID, speedClassId: "turbo" },
+      { trackId: "sunset-highway", raceTypeId: PURSUIT_RACE_TYPE_ID, speedClassId: "arcade" },
+      { trackId: "redline-run", raceTypeId: PURSUIT_RACE_TYPE_ID, speedClassId: "arcade" }
     ];
     const results = [];
     for (let index = 0; index < targets.length; index += 1) {
@@ -15463,10 +17141,34 @@ class NeonRoadRally {
         trackId: target.trackId,
         dt: 0.4
       });
+      const sequence = this.captureRoadDirectorSequence({
+        seed: `targeted-director-sequence-${target.trackId}-${target.raceTypeId}-${target.speedClassId}`,
+        trackId: target.trackId,
+        raceTypeId: target.raceTypeId,
+        speedClassId: target.speedClassId,
+        waveLimit: 32,
+        dt: 0.4
+      });
+      const roadblockWaves = (sequence.sequence || []).filter((wave) => wave.type === "pursuitRoadblock" || wave.type === "pursuitHardRoadblock");
+      const pursuitTarget = isPursuitRaceType(target.raceTypeId);
+      const roadblockGapReadable = !pursuitTarget || roadblockWaves.every((wave) => {
+        const blocked = Array.isArray(wave.blockedLanes) ? wave.blockedLanes : [];
+        const routes = Array.isArray(wave.routeLanes) ? wave.routeLanes : [];
+        return blocked.length >= 2
+          && blocked.length <= 4
+          && routes.length >= 1
+          && routes.some((lane) => !blocked.includes(lane));
+      });
+      const noCheapRoadblock = !pursuitTarget || roadblockWaves.every((wave) => {
+        const progress = (wave.distance || 0) / Math.max(1, track.distanceToFinish || 1);
+        const tuning = getPursuitTuning(target.speedClassId, track);
+        return progress >= tuning.noRoadblockProgress;
+      });
       const budget = {
         ...ACTIVE_FIELD_BUDGET_CONFIG.default,
         ...(ACTIVE_FIELD_BUDGET_CONFIG[target.speedClassId] || {}),
-        ...(isFuelRunRaceType(target.raceTypeId) ? ACTIVE_FIELD_BUDGET_CONFIG.fuelRun : {})
+        ...(isFuelRunRaceType(target.raceTypeId) ? ACTIVE_FIELD_BUDGET_CONFIG.fuelRun : {}),
+        ...(pursuitTarget ? ACTIVE_FIELD_BUDGET_CONFIG.pursuit : {})
       };
       const passDetails = {
         noVisibleSpawnViolations: summary.visibleSpawnViolations === 0,
@@ -15475,6 +17177,9 @@ class NeonRoadRally {
         noEightCarClusters: summary.maxVisibleHardBlockers < 8,
         noDeadScreenLongerThanMode: summary.longestDeadScreenSeconds <= (budget.deadScreenLimitSeconds || 2) + 0.8,
         meaningfulActivityReported: (summary.visibleMeaningfulAverage || 0) > 0,
+        pursuitRoadblocksPresent: !pursuitTarget || roadblockWaves.length > 0,
+        pursuitRoadblockGapsReadable: roadblockGapReadable,
+        pursuitNoCheapRoadblock: noCheapRoadblock,
         noCheapStart: (summary.director?.sectionStats?.launch?.totalWaves || 0) > 0
           && (summary.director?.sectionStats?.launch?.meaningfulWavePercent || 0) > 0,
         routeReadable: summary.routeReadabilityFailures === 0 && summary.minorOnlyOpenLaneEvents === 0,
@@ -15506,7 +17211,10 @@ class NeonRoadRally {
           sameLaneOverlaps: summary.sameLaneOverlaps,
           boostObjectOverlaps: summary.boostObjectOverlaps,
           rampObjectOverlaps: summary.rampObjectOverlaps,
-          gasCanOverlaps: summary.gasCanOverlaps
+          gasCanOverlaps: summary.gasCanOverlaps,
+          pursuitRoadblocks: roadblockWaves.length,
+          pursuitPressureWaves: summary.director?.waveCounts?.pursuitPressureLanes || 0,
+          pursuitRecoveryWaves: summary.director?.waveCounts?.pursuitRecoveryGap || 0
         },
         director: {
           intentCounts: summary.director?.directorIntentCounts || {},
@@ -15577,6 +17285,31 @@ class NeonRoadRally {
     if (simRun.fuel <= 0) simRun.simOutOfFuel = true;
   }
 
+  updatePursuitSimulationState(simRun, dt) {
+    if (!simRun || !isPursuitRaceType(simRun.raceTypeId)) return;
+    const track = simRun.track || TRACKS[0];
+    const tuning = getPursuitTuning(simRun.speedClassId, track);
+    const progress = clamp((simRun.distance || 0) / Math.max(1, track.distanceToFinish || 1), 0, 1);
+    const section = getTrackSection(track, progress);
+    simRun.timeSinceLastRoadblock = Math.max(0, (simRun.timeSinceLastRoadblock || 0) + dt);
+    let delta = -tuning.recoveryDropPerSecond * 0.42 * dt;
+    let status = "Heat Dropping";
+    if (progress >= tuning.escapeZoneProgress || section.id === "breather") {
+      delta = -tuning.escapeDropPerSecond * dt;
+      status = progress >= tuning.escapeZoneProgress ? "Escape Zone" : "Heat Dropping";
+      if (progress >= tuning.escapeZoneProgress) simRun.escapeReached = true;
+    } else if (section.id === "pressure" || section.id === "finalPush") {
+      delta = tuning.heatRisePerSecond * (section.id === "finalPush" ? 1.2 : 1) * dt;
+      status = "Heat Rising";
+    }
+    const before = Number.isFinite(simRun.pursuitHeat) ? simRun.pursuitHeat : tuning.startHeat;
+    const after = clamp(before + delta, 0, tuning.heatLimit);
+    simRun.pursuitHeat = after;
+    simRun.pursuitHeatMax = Math.max(simRun.pursuitHeatMax || 0, after);
+    simRun.pursuitStatusText = status;
+    simRun.pursuitHeatStatus = status === "Heat Rising" ? "Heat Rising" : "Heat Dropping";
+  }
+
   captureRoadDirectorSequence(options = {}) {
     const speedClassId = normalizeSpeedClassId(options.speedClassId, DEFAULT_SPEED_CLASS_ID);
     const baseTrack = getTrackById(options.track?.id || options.trackId || DEFAULT_TRACK_ID);
@@ -15609,6 +17342,7 @@ class NeonRoadRally {
       renderLaneFloat: TRACK_DIRECTOR.centerLane
     };
     this.configureFuelForRun(simRun);
+    this.configurePursuitForRun(simRun);
     simRun.simulateFuelPickups = true;
     const simGame = {
       run: simRun,
@@ -15629,6 +17363,9 @@ class NeonRoadRally {
       simRun.currentSpeed = getTrackCruiseSpeed(track, progress, speedClassId);
       if (isFuelRunRaceType(raceTypeId)) {
         this.updateFuelRunSimulationState(simRun, dt);
+      }
+      if (isPursuitRaceType(raceTypeId)) {
+        this.updatePursuitSimulationState(simRun, dt);
       }
       simRun.distance += simRun.currentSpeed * dt;
       simRun.elapsed += dt;
@@ -15734,6 +17471,7 @@ class NeonRoadRally {
     const baseSeed = options.seed || "sunset-highway-spawn-safety-v1";
     const raceTypeId = normalizeRaceTypeId(options.raceTypeId || options.raceType, DEFAULT_RACE_TYPE_ID);
     const fuelRun = isFuelRunRaceType(raceTypeId);
+    const pursuitRun = isPursuitRaceType(raceTypeId);
     const track = getTrackById(options.track?.id || options.trackId || DEFAULT_TRACK_ID);
     const dt = options.dt || 0.4;
     const pressureCounts = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
@@ -15770,6 +17508,9 @@ class NeonRoadRally {
     let longestNoFuelStretch = 0;
     let simulatedOutOfFuelRuns = 0;
     let ignoringGasOutOfFuelRuns = 0;
+    let roadblocksSpawnedSum = 0;
+    let roadblockWarningsSum = 0;
+    let pursuitHeatMaxSum = 0;
     let visibleSpawnViolations = 0;
     let maxWavesSpawnedInSingleFrame = 0;
     let maxVisibleHardBlockers = 0;
@@ -16177,6 +17918,9 @@ class NeonRoadRally {
         longestNoFuelStretch: 0,
         simulatedOutOfFuelRuns: 0,
         ignoringGasOutOfFuelRuns: 0,
+        roadblocksSpawnedSum: 0,
+        roadblockWarningsSum: 0,
+        pursuitHeatMaxSum: 0,
         fuelOpportunitiesBySection: {},
         minSameLaneSpacing: Infinity,
         spacingSum: 0,
@@ -16201,6 +17945,7 @@ class NeonRoadRally {
           currentSpeed: getTrackCruiseSpeed(runTrack, 0, speedClassId)
         };
         this.configureFuelForRun(simRun);
+        this.configurePursuitForRun(simRun);
         simRun.simulateFuelPickups = fuelRun;
         const simGame = {
           run: simRun,
@@ -16219,6 +17964,9 @@ class NeonRoadRally {
           simRun.currentSpeed = getTrackCruiseSpeed(runTrack, progress, speedClassId);
           if (fuelRun) {
             this.updateFuelRunSimulationState(simRun, dt);
+          }
+          if (pursuitRun) {
+            this.updatePursuitSimulationState(simRun, dt);
           }
           simRun.distance += simRun.currentSpeed * dt;
           simRun.elapsed += dt;
@@ -16418,6 +18166,14 @@ class NeonRoadRally {
             perSpeedClass[speedClassId].fuelOpportunitiesBySection[sectionId] = (perSpeedClass[speedClassId].fuelOpportunitiesBySection[sectionId] || 0) + count;
           });
         }
+        if (pursuitRun) {
+          roadblocksSpawnedSum += simRun.roadblocksSpawned || 0;
+          roadblockWarningsSum += simRun.roadblockWarnings || 0;
+          pursuitHeatMaxSum += simRun.pursuitHeatMax || 0;
+          perSpeedClass[speedClassId].roadblocksSpawnedSum += simRun.roadblocksSpawned || 0;
+          perSpeedClass[speedClassId].roadblockWarningsSum += simRun.roadblockWarnings || 0;
+          perSpeedClass[speedClassId].pursuitHeatMaxSum += simRun.pursuitHeatMax || 0;
+        }
         completedRuns += 1;
 
         if (completedRuns > 0 && completedRuns % 25 === 0) {
@@ -16450,6 +18206,7 @@ class NeonRoadRally {
       item.averageMaxTimeBetweenGasCans = fuelRun ? item.gasCanMaxGapSum / Math.max(1, runsPerSpeedClass) : null;
       item.simulatedOutOfFuelRisk = fuelRun ? item.simulatedOutOfFuelRuns / Math.max(1, runsPerSpeedClass) : 0;
       item.ignoringGasOutOfFuelRisk = fuelRun ? item.ignoringGasOutOfFuelRuns / Math.max(1, runsPerSpeedClass) : 0;
+      item.averagePursuitHeatMax = pursuitRun ? item.pursuitHeatMaxSum / Math.max(1, runsPerSpeedClass) : 0;
       item.director = finalizeDirectorStats(item.director);
       item.sectionSafety = finalizeSectionSafety(item.sectionSafety);
       delete item.spacingSum;
@@ -16531,9 +18288,15 @@ class NeonRoadRally {
     const directorTwoThreeCommon = (director.pressureCounts[2] || 0) + (director.pressureCounts[3] || 0) >= (director.pressureCounts[1] || 0);
     const centerChallengedRegularly = director.nonOpeningCenterBlockedPercent >= 0.28;
     const boostNotMostlyCenter = (director.boostLaneDistribution[TRACK_DIRECTOR.centerLane] || 0) <= 0.34;
-    const repeatedPatternsControlled = fuelRun || director.repeatedPatternPercent <= 0.18;
+    const modeSpecificRun = fuelRun || pursuitRun;
+    const pursuitRoadblockCount = (director.waveCounts?.pursuitRoadblock || 0) + (director.waveCounts?.pursuitHardRoadblock || 0);
+    const pursuitPressureWaveCount = director.waveCounts?.pursuitPressureLanes || 0;
+    const pursuitRecoveryWaveCount = director.waveCounts?.pursuitRecoveryGap || 0;
+    const pursuitRoadblocksPresent = !pursuitRun || pursuitRoadblockCount > 0;
+    const pursuitWarningsPresent = !pursuitRun || roadblockWarningsSum >= pursuitRoadblockCount;
+    const repeatedPatternsControlled = modeSpecificRun || director.repeatedPatternPercent <= 0.18;
     const directorFairnessPassed = director.fairnessFailures === 0;
-    const directorPressureBudgetPassed = fuelRun || director.pressureBudgetFailures === 0;
+    const directorPressureBudgetPassed = modeSpecificRun || director.pressureBudgetFailures === 0;
     const trafficObjectCount = ["slowCar", "fastCar", "truck", "barrier"].reduce((sum, type) => sum + (director.obstacleTypeCounts?.[type] || 0), 0);
     const supportObjectCount = ["ramp", "boostPad"].reduce((sum, type) => sum + (director.obstacleTypeCounts?.[type] || 0), 0);
     const minorHazardCount = ["cone", "oil", "deer", "branch"].reduce((sum, type) => sum + (director.obstacleTypeCounts?.[type] || 0), 0);
@@ -16564,7 +18327,7 @@ class NeonRoadRally {
       waveLimit: 18,
       show: false
     });
-    const effectiveSectionShapeChecks = fuelRun
+    const effectiveSectionShapeChecks = modeSpecificRun
       ? {
         finalPushMoreIntenseThanGroove: true,
         breatherCalmerThanPressure: true,
@@ -16589,22 +18352,24 @@ class NeonRoadRally {
       && (!fuelRun || fuelObjectMixPassed)
       && fuelMinorHazardsNearZero
       && (!fuelRun || averageGasCansSpawned >= 3.2)
-      && (fuelRun || pressureCounts[4] > 0)
-      && (fuelRun || fourLaneRare)
-      && (fuelRun || directorTwoThreeCommon)
-      && (fuelRun || centerChallengedRegularly)
+      && (!pursuitRun || pursuitRoadblocksPresent)
+      && (!pursuitRun || pursuitWarningsPresent)
+      && (modeSpecificRun || pressureCounts[4] > 0)
+      && (modeSpecificRun || fourLaneRare)
+      && (modeSpecificRun || directorTwoThreeCommon)
+      && (modeSpecificRun || centerChallengedRegularly)
       && boostNotMostlyCenter
       && repeatedPatternsControlled
       && directorFairnessPassed
-      && (fuelRun || directorPressureBudgetPassed)
-      && (fuelRun || modeIntensityChecks.sundayPlayable)
-      && (fuelRun || modeIntensityChecks.sundayGentle)
-      && (fuelRun || modeIntensityChecks.rookieApproachable)
-      && (fuelRun || modeIntensityChecks.arcadeTwoThreeCommon)
-      && (fuelRun || modeIntensityChecks.arcadeNoDeadAir)
-      && (fuelRun || modeIntensityChecks.proTurboThreeLaneFrequent)
-      && (fuelRun || modeIntensityChecks.fourLaneOnlyHighModes)
-      && (fuelRun || modeIntensityChecks.centerNotSafeLong)
+      && (modeSpecificRun || directorPressureBudgetPassed)
+      && (modeSpecificRun || modeIntensityChecks.sundayPlayable)
+      && (modeSpecificRun || modeIntensityChecks.sundayGentle)
+      && (modeSpecificRun || modeIntensityChecks.rookieApproachable)
+      && (modeSpecificRun || modeIntensityChecks.arcadeTwoThreeCommon)
+      && (modeSpecificRun || modeIntensityChecks.arcadeNoDeadAir)
+      && (modeSpecificRun || modeIntensityChecks.proTurboThreeLaneFrequent)
+      && (modeSpecificRun || modeIntensityChecks.fourLaneOnlyHighModes)
+      && (modeSpecificRun || modeIntensityChecks.centerNotSafeLong)
       && effectiveSectionShapeChecks.finalPushMoreIntenseThanGroove
       && effectiveSectionShapeChecks.breatherCalmerThanPressure
       && effectiveSectionShapeChecks.breatherNotEmpty
@@ -16612,7 +18377,8 @@ class NeonRoadRally {
     const activeBudgetForSummary = {
       ...ACTIVE_FIELD_BUDGET_CONFIG.default,
       ...(ACTIVE_FIELD_BUDGET_CONFIG[speedClassIds[0]] || {}),
-      ...(fuelRun ? ACTIVE_FIELD_BUDGET_CONFIG.fuelRun : {})
+      ...(fuelRun ? ACTIVE_FIELD_BUDGET_CONFIG.fuelRun : {}),
+      ...(pursuitRun ? ACTIVE_FIELD_BUDGET_CONFIG.pursuit : {})
     };
     const activeFieldCapsRespected = speedClassIds.length > 1 || (
       maxVisibleHardBlockers <= activeBudgetForSummary.maxVisibleHardBlockers
@@ -16662,7 +18428,7 @@ class NeonRoadRally {
       hardRowExamples,
       routeExamples,
       rampSafetyExamples,
-	      overlapExamples,
+      overlapExamples,
       preventedUnsafeSpawns,
       visibleSpawnViolations,
       maxWavesSpawnedInSingleFrame,
@@ -16686,6 +18452,12 @@ class NeonRoadRally {
       simulatedOutOfFuelRisk: fuelRun ? simulatedOutOfFuelRuns / Math.max(1, runs) : 0,
       ignoringGasOutOfFuelRisk: fuelRun ? ignoringGasOutOfFuelRuns / Math.max(1, runs) : 0,
       fuelRunObjectMix,
+      pursuitRoadblockCount,
+      pursuitPressureWaveCount,
+      pursuitRecoveryWaveCount,
+      roadblocksSpawnedAverage: pursuitRun ? roadblocksSpawnedSum / Math.max(1, runs) : 0,
+      roadblockWarningsAverage: pursuitRun ? roadblockWarningsSum / Math.max(1, runs) : 0,
+      pursuitHeatMaxAverage: pursuitRun ? pursuitHeatMaxSum / Math.max(1, runs) : 0,
       trafficObjectCount,
       supportObjectCount,
       minorHazardCount,
@@ -16716,11 +18488,13 @@ class NeonRoadRally {
         rampUsefulnessPassed,
         unsafeRampLandingsPassed,
         fuelMinorHazardsNearZero,
-	        fourLaneExists: pressureCounts[4] > 0,
+        fourLaneExists: pressureCounts[4] > 0,
         fourLaneRare,
         fuelOpportunitiesSufficient,
         fuelNotFreeCenter,
         fuelObjectMixPassed,
+        pursuitRoadblocksPresent,
+        pursuitWarningsPresent,
         twoThreeCommon,
         directorTwoThreeCommon,
         centerChallengedRegularly,
@@ -16933,10 +18707,13 @@ class NeonRoadRally {
       const fuelText = summary.raceTypeId === FUEL_RUN_RACE_TYPE_ID
         ? `, gas ${item.averageGasCansSpawned.toFixed(1)}, gas max ${fmtSeconds(item.averageMaxTimeBetweenGasCans)}, no-fuel risk ${(item.simulatedOutOfFuelRisk * 100).toFixed(1)}%, ignore-gas ${(item.ignoringGasOutOfFuelRisk * 100).toFixed(0)}%`
         : "";
+      const pursuitText = summary.raceTypeId === PURSUIT_RACE_TYPE_ID
+        ? `, roadblocks ${(item.roadblocksSpawnedSum || 0).toLocaleString()}, warnings ${(item.roadblockWarningsSum || 0).toLocaleString()}, heat max ${(item.averagePursuitHeatMax || 0).toFixed(1)}`
+        : "";
       const rampText = item.rampUsefulnessSamples
         ? `, ramps ${item.rampsWithUsefulTarget}/${item.rampUsefulnessSamples} useful`
         : "";
-      return `${item.label}: ${item.invalidWalls} walls, ${item.hardBlockerWalls || 0} hard walls, max ${item.maxBlocked}, hard max ${item.maxHardBlocked || 0}, hard4 ${(item.hardBlockerFourLanePressure || 0).toLocaleString()}, row max ${item.maxSameRowHardBlockers || 0}, flat4 ${item.flatHardBlockerFourRows || 0}, route ${item.routeReadabilityFailures || 0}, minor-open ${item.minorOnlyOpenLaneEvents || 0}, ${item.sameLaneOverlaps} overlaps, min gap ${minSpacing}, ${centerPercent}, ${fmtSeconds(gap)} meaningful, ${fmtSeconds(empty)} longest empty, ${highPressure}, budget misses ${budgetFailures}${rampText}${fuelText}`;
+      return `${item.label}: ${item.invalidWalls} walls, ${item.hardBlockerWalls || 0} hard walls, max ${item.maxBlocked}, hard max ${item.maxHardBlocked || 0}, hard4 ${(item.hardBlockerFourLanePressure || 0).toLocaleString()}, row max ${item.maxSameRowHardBlockers || 0}, flat4 ${item.flatHardBlockerFourRows || 0}, route ${item.routeReadabilityFailures || 0}, minor-open ${item.minorOnlyOpenLaneEvents || 0}, ${item.sameLaneOverlaps} overlaps, min gap ${minSpacing}, ${centerPercent}, ${fmtSeconds(gap)} meaningful, ${fmtSeconds(empty)} longest empty, ${highPressure}, budget misses ${budgetFailures}${rampText}${fuelText}${pursuitText}`;
     }).join(" · ");
     const averageSpacing = summary.averageObjectSpacing === null ? "n/a" : Math.round(summary.averageObjectSpacing).toLocaleString();
     const minSpacing = summary.minSameLaneSpacing === null ? "n/a" : Math.round(summary.minSameLaneSpacing).toLocaleString();
@@ -17055,6 +18832,12 @@ class NeonRoadRally {
             <div class="score-card"><strong>Longest No-Fuel Stretch</strong><span>${fmtSeconds(summary.longestNoFuelStretch)}</span></div>
             <div class="score-card"><strong>Fuel Mix</strong><span>${(summary.fuelRunObjectMix.trafficPercent * 100).toFixed(0)}% traffic / ${(summary.fuelRunObjectMix.supportPercent * 100).toFixed(0)}% support / ${(summary.fuelRunObjectMix.minorHazardPercent * 100).toFixed(0)}% minor</span></div>
             <div class="score-card"><strong>Out-of-Fuel Risk</strong><span>${(summary.simulatedOutOfFuelRisk * 100).toFixed(1)}% / ignore ${(summary.ignoringGasOutOfFuelRisk * 100).toFixed(0)}%</span></div>
+          ` : ""}
+          ${summary.raceTypeId === PURSUIT_RACE_TYPE_ID ? `
+            <div class="score-card"><strong>Pursuit Roadblocks</strong><span>${summary.pursuitRoadblockCount.toLocaleString()}</span></div>
+            <div class="score-card"><strong>Pursuit Pressure</strong><span>${summary.pursuitPressureWaveCount.toLocaleString()} pressure · ${summary.pursuitRecoveryWaveCount.toLocaleString()} recovery</span></div>
+            <div class="score-card"><strong>Roadblock Warnings</strong><span>${summary.roadblockWarningsAverage.toFixed(1)} avg</span></div>
+            <div class="score-card"><strong>Avg Max Heat</strong><span>${summary.pursuitHeatMaxAverage.toFixed(1)}</span></div>
           ` : ""}
           <div class="score-card"><strong>Section Shape</strong><span>${summary.passDetails.finalPushMoreIntenseThanGroove && summary.passDetails.breatherCalmerThanPressure ? "PASS" : "CHECK"}</span></div>
           <div class="score-card"><strong>Seed Determinism</strong><span>${summary.passDetails.seededDeterminismPassed ? "PASS" : "FAIL"}</span></div>
@@ -17335,10 +19118,11 @@ class NeonRoadRally {
       modes: [
         {
           title: "Race Types",
-          chips: ["Classic", "Fuel Run"],
+          chips: ["Classic", "Fuel Run", "Pursuit"],
           points: [
             "Classic: survive, score, and finish.",
-            "Fuel Run: fuel drains over time, gas cans refill it, manual boost saves fuel, and running out ends the run."
+            "Fuel Run: Fuel drains as you race. Grab gas cans to stay alive. Boosting can help, but running dry ends the run.",
+            "Pursuit: Police pressure fills the heat bar. If it fills, you get Busted. Boost, hit ramps, clear roadblocks, and reach the Escape Zone to shake them."
           ]
         },
         {
@@ -17368,7 +19152,8 @@ class NeonRoadRally {
           points: [
             "Party Mode is local pass-the-keyboard competition on one computer.",
             "Players use the same seed for fair comparison.",
-            "One Run Each, Best of 3, and Total Score decide the winner by highest score."
+            "One Run Each, Best of 3, and Total Score decide the winner by highest score.",
+            "Party Fuel: Take turns in Fuel Run and see who can survive longest or score highest."
           ]
         }
       ],
@@ -17633,6 +19418,7 @@ class NeonRoadRally {
     const filter = normalizePlaytestReportFilter(filterValue);
     if (filter === "classic") return runs.filter((run) => run.raceTypeId === DEFAULT_RACE_TYPE_ID);
     if (filter === "fuelRun") return runs.filter((run) => run.raceTypeId === FUEL_RUN_RACE_TYPE_ID);
+    if (filter === "pursuit") return runs.filter((run) => run.raceTypeId === PURSUIT_RACE_TYPE_ID);
     if (filter === "challenge") return runs.filter((run) => Boolean(run.challengeId));
     if (filter === "party") return runs.filter((run) => Boolean(run.partyMode));
     if (filter === "turbo") return runs.filter((run) => run.raceModeId === "turbo");
@@ -17691,12 +19477,35 @@ class NeonRoadRally {
     const runs = this.filterPlaytestRuns(allRuns, filter);
     const fuelRuns = runs.filter((run) => run.raceTypeId === FUEL_RUN_RACE_TYPE_ID);
     const fuelFinishes = fuelRuns.filter((run) => run.status === "finished");
+    const pursuitRuns = runs.filter((run) => run.raceTypeId === PURSUIT_RACE_TYPE_ID);
+    const pursuitFinishes = pursuitRuns.filter((run) => run.status === "finished");
     const totalFuelSavedByBoost = fuelRuns.reduce((sum, run) => sum + (Number(run.fuelSavedByBoost) || 0), 0);
     const totalFuelDrainPausedTime = fuelRuns.reduce((sum, run) => sum + (Number(run.fuelDrainPausedTime) || 0), 0);
     const totalBoostsUsedInFuelRun = fuelRuns.reduce((sum, run) => sum + (Number(run.boostsUsedInFuelRun) || 0), 0);
+    const pursuitBonuses = pursuitRuns.reduce((sum, run) => {
+      const bonuses = run.pursuitBonuses || {};
+      return sum
+        + (Number(bonuses.escapeBonus) || 0)
+        + (Number(bonuses.roadblockDodge) || 0)
+        + (Number(bonuses.cleanGetaway) || 0)
+        + (Number(bonuses.heatSurvivor) || 0);
+    }, 0);
     const challengeRuns = runs.filter((run) => Boolean(run.challengeId));
     const partyRuns = runs.filter((run) => Boolean(run.partyMode));
+    const partyFuelRuns = partyRuns.filter((run) => run.raceTypeId === FUEL_RUN_RACE_TYPE_ID);
+    const partyFuelFinishes = partyFuelRuns.filter((run) => run.status === "finished");
     const partySessionIds = new Set(partyRuns.map((run) => run.partySessionId).filter(Boolean));
+    const masteryBadgeIds = runs
+      .flatMap((run) => Array.isArray(run.newlyEarnedBadges) ? run.newlyEarnedBadges : [])
+      .filter((id) => getBadgeDefinition(id)?.category === "mastery");
+    const masteryBadgeRows = Array.from(masteryBadgeIds.reduce((map, id) => {
+      const definition = getBadgeDefinition(id);
+      const label = definition?.name || id;
+      map.set(label, (map.get(label) || 0) + 1);
+      return map;
+    }, new Map()).entries())
+      .map(([label, count]) => ({ label, count }))
+      .sort((a, b) => b.count - a.count || a.label.localeCompare(b.label));
     const challengeGroups = this.countPlaytestRuns(challengeRuns, (run) => run.challengeName || run.challengeId);
     const challengeRows = challengeGroups.map((group) => {
       const groupRuns = challengeRuns.filter((run) => (run.challengeName || run.challengeId) === group.label);
@@ -17723,6 +19532,8 @@ class NeonRoadRally {
       averageLaneChanges: this.averagePlaytestField(runs, "laneChanges"),
       averageCenterLaneTime: this.averagePlaytestField(runs, "centerLaneTime"),
       totalNewBadges: runs.reduce((sum, run) => sum + (Array.isArray(run.newlyEarnedBadges) ? run.newlyEarnedBadges.length : 0), 0),
+      totalMasteryBadgeUnlocks: masteryBadgeIds.length,
+      masteryBadgeRows,
       maxTotalBadgesEarned: runs.reduce((max, run) => Math.max(max, Number(run.totalBadgesEarned) || 0), 0),
       averageWavesFirst10Seconds: this.averagePlaytestField(runs, "wavesFirst10Seconds"),
       averageLaunchWaveCount: this.averagePlaytestField(runs, "launchWaveCount"),
@@ -17757,6 +19568,7 @@ class NeonRoadRally {
       typeRows: this.groupPlaytestRuns(runs, "raceTypeId", "raceTypeLabel"),
       crashRows,
       outOfFuelCount: runs.filter((run) => run.status === "outOfFuel").length,
+      bustedCount: runs.filter((run) => run.status === "busted" || run.bustedOccurred).length,
       fuelSummary: {
         runs: fuelRuns.length,
         averageGasCansCollected: this.averagePlaytestField(fuelRuns, "gasCansCollected"),
@@ -17770,6 +19582,25 @@ class NeonRoadRally {
         averageLowFuelTime: this.averagePlaytestField(fuelRuns, "lowFuelTime"),
         averageCriticalFuelTime: this.averagePlaytestField(fuelRuns, "criticalFuelTime"),
         outOfFuelCount: fuelRuns.filter((run) => run.outOfFuelOccurred).length
+      },
+      pursuitSummary: {
+        runs: pursuitRuns.length,
+        escaped: pursuitFinishes.length,
+        busted: pursuitRuns.filter((run) => run.bustedOccurred || run.status === "busted").length,
+        crashed: pursuitRuns.filter((run) => run.status === "crashed").length,
+        averageHeatMax: this.averagePlaytestField(pursuitRuns, "heatMax"),
+        averageHeatAtEnd: this.averagePlaytestField(pursuitRuns, "heatAtEnd"),
+        averageHeatCriticalTime: this.averagePlaytestField(pursuitRuns, "heatCriticalTime"),
+        averageHeatRisingTime: this.averagePlaytestField(pursuitRuns, "heatRisingTime"),
+        averageHeatDroppingTime: this.averagePlaytestField(pursuitRuns, "heatDroppingTime"),
+        roadblocksSpawned: pursuitRuns.reduce((sum, run) => sum + (Number(run.roadblocksSpawned) || 0), 0),
+        roadblocksCleared: pursuitRuns.reduce((sum, run) => sum + (Number(run.roadblocksCleared) || 0), 0),
+        roadblockWarnings: pursuitRuns.reduce((sum, run) => sum + (Number(run.roadblockWarnings) || 0), 0),
+        escapeReached: pursuitRuns.filter((run) => run.escapeReached || run.status === "finished").length,
+        cleanEscapes: pursuitRuns.filter((run) => run.status === "finished" && (run.slowdownHits || 0) === 0).length,
+        heatSurvivorEscapes: pursuitRuns.filter((run) => run.status === "finished" && (run.heatMax || 0) >= PURSUIT_CONFIG.criticalThreshold).length,
+        totalPursuitBonuses: pursuitBonuses,
+        resultRows: this.countPlaytestRuns(pursuitRuns, (run) => run.pursuitResult || getRunOutcomeLabel(run))
       },
       challengeSummary: {
         runs: challengeRuns.length,
@@ -17786,8 +19617,23 @@ class NeonRoadRally {
         averageBestScore: this.averagePlaytestField(partyRuns, "partyBestScore"),
         averageTotalScore: this.averagePlaytestField(partyRuns, "partyTotalScore"),
         leaderChanges: partyRuns.reduce((max, run) => Math.max(max, Number(run.partyLeaderChanges) || 0), 0),
+        fuelRunCount: partyFuelRuns.length,
+        fuelRunCompletionRate: this.completionRate(partyFuelRuns),
+        fuelRunGasCansCollected: partyFuelRuns.reduce((sum, run) => sum + (Number(run.gasCansCollected) || 0), 0),
+        fuelRunGasCansSpawned: partyFuelRuns.reduce((sum, run) => sum + (Number(run.gasCansSpawned) || 0), 0),
+        fuelRunOutOfFuelCount: partyFuelRuns.filter((run) => run.outOfFuelOccurred || run.status === "outOfFuel").length,
+        fuelRunAverageFuelRemainingOnFinishes: this.averagePlaytestField(partyFuelFinishes, "fuelRemaining"),
         roundTypes: this.countPlaytestRuns(partyRuns, (run) => getPartyRoundTypeLabel(run.partyRoundType)),
         seedModes: this.countPlaytestRuns(partyRuns, (run) => getPartySeedModeLabel(run.partySeedMode))
+      },
+      partyFuelRunSummary: {
+        runs: partyFuelRuns.length,
+        completed: partyFuelFinishes.length,
+        completionRate: this.completionRate(partyFuelRuns),
+        gasCansCollected: partyFuelRuns.reduce((sum, run) => sum + (Number(run.gasCansCollected) || 0), 0),
+        gasCansSpawned: partyFuelRuns.reduce((sum, run) => sum + (Number(run.gasCansSpawned) || 0), 0),
+        outOfFuelCount: partyFuelRuns.filter((run) => run.outOfFuelOccurred || run.status === "outOfFuel").length,
+        averageFuelRemainingOnFinishes: this.averagePlaytestField(partyFuelFinishes, "fuelRemaining")
       }
     };
   }
@@ -17824,10 +19670,12 @@ class NeonRoadRally {
         averageScore: Math.round(aggregate.averageScore),
         averageDurationSeconds: Number(aggregate.averageDuration.toFixed(2)),
         outOfFuelCount: aggregate.outOfFuelCount,
+        bustedCount: aggregate.bustedCount,
         averageBoostsUsed: Number(aggregate.averageBoostsUsed.toFixed(2)),
         averageLaneChanges: Number(aggregate.averageLaneChanges.toFixed(2)),
         averageCenterLaneTimeSeconds: Number(aggregate.averageCenterLaneTime.toFixed(2)),
         totalNewBadges: aggregate.totalNewBadges,
+        totalMasteryBadgeUnlocks: aggregate.totalMasteryBadgeUnlocks,
         maxTotalBadgesEarned: aggregate.maxTotalBadgesEarned,
         averageWavesFirst10Seconds: Number(aggregate.averageWavesFirst10Seconds.toFixed(2)),
         averageLaunchWaveCount: Number(aggregate.averageLaunchWaveCount.toFixed(2)),
@@ -17862,8 +19710,11 @@ class NeonRoadRally {
       completionByRaceType: aggregate.typeRows,
       crashCountByObstacleType: aggregate.crashRows,
       fuelRun: aggregate.fuelSummary,
+      pursuitMode: aggregate.pursuitSummary,
       challengeCompletionSummary: aggregate.challengeSummary,
       partyModeSummary: aggregate.partySummary,
+      partyFuelRun: aggregate.partyFuelRunSummary,
+      masteryBadgeUnlocks: aggregate.masteryBadgeRows,
       runSummaries: aggregate.runs
     };
     return JSON.stringify(payload, null, 2);
@@ -18099,6 +19950,18 @@ class NeonRoadRally {
         id: normalizeRaceTypeId(run.raceTypeId, DEFAULT_RACE_TYPE_ID),
         label: getRaceTypeLabel(run.raceTypeId)
       },
+      pursuit: isPursuitRaceType(run.raceTypeId) ? {
+        heat: Math.round(run.pursuitHeat || 0),
+        heatLimit: run.pursuitHeatLimit || PURSUIT_CONFIG.heatLimit,
+        heatMax: Math.round(run.pursuitHeatMax || 0),
+        status: run.pursuitStatusText || run.pursuitHeatStatus || "Heat Dropping",
+        roadblockAhead: Boolean(run.pursuitRoadblockAhead),
+        nextRoadblockSafeLane: Number.isFinite(run.nextRoadblockSafeLane) ? run.nextRoadblockSafeLane : null,
+        timeSinceLastRoadblockSeconds: Number.isFinite(run.timeSinceLastRoadblock) ? Number(run.timeSinceLastRoadblock.toFixed(1)) : null,
+        roadblocksSpawned: run.roadblocksSpawned || 0,
+        roadblocksCleared: run.roadblocksCleared || 0,
+        roadblockWarnings: run.roadblockWarnings || 0
+      } : null,
       raceMode: {
         id: normalizeSpeedClassId(run.speedClassId, DEFAULT_SPEED_CLASS_ID),
         label: getSpeedClassLabel(run.speedClassId)
@@ -18297,6 +20160,8 @@ class NeonRoadRally {
           ${card("Race Type", snapshot.raceType.label, snapshot.raceType.id)}
           ${card("Race Mode", snapshot.raceMode.label, snapshot.raceMode.id)}
           ${card("Seed", snapshot.seed, `hash ${snapshot.seedHash}`)}
+          ${snapshot.pursuit ? card("Pursuit Heat", `${snapshot.pursuit.heat}/${snapshot.pursuit.heatLimit}`, `max ${snapshot.pursuit.heatMax} - ${snapshot.pursuit.status}`) : ""}
+          ${snapshot.pursuit ? card("Pursuit Roadblocks", `${snapshot.pursuit.roadblocksCleared}/${snapshot.pursuit.roadblocksSpawned}`, `${snapshot.pursuit.roadblockWarnings} warnings - ahead ${snapshot.pursuit.roadblockAhead ? "yes" : "no"}`) : ""}
           ${card("Section", snapshot.section.label, `${snapshot.section.id} - ${Math.round(snapshot.section.progress * 100)}%`)}
           ${card("Wave", snapshot.currentWave.name, snapshot.currentWave.type)}
           ${card("Wave Family", snapshot.currentWave.family)}
@@ -18403,6 +20268,18 @@ class NeonRoadRally {
         <span class="meta">${row.completed}/${row.count} complete · ${row.newBest} new best${row.newBest === 1 ? "" : "s"}</span>
       </li>
     `);
+    const pursuitResultList = this.renderPlaytestSummaryList(aggregate.pursuitSummary.resultRows, "No Pursuit runs recorded in this filter.", (row) => `
+      <li class="leaderboard-item playtest-report-row">
+        <span class="leaderboard-rank">${escapeHtml(row.label)}</span>
+        <span class="leaderboard-score">${row.count}</span>
+      </li>
+    `);
+    const masteryBadgeList = this.renderPlaytestSummaryList(aggregate.masteryBadgeRows, "No mastery badge unlocks recorded in this filter.", (row) => `
+      <li class="leaderboard-item playtest-report-row">
+        <span class="leaderboard-rank">${escapeHtml(row.label)}</span>
+        <span class="leaderboard-score">${row.count}</span>
+      </li>
+    `);
     this.layer.classList.remove("is-empty");
     this.layer.innerHTML = `
       <section class="panel playtest-report-panel">
@@ -18431,10 +20308,12 @@ class NeonRoadRally {
           <div class="score-card"><strong>Average Score</strong><span>${formatScore(aggregate.averageScore)}</span></div>
           <div class="score-card"><strong>Average Duration</strong><span>${formatTime(aggregate.averageDuration)}</span></div>
           <div class="score-card"><strong>Out Of Fuel</strong><span>${aggregate.outOfFuelCount}</span></div>
+          <div class="score-card"><strong>Busted</strong><span>${aggregate.bustedCount}</span></div>
           <div class="score-card"><strong>Avg Boosts Used</strong><span>${this.formatPlaytestDecimal(aggregate.averageBoostsUsed)}</span></div>
           <div class="score-card"><strong>Avg Lane Changes</strong><span>${this.formatPlaytestDecimal(aggregate.averageLaneChanges)}</span></div>
           <div class="score-card"><strong>Avg Center-Lane Time</strong><span>${formatTime(aggregate.averageCenterLaneTime)}</span></div>
           <div class="score-card"><strong>New Badges</strong><span>${aggregate.totalNewBadges}</span></div>
+          <div class="score-card"><strong>Mastery Unlocks</strong><span>${aggregate.totalMasteryBadgeUnlocks}</span></div>
           <div class="score-card"><strong>Badge High Water</strong><span>${aggregate.maxTotalBadgesEarned}/${getVisibleBadgeDefinitions().length}</span></div>
           <div class="score-card"><strong>Avg Waves First 10s</strong><span>${this.formatPlaytestDecimal(aggregate.averageWavesFirst10Seconds)}</span></div>
           <div class="score-card"><strong>Avg Launch Waves</strong><span>${this.formatPlaytestDecimal(aggregate.averageLaunchWaveCount)}</span></div>
@@ -18461,8 +20340,16 @@ class NeonRoadRally {
           <div class="score-card"><strong>Fuel Saved By Boost</strong><span>${this.formatPlaytestDecimal(aggregate.fuelSummary.totalFuelSavedByBoost)} fuel</span></div>
           <div class="score-card"><strong>Fuel Pause Time</strong><span>${this.formatPlaytestDecimal(aggregate.fuelSummary.totalFuelDrainPausedTime)}s</span></div>
           <div class="score-card"><strong>Fuel Boost Uses</strong><span>${aggregate.fuelSummary.totalBoostsUsedInFuelRun}</span></div>
+          <div class="score-card"><strong>Pursuit Runs</strong><span>${aggregate.pursuitSummary.runs}</span></div>
+          <div class="score-card"><strong>Pursuit Escapes</strong><span>${aggregate.pursuitSummary.escaped}/${aggregate.pursuitSummary.runs}</span></div>
+          <div class="score-card"><strong>Avg Pursuit Heat</strong><span>${this.formatPlaytestDecimal(aggregate.pursuitSummary.averageHeatAtEnd)} / max ${this.formatPlaytestDecimal(aggregate.pursuitSummary.averageHeatMax)}</span></div>
+          <div class="score-card"><strong>Roadblocks</strong><span>${aggregate.pursuitSummary.roadblocksCleared}/${aggregate.pursuitSummary.roadblocksSpawned} cleared</span></div>
+          <div class="score-card"><strong>Roadblock Warnings</strong><span>${aggregate.pursuitSummary.roadblockWarnings}</span></div>
           <div class="score-card"><strong>Challenge Runs</strong><span>${aggregate.challengeSummary.completed}/${aggregate.challengeSummary.runs}</span></div>
           <div class="score-card"><strong>Party Runs</strong><span>${aggregate.partySummary.runs}</span></div>
+          <div class="score-card"><strong>Party Fuel Runs</strong><span>${aggregate.partyFuelRunSummary.completed}/${aggregate.partyFuelRunSummary.runs}</span></div>
+          <div class="score-card"><strong>Party Fuel Gas</strong><span>${aggregate.partyFuelRunSummary.gasCansCollected}/${aggregate.partyFuelRunSummary.gasCansSpawned}</span></div>
+          <div class="score-card"><strong>Party Fuel Out</strong><span>${aggregate.partyFuelRunSummary.outOfFuelCount}</span></div>
         </div>
         <div class="playtest-report-columns">
           <section>
@@ -18485,10 +20372,20 @@ class NeonRoadRally {
             <h3>Challenges</h3>
             ${challengeList}
           </section>
+          <section>
+            <h3>Pursuit Results</h3>
+            ${pursuitResultList}
+          </section>
+          <section>
+            <h3>Mastery Badges</h3>
+            ${masteryBadgeList}
+          </section>
         </div>
         <div class="score-grid playtest-detail-grid">
           <div class="score-card"><strong>Fuel Runs</strong><span class="is-compact">${aggregate.fuelSummary.runs} runs · ${this.formatPlaytestDecimal(aggregate.fuelSummary.averageGasCansSpawned)} gas spawned · ${formatTime(aggregate.fuelSummary.averageLowFuelTime)} low fuel · ${formatTime(aggregate.fuelSummary.averageCriticalFuelTime)} critical</span></div>
+          <div class="score-card"><strong>Pursuit Summary</strong><span class="is-compact">${aggregate.pursuitSummary.escaped} escaped · ${aggregate.pursuitSummary.busted} busted · heat critical ${formatTime(aggregate.pursuitSummary.averageHeatCriticalTime)} avg · rising ${formatTime(aggregate.pursuitSummary.averageHeatRisingTime)} · dropping ${formatTime(aggregate.pursuitSummary.averageHeatDroppingTime)} · bonuses ${formatScore(aggregate.pursuitSummary.totalPursuitBonuses)}</span></div>
           <div class="score-card"><strong>Party Summary</strong><span class="is-compact">${aggregate.partySummary.sessions} sessions · avg rank ${this.formatPlaytestDecimal(aggregate.partySummary.averageRank)} · avg gap ${formatScore(aggregate.partySummary.averageLeaderGap)} · avg players ${this.formatPlaytestDecimal(aggregate.partySummary.playerCountAverage)} · leader changes ${aggregate.partySummary.leaderChanges}</span></div>
+          <div class="score-card"><strong>Party Fuel Summary</strong><span class="is-compact">${aggregate.partyFuelRunSummary.runs} runs · ${this.formatPlaytestPercent(aggregate.partyFuelRunSummary.completionRate)} finished · gas ${aggregate.partyFuelRunSummary.gasCansCollected}/${aggregate.partyFuelRunSummary.gasCansSpawned} · out ${aggregate.partyFuelRunSummary.outOfFuelCount} · avg finish fuel ${this.formatPlaytestDecimal(aggregate.partyFuelRunSummary.averageFuelRemainingOnFinishes)}</span></div>
         </div>
         <div class="row playtest-action-row">
           <button class="small-button primary" data-action="copyPlaytestReport">Copy Playtest Report</button>
@@ -18578,13 +20475,15 @@ class NeonRoadRally {
         ${TRACKS.map((track) => {
           const selected = track.id === selectedId;
           const modes = Array.isArray(track.recommendedModes) ? track.recommendedModes.join(" | ") : "Solo / Seeded Run";
-          const fuelLabel = trackSupportsRaceType(track, FUEL_RUN_RACE_TYPE_ID) ? "Fuel Run ready" : "Classic only";
+          const pursuitReady = trackSupportsRaceType(track, PURSUIT_RACE_TYPE_ID);
+          const fuelReady = trackSupportsRaceType(track, FUEL_RUN_RACE_TYPE_ID);
+          const supportLabel = fuelReady && pursuitReady ? "Classic + Fuel + Pursuit" : (fuelReady ? "Fuel Run ready" : (pursuitReady ? "Pursuit ready" : "Classic only"));
           return `
             <label class="track-option ${selected ? "selected" : ""}" data-track-card="${escapeAttr(track.id)}">
               <input type="radio" name="${escapeAttr(name)}" value="${escapeAttr(track.id)}" ${selected ? "checked" : ""}>
               <span class="track-option-title">
                 <strong>${escapeHtml(track.name)}</strong>
-                <em>${escapeHtml(fuelLabel)}</em>
+                <em>${escapeHtml(supportLabel)}</em>
               </span>
               <span>${escapeHtml(track.cardIdentity || track.description)}</span>
               <small>Recommended: ${escapeHtml(modes)}</small>
@@ -18709,6 +20608,7 @@ class NeonRoadRally {
           </div>
           <p class="hint">Same seed + same track + same race speed + same race type repeats the Road Director sequence.</p>
           <p id="fuelRunBoostHint" class="hint" ${raceType.id === FUEL_RUN_RACE_TYPE_ID ? "" : "hidden"}>Fuel Run: Boost saves fuel.</p>
+          <p id="pursuitModeHint" class="hint" ${raceType.id === PURSUIT_RACE_TYPE_ID ? "" : "hidden"}>Pursuit: Police pressure fills the heat bar. If it fills, you get Busted. Boost, hit ramps, clear roadblocks, and reach the Escape Zone to shake them.</p>
           <p id="roadSeedHash" class="hint">Seed hash: ${seedHash}</p>
           <div class="row">
             <button class="small-button" data-action="randomSeed">Random Seed</button>
@@ -18731,6 +20631,7 @@ class NeonRoadRally {
     const raceTypeSelect = document.getElementById("preRaceType");
     const raceTypeSummary = document.getElementById("preRaceTypeSummary");
     const fuelRunBoostHint = document.getElementById("fuelRunBoostHint");
+    const pursuitModeHint = document.getElementById("pursuitModeHint");
     const modeSelect = document.getElementById("preRaceSpeedClass");
     const modeSummary = document.getElementById("preRaceModeSummary");
     const trackSummary = document.getElementById("preRaceTrackSummary");
@@ -18761,6 +20662,9 @@ class NeonRoadRally {
       }
       if (fuelRunBoostHint) {
         fuelRunBoostHint.hidden = raceType.id !== FUEL_RUN_RACE_TYPE_ID;
+      }
+      if (pursuitModeHint) {
+        pursuitModeHint.hidden = raceType.id !== PURSUIT_RACE_TYPE_ID;
       }
       if (trackSummary) {
         trackSummary.textContent = track.name;
@@ -18876,9 +20780,9 @@ class NeonRoadRally {
       .filter((id, index, list) => validIds.has(id) && list.indexOf(id) === index)
       .slice(0, PARTY_MAX_PLAYERS);
     this.partySetup.raceMode = normalizeSpeedClassId(this.partySetup.raceMode, DEFAULT_SPEED_CLASS_ID);
-    this.partySetup.raceType = DEFAULT_RACE_TYPE_ID;
     this.partySetup.sharedSeed = normalizeRoadSeed(this.partySetup.sharedSeed, "");
     this.partySetup.trackId = normalizeTrackId(this.partySetup.trackId, DEFAULT_TRACK_ID);
+    this.partySetup.raceType = normalizePartyRaceType(this.partySetup.raceType, getTrackById(this.partySetup.trackId));
     this.partySetup.roundType = normalizePartyRoundType(this.partySetup.roundType, PARTY_ROUND_TYPE_ONE_RUN);
     this.partySetup.seedMode = normalizePartySeedMode(this.partySetup.seedMode, PARTY_SEED_MODE_SAME_ROUND);
     return this.partySetup;
@@ -18895,12 +20799,15 @@ class NeonRoadRally {
   readPartySetupForm() {
     const setup = this.getPartySetup();
     const raceMode = document.getElementById("partyRaceMode");
+    const raceType = document.getElementById("partyRaceType");
     const roundType = document.getElementById("partyRoundType");
     const seedMode = document.getElementById("partySeedMode");
     const seedInput = document.getElementById("partySeedInput");
     const track = this.getSelectedTrackFromInputs("partyTrack", setup.trackId || DEFAULT_TRACK_ID);
     setup.trackId = track.id;
     if (raceMode) setup.raceMode = normalizeSpeedClassId(raceMode.value, setup.raceMode);
+    if (raceType) setup.raceType = normalizePartyRaceType(raceType.value, track);
+    else setup.raceType = normalizePartyRaceType(setup.raceType, track);
     if (roundType) setup.roundType = normalizePartyRoundType(roundType.value, setup.roundType);
     if (seedMode) setup.seedMode = normalizePartySeedMode(seedMode.value, setup.seedMode);
     if (seedInput) setup.sharedSeed = normalizeRoadSeed(seedInput.value, "");
@@ -18953,21 +20860,23 @@ class NeonRoadRally {
 
     const setup = this.getPartySetup();
     const track = getTrackById(setup.trackId);
+    setup.raceType = normalizePartyRaceType(setup.raceType, track);
+    const partyRaceType = getRaceTypeConfig(setup.raceType);
     const selectedPlayers = this.getPartySetupSelectedPlayers();
     const selectedIds = new Set(setup.selectedPlayerIds);
     const seed = setup.sharedSeed || "Random seed on start";
-    const seedHash = setup.sharedSeed ? (hashSeed(getRunRandomSeedSource(setup.sharedSeed, track, setup.raceMode, DEFAULT_RACE_TYPE_ID)) >>> 0) : "pending";
+    const seedHash = setup.sharedSeed ? (hashSeed(getRunRandomSeedSource(setup.sharedSeed, track, setup.raceMode, partyRaceType.id)) >>> 0) : "pending";
     const roundTypeConfig = getPartyRoundTypeConfig(setup.roundType);
     const seedModeLabel = getPartySeedModeLabel(setup.seedMode);
     this.layer.classList.remove("is-empty");
     this.layer.innerHTML = `
       <section class="panel party-panel">
         <h2>Party Mode</h2>
-        <p class="hint">Pass the keyboard on one local machine. Best of 3 and Total Score use three runs per player. Party Mode stays Classic for this pass.</p>
+        <p class="hint">Pass the keyboard on one local machine. Best of 3 and Total Score use three runs per player. Choose Classic Race or Fuel Run for the whole round.</p>
         <div class="party-summary-strip">
           <div class="score-card"><strong>Selected Players</strong><span>${selectedPlayers.length}/${PARTY_MAX_PLAYERS}</span></div>
           <div class="score-card"><strong>Track</strong><span id="partyTrackSummary">${escapeHtml(track.name)}</span></div>
-          <div class="score-card"><strong>Race Type</strong><span>Classic</span></div>
+          <div class="score-card"><strong>Race Type</strong><span id="partyRaceTypeSummary">${escapeHtml(partyRaceType.label)}</span></div>
           <div class="score-card"><strong>Race Mode</strong><span>${escapeHtml(getSpeedClassLabel(setup.raceMode))}</span></div>
           <div class="score-card"><strong>Music</strong><span id="partyMusicSummary">${escapeHtml(getTrackMusicStatus(track))}</span></div>
           <div class="score-card"><strong>Shared Seed</strong><span class="is-compact">${escapeHtml(seed)}</span></div>
@@ -19039,6 +20948,13 @@ class NeonRoadRally {
               ${this.renderTrackSelect("partyTrack", track.id)}
             </div>
             <div class="field">
+              <label for="partyRaceType">Race Type</label>
+              <select id="partyRaceType">
+                ${getPartyRaceTypesForTrack(track, partyRaceType.id).map((raceType) => `<option value="${escapeAttr(raceType.id)}" ${raceType.id === partyRaceType.id ? "selected" : ""}>${raceType.id === DEFAULT_RACE_TYPE_ID ? "Classic Race" : escapeHtml(raceType.label)}</option>`).join("")}
+              </select>
+              <p id="partyRaceTypeHint" class="hint">${partyRaceType.id === FUEL_RUN_RACE_TYPE_ID ? "Collect gas cans and survive to the finish. Run out of fuel and your run ends." : "Classic Race: survive, score, and finish."}</p>
+            </div>
+            <div class="field">
               <label for="partyRaceMode">Race Mode</label>
               ${this.renderSpeedClassLadder(track, setup.raceMode)}
               <select id="partyRaceMode">
@@ -19089,11 +21005,14 @@ class NeonRoadRally {
     const display = document.getElementById("partySeedDisplay");
     const seedHash = document.getElementById("partySeedHash");
     const raceMode = document.getElementById("partyRaceMode");
+    const raceType = document.getElementById("partyRaceType");
     const roundType = document.getElementById("partyRoundType");
     const seedMode = document.getElementById("partySeedMode");
     const newDriverInput = document.getElementById("partyNewDriverName");
     const renameInput = document.getElementById("partyRenameName");
     const trackSummary = document.getElementById("partyTrackSummary");
+    const raceTypeSummary = document.getElementById("partyRaceTypeSummary");
+    const raceTypeHint = document.getElementById("partyRaceTypeHint");
     const musicSummary = document.getElementById("partyMusicSummary");
     const roundSummary = document.getElementById("partyRoundSummary");
     const seedModeSummary = document.getElementById("partySeedModeSummary");
@@ -19103,15 +21022,24 @@ class NeonRoadRally {
       if (input.value !== normalized) input.value = normalized;
       const track = this.getSelectedTrackFromInputs("partyTrack", this.getPartySetup().trackId || DEFAULT_TRACK_ID);
       const mode = normalizeSpeedClassId(raceMode?.value, DEFAULT_SPEED_CLASS_ID);
+      const selectedRaceType = normalizePartyRaceType(raceType?.value || this.getPartySetup().raceType, track);
+      if (raceType && raceType.value !== selectedRaceType) raceType.value = selectedRaceType;
+      const raceTypeConfig = getRaceTypeConfig(selectedRaceType);
       this.syncModeLadderMetrics(track);
       this.syncModeLadderSelection(mode);
       display.textContent = normalized || "Random seed on start";
       if (seedHash) {
         seedHash.textContent = normalized
-          ? `Seed hash: ${hashSeed(getRunRandomSeedSource(normalized, track, mode, DEFAULT_RACE_TYPE_ID)) >>> 0}`
+          ? `Seed hash: ${hashSeed(getRunRandomSeedSource(normalized, track, mode, selectedRaceType)) >>> 0}`
           : "Seed hash: pending";
       }
       if (trackSummary) trackSummary.textContent = track.name;
+      if (raceTypeSummary) raceTypeSummary.textContent = raceTypeConfig.label;
+      if (raceTypeHint) {
+        raceTypeHint.textContent = selectedRaceType === FUEL_RUN_RACE_TYPE_ID
+          ? "Collect gas cans and survive to the finish. Run out of fuel and your run ends."
+          : "Classic Race: survive, score, and finish.";
+      }
       if (musicSummary) musicSummary.textContent = getTrackMusicStatus(track);
       if (roundSummary) roundSummary.textContent = getPartyRoundTypeLabel(roundType?.value || this.getPartySetup().roundType);
       if (seedModeSummary) seedModeSummary.textContent = getPartySeedModeLabel(seedMode?.value || this.getPartySetup().seedMode);
@@ -19121,6 +21049,12 @@ class NeonRoadRally {
       const track = getTrackById(setup.trackId);
       this.syncTrackSelectCards("partyTrack", track.id);
       this.syncSpeedClassSelectForTrack(raceMode, track);
+      if (raceType) {
+        const selectedRaceType = normalizePartyRaceType(raceType.value || setup.raceType, track);
+        const options = getPartyRaceTypesForTrack(track, selectedRaceType);
+        raceType.innerHTML = options.map((item) => `<option value="${escapeAttr(item.id)}" ${item.id === selectedRaceType ? "selected" : ""}>${item.id === DEFAULT_RACE_TYPE_ID ? "Classic Race" : escapeHtml(item.label)}</option>`).join("");
+        setup.raceType = selectedRaceType;
+      }
       this.audio.setRaceMusicTrack(track);
       updateSeedDisplay();
     };
@@ -19156,6 +21090,12 @@ class NeonRoadRally {
     }
     if (raceMode) {
       raceMode.addEventListener("change", () => {
+        this.readPartySetupForm();
+        updateSeedDisplay();
+      });
+    }
+    if (raceType) {
+      raceType.addEventListener("change", () => {
         this.readPartySetupForm();
         updateSeedDisplay();
       });
@@ -19284,17 +21224,19 @@ class NeonRoadRally {
     setup.sharedSeed = sharedSeed;
     setup.selectedPlayerIds = selectedPlayers.map((player) => player.id);
     setup.trackId = track.id;
+    setup.raceType = normalizePartyRaceType(setup.raceType, track);
     this.partySession = new PartySession({
       players: selectedPlayers,
       sharedSeed,
       track,
       raceMode: setup.raceMode,
-      raceType: DEFAULT_RACE_TYPE_ID,
+      raceType: setup.raceType,
       roundType: setup.roundType,
       seedMode: setup.seedMode
     });
     this.pendingRoadSeed = sharedSeed;
     this.pendingTrackId = track.id;
+    this.pendingRaceTypeId = setup.raceType;
     this.showPartyTurnScreen(`${getPartyRoundTypeLabel(setup.roundType)} ready.`);
   }
 
@@ -19323,6 +21265,7 @@ class NeonRoadRally {
 
   renderPartyStandingsList(session, standings, recentResult = null, final = false) {
     const metricLabel = session.scoringLabel;
+    const fuelParty = isFuelRunRaceType(session?.raceType);
     return `
       <ol class="leaderboard-list party-standings-list">
         ${standings.length ? standings.map((result, index) => {
@@ -19341,6 +21284,8 @@ class NeonRoadRally {
                   <span><strong>Best</strong><em>${formatScore(result.bestScore)}</em></span>
                   <span><strong>Total</strong><em>${formatScore(result.totalScore)}</em></span>
                   <span><strong>Runs</strong><em>${result.completedRuns}/${session.totalRounds}</em></span>
+                  ${fuelParty ? `<span><strong>Gas</strong><em>${result.totalGasCansCollected || 0}</em></span>` : ""}
+                  ${fuelParty ? `<span><strong>Fuel</strong><em>${result.latestOutOfFuel ? "Out" : Math.max(0, result.latestFuelRemaining || 0)}</em></span>` : ""}
                 </span>
                 ${this.renderMedalChips(result.medals, true)}
               </span>
@@ -19390,7 +21335,7 @@ class NeonRoadRally {
             <div class="score-card"><strong>Round Type</strong><span>${escapeHtml(getPartyRoundTypeLabel(session.roundType))}</span></div>
             <div class="score-card"><strong>Seed Behavior</strong><span>${escapeHtml(getPartySeedModeLabel(session.seedMode))}</span></div>
           </div>
-          <p class="hint">Press Enter or Start Run when this player is at the keyboard.</p>
+          <p class="hint">${isFuelRunRaceType(session.raceType) ? "Fuel Run: collect gas cans and survive to the finish. Run out of fuel and the run ends." : "Press Enter or Start Run when this player is at the keyboard."}</p>
           <div class="row">
             <button class="small-button primary" data-action="partyStartRun">Start Run</button>
             <button class="small-button" data-action="partyChangeSetup">Change Players/Mode</button>
@@ -19455,7 +21400,7 @@ class NeonRoadRally {
       player,
       track: session.track,
       speedClassId: session.raceMode,
-      raceTypeId: DEFAULT_RACE_TYPE_ID,
+      raceTypeId: session.raceType,
       seed: session.currentSeed,
       partyMode: true,
       partySeedLocked: true
@@ -19618,9 +21563,9 @@ class NeonRoadRally {
               <strong>${escapeHtml(badge.icon || "BDG")}</strong>
               <span>
                 <b>${escapeHtml(badge.name)}</b>
-                <small>${escapeHtml(badge.categoryLabel)} - ${escapeHtml(badge.difficulty)}</small>
+                <small>${escapeHtml(badge.categoryLabel)} - ${escapeHtml(badge.difficulty)}${badge.progress ? ` - ${escapeHtml(badge.progress.text)}` : ""}</small>
               </span>
-              <small>${badge.earned ? `Earned ${escapeHtml(formatBadgeEarnedDate({ earnedAt: badge.earnedAt }))}` : `Locked: ${escapeHtml(badge.description)}`}</small>
+              <small>${badge.earned ? `Earned ${escapeHtml(formatBadgeEarnedDate({ earnedAt: badge.earnedAt }))}` : `${badge.progress ? `Progress ${escapeHtml(badge.progress.text)} - ` : "Locked: "}${escapeHtml(badge.description)}`}</small>
             </span>
           `).join("")}
         </div>
@@ -19664,6 +21609,10 @@ class NeonRoadRally {
     if (breakdown.ramp > 0) extras.push(["Ramp Bonus", breakdown.ramp, "Ramps hit.", "positive"]);
     if (breakdown.gasCan > 0) extras.push(["Gas Can Bonus", breakdown.gasCan, `${summary.gasCansCollected || 0} gas cans collected.`, "positive"]);
     if (breakdown.fuelBonus > 0) extras.push(["Fuel Remaining Bonus", breakdown.fuelBonus, `${summary.fuelRemaining || 0} fuel left at finish.`, "positive"]);
+    if (breakdown.roadblockDodge > 0) extras.push(["Roadblock Dodge Bonus", breakdown.roadblockDodge, `${summary.roadblocksCleared || 0} roadblocks cleared.`, "positive"]);
+    if (breakdown.pursuitEscape > 0) extras.push(["Escape Bonus", breakdown.pursuitEscape, "Reached the Escape Zone.", "positive"]);
+    if (breakdown.cleanGetaway > 0) extras.push(["Clean Getaway Bonus", breakdown.cleanGetaway, "Escaped with zero slowdown hits.", "positive"]);
+    if (breakdown.heatSurvivor > 0) extras.push(["Heat Survivor Bonus", breakdown.heatSurvivor, "Escaped after critical heat.", "positive"]);
     return `
       <div class="score-breakdown">
         ${rows.concat(extras).map(([label, value, detail, tone]) => `
@@ -19811,6 +21760,13 @@ class NeonRoadRally {
               <span data-tally-value="${escapeAttr(summary.finalScore)}">${formatScore(summary.finalScore)}</span>
               ${summary.topTwentyRank ? `<small>Top 20 #${summary.topTwentyRank}</small>` : `<small>${summary.newPersonalBest ? "Personal Best" : "Run Score"}</small>`}
             </div>
+            ${summary.raceTypeId === FUEL_RUN_RACE_TYPE_ID ? `
+              <div class="party-stat-grid">
+                <span><strong>Gas Cans</strong><em>${Math.max(0, summary.gasCansCollected || 0)} / ${Math.max(0, summary.gasCansSpawned || 0)}</em></span>
+                <span><strong>Fuel Left</strong><em>${summary.status === "outOfFuel" ? "Out" : Math.max(0, summary.fuelRemaining || 0)}</em></span>
+                <span><strong>Lowest Fuel</strong><em>${Math.max(0, Math.round(summary.lowestFuelReached || 0))}</em></span>
+              </div>
+            ` : ""}
             ${this.renderMedalChips(summary.medals, true)}
             ${this.renderBadgeEarnedPanel(summary, true)}
           </div>
@@ -19852,12 +21808,13 @@ class NeonRoadRally {
       selectedPlayerIds: this.partySession.selectedPlayers.map((player) => player.id),
       trackId: this.partySession.track.id,
       raceMode: this.partySession.raceMode,
-      raceType: DEFAULT_RACE_TYPE_ID,
+      raceType: this.partySession.raceType,
       sharedSeed: this.partySession.sharedSeed,
       roundType: this.partySession.roundType,
       seedMode: this.partySession.seedMode
     };
     this.pendingRoadSeed = this.partySession.sharedSeed;
+    this.pendingRaceTypeId = this.partySession.raceType;
     this.showPartyTurnScreen(useSameSeed ? "Rematch with the same settings and seed set." : "Rematch with the same settings and new seed.");
   }
 
@@ -19868,7 +21825,7 @@ class NeonRoadRally {
         selectedPlayerIds: session.selectedPlayers.map((player) => player.id),
         trackId: session.track.id,
         raceMode: session.raceMode,
-        raceType: DEFAULT_RACE_TYPE_ID,
+        raceType: session.raceType,
         sharedSeed: session.sharedSeed,
         roundType: session.roundType,
         seedMode: session.seedMode
@@ -19877,6 +21834,7 @@ class NeonRoadRally {
       this.getPartySetup();
     }
     this.partySession = null;
+    this.pendingRaceTypeId = this.partySetup?.raceType || this.pendingRaceTypeId;
     this.showPartySetupScreen("Adjust the party round.");
   }
 
@@ -20450,7 +22408,7 @@ class NeonRoadRally {
               <span class="leaderboard-rank">#${index + 1}</span>
               <span>
                 <strong>${escapeHtml(entry.playerName)}</strong>
-                <span class="meta">${entry.challengeId ? `Challenge: ${escapeHtml(entry.challengeName || entry.challengeId)} · ` : ""}${entry.partyMode ? `Party ${escapeHtml(getPartyRoundTypeLabel(entry.partyRoundType))} R${entry.partyRoundIndex || 1} · ` : ""}${escapeHtml(entry.carName)} · ${escapeHtml(entry.trackName)} · ${escapeHtml(getRaceTypeLabel(entry.raceType))} · ${escapeHtml(getSpeedClassLabel(entry.raceMode || entry.speedClass))} · Seed ${escapeHtml(formatRoadSeed(entry.seed))} · ${escapeHtml(getRunStatusLabel(entry.status))} · ${formatTime(entry.time)}${entry.raceType === FUEL_RUN_RACE_TYPE_ID ? ` · Fuel ${Math.max(0, entry.fuelRemaining || 0)}` : ""}${formatShortDate(entry.date) ? ` · ${escapeHtml(formatShortDate(entry.date))}` : ""}</span>
+                <span class="meta">${entry.challengeId ? `Challenge: ${escapeHtml(entry.challengeName || entry.challengeId)} · ` : ""}${entry.partyMode ? `Party ${escapeHtml(getPartyRoundTypeLabel(entry.partyRoundType))} R${entry.partyRoundIndex || 1} · ` : ""}${escapeHtml(entry.carName)} · ${escapeHtml(entry.trackName)} · ${escapeHtml(getRaceTypeLabel(entry.raceType))} · ${escapeHtml(getSpeedClassLabel(entry.raceMode || entry.speedClass))} · Seed ${escapeHtml(formatRoadSeed(entry.seed))} · ${escapeHtml(getRunOutcomeLabel(entry))} · ${formatTime(entry.time)}${entry.raceType === FUEL_RUN_RACE_TYPE_ID ? ` · Fuel ${Math.max(0, entry.fuelRemaining || 0)}` : ""}${entry.raceType === PURSUIT_RACE_TYPE_ID ? ` · Heat ${Math.round(entry.heatAtEnd || 0)} · Roadblocks ${Math.max(0, entry.roadblocksCleared || 0)}` : ""}${formatShortDate(entry.date) ? ` · ${escapeHtml(formatShortDate(entry.date))}` : ""}</span>
               </span>
               <span class="leaderboard-score">${formatScore(entry.score)}</span>
             </li>
@@ -20474,7 +22432,7 @@ class NeonRoadRally {
       return;
     }
     const leaderboard = this.profiles.data.leaderboard.slice(0, LEADERBOARD_MAX_ENTRIES);
-    const outcomeText = getRunStatusLabel(summary.status, summary.reason);
+    const outcomeText = getRunOutcomeLabel(summary);
     const leaderboardText = summary.scoreSaved
       ? (summary.topTwentyRank ? `Top 20 #${summary.topTwentyRank}` : (summary.topTwentyGap ? `${formatScore(summary.topTwentyGap)} from #20` : "Saved"))
       : `Debug speed x${summary.debugSpeedScale.toFixed(2)} - not saved`;
@@ -20488,7 +22446,7 @@ class NeonRoadRally {
         <div class="score-hero ${summary.newHighScore ? "is-high-score" : ""}">
           <div>
             <span class="eyebrow">${summary.challengeMode ? "Challenge Run Result" : (summary.partyMode ? "Party Run Result" : "Run Result")}</span>
-            <h2>${summary.challengeMode ? (summary.challengeResult?.completed ? "Challenge Complete" : "Challenge Failed") : (summary.status === "finished" ? "Track Complete" : (summary.status === "outOfFuel" ? "Out of Fuel" : "Run Over"))}</h2>
+            <h2>${summary.challengeMode ? (summary.challengeResult?.completed ? "Challenge Complete" : "Challenge Failed") : (summary.raceTypeId === PURSUIT_RACE_TYPE_ID ? outcomeText : (summary.status === "finished" ? "Track Complete" : (summary.status === "outOfFuel" ? "Out of Fuel" : "Run Over")))}</h2>
             <p class="hint">${summary.challengeMode ? `${escapeHtml(summary.challengeName)} · ` : ""}${escapeHtml(summary.trackName)} · ${escapeHtml(summary.raceTypeLabel || getRaceTypeLabel(summary.raceTypeId))} · ${escapeHtml(summary.speedClassLabel)} · Seed ${escapeHtml(summary.seed)}</p>
             <div class="score-callout-row">${this.renderTitleCallouts(summary)}${this.renderNewBadgeCallouts(summary)}${this.renderChallengeCallouts(summary)}${this.renderLeaderboardContext(summary)}</div>
           </div>
@@ -20519,6 +22477,12 @@ class NeonRoadRally {
             <div class="score-card"><strong>Boost Fuel Saved</strong><span>${this.formatPlaytestDecimal(summary.fuelSavedByBoost || 0)} fuel · ${this.formatPlaytestDecimal(summary.fuelDrainPausedTime || 0)}s</span></div>
             <div class="score-card"><strong>Fuel Bonus</strong><span>${formatScore(summary.fuelBonus || 0)}</span></div>
           ` : ""}
+          ${summary.raceTypeId === PURSUIT_RACE_TYPE_ID ? `
+            <div class="score-card"><strong>Heat At End</strong><span>${Math.round(summary.heatAtEnd || 0)} / ${PURSUIT_CONFIG.heatLimit}</span></div>
+            <div class="score-card"><strong>Max Heat</strong><span>${Math.round(summary.heatMax || 0)} / ${PURSUIT_CONFIG.heatLimit}</span></div>
+            <div class="score-card"><strong>Roadblocks</strong><span>${Math.max(0, summary.roadblocksCleared || 0)} cleared / ${Math.max(0, summary.roadblocksSpawned || 0)} spawned</span></div>
+            <div class="score-card"><strong>Pursuit Result</strong><span>${escapeHtml(summary.pursuitResult || outcomeText)}</span></div>
+          ` : ""}
           <div class="score-card"><strong>Distance</strong><span>${Math.round(summary.distance).toLocaleString()} / ${summary.trackDistance.toLocaleString()}</span></div>
           <div class="score-card"><strong>Time</strong><span>${formatTime(summary.time)}</span></div>
           <div class="score-card"><strong>Personal Best</strong><span>${escapeHtml(personalBestText)}</span></div>
@@ -20538,7 +22502,7 @@ class NeonRoadRally {
               <span class="leaderboard-rank">#${index + 1}</span>
               <span>
                 <strong>${escapeHtml(entry.playerName)}</strong>
-                <span class="meta">${entry.challengeId ? `Challenge: ${escapeHtml(entry.challengeName || entry.challengeId)} · ` : ""}${entry.partyMode ? `Party ${escapeHtml(getPartyRoundTypeLabel(entry.partyRoundType))} R${entry.partyRoundIndex || 1} · ` : ""}${escapeHtml(entry.carName)} · ${escapeHtml(entry.trackName)} · ${escapeHtml(getRaceTypeLabel(entry.raceType))} · ${escapeHtml(getSpeedClassLabel(entry.raceMode || entry.speedClass))} · Seed ${escapeHtml(formatRoadSeed(entry.seed))} · ${escapeHtml(getRunStatusLabel(entry.status))} · ${formatTime(entry.time)}</span>
+                <span class="meta">${entry.challengeId ? `Challenge: ${escapeHtml(entry.challengeName || entry.challengeId)} · ` : ""}${entry.partyMode ? `Party ${escapeHtml(getPartyRoundTypeLabel(entry.partyRoundType))} R${entry.partyRoundIndex || 1} · ` : ""}${escapeHtml(entry.carName)} · ${escapeHtml(entry.trackName)} · ${escapeHtml(getRaceTypeLabel(entry.raceType))} · ${escapeHtml(getSpeedClassLabel(entry.raceMode || entry.speedClass))} · Seed ${escapeHtml(formatRoadSeed(entry.seed))} · ${escapeHtml(getRunOutcomeLabel(entry))} · ${formatTime(entry.time)}${entry.raceType === PURSUIT_RACE_TYPE_ID ? ` · Heat ${Math.round(entry.heatAtEnd || 0)} · Roadblocks ${Math.max(0, entry.roadblocksCleared || 0)}` : ""}</span>
               </span>
               <span class="leaderboard-score">${formatScore(entry.score)}</span>
             </li>
@@ -20783,7 +22747,7 @@ class NeonRoadRally {
       const setup = this.getPartySetup();
       setup.trackId = normalizeTrackId(pick.trackId, DEFAULT_TRACK_ID);
       setup.raceMode = normalizeSpeedClassId(pick.speedClassId, DEFAULT_SPEED_CLASS_ID);
-      setup.raceType = DEFAULT_RACE_TYPE_ID;
+      setup.raceType = normalizePartyRaceType(pick.raceTypeId || setup.raceType, getTrackById(setup.trackId));
       setup.roundType = normalizePartyRoundType(pick.partyRoundType, PARTY_ROUND_TYPE_BEST_OF_3);
       setup.seedMode = normalizePartySeedMode(pick.partySeedMode, PARTY_SEED_MODE_SAME_ROUND);
       if (!setup.sharedSeed) setup.sharedSeed = generateReadableRoadSeed();
