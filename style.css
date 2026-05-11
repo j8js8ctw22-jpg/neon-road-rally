@@ -2311,6 +2311,70 @@ button:disabled {
   line-height: 1.25;
 }
 
+.pursuit-result-panel {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: minmax(0, 1fr) minmax(240px, 1.35fr);
+  align-items: stretch;
+  margin: 8px 0 12px;
+  border: 1px solid rgba(255, 51, 76, 0.36);
+  border-radius: 8px;
+  padding: 10px;
+  background:
+    linear-gradient(90deg, rgba(255, 51, 76, 0.14), rgba(40, 246, 255, 0.1)),
+    rgba(5, 8, 20, 0.64);
+}
+
+.pursuit-result-main {
+  display: grid;
+  gap: 4px;
+  align-content: center;
+  border-right: 1px solid rgba(246, 251, 255, 0.12);
+  padding-right: 10px;
+}
+
+.pursuit-result-main strong {
+  color: #f6fbff;
+  font-size: clamp(1.35rem, 3vw, 1.9rem);
+  line-height: 1;
+  text-transform: uppercase;
+  text-shadow: 0 0 16px rgba(255, 51, 76, 0.34);
+}
+
+.pursuit-result-main small {
+  color: var(--muted);
+  line-height: 1.28;
+}
+
+.pursuit-result-stats {
+  display: grid;
+  gap: 7px;
+  grid-template-columns: repeat(auto-fit, minmax(118px, 1fr));
+}
+
+.pursuit-result-stats span {
+  display: grid;
+  gap: 3px;
+  border: 1px solid rgba(40, 246, 255, 0.22);
+  border-radius: 6px;
+  padding: 8px;
+  background: rgba(4, 14, 20, 0.64);
+}
+
+.pursuit-result-stats b {
+  color: var(--yellow);
+  font-size: 0.68rem;
+  text-transform: uppercase;
+}
+
+.pursuit-result-stats em {
+  color: #f6fbff;
+  font-style: normal;
+  font-weight: 900;
+  line-height: 1.12;
+  overflow-wrap: anywhere;
+}
+
 .result-boost-note {
   margin: 0 0 12px;
   border-left: 2px solid rgba(68, 255, 153, 0.58);
@@ -2822,6 +2886,7 @@ button:disabled {
   .playtest-report-columns,
   .score-hero,
   .party-drama-header,
+  .pursuit-result-panel,
   .how-to-header,
   .how-to-grid,
   .party-last-run-card,
@@ -2848,6 +2913,13 @@ button:disabled {
 
   .playtest-report-status {
     text-align: left;
+  }
+
+  .pursuit-result-main {
+    border-right: 0;
+    border-bottom: 1px solid rgba(246, 251, 255, 0.12);
+    padding-right: 0;
+    padding-bottom: 8px;
   }
 
   .playtest-report-row {
