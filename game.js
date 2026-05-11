@@ -15544,7 +15544,7 @@ class NeonRoadRally {
         const callout = /ramp/i.test(reason)
           ? "Ramp escape!"
           : (/boost/i.test(reason) ? "Boost escape!" : (/heat dropping/i.test(reason) ? "You're pulling away!" : (reason || "Heat dropping!")));
-        this.showRaceStateCallout(callout, "good", 1.1, { replace: false });
+        this.showRaceStateCallout(callout, "good", 1.1, { replace: true });
       }
     }
   }
@@ -21563,7 +21563,7 @@ class NeonRoadRally {
               <strong>${escapeHtml(badge.icon || "BDG")}</strong>
               <span>
                 <b>${escapeHtml(badge.name)}</b>
-                <small>${escapeHtml(badge.categoryLabel)} - ${escapeHtml(badge.difficulty)}${badge.progress ? ` - ${escapeHtml(badge.progress.text)}` : ""}</small>
+                <small>${escapeHtml(badge.categoryLabel)} - ${escapeHtml(badge.difficulty)}</small>
               </span>
               <small>${badge.earned ? `Earned ${escapeHtml(formatBadgeEarnedDate({ earnedAt: badge.earnedAt }))}` : `${badge.progress ? `Progress ${escapeHtml(badge.progress.text)} - ` : "Locked: "}${escapeHtml(badge.description)}`}</small>
             </span>
