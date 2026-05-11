@@ -168,7 +168,8 @@ async function run() {
 
   await clickText("Leaderboard");
   await page.waitForFunction(() => window.neonRoadRally?.screen === "leaderboard", null, { timeout: 5000 });
-  await expectText("Top 20 Scores");
+  await expectText("Score Attack");
+  await expectText("Time Attack");
   await page.getByRole("button", { name: /Back|Title/i }).first().click();
   await page.waitForFunction(() => window.neonRoadRally?.screen === "title", null, { timeout: 5000 });
 
