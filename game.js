@@ -13937,6 +13937,46 @@ class Renderer {
     return clamp(speed * 0.62 + speedClass * 0.28 + boostPunch * 0.28 + finalStretch * 0.18, 0, 1.32);
   }
 
+  getFuelGasCanReadIntensity() {
+    const run = this.game.run;
+    if (!run || this.game.screen !== "game" || !isFuelRunRaceType(run.raceTypeId)) return 0;
+    let best = 0;
+    for (const obstacle of this.game.obstacles.obstacles) {
+      if (obstacle.type !== "gasCan" || obstacle.hit || obstacle.remove) continue;
+      const ahead = obstacle.distance - run.distance;
+      if (ahead < -45 || ahead > VIEW_DISTANCE * 1.04) continue;
+      const approach = 1 - clamp(ahead / Math.max(1, VIEW_DISTANCE * 0.92), 0, 1);
+      best = Math.max(best, 0.28 + approach * 0.72);
+    }
+    return clamp(best, 0, 1);
+  }
+
+  getPursuitRoadblockReadIntensity() {
+    const run = this.game.run;
+    if (!run || this.game.screen !== "game" || !isPursuitRaceType(run.raceTypeId)) return 0;
+    let best = run.pursuitRoadblockAhead ? 0.38 : 0;
+    for (const obstacle of this.game.obstacles.obstacles) {
+      if (!obstacle.pursuitRoadblock || obstacle.hit || obstacle.remove) continue;
+      const ahead = obstacle.distance - run.distance;
+      if (ahead < -80 || ahead > VIEW_DISTANCE * 1.12) continue;
+      const approach = 1 - clamp(ahead / Math.max(1, VIEW_DISTANCE * 1.02), 0, 1);
+      best = Math.max(best, 0.36 + approach * 0.64);
+    }
+    return clamp(best, 0, 1);
+  }
+
+  getCriticalReadProtection() {
+    const run = this.game.run;
+    if (!run || this.game.screen !== "game") return 0;
+    const fuelCritical = isFuelRunRaceType(run.raceTypeId) && (run.criticalFuelActive || run.lowFuelActive)
+      ? this.getFuelGasCanReadIntensity()
+      : 0;
+    const pursuitRoadblock = isPursuitRaceType(run.raceTypeId)
+      ? this.getPursuitRoadblockReadIntensity()
+      : 0;
+    return clamp(Math.max(fuelCritical, pursuitRoadblock), 0, 1);
+  }
+
   getVisualMotionMultiplier() {
     const speedFeel = this.getSpeedFeelIntensity();
     const boostPunch = this.getBoostVisualPunch();
@@ -14380,8 +14420,9 @@ class Renderer {
     const pulse = this.getMusicPulse(identity);
     const color = identity.color || "#28f6ff";
     const intensity = clampNumber(identity.intensity, 0, 2, 0);
-    const edgeAlpha = clamp((identity.edgePulse || 0) * (0.38 + pulse * 0.44) * (0.72 + intensity * 0.16), 0, 0.22) * alpha;
-    const lowEnergyAlpha = clamp((identity.lowEnergy || 0) * (0.42 + pulse * 0.22) * (0.7 + intensity * 0.12), 0, 0.16) * alpha;
+    const readProtection = this.getCriticalReadProtection();
+    const edgeAlpha = clamp((identity.edgePulse || 0) * (0.38 + pulse * 0.44) * (0.72 + intensity * 0.16), 0, 0.22) * alpha * (1 - readProtection * 0.32);
+    const lowEnergyAlpha = clamp((identity.lowEnergy || 0) * (0.42 + pulse * 0.22) * (0.7 + intensity * 0.12), 0, 0.16) * alpha * (1 - readProtection * 0.42);
     if (edgeAlpha <= 0.006 && lowEnergyAlpha <= 0.006) return;
 
     ctx.save();
@@ -14471,7 +14512,8 @@ class Renderer {
     const road = this.road;
     const pulse = 0.5 + Math.sin((run.elapsed || 0) * (critical ? 13 : 8)) * 0.5;
     const color = savedPulse > 0.05 ? "#44ff99" : (critical ? "#ff334c" : "#ffe45e");
-    const edgeAlpha = alpha * clamp((low ? 0.1 + pulse * (critical ? 0.16 : 0.09) : 0) + savedPulse * 0.2, 0, 0.34);
+    const gasRead = this.getFuelGasCanReadIntensity();
+    const edgeAlpha = alpha * clamp((low ? 0.1 + pulse * (critical ? 0.16 : 0.09) : 0) + savedPulse * 0.2, 0, 0.34) * (1 - gasRead * 0.28);
     ctx.save();
     ctx.globalCompositeOperation = "lighter";
     ctx.globalAlpha = edgeAlpha;
@@ -14487,8 +14529,8 @@ class Renderer {
     ctx.stroke();
     const wash = ctx.createLinearGradient(0, road.y, 0, road.y + road.h);
     wash.addColorStop(0, "rgba(0, 0, 0, 0)");
-    wash.addColorStop(0.78, rgbaFromHex(color, edgeAlpha * 0.55));
-    wash.addColorStop(1, rgbaFromHex(color, edgeAlpha * 0.18));
+    wash.addColorStop(0.78, rgbaFromHex(color, edgeAlpha * (0.42 - gasRead * 0.12)));
+    wash.addColorStop(1, rgbaFromHex(color, edgeAlpha * (0.14 - gasRead * 0.04)));
     ctx.fillStyle = wash;
     ctx.fillRect(road.x, road.y, road.w, road.h);
     ctx.restore();
@@ -14755,9 +14797,11 @@ class Renderer {
         speedFeel: this.getSpeedFeelIntensity()
       });
     } else if (obstacle.type === "gasCan") {
+      this.drawGasCanApproachGuide(ctx, obstacle, x, y, visual.w, visual.h, scale);
       drawGasCan(ctx, x, y, drawScale, {
         pulse: 0.5 + Math.sin((this.game.run?.elapsed || 0) * 8 + obstacle.distance * 0.012) * 0.5,
-        urgent: Boolean(this.game.run?.lowFuelActive || this.game.run?.criticalFuelActive)
+        urgent: Boolean(this.game.run?.lowFuelActive || this.game.run?.criticalFuelActive),
+        approach: this.getFuelGasCanReadIntensity()
       });
     } else if (obstacle.type === "barrier") {
       drawBarrier(ctx, x, y, drawScale);
@@ -14769,6 +14813,64 @@ class Renderer {
     if (obstacle.pursuitMarker || obstacle.pursuitRoadblock) {
       this.drawPursuitObstacleMarker(ctx, x, y, visual.w, visual.h, scale, obstacle);
     }
+  }
+
+  drawGasCanApproachGuide(ctx, obstacle, x, y, width, height, scale) {
+    const run = this.game.run;
+    if (!run || !isFuelRunRaceType(run.raceTypeId) || obstacle.hit || obstacle.remove) return;
+    if (y < this.road.y - 90 || y > this.height + 120) return;
+    const ahead = obstacle.distance - run.distance;
+    if (ahead < -50 || ahead > VIEW_DISTANCE * 1.04) return;
+    const laneW = this.road.laneW;
+    const depth = clamp((y - this.road.y) / Math.max(1, this.road.h), 0, 1);
+    const lowFuel = Boolean(run.lowFuelActive || run.criticalFuelActive);
+    const approach = clamp(1 - ahead / Math.max(1, VIEW_DISTANCE * 0.95), 0, 1);
+    const pulse = 0.5 + Math.sin((run.elapsed || 0) * (lowFuel ? 11 : 7) + obstacle.distance * 0.01) * 0.5;
+    const playerY = this.getPlayerScreenY();
+    const guideTop = Math.max(this.road.y, y - Math.max(height * 1.15, laneW * 0.72));
+    const naturalBottom = y + Math.max(height * 0.46, laneW * 0.32);
+    const guideBottom = Math.min(naturalBottom, playerY - laneW * 0.72);
+    if (guideBottom <= guideTop + 6) return;
+    const color = lowFuel ? "#ffe45e" : "#44ff99";
+    const alpha = clamp((lowFuel ? 0.28 : 0.18) + depth * 0.18 + approach * 0.2 + pulse * 0.06, 0.16, lowFuel ? 0.66 : 0.48);
+    ctx.save();
+    ctx.globalCompositeOperation = "lighter";
+    const gradient = ctx.createLinearGradient(0, guideTop, 0, guideBottom);
+    gradient.addColorStop(0, rgbaFromHex(color, 0));
+    gradient.addColorStop(0.48, rgbaFromHex(color, alpha * 0.2));
+    gradient.addColorStop(1, rgbaFromHex(color, alpha * 0.12));
+    ctx.fillStyle = gradient;
+    ctx.fillRect(x - laneW * 0.34, guideTop, laneW * 0.68, guideBottom - guideTop);
+    ctx.globalAlpha = alpha;
+    ctx.strokeStyle = color;
+    ctx.shadowBlur = 11 + pulse * 9 + (lowFuel ? 6 : 0);
+    ctx.shadowColor = color;
+    ctx.lineWidth = Math.max(2, 2.6 * scale);
+    ctx.beginPath();
+    ctx.moveTo(x - laneW * 0.29, guideBottom);
+    ctx.lineTo(x - laneW * 0.2, guideTop + (guideBottom - guideTop) * 0.32);
+    ctx.moveTo(x + laneW * 0.29, guideBottom);
+    ctx.lineTo(x + laneW * 0.2, guideTop + (guideBottom - guideTop) * 0.32);
+    ctx.stroke();
+    for (let i = 0; i < 3; i += 1) {
+      const t = (i + 1) / 4;
+      const cy = lerp(guideBottom, guideTop, t);
+      const chevronW = laneW * lerp(0.2, 0.32, t);
+      const chevronH = Math.max(7, 10 * scale);
+      ctx.globalAlpha = alpha * lerp(0.62, 0.95, t);
+      ctx.beginPath();
+      ctx.moveTo(x - chevronW, cy - chevronH * 0.4);
+      ctx.lineTo(x, cy + chevronH * 0.42);
+      ctx.lineTo(x + chevronW, cy - chevronH * 0.4);
+      ctx.stroke();
+    }
+    ctx.globalAlpha = alpha * 0.74;
+    ctx.strokeStyle = "#f6fbff";
+    ctx.lineWidth = Math.max(1.5, 2 * scale);
+    ctx.beginPath();
+    ctx.ellipse(x, y + height * 0.2, width * 0.52, height * 0.2, 0, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
   }
 
   drawPursuitObstacleMarker(ctx, x, y, width, height, scale, obstacle) {
@@ -15049,14 +15151,16 @@ class Renderer {
     const theme = this.getCurrentTrackVisualTheme();
     const boostPunchDuration = ARCADE_FEEL.boostStreakPunchMs / 1000;
     const boostPunch = boostPunchDuration > 0 ? clamp((run.boostStreakPunchTimer || 0) / boostPunchDuration, 0, 1) : 0;
+    const readProtection = this.getCriticalReadProtection();
     const intensity = (run.boostTimer > 0 ? 0.5 : (run.padBoostTimer > 0 ? 0.45 : (sectionEnergy ? 0.16 : 0.2)))
       * TRACK_VISUALS.speedStreakIntensity
       * clampNumber(theme.speedStreakIntensity, 0.4, 1.8, 1)
       * (1 + finalStretch * 0.25)
       * clamp(visualIntensity, 0.8, 1.35)
       * (1 + boostPunch * 0.7)
-      * (0.9 + speedFeel * 0.22 + speedClass * 0.14);
-    const lineCount = Math.round((run.boostTimer > 0 ? 42 : (run.padBoostTimer > 0 ? 34 : (sectionEnergy ? 22 : 18))) * (0.85 + speedRatio * 0.42 + speedClass * 0.16) * clamp(visualIntensity, 0.92, 1.18) * (1 + boostPunch * 0.48));
+      * (0.9 + speedFeel * 0.22 + speedClass * 0.14)
+      * (1 - readProtection * 0.22);
+    const lineCount = Math.round((run.boostTimer > 0 ? 42 : (run.padBoostTimer > 0 ? 34 : (sectionEnergy ? 22 : 18))) * (0.85 + speedRatio * 0.42 + speedClass * 0.16) * clamp(visualIntensity, 0.92, 1.18) * (1 + boostPunch * 0.48) * (1 - readProtection * 0.18));
     ctx.save();
     ctx.globalAlpha = clamp(intensity, 0, 0.82);
     ctx.strokeStyle = boosting ? (theme.boostStreakColor || "#28f6ff") : (theme.speedStreakColor || "#f6fbff");
@@ -15573,29 +15677,57 @@ class Renderer {
         if (y < this.road.y - 70 || y > this.height + 120) return;
         const laneX = this.laneCenter(obstacle.pursuitEscapeLane);
         const depth = clamp((y - this.road.y) / Math.max(1, this.road.h), 0, 1);
-        const alpha = clamp(0.18 + depth * 0.36 + (run.pursuitWarningTimer || 0) * 0.04, 0.18, 0.62);
-        const guideH = Math.max(34, laneW * (0.82 + depth * 0.6));
+        const readIntensity = this.getPursuitRoadblockReadIntensity();
+        const alpha = clamp(0.26 + depth * 0.34 + (run.pursuitWarningTimer || 0) * 0.045 + readIntensity * 0.12, 0.22, 0.74);
+        const guideH = Math.max(40, laneW * (0.96 + depth * 0.72));
         const pulse = 0.5 + Math.sin((run.elapsed || 0) * 12 + y * 0.01) * 0.5;
+        const playerY = this.getPlayerScreenY();
+        const guideTop = Math.max(this.road.y + 4, y - guideH * 0.66);
+        const guideBottom = Math.min(playerY - laneW * 0.74, y + guideH * 1.34);
+        if (guideBottom <= guideTop + 10) return;
+        const guide = ctx.createLinearGradient(0, guideTop, 0, guideBottom);
+        guide.addColorStop(0, "rgba(68, 255, 153, 0)");
+        guide.addColorStop(0.26, `rgba(68, 255, 153, ${alpha * 0.16})`);
+        guide.addColorStop(0.78, `rgba(40, 246, 255, ${alpha * 0.11})`);
+        guide.addColorStop(1, "rgba(68, 255, 153, 0)");
+        ctx.globalCompositeOperation = "lighter";
+        ctx.fillStyle = guide;
+        ctx.globalAlpha = 1;
+        ctx.fillRect(laneX - laneW * 0.41, guideTop, laneW * 0.82, guideBottom - guideTop);
         ctx.globalAlpha = alpha;
-        ctx.fillStyle = "rgba(68, 255, 153, 0.18)";
-        ctx.fillRect(laneX - laneW * 0.38, y - guideH * 0.44, laneW * 0.76, guideH * 0.88);
         ctx.strokeStyle = pulse > 0.5 ? "#44ff99" : "#28f6ff";
         ctx.lineWidth = Math.max(2, 2.4 * scale);
         ctx.shadowBlur = 12 + pulse * 10;
         ctx.shadowColor = ctx.strokeStyle;
-        for (let i = 0; i < 3; i += 1) {
-          const cy = y - guideH * 0.26 + i * guideH * 0.22;
+        ctx.beginPath();
+        ctx.moveTo(laneX - laneW * 0.39, guideBottom);
+        ctx.lineTo(laneX - laneW * 0.31, guideTop + (guideBottom - guideTop) * 0.12);
+        ctx.moveTo(laneX + laneW * 0.39, guideBottom);
+        ctx.lineTo(laneX + laneW * 0.31, guideTop + (guideBottom - guideTop) * 0.12);
+        ctx.stroke();
+        const chevronCount = guideBottom - guideTop > laneW * 1.4 ? 5 : 3;
+        for (let i = 0; i < chevronCount; i += 1) {
+          const t = chevronCount <= 1 ? 0.5 : i / (chevronCount - 1);
+          const cy = lerp(guideBottom - laneW * 0.24, guideTop + laneW * 0.3, t);
+          const chevronW = laneW * lerp(0.2, 0.33, t);
+          ctx.globalAlpha = alpha * lerp(0.58, 1, t);
           ctx.beginPath();
-          ctx.moveTo(laneX - laneW * 0.18, cy - 5 * scale);
-          ctx.lineTo(laneX, cy + 7 * scale);
-          ctx.lineTo(laneX + laneW * 0.18, cy - 5 * scale);
+          ctx.moveTo(laneX - chevronW, cy - 6 * scale);
+          ctx.lineTo(laneX, cy + 9 * scale);
+          ctx.lineTo(laneX + chevronW, cy - 6 * scale);
           ctx.stroke();
         }
-        if (this.width >= 560 && depth > 0.22) {
+        ctx.globalAlpha = alpha * 0.8;
+        ctx.fillStyle = pulse > 0.5 ? "rgba(68, 255, 153, 0.34)" : "rgba(40, 246, 255, 0.3)";
+        ctx.beginPath();
+        ctx.ellipse(laneX, y + guideH * 0.14, laneW * 0.34, Math.max(9, 15 * scale), 0, 0, Math.PI * 2);
+        ctx.fill();
+        if (this.width >= 560 && depth > 0.14) {
           ctx.shadowBlur = 8;
           ctx.fillStyle = "#f6fbff";
           ctx.font = `900 ${Math.max(9, 11 * scale)}px Trebuchet MS, Verdana, sans-serif`;
-          ctx.fillText("ESCAPE GAP", laneX, y + guideH * 0.34, laneW * 1.25);
+          ctx.globalAlpha = alpha * 1.05;
+          ctx.fillText("SAFE GAP", laneX, Math.min(guideBottom - 12, y + guideH * 0.42), laneW * 1.15);
         }
       });
       ctx.restore();
@@ -15607,7 +15739,8 @@ class Renderer {
       const heatPercent = clamp((run.pursuitHeat || 0) / Math.max(1, run.pursuitHeatLimit || PURSUIT_CONFIG.heatLimit), 0, 1);
       const warning = run.pursuitRoadblockAhead || (run.pursuitWarningTimer || 0) > 0;
       const pulseBoost = clamp(Math.max(run.pursuitChasePulseTimer || 0, run.pursuitSirenPulseTimer || 0) / 1.45, 0, 1);
-      const intensity = clamp(heatPercent * 0.38 + (warning ? 0.34 : 0) + pulseBoost * 0.28, 0, 0.92);
+      const readProtection = this.getPursuitRoadblockReadIntensity();
+      const intensity = clamp(heatPercent * 0.38 + (warning ? 0.34 : 0) + pulseBoost * 0.28, 0, 0.92) * (1 - readProtection * 0.22);
       if (intensity <= 0.04) return;
       const ctx = this.ctx;
       const playerY = this.getPlayerScreenY();
@@ -15652,15 +15785,17 @@ class Renderer {
       const warning = run.pursuitRoadblockAhead || (run.pursuitWarningTimer || 0) > 0;
       const sirenPulse = clamp((run.pursuitSirenPulseTimer || 0) / 1.45, 0, 1);
       const pulse = 0.5 + Math.sin((run.elapsed || 0) * (warning ? 15 : 9)) * 0.5;
+      const readProtection = this.getPursuitRoadblockReadIntensity();
       const alpha = warning
         ? 0.22 + pulse * 0.12 + sirenPulse * 0.08
         : (heatPercent >= 0.8 ? 0.14 + pulse * 0.08 : heatPercent * 0.08);
-      if (alpha <= 0.01) return;
+      const protectedAlpha = alpha * (1 - readProtection * 0.3);
+      if (protectedAlpha <= 0.01) return;
       const ctx = this.ctx;
       const road = this.road;
       ctx.save();
       ctx.globalCompositeOperation = "lighter";
-      ctx.globalAlpha = alpha;
+      ctx.globalAlpha = protectedAlpha;
       const leftColor = pulse > 0.5 ? "#ff334c" : "#28f6ff";
       const rightColor = pulse > 0.5 ? "#28f6ff" : "#ff334c";
       ctx.shadowBlur = 20 + sirenPulse * 14;
@@ -15681,7 +15816,7 @@ class Renderer {
       bottomGradient.addColorStop(0, "rgba(0, 0, 0, 0)");
       bottomGradient.addColorStop(0.62, pulse > 0.5 ? "rgba(255, 51, 76, 0.24)" : "rgba(40, 246, 255, 0.22)");
       bottomGradient.addColorStop(1, pulse > 0.5 ? "rgba(40, 246, 255, 0.32)" : "rgba(255, 51, 76, 0.3)");
-      ctx.globalAlpha = alpha * 0.78;
+      ctx.globalAlpha = protectedAlpha * 0.78;
       ctx.fillStyle = bottomGradient;
       ctx.fillRect(0, this.height * 0.72, this.width, this.height * 0.28);
       if (warning || heatPercent >= 0.55) {
@@ -15689,7 +15824,7 @@ class Renderer {
         const horizonGradient = ctx.createRadialGradient(this.width * 0.5, horizonY, 4, this.width * 0.5, horizonY, Math.max(240, this.width * 0.45));
         horizonGradient.addColorStop(0, pulse > 0.5 ? "rgba(255, 51, 76, 0.24)" : "rgba(40, 246, 255, 0.22)");
         horizonGradient.addColorStop(1, "rgba(0, 0, 0, 0)");
-        ctx.globalAlpha = alpha * 0.62;
+        ctx.globalAlpha = protectedAlpha * 0.62;
         ctx.fillStyle = horizonGradient;
         ctx.fillRect(0, horizonY - 130, this.width, 260);
       }
@@ -17655,18 +17790,32 @@ function drawGasCan(ctx, x, y, scale = 1, state = {}) {
   const h = 64 * scale;
   const pulse = clampNumber(state.pulse, 0, 1, 0.5);
   const urgent = Boolean(state.urgent);
+  const approach = clampNumber(state.approach, 0, 1, 0);
   ctx.save();
   ctx.translate(x, y);
   drawShadow(ctx, w * 0.86, h * 0.72);
   ctx.globalCompositeOperation = "lighter";
-  ctx.globalAlpha = urgent ? 0.24 + pulse * 0.18 : 0.14 + pulse * 0.08;
-  ctx.fillStyle = urgent ? "rgba(255, 228, 94, 0.58)" : "rgba(255, 51, 76, 0.44)";
+  ctx.globalAlpha = urgent ? 0.28 + pulse * 0.22 : 0.16 + pulse * 0.1 + approach * 0.08;
+  ctx.fillStyle = urgent ? "rgba(255, 228, 94, 0.6)" : "rgba(255, 51, 76, 0.46)";
   ctx.beginPath();
   ctx.ellipse(0, h * 0.14, w * 0.5, h * 0.42, 0, 0, Math.PI * 2);
   ctx.fill();
+  ctx.globalAlpha = urgent ? 0.5 + pulse * 0.22 : 0.26 + approach * 0.16 + pulse * 0.08;
+  ctx.strokeStyle = urgent ? "#ffe45e" : "#44ff99";
+  ctx.lineWidth = Math.max(2, 2.5 * scale);
+  ctx.shadowBlur = urgent ? 18 + pulse * 10 : 10 + approach * 8;
+  ctx.shadowColor = ctx.strokeStyle;
+  ctx.beginPath();
+  ctx.ellipse(0, h * 0.16, w * 0.62, h * 0.5, 0, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(-w * 0.48, -h * 0.02);
+  ctx.lineTo(0, -h * 0.5);
+  ctx.lineTo(w * 0.48, -h * 0.02);
+  ctx.stroke();
   ctx.globalAlpha = 1;
   ctx.globalCompositeOperation = "source-over";
-  ctx.shadowBlur = urgent ? 18 + pulse * 10 : 10;
+  ctx.shadowBlur = urgent ? 18 + pulse * 10 : 10 + approach * 3;
   ctx.shadowColor = "#ff334c";
   ctx.fillStyle = "#c91f32";
   pixelPath(ctx, [
@@ -17689,6 +17838,8 @@ function drawGasCan(ctx, x, y, scale = 1, state = {}) {
   ctx.fillRect(-w * 0.1, -h * 0.48, w * 0.18, h * 0.08);
   ctx.fillStyle = "#f6fbff";
   ctx.fillRect(-w * 0.22, -h * 0.12, w * 0.44, h * 0.09);
+  ctx.fillStyle = "#44ff99";
+  ctx.fillRect(-w * 0.22, h * 0.02, w * 0.44, Math.max(2, h * 0.06));
   ctx.fillStyle = "#ffe45e";
   ctx.shadowBlur = urgent ? 12 : 6;
   ctx.shadowColor = "#ffe45e";
