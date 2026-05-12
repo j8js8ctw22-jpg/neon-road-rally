@@ -54,6 +54,14 @@ const ROUTES = {
     raceTypeId: "classic",
     seed: "SUNSET-LAST-LIGHT-REDLINE"
   },
+  "boostline-neon-palm": {
+    routeId: "boostline-neon-palm",
+    routeName: "Neon Palm Boostline",
+    trackId: "sunset-highway",
+    speedClassId: "turbo",
+    raceTypeId: "boostline",
+    seed: "SUNSET-NEON-PALM-BOOSTLINE"
+  },
   "redline-switchyard-boostline": {
     routeId: "redline-switchyard-boostline",
     routeName: "Switchyard Boostline",
@@ -65,7 +73,7 @@ const ROUTES = {
 };
 
 function getRouteList() {
-  const ids = String(process.env.NRR_PERF_ROUTE_IDS || "sunset-neon-palm-sprint,sunset-last-light-gauntlet")
+  const ids = String(process.env.NRR_PERF_ROUTE_IDS || "sunset-neon-palm-sprint,sunset-last-light-gauntlet,boostline-neon-palm")
     .split(",")
     .map((id) => id.trim())
     .filter(Boolean);
