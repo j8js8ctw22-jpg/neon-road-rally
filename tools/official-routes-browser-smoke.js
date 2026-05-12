@@ -187,7 +187,12 @@ async function finishCurrentRace(page, score, time) {
       worstFrameMs: Number((run.frameTimeMaxMs || 0).toFixed(2)),
       averageFps: Number((run.averageFps || 0).toFixed(1)),
       slowFramePercent: Number((run.slowFramePercent || 0).toFixed(2)),
-      performanceEffectScale: Number((run.performanceEffectScale || 1).toFixed(2))
+      performanceEffectScale: Number((run.performanceEffectScale || 1).toFixed(2)),
+      renderEffectScale: Number((run.renderEffectScale || 1).toFixed(2)),
+      renderEffectScaleMin: Number((run.renderEffectScaleMin || 1).toFixed(2)),
+      officialRouteId: run.officialRouteId || "",
+      routeSeedLocked: Boolean(run.routeSeedLocked || run.officialRouteSeedLocked),
+      routeSignatureHash: run.routeSignatureHash || ""
     };
   });
   assert(telemetry.frameSampleCount > 0, "Frame telemetry should collect samples on race screen", { telemetry });
@@ -312,6 +317,40 @@ async function runCustomScenario(page) {
   return { routeId: "custom-road", telemetry };
 }
 
+async function runManualOfficialSeedScenario(page) {
+  const route = routeById("sunset-neon-palm-sprint");
+  await selectTrack(page, "sunset-highway");
+  await setRaceType(page, "classic");
+  await clickAction(page, "randomSeed");
+  await page.waitForFunction(() => window.neonRoadRally?.screen === "preRace", null, { timeout: 5000 });
+  await selectPracticeSpeed(page, "turbo");
+  const input = page.locator("#roadSeedInput");
+  await input.fill(route.seed);
+  await page.waitForFunction(
+    ({ seed, routeId, name }) => (
+      document.querySelector("#roadSeedInput")?.value === seed
+      && document.querySelector("#officialRouteInput")?.value === routeId
+      && document.querySelector("#soloSetupCompetitionLabel")?.textContent?.includes("Official Race")
+      && document.querySelector("#soloSetupActionSummary")?.textContent?.includes(name)
+    ),
+    { seed: route.seed, routeId: route.id, name: route.name },
+    { timeout: 5000 }
+  );
+  const readyText = await page.locator(".solo-setup-action").innerText();
+  assertIncludes(readyText, "Official Race");
+  assertIncludes(readyText, route.name);
+  await clickAction(page, "startSeededRace");
+  const telemetry = await finishCurrentRace(page, 118800, 41.987);
+  const text = await bodyText(page);
+  assertIncludes(text, "Official Race Result");
+  assertIncludes(text, route.name);
+  assertIncludes(text, route.seed);
+  assert(!text.includes("Custom Road Result"), "Official seed manual run should not present as Custom Road");
+  await clickAction(page, "preRace");
+  await page.waitForFunction(() => window.neonRoadRally?.screen === "preRace", null, { timeout: 5000 });
+  return { routeId: route.id, telemetry, manualSeed: route.seed };
+}
+
 async function assertLeaderboards(page) {
   await clickAction(page, "leaderboard", '[data-view="scoreAttack"]');
   await page.waitForFunction(() => window.neonRoadRally?.screen === "leaderboard", null, { timeout: 5000 });
@@ -329,6 +368,8 @@ async function assertLeaderboards(page) {
       && lowerScoreText.indexOf("custom road scores") > lowerScoreText.indexOf("official score attack"),
     "Custom Road scores should appear below Official Score Attack"
   );
+  const customScoreSection = lowerScoreText.slice(lowerScoreText.indexOf("custom road scores"));
+  assert(!customScoreSection.includes("sunset-palm-sprint-turbo"), "Official seed should not appear in Custom Road Scores");
 
   await clickAction(page, "setLeaderboardView", '[data-view="timeAttack"]');
   await page.waitForFunction(() => window.neonRoadRally?.leaderboardView === "timeAttack", null, { timeout: 5000 });
@@ -337,8 +378,12 @@ async function assertLeaderboards(page) {
   assertIncludes(text, "Official Time Attack");
   assertIncludes(text, "Neon Palm Sprint");
   assertIncludes(text, "42.123s");
+  assertIncludes(text, "41.987s");
   assertIncludes(text, "Custom Road Times");
   assertIncludes(text, "48.321s");
+  const lowerTimeText = text.toLowerCase();
+  const customTimeSection = lowerTimeText.slice(lowerTimeText.indexOf("custom road times"));
+  assert(!customTimeSection.includes("sunset-palm-sprint-turbo"), "Official seed should not appear in Custom Road Times");
 }
 
 async function run() {
@@ -375,8 +420,24 @@ async function run() {
       telemetrySamples.push(await runOfficialScenario(page, OFFICIAL_SCENARIOS[index], { returnToSetup: index < OFFICIAL_SCENARIOS.length - 1 }));
     }
     await assertOfficialTimeBoard(page);
+    telemetrySamples.push(await runManualOfficialSeedScenario(page));
     telemetrySamples.push(await runCustomScenario(page));
     await assertLeaderboards(page);
+
+    const playtestRouteTelemetry = await page.evaluate(() => {
+      const runs = window.neonRoadRally?.playtestReports?.getRuns?.() || [];
+      return runs
+        .filter((run) => run.officialRouteId)
+        .map((run) => ({
+          route: run.officialRouteName || run.officialRouteId,
+          signatureHash: run.routeSignatureHash || "",
+          routeSeedLocked: Boolean(run.routeSeedLocked),
+          averageFps: Number((run.averageFps || 0).toFixed(1)),
+          worstFrameMs: Number((run.worstFrameMs || 0).toFixed(1)),
+          renderEffectScaleMin: Number((run.renderEffectScaleMin || 1).toFixed(2))
+        }));
+    });
+    assert(playtestRouteTelemetry.some((run) => run.route === "Neon Palm Sprint" && run.signatureHash && run.routeSeedLocked), "Playtest Report should include official route signature and seed-lock telemetry", { playtestRouteTelemetry });
 
     assert(consoleIssues.length === 0, "Console warnings/errors found", { consoleIssues });
     console.log("OFFICIAL_ROUTES_BROWSER_SMOKE_OK");
@@ -392,6 +453,7 @@ async function run() {
       })),
       customSeed: "CUSTOM-OFFICIAL-SMOKE",
       frameTelemetry: telemetrySamples,
+      playtestRouteTelemetry,
       consoleIssues
     }, null, 2));
   } finally {
