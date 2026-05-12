@@ -1,7 +1,35 @@
 #!/usr/bin/env node
 "use strict";
 
-const { chromium } = require("playwright");
+const fs = require("fs");
+const path = require("path");
+const { createRequire } = require("module");
+
+function loadPlaywright() {
+  try {
+    return require("playwright");
+  } catch (error) {
+    if (error?.code !== "MODULE_NOT_FOUND") throw error;
+  }
+
+  const candidates = [
+    process.env.NRR_PLAYWRIGHT_NODE_MODULES,
+    ...String(process.env.NODE_PATH || "").split(path.delimiter).filter(Boolean),
+    process.env.HOME
+      ? path.join(process.env.HOME, ".cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules")
+      : ""
+  ].filter(Boolean);
+
+  for (const nodeModulesPath of candidates) {
+    const packagePath = path.join(nodeModulesPath, "playwright", "package.json");
+    if (!fs.existsSync(packagePath)) continue;
+    return createRequire(packagePath)("playwright");
+  }
+
+  throw new Error("Cannot find module 'playwright'. Install it locally, set NODE_PATH, or set NRR_PLAYWRIGHT_NODE_MODULES to a node_modules directory containing Playwright.");
+}
+
+const { chromium } = loadPlaywright();
 
 const BRAVE_PATH = "/Applications/Brave Browser.app/Contents/MacOS/Brave Browser";
 const BASE_URL = process.env.NRR_SMOKE_URL || "http://127.0.0.1:8085/";
@@ -156,7 +184,13 @@ async function run() {
   await page.waitForFunction(() => window.neonRoadRally?.screen === "preRace", null, { timeout: 5000 });
   await page.selectOption("#preRaceType", "classic");
   await page.selectOption("#preRaceType", "fuelRun");
-  await page.selectOption("#preRaceType", "pursuit");
+  const soloRaceTypeValues = await page.$$eval("#preRaceType option", (options) => options.map((option) => option.value));
+  if (!soloRaceTypeValues.includes("classic") || !soloRaceTypeValues.includes("fuelRun")) {
+    throw new Error(`Solo setup missing expected race types: ${soloRaceTypeValues.join(", ")}`);
+  }
+  if (soloRaceTypeValues.includes("pursuit")) {
+    throw new Error("Pursuit should not appear in normal solo setup");
+  }
   await page.getByRole("button", { name: /^Back( to Title)?$/ }).click();
   await page.waitForFunction(() => window.neonRoadRally?.screen === "title", null, { timeout: 5000 });
 

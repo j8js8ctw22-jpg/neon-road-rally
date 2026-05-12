@@ -805,6 +805,70 @@ button {
   margin-top: 8px;
 }
 
+.official-route-grid {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(auto-fit, minmax(175px, 1fr));
+}
+
+.compact-official-route-grid {
+  margin: 8px 0 12px;
+}
+
+.official-route-card {
+  display: grid;
+  gap: 4px;
+  min-height: 92px;
+  border: 1px solid rgba(255, 228, 94, 0.26);
+  border-radius: 7px;
+  padding: 10px;
+  background: rgba(8, 14, 34, 0.82);
+  color: var(--text);
+  cursor: pointer;
+  text-align: left;
+}
+
+.official-route-card strong,
+.official-route-card span,
+.official-route-card small {
+  display: block;
+}
+
+.official-route-card strong {
+  color: #fff;
+  font-size: 0.82rem;
+  line-height: 1.15;
+  text-transform: uppercase;
+}
+
+.official-route-card span {
+  color: var(--yellow);
+  font-family: ui-monospace, "SFMono-Regular", Consolas, monospace;
+  font-size: 0.72rem;
+  overflow-wrap: anywhere;
+}
+
+.official-route-card small {
+  color: var(--muted);
+  font-size: 0.72rem;
+  line-height: 1.25;
+}
+
+.official-route-card:hover,
+.official-route-card:focus-visible {
+  outline: none;
+  border-color: var(--yellow);
+  box-shadow: 0 0 14px rgba(255, 228, 94, 0.18);
+}
+
+.official-route-card.is-selected {
+  border-color: var(--green);
+  background:
+    linear-gradient(135deg, rgba(68, 255, 153, 0.16), rgba(40, 246, 255, 0.08)),
+    rgba(8, 18, 28, 0.94);
+  box-shadow: inset 0 0 18px rgba(68, 255, 153, 0.12);
+}
+
 .race-type-card {
   display: grid;
   gap: 4px;
@@ -3123,6 +3187,7 @@ button:disabled {
   .party-last-run-card,
   .score-grid,
   .track-select-grid,
+  .official-route-grid,
   .audio-grid,
   .audio-test-grid,
   .setup-sticky-action,
