@@ -191,6 +191,115 @@ async function main() {
 
     const app = Object.create(NeonRoadRally.prototype);
     app.renderer = makeHarnessRenderer();
+    const officialRouteAudit = app.runOfficialRouteDeterminismAudit({
+      routeIds: ["sunset-neon-palm-sprint", "redline-tunnel-spark-sprint"],
+      raceTypeIds: [DEFAULT_RACE_TYPE_ID, FUEL_RUN_RACE_TYPE_ID],
+      repeats: 4,
+      waveLimit: 32,
+      dt: 0.36
+    });
+    assert(officialRouteAudit.pass, "Official route signatures should be stable across repeated generation");
+    assert(officialRouteAudit.officialSeedNormalizationPassed, "Manual official seeds should normalize to official route identity");
+    assert(officialRouteAudit.customSeedRemainsCustom, "Non-official manual seed should remain Custom Road");
+    function captureOfficialRacecraft(routeId, raceTypeId = DEFAULT_RACE_TYPE_ID) {
+      const capture = app.captureRoadDirectorSequence({
+        officialRouteId: routeId,
+        raceTypeId,
+        waveLimit: 38,
+        dt: 0.36,
+        routeSeedLocked: true
+      });
+      const repeat = app.captureRoadDirectorSequence({
+        officialRouteId: routeId,
+        raceTypeId,
+        waveLimit: 38,
+        dt: 0.36,
+        routeSeedLocked: true
+      });
+      const signature = app.getRoadDirectorRouteSignature(capture, { officialRouteId: routeId });
+      const repeatSignature = app.getRoadDirectorRouteSignature(repeat, { officialRouteId: routeId });
+      assert.strictEqual(signature.hash, repeatSignature.hash, routeId + " official racecraft signature should repeat");
+      return {
+        routeId,
+        raceTypeId,
+        signatureHash: signature.hash,
+        sequence: capture.sequence || []
+      };
+    }
+
+    function hasWave(sample, type, predicate = () => true) {
+      return sample.sequence.some((wave) => wave.type === type && predicate(wave));
+    }
+
+    const safeFastRacecraft = captureOfficialRacecraft("sunset-neon-palm-sprint");
+    const boostChainRacecraft = captureOfficialRacecraft("sunset-boostline-pier");
+    const rampShortcutRacecraft = captureOfficialRacecraft("sunset-glass-city-climb");
+    const redlineFuelRacecraft = captureOfficialRacecraft("redline-switchyard-boostline", FUEL_RUN_RACE_TYPE_ID);
+    assert(
+      hasWave(safeFastRacecraft, "officialFastLineFork", (wave) => (
+        wave.routeType === "safe line vs fast line"
+        && (wave.routeLanes || []).length >= 2
+        && (wave.boostLanes || []).length >= 1
+        && (wave.blockedLanes || []).length >= 1
+      )),
+      "Neon Palm Sprint should expose a safe-line vs fast-line choice"
+    );
+    assert(
+      hasWave(boostChainRacecraft, "officialBoostRampChain", (wave) => (
+        wave.routeType === "boost-to-ramp shortcut"
+        && (wave.boostLanes || []).length >= 1
+        && (wave.rampLanes || []).length >= 1
+      )),
+      "Boostline Pier should expose a boost-chain into ramp opportunity"
+    );
+    assert(
+      hasWave(rampShortcutRacecraft, "officialBoostRampChain", (wave) => (wave.rampLanes || []).length >= 1)
+        || hasWave(rampShortcutRacecraft, "rampEscape", (wave) => (wave.rampLanes || []).length >= 1),
+      "Glass City Climb should expose a readable ramp shortcut"
+    );
+    assert(
+      hasWave(redlineFuelRacecraft, "fuelTrafficGate", (wave) => (wave.gasCanLanes || []).length >= 1)
+        || hasWave(redlineFuelRacecraft, "fuelSupport", (wave) => (wave.boostLanes || []).length >= 1),
+      "Switchyard Boostline Fuel Run should keep an official fuel/boost racecraft route"
+    );
+    const officialRacecraftSafety = await app.runSpawnSafetySimulationCore({
+      runs: 1,
+      officialRouteId: "sunset-boostline-pier",
+      raceTypeId: DEFAULT_RACE_TYPE_ID,
+      dt: 0.3
+    });
+    assert.strictEqual(officialRacecraftSafety.visibleSpawnViolations, 0, "Official racecraft route should avoid visible spawn violations");
+    assert.strictEqual(officialRacecraftSafety.invalidWalls, 0, "Official racecraft route should avoid impossible walls");
+    assert.strictEqual(officialRacecraftSafety.hardBlockerWalls, 0, "Official racecraft route should avoid hard-blocker walls");
+    assert.strictEqual(officialRacecraftSafety.routeReadabilityFailures, 0, "Official racecraft route should keep readable route choices");
+    console.log("OFFICIAL_RACECRAFT_SAMPLE " + JSON.stringify({
+      safeFast: {
+        routeId: safeFastRacecraft.routeId,
+        signatureHash: safeFastRacecraft.signatureHash,
+        waves: safeFastRacecraft.sequence.filter((wave) => String(wave.type || "").startsWith("official")).map((wave) => wave.type)
+      },
+      boostChain: {
+        routeId: boostChainRacecraft.routeId,
+        signatureHash: boostChainRacecraft.signatureHash,
+        waves: boostChainRacecraft.sequence.filter((wave) => String(wave.type || "").startsWith("official")).map((wave) => wave.type)
+      },
+      rampShortcut: {
+        routeId: rampShortcutRacecraft.routeId,
+        signatureHash: rampShortcutRacecraft.signatureHash,
+        rampWaves: rampShortcutRacecraft.sequence.filter((wave) => (wave.rampLanes || []).length).map((wave) => wave.type)
+      },
+      redlineFuel: {
+        routeId: redlineFuelRacecraft.routeId,
+        signatureHash: redlineFuelRacecraft.signatureHash,
+        fuelWaves: redlineFuelRacecraft.sequence.filter((wave) => (wave.gasCanLanes || []).length || (wave.boostLanes || []).length).map((wave) => wave.type).slice(0, 6)
+      },
+      safety: {
+        visibleSpawnViolations: officialRacecraftSafety.visibleSpawnViolations,
+        invalidWalls: officialRacecraftSafety.invalidWalls,
+        hardBlockerWalls: officialRacecraftSafety.hardBlockerWalls,
+        routeReadabilityFailures: officialRacecraftSafety.routeReadabilityFailures
+      }
+    }));
     const fuelTrack = createRaceTrackForSpeedClass(getTrackById("sunset-highway"), "arcade", FUEL_RUN_RACE_TYPE_ID);
     const fuelRegressionRun = {
       track: fuelTrack,

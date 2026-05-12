@@ -1390,6 +1390,42 @@ const ROAD_DIRECTOR_WAVE_METADATA = {
     trackAffinity: ["sunset-highway", "redline-run"],
     sectionAffinity: ["groove", "breather", "pressure"]
   },
+  officialFastLineFork: {
+    id: "officialFastLineFork",
+    displayName: "Official Fast-Line Fork",
+    family: "racecraft",
+    intent: "offer safe line vs fast line",
+    requiredAction: "commit early to safe or boost lane",
+    routeType: "safe line vs fast line",
+    rewardType: "boost",
+    pressureRating: 3,
+    trackAffinity: ["sunset-highway", "redline-run"],
+    sectionAffinity: ["groove", "pressure", "finalPush"]
+  },
+  officialBoostRampChain: {
+    id: "officialBoostRampChain",
+    displayName: "Official Boost Ramp Chain",
+    family: "racecraft",
+    intent: "chain boost into a ramp shortcut",
+    requiredAction: "line up early for boost then ramp",
+    routeType: "boost-to-ramp shortcut",
+    rewardType: "boost/ramp",
+    pressureRating: 3,
+    trackAffinity: ["sunset-highway", "redline-run"],
+    sectionAffinity: ["groove", "pressure", "breather"]
+  },
+  officialFinalPushSplit: {
+    id: "officialFinalPushSplit",
+    displayName: "Official Final Push Split",
+    family: "racecraft",
+    intent: "make the last route choice decisive",
+    requiredAction: "choose clean finish or risky boost route",
+    routeType: "final push route choice",
+    rewardType: "boost",
+    pressureRating: 4,
+    trackAffinity: ["sunset-highway", "redline-run"],
+    sectionAffinity: ["finalPush"]
+  },
   nearMissCorridor: {
     id: "nearMissCorridor",
     displayName: "Near-Miss Corridor",
@@ -2626,6 +2662,96 @@ const OFFICIAL_ROUTES = OFFICIAL_ROUTE_DEFINITIONS.map((route, index) => {
 const DEFAULT_OFFICIAL_ROUTE_ID = "sunset-neon-palm-sprint";
 const OFFICIAL_ROUTE_ID_SET = new Set(OFFICIAL_ROUTES.map((route) => route.id));
 const OFFICIAL_ROUTE_SIGNATURE_VERSION = "official-route-spine-v3";
+const OFFICIAL_RACECRAFT_SECTION_ORDER = ["groove", "pressure", "breather", "finalPush"];
+const OFFICIAL_RACECRAFT_SECTION_MIN_PROGRESS = {
+  groove: 0.08,
+  pressure: 0.08,
+  breather: 0.08,
+  finalPush: 0.06
+};
+const OFFICIAL_RACECRAFT_CLASSIC_PLANS = {
+  "clean speed": {
+    groove: ["officialFastLineFork", "boostTemptation"],
+    pressure: ["nearMissCorridor", "officialFastLineFork"],
+    breather: ["boostTemptation", "recoveryGap"],
+    finalPush: ["officialFinalPushSplit", "nearMissCorridor"]
+  },
+  "boost line": {
+    groove: ["officialBoostRampChain", "speedGateChain", "boostTemptation"],
+    pressure: ["speedGateChain", "officialFastLineFork", "boostTemptation"],
+    breather: ["boostTemptation", "recoveryGap"],
+    finalPush: ["officialFinalPushSplit", "speedGateChain"]
+  },
+  "ramp route": {
+    groove: ["rampEscape", "officialBoostRampChain"],
+    pressure: ["officialBoostRampChain", "rampEscape", "rampOverpass"],
+    breather: ["rampEscape", "recoveryGap"],
+    finalPush: ["officialFinalPushSplit", "rampEscape"]
+  },
+  "lane discipline": {
+    groove: ["officialFastLineFork", "offsetPair"],
+    pressure: ["nearMissCorridor", "leftRightSweep"],
+    breather: ["recoveryGap", "boostTemptation"],
+    finalPush: ["officialFinalPushSplit", "nearMissCorridor"]
+  },
+  "traffic pressure": {
+    groove: ["offsetPair", "officialFastLineFork"],
+    pressure: ["nearMissCorridor", "leftRightSweep", "expressConvoy"],
+    breather: ["recoveryGap", "boostTemptation"],
+    finalPush: ["officialFinalPushSplit", "nearMissCorridor"]
+  },
+  "final push": {
+    groove: ["officialFastLineFork", "boostTemptation"],
+    pressure: ["nearMissCorridor", "leftRightSweep"],
+    breather: ["recoveryGap", "boostTemptation"],
+    finalPush: ["officialFinalPushSplit", "nearMissCorridor", "speedGateChain"]
+  }
+};
+const OFFICIAL_RACECRAFT_FUEL_PLANS = {
+  "clean speed": {
+    groove: ["fuelSupport", "fuelSideTemptation"],
+    pressure: ["fuelTrafficGate", "fuelTrafficPressure"],
+    breather: ["fuelSideTemptation", "recoveryGap"],
+    finalPush: ["fuelTrafficGate", "fuelAfterPressure"]
+  },
+  "boost line": {
+    groove: ["fuelSupport", "fuelSideTemptation"],
+    pressure: ["fuelTrafficGate", "fuelSupport"],
+    breather: ["fuelSupport", "fuelSideTemptation"],
+    finalPush: ["fuelTrafficGate", "fuelAfterPressure"]
+  },
+  "ramp route": {
+    groove: ["fuelTrafficGate", "fuelSupport"],
+    pressure: ["fuelTrafficGate", "fuelAfterPressure"],
+    breather: ["fuelSupport", "recoveryGap"],
+    finalPush: ["fuelTrafficGate", "fuelAfterPressure"]
+  },
+  "lane discipline": {
+    groove: ["fuelSideTemptation", "fuelTrafficGate"],
+    pressure: ["fuelTrafficGate", "fuelTrafficPressure"],
+    breather: ["fuelSplit", "recoveryGap"],
+    finalPush: ["fuelTrafficGate", "fuelAfterPressure"]
+  },
+  "traffic pressure": {
+    groove: ["fuelTrafficPressure", "fuelSideTemptation"],
+    pressure: ["fuelTrafficGate", "fuelAfterPressure"],
+    breather: ["fuelSideTemptation", "recoveryGap"],
+    finalPush: ["fuelTrafficGate", "fuelTrafficPressure"]
+  },
+  "final push": {
+    groove: ["fuelSideTemptation", "fuelSupport"],
+    pressure: ["fuelTrafficGate", "fuelTrafficPressure"],
+    breather: ["fuelAfterPressure", "recoveryGap"],
+    finalPush: ["fuelTrafficGate", "fuelAfterPressure"]
+  }
+};
+
+function getOfficialRouteRacecraftPlan(route, raceTypeId = DEFAULT_RACE_TYPE_ID) {
+  if (!route) return null;
+  const key = String(route.feelTag || "").toLowerCase();
+  const plans = isFuelRunRaceType(raceTypeId) ? OFFICIAL_RACECRAFT_FUEL_PLANS : OFFICIAL_RACECRAFT_CLASSIC_PLANS;
+  return plans[key] || plans["clean speed"] || null;
+}
 
 const RACE_TYPES = [
   {
@@ -8286,6 +8412,7 @@ class RoadDirector {
     this.seedLockLastCenterBlockDistance = 0;
     this.seedLockLastMovementDistance = 0;
     this.seedLockLastMeaningfulWaveDistance = 0;
+    this.officialRacecraftSectionsUsed = {};
   }
 
   createStats() {
@@ -8597,6 +8724,8 @@ class RoadDirector {
       fuel: this.manager.getFuelRunContext(distance),
       pursuitRun: isPursuitRaceType(raceTypeId),
       pursuit: this.manager.getPursuitContext(distance),
+      officialRouteId: run.officialRouteId || "",
+      officialRoute: getOfficialRouteById(run.officialRouteId || ""),
       cadence,
       modeIntensity,
       playerLane,
@@ -8855,6 +8984,37 @@ class RoadDirector {
     return weight;
   }
 
+  getOfficialRacecraftSectionKey(context) {
+    if (!context?.officialRouteId || !context?.section?.id) return "";
+    return `${context.officialRouteId}:${context.raceTypeId}:${context.section.id}`;
+  }
+
+  peekOfficialRacecraftWaveType(context) {
+    if (!context?.officialRouteId || context.pursuitRun || context.activity?.overDensity) return "";
+    const sectionId = context.section?.id || "";
+    if (!OFFICIAL_RACECRAFT_SECTION_ORDER.includes(sectionId)) return "";
+    const sectionKey = this.getOfficialRacecraftSectionKey(context);
+    if (!sectionKey || this.officialRacecraftSectionsUsed[sectionKey]) return "";
+    const minSectionProgress = OFFICIAL_RACECRAFT_SECTION_MIN_PROGRESS[sectionId] ?? 0.08;
+    if ((context.sectionProgress || 0) < minSectionProgress) return "";
+    const plan = getOfficialRouteRacecraftPlan(context.officialRoute, context.raceTypeId);
+    const candidates = plan?.[sectionId] || [];
+    for (const type of candidates) {
+      if (!this.isWaveAllowed(type, context)) continue;
+      if (this.lastWaveType === type) continue;
+      return type;
+    }
+    return "";
+  }
+
+  consumeOfficialRacecraftWaveType(context) {
+    const type = this.peekOfficialRacecraftWaveType(context);
+    if (!type) return "";
+    const sectionKey = this.getOfficialRacecraftSectionKey(context);
+    if (sectionKey) this.officialRacecraftSectionsUsed[sectionKey] = true;
+    return type;
+  }
+
   chooseWaveType(context) {
     if (context.pursuitRun) {
       return this.choosePursuitWaveType(context);
@@ -8866,6 +9026,8 @@ class RoadDirector {
       this.forceRecoveryNext = false;
       return "recoveryGap";
     }
+    const officialRacecraftWave = this.consumeOfficialRacecraftWaveType(context);
+    if (officialRacecraftWave) return officialRacecraftWave;
     if (context.activity?.underActivity && !context.activity?.overDensity) {
       return this.chooseActivityFloorWave(context);
     }
@@ -9264,6 +9426,9 @@ class RoadDirector {
       ].map(scoreFuelChoice), () => this.random()) || "fuelSideTemptation";
     }
 
+    const officialRacecraftWave = this.consumeOfficialRacecraftWaveType(context);
+    if (officialRacecraftWave) return officialRacecraftWave;
+
     const supportWeight = context.progress > 0.18 && context.progress < 0.88 ? 1.7 : 0.72;
     return weightedChoice([
       { value: "fuelTrafficPressure", weight: context.forceMeaningful ? 3.2 : 2.55 },
@@ -9328,6 +9493,9 @@ class RoadDirector {
       deerCrossing: context.speedClassId === "sunday" ? 1.1 : 2.1,
         rampEscape: context.speedClassId === "sunday" ? 0.35 : 0.72,
         boostTemptation: 0.62,
+      officialFastLineFork: context.speedClassId === "turbo" ? 2.8 : 2.35,
+      officialBoostRampChain: 1.95,
+      officialFinalPushSplit: context.speedClassId === "turbo" ? 3.4 : 3.05,
       nearMissCorridor: context.speedClassId === "rookie" ? 2.2 : 3.45,
       fourLaneSpike: 4.75,
       redlineSlalom: context.speedClassId === "turbo" ? 3.05 : 2.45,
@@ -9396,6 +9564,9 @@ class RoadDirector {
       deerCrossing: () => this.waveDeerCrossing(distance, context, result),
       rampEscape: () => this.waveRampEscape(distance, context, result),
       boostTemptation: () => this.waveBoostTemptation(distance, context, result),
+      officialFastLineFork: () => this.waveOfficialFastLineFork(distance, context, result),
+      officialBoostRampChain: () => this.waveOfficialBoostRampChain(distance, context, result),
+      officialFinalPushSplit: () => this.waveOfficialFinalPushSplit(distance, context, result),
       nearMissCorridor: () => this.waveNearMissCorridor(distance, context, result),
       fourLaneSpike: () => this.waveFourLaneSpike(distance, context, result),
       redlineSlalom: () => this.waveRedlineSlalom(distance, context, result),
@@ -9636,7 +9807,13 @@ class RoadDirector {
       this.centerSafeSeconds = 0;
     }
 
-    const requiresMovement = result.centerBlocked || blockedCount >= 2 || result.type === "boostTemptation" || result.type === "rampEscape";
+    const requiresMovement = result.centerBlocked
+      || blockedCount >= 2
+      || result.type === "boostTemptation"
+      || result.type === "rampEscape"
+      || result.type === "officialFastLineFork"
+      || result.type === "officialBoostRampChain"
+      || result.type === "officialFinalPushSplit";
     if (requiresMovement) {
       stats.movementGapSeconds.push(this.decisionSafeSeconds);
       this.decisionSafeSeconds = 0;
@@ -9710,7 +9887,7 @@ class RoadDirector {
       stats.rampSolutionCount += result.rampSolutions.length;
       sectionStats.rampSolutionCount = (sectionStats.rampSolutionCount || 0) + result.rampSolutions.length;
     }
-    if (result.type === "rampEscape" && result.rampLanes.length && (blockedCount >= 2 || result.rampSolutions.length)) {
+    if ((result.type === "rampEscape" || result.type === "rampOverpass" || result.type === "officialBoostRampChain") && result.rampLanes.length && (blockedCount >= 2 || result.rampSolutions.length)) {
       stats.rampUsefulCount += result.rampSolutions.length || 1;
     }
 
@@ -9852,6 +10029,9 @@ class RoadDirector {
       deerCrossing: 1.02,
       rampEscape: 0.94,
       boostTemptation: 0.78,
+      officialFastLineFork: 0.86,
+      officialBoostRampChain: 0.92,
+      officialFinalPushSplit: 0.96,
       nearMissCorridor: 1,
       fourLaneSpike: 1.16,
       redlineSlalom: 0.88,
@@ -10616,6 +10796,87 @@ class RoadDirector {
     if (!launchOpening || this.random() < launchBoostChance) {
       this.spawn("boostPad", rewardLane, distance + clamp(context.cruiseSpeed * 0.27, 260, 430), result);
     }
+  }
+
+  waveOfficialFastLineFork(distance, context, result) {
+    const safeLane = this.pickWaveSafeLane(context, {
+      centerSafeChance: context.centerRestChance * 0.9
+    });
+    const fastLane = this.pickRewardLane(context, [safeLane]);
+    this.recordIntendedRoute(result, [safeLane, fastLane], "safe line vs fast line");
+    const lanes = this.orderPressureLanes(context, shuffle(this.lanesExcept([safeLane, fastLane]), () => this.random()));
+    const step = this.staggerDistance(context, 0.12, 145, 250);
+    const firstType = this.chooseBlockerType(context, 0.14);
+    if (Number.isFinite(lanes[0]) && this.canAddPressure(result, firstType, context, 0.25)) {
+      this.spawn(firstType, lanes[0], distance, result);
+    }
+    const secondType = context.track?.id === "redline-run" ? "fastCar" : "slowCar";
+    if (Number.isFinite(lanes[1]) && this.canAddPressure(result, secondType, context, 0.3)) {
+      this.spawn(secondType, lanes[1], distance + step, result);
+    }
+    const boostDistance = distance + this.staggerDistance(context, 0.23, 280, 450);
+    this.spawn("boostPad", fastLane, boostDistance, result);
+    if (context.section?.id === "finalPush" && Number.isFinite(lanes[2]) && this.canAddPressure(result, "fastCar", context, 0.4)) {
+      this.spawn("fastCar", lanes[2], boostDistance + this.staggerDistance(context, 0.16, 180, 320), result);
+    }
+  }
+
+  waveOfficialBoostRampChain(distance, context, result) {
+    const lineLane = this.pickRewardLane(context);
+    const rampDistance = distance + this.staggerDistance(context, 0.34, 460, 720);
+    const rampTargetType = this.getTrackObjectWeight("slowCar", context) > 0.2
+      ? "slowCar"
+      : this.getTrackMinorFallback("cone", context);
+    const ramp = this.spawnRampSolution(lineLane, rampDistance, context, result, {
+      targetType: rampTargetType,
+      targetGap: this.staggerDistance(context, 0.2, 270, 410)
+    });
+    if (!ramp) {
+      this.retagWaveResult(result, "officialFastLineFork");
+      this.waveOfficialFastLineFork(distance, context, result);
+      return;
+    }
+
+    this.recordIntendedRoute(result, lineLane, "boost-to-ramp shortcut");
+    const boostDistance = Math.max(distance, rampDistance - this.staggerDistance(context, 0.28, 370, 610));
+    this.spawn("boostPad", lineLane, boostDistance, result);
+    const lanes = this.orderPressureLanes(context, shuffle(this.lanesExcept(lineLane), () => this.random()));
+    const pressureDistance = boostDistance + this.staggerDistance(context, 0.16, 190, 330);
+    if (Number.isFinite(lanes[0])) {
+      const firstType = context.track?.id === "redline-run" ? "fastCar" : this.chooseBlockerType(context, 0.14);
+      if (this.canAddPressure(result, firstType, context, 0.25)) this.spawn(firstType, lanes[0], pressureDistance, result);
+    }
+    if (Number.isFinite(lanes[1]) && this.canAddPressure(result, "slowCar", context, 0.3)) {
+      this.spawn("slowCar", lanes[1], pressureDistance + this.staggerDistance(context, 0.1, 110, 210), result);
+    }
+    const landingBoostDistance = (ramp.solutionTargetDistance || (rampDistance + 340))
+      + ROAD_READABILITY_CONFIG.rampLandingSafetyDistance
+      + this.staggerDistance(context, 0.16, 180, 320);
+    if (context.section?.id !== "pressure" || this.random() < 0.58) {
+      this.spawn("boostPad", lineLane, landingBoostDistance, result);
+    }
+  }
+
+  waveOfficialFinalPushSplit(distance, context, result) {
+    const fastLane = this.pickRewardLane(context);
+    const safeLane = this.pickWaveSafeLane(context, {
+      excluded: [fastLane],
+      centerSafeChance: context.centerRestChance * 0.58
+    });
+    this.recordIntendedRoute(result, [safeLane, fastLane], "final push route choice");
+    const lanes = this.orderPressureLanes(context, shuffle(this.lanesExcept([safeLane, fastLane]), () => this.random()));
+    const step = this.staggerDistance(context, 0.11, 130, 245);
+    const firstType = context.track?.id === "redline-run" ? "fastCar" : this.chooseBlockerType(context, 0.16);
+    if (Number.isFinite(lanes[0]) && this.canAddPressure(result, firstType, context, 0.3)) {
+      this.spawn(firstType, lanes[0], distance, result);
+    }
+    if (Number.isFinite(lanes[1]) && this.canAddPressure(result, "slowCar", context, 0.3)) {
+      this.spawn("slowCar", lanes[1], distance + step, result);
+    }
+    if (Number.isFinite(lanes[2]) && this.canAddPressure(result, "fastCar", context, 0.4)) {
+      this.spawn("fastCar", lanes[2], distance + step * 2.1, result);
+    }
+    this.spawn("boostPad", fastLane, distance + this.staggerDistance(context, 0.29, 340, 560), result);
   }
 
   waveNearMissCorridor(distance, context, result) {
@@ -21718,15 +21979,16 @@ class NeonRoadRally {
 
   async runSpawnSafetySimulationCore(options = {}) {
     const runsPerSpeedClass = options.runs || 1000;
+    const officialRoute = getOfficialRouteById(options.officialRouteId || options.routeId);
     const speedClassIds = Array.isArray(options.speedClassIds) && options.speedClassIds.length
       ? options.speedClassIds.map((id) => normalizeSpeedClassId(id)).filter((id, index, list) => list.indexOf(id) === index)
-      : SPEED_CLASSES.map((speedClass) => speedClass.id);
+      : (officialRoute ? [officialRoute.speedClassId] : SPEED_CLASSES.map((speedClass) => speedClass.id));
     const runs = runsPerSpeedClass * speedClassIds.length;
-    const baseSeed = options.seed || "sunset-highway-spawn-safety-v1";
+    const baseSeed = officialRoute?.seed || options.seed || "sunset-highway-spawn-safety-v1";
     const raceTypeId = normalizeRaceTypeId(options.raceTypeId || options.raceType, DEFAULT_RACE_TYPE_ID);
     const fuelRun = isFuelRunRaceType(raceTypeId);
     const pursuitRun = isPursuitRaceType(raceTypeId);
-    const track = getTrackById(options.track?.id || options.trackId || DEFAULT_TRACK_ID);
+    const track = officialRoute ? getTrackById(officialRoute.trackId) : getTrackById(options.track?.id || options.trackId || DEFAULT_TRACK_ID);
     const dt = options.dt || 0.4;
     const pressureCounts = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
     const hardBlockerPressureCounts = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
@@ -22252,14 +22514,27 @@ class NeonRoadRally {
       };
 
       for (let runIndex = 0; runIndex < runsPerSpeedClass; runIndex += 1) {
-        const seed = `${baseSeed}:${raceTypeId}:${speedClassId}:${runIndex}`;
-        const rng = createSeededRandom(seed);
+        const seed = officialRoute ? baseSeed : `${baseSeed}:${raceTypeId}:${speedClassId}:${runIndex}`;
+        const rngSeedSource = officialRoute
+          ? getRunRandomSeedSource(seed, runTrack, speedClassId, raceTypeId)
+          : seed;
+        const rng = createSeededRandom(rngSeedSource);
         const simRun = {
           track: runTrack,
           speedClassId,
           speedClass,
           raceTypeId,
           raceType: getRaceTypeConfig(raceTypeId),
+          officialRouteId: officialRoute?.id || "",
+          officialRouteName: officialRoute?.name || "",
+          officialSeed: officialRoute?.seed || "",
+          officialRouteSeedLocked: Boolean(officialRoute),
+          routeSeedLocked: Boolean(officialRoute),
+          roadSeed: seed,
+          roadSeedSource: rngSeedSource,
+          roadSeedHash: rng.seedHash,
+          roadRngState: rng.getState(),
+          roadDirectorSequence: [],
           distance: 0,
           elapsed: 0,
           currentSpeed: getTrackCruiseSpeed(runTrack, 0, speedClassId)
@@ -26868,6 +27143,8 @@ class NeonRoadRally {
       const status = normalizeRunStatus(summary.status);
       const progress = clamp((summary.distance || 0) / Math.max(1, summary.trackDistance || 1), 0, 1);
       const missedBoosts = Math.max(0, summary.boostPadsMissedReachable || 0);
+      const boosts = Math.max(0, summary.boostPadsCollected || 0);
+      const bestBoostChain = Math.max(0, summary.bestBoostPadChain || 0);
       const slowdowns = Math.max(0, summary.slowdownHits || 0);
       const rampClears = Math.max(0, summary.rampTargetsCleared || 0);
       const add = (title, detail) => {
@@ -26882,13 +27159,20 @@ class NeonRoadRally {
           else if (delta < 0) add("New personal best", `${formatSignedTimeDeltaSeconds(delta)} new PB`);
           else add("Matched PB", "Same finish time as your saved best.");
         }
-        if (missedBoosts > 0) {
-          add("Missed reachable boosts", "Finished, but reachable boosts were left on the road.");
+        if (bestBoostChain >= 2) {
+          add("Strong boost route", `Boost chain x${bestBoostChain} linked cleanly.`);
+        } else if (missedBoosts > 0) {
+          add("Missed boost chain", "Reachable boost pads were left on the road.");
+        } else if (boosts >= 2) {
+          add("Clean boost route", `${boosts} boost pads collected without a reachable miss.`);
+        }
+        if (rampClears > 0) {
+          add("Strong ramp route", `${rampClears} ramp shortcut${rampClears === 1 ? "" : "s"} cleared.`);
         } else if (slowdowns === 0) {
           add("Clean run", "No slowdown hits.");
         }
-        if (rampClears >= 2) {
-          add("Strong ramp route", `${rampClears} ramp targets cleared.`);
+        if (summary.officialRouteId && slowdowns === 0 && boosts <= 1 && missedBoosts === 0) {
+          add("Safe finish", "Clean finish, but the faster route likely needs more boost commitment.");
         }
         if (summary.raceTypeId === FUEL_RUN_RACE_TYPE_ID) {
           const gasMissed = Math.max(0, (summary.gasCansSpawned || 0) - (summary.gasCansCollected || 0));

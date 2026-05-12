@@ -62,9 +62,10 @@ const TRACK_ROUTES = {
 };
 
 const OFFICIAL_SCENARIOS = [
-  { routeId: "sunset-neon-palm-sprint", trackId: "sunset-highway", raceType: "classic", score: 112300, time: 42.123 },
+  { routeId: "sunset-neon-palm-sprint", trackId: "sunset-highway", raceType: "classic", score: 112300, time: 42.123, feedback: { boostPadsCollected: 3, bestBoostPadChain: 2, rampsUsed: 1, rampTargetsCleared: 0 }, expectFeedback: "Strong boost route" },
+  { routeId: "sunset-glass-city-climb", trackId: "sunset-highway", raceType: "classic", score: 132400, time: 39.654, feedback: { boostPadsCollected: 1, bestBoostPadChain: 0, rampsUsed: 2, rampTargetsCleared: 2 }, expectFeedback: "Strong ramp route" },
   { routeId: "sunset-last-light-gauntlet", trackId: "sunset-highway", raceType: "classic", score: 284500, time: 28.456 },
-  { routeId: "redline-switchyard-boostline", trackId: "redline-run", raceType: "fuelRun", score: 219800, time: 35.789 }
+  { routeId: "redline-switchyard-boostline", trackId: "redline-run", raceType: "fuelRun", score: 219800, time: 35.789, feedback: { boostPadsCollected: 2, bestBoostPadChain: 2, rampsUsed: 1, rampTargetsCleared: 1, gasCansCollected: 2, gasCansSpawned: 2 }, expectFeedback: "Strong boost route" }
 ];
 
 function routeById(routeId) {
@@ -174,7 +175,7 @@ async function selectOfficialRoute(page, routeId) {
   );
 }
 
-async function finishCurrentRace(page, score, time) {
+async function finishCurrentRace(page, score, time, feedback = {}) {
   await page.waitForFunction(() => window.neonRoadRally?.screen === "game", null, { timeout: 5000 });
   await page.waitForTimeout(350);
   const telemetry = await page.evaluate(() => {
@@ -197,7 +198,7 @@ async function finishCurrentRace(page, score, time) {
   });
   assert(telemetry.frameSampleCount > 0, "Frame telemetry should collect samples on race screen", { telemetry });
   assert(telemetry.averageFrameMs > 0, "Frame telemetry should report average frame time", { telemetry });
-  await page.evaluate(({ runScore, runTime }) => {
+  await page.evaluate(({ runScore, runTime, routeFeedback }) => {
     const app = window.neonRoadRally;
     const run = app.run;
     run.countdownTimer = 0;
@@ -208,19 +209,22 @@ async function finishCurrentRace(page, score, time) {
     run.score = runScore;
     run.manualBoostsUsed = 0;
     run.manualBoosts = 3;
-    run.boostPadsCollected = 1;
-    run.rampsUsed = 1;
-    run.rampTargetsCleared = 1;
+    run.boostPadsCollected = routeFeedback.boostPadsCollected ?? 1;
+    run.bestBoostPadChain = routeFeedback.bestBoostPadChain ?? run.bestBoostPadChain ?? 0;
+    run.boostPadsReachableSeen = routeFeedback.boostPadsReachableSeen ?? Math.max(run.boostPadsCollected || 0, 1);
+    run.boostPadsMissedReachable = routeFeedback.boostPadsMissedReachable ?? 0;
+    run.rampsUsed = routeFeedback.rampsUsed ?? 1;
+    run.rampTargetsCleared = routeFeedback.rampTargetsCleared ?? 1;
     run.nearMisses = 1;
     run.laneMoves = 2;
     run.slowdownHits = 0;
     if (run.raceTypeId === "fuelRun") {
       run.fuel = Math.max(run.fuel || 0, run.fuelMax || 80);
-      run.gasCansCollected = Math.max(run.gasCansCollected || 0, 1);
-      run.gasCansSpawned = Math.max(run.gasCansSpawned || 0, 1);
+      run.gasCansCollected = Math.max(run.gasCansCollected || 0, routeFeedback.gasCansCollected ?? 1);
+      run.gasCansSpawned = Math.max(run.gasCansSpawned || 0, routeFeedback.gasCansSpawned ?? 1);
     }
     app.endRace("finished", "Official Routes Smoke Finish");
-  }, { runScore: score, runTime: time });
+  }, { runScore: score, runTime: time, routeFeedback: feedback });
   await page.waitForFunction(() => window.neonRoadRally?.screen === "score", null, { timeout: 5000 });
   return telemetry;
 }
@@ -234,7 +238,7 @@ async function runOfficialScenario(page, scenario, options = {}) {
   assertIncludes(readyText, "Official Race");
   assertIncludes(readyText, route.name);
   await clickAction(page, "startSeededRace");
-  const telemetry = await finishCurrentRace(page, scenario.score, scenario.time);
+  const telemetry = await finishCurrentRace(page, scenario.score, scenario.time, scenario.feedback || {});
   const text = await bodyText(page);
   assertIncludes(text, "Official Race Result");
   assertIncludes(text, route.name);
@@ -242,6 +246,7 @@ async function runOfficialScenario(page, scenario, options = {}) {
   assertIncludes(text, `${scenario.time.toFixed(3)}s`);
   assertIncludes(text, "PB Delta");
   assertIncludes(text, "Top 20");
+  if (scenario.expectFeedback) assertIncludes(text, scenario.expectFeedback);
   await page.locator(".result-details-block summary").click();
   const detailText = await bodyText(page);
   assertIncludes(detailText, "Competition");
