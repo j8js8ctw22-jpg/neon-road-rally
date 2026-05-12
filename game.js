@@ -3027,7 +3027,7 @@ const TRACK_VISUALS = {
   sceneryDensity: 1,
   speedStreakIntensity: 0.72,
   horizonGlowStrength: 0.85,
-  roadsideSignFrequency: 0.28,
+  roadsideSignFrequency: 0.08,
   asphaltBandSpacing: 118,
   roadSeamSpacing: 76,
   edgeLightSpacing: 86,
@@ -14295,7 +14295,11 @@ class Renderer {
     const visualIntensity = this.getRaceVisualIntensity();
     const theme = this.getCurrentTrackVisualTheme();
     const effectScale = this.getPerformanceEffectScale();
-    const sceneryDensity = (TRACK_VISUALS.sceneryDensity || 1) * clampNumber(theme.sceneryDensity, 0.3, 1.4, 1) * lerp(0.72, 1, effectScale);
+    const activeRace = this.game.screen === "game";
+    const sceneryDensity = (TRACK_VISUALS.sceneryDensity || 1)
+      * clampNumber(theme.sceneryDensity, 0.3, 1.4, 1)
+      * lerp(0.72, 1, effectScale)
+      * (activeRace ? 0.74 : 1);
     const spacing = TRACK_VISUALS.scenerySpacing / Math.max(0.55, sceneryDensity);
     const sceneryScrollScale = 0.22 + speedRatio * 0.12;
     const scroll = (scrollSource * sceneryScrollScale) % spacing;
@@ -14319,6 +14323,17 @@ class Renderer {
       const typeRoll = deterministicNoise(worldIndex, 23);
       const signRoll = deterministicNoise(worldIndex, 24);
       const warmth = clamp(this.getFinalStretchIntensity() + Math.max(0, visualIntensity - 1) * 0.42, 0, 1);
+
+      if (activeRace) {
+        if (theme.urbanScenery) {
+          this.drawUrbanBarrierBlock(x, y, scale * 0.88, side, theme);
+        } else if (typeRoll < 0.52) {
+          this.drawPalmSilhouette(x, y, scale * 0.9, side);
+        } else {
+          this.drawLowDesertRock(x, y, scale * 0.9, warmth);
+        }
+        continue;
+      }
 
       if (theme.urbanScenery) {
         if (typeRoll < 0.34) {
@@ -26363,6 +26378,100 @@ class NeonRoadRally {
     `;
   }
 
+  getScoreAttackPlacementText(summary) {
+    if (!summary?.scoreSaved) return "Not saved";
+    if (summary.topTwentyRank) {
+      return `${summary.officialRouteId ? "Official " : ""}Top 20 #${summary.topTwentyRank}`;
+    }
+    if (summary.topTwentyGap > 0) return `${formatScore(summary.topTwentyGap)} from #20`;
+    return "Saved score";
+  }
+
+  getTimeAttackPlacementText(summary) {
+    if (!summary) return "No finish time";
+    const status = normalizeRunStatus(summary.status);
+    if (status !== "finished" || summary.finishTimeMs === null || summary.finishTimeMs === undefined) {
+      return "No finish time";
+    }
+    if (!summary.scoreSaved) return "Not saved";
+    const rows = this.getTimeAttackLeaderboardRows({
+      trackId: summary.trackId,
+      raceTypeId: summary.raceTypeId,
+      speedClassId: summary.speedClass
+    }, { legacy: false, limit: LEADERBOARD_STORAGE_MAX_ENTRIES })
+      .filter((entry) => !summary.officialRouteId || entry.officialRouteId === summary.officialRouteId);
+    const rank = rows.findIndex((entry) => entry.runId && summary.runId && entry.runId === summary.runId) + 1;
+    if (rank > 0 && rank <= LEADERBOARD_MAX_ENTRIES) {
+      return `${summary.officialRouteId ? "Official " : ""}Top 20 #${rank}`;
+    }
+    const finishTimeMs = normalizeFinishTimeMs(summary.finishTimeMs, summary.finishTimeSecondsPrecise ?? summary.time);
+    const cutoff = rows[LEADERBOARD_MAX_ENTRIES - 1]?.finishTimeMs;
+    if (finishTimeMs !== null && Number.isFinite(cutoff) && finishTimeMs > cutoff) {
+      return `${formatSignedTimeDeltaSeconds((finishTimeMs - cutoff) / 1000)} from #20`;
+    }
+    if (rank > LEADERBOARD_MAX_ENTRIES) return `#${rank} saved`;
+    return summary.newPersonalBestTime ? "Personal best time" : "Saved time";
+  }
+
+  renderResultRewardStrip(summary) {
+    const badges = Array.isArray(summary?.newlyEarnedBadges) ? summary.newlyEarnedBadges : [];
+    const masteryBadges = badges.filter((badge) => badge.category === "mastery");
+    const titleChanges = summary?.titleChanges || {};
+    const titles = []
+      .concat((Array.isArray(titleChanges.claimed) ? titleChanges.claimed : []).map((title) => ({ ...title, state: "claimed" })))
+      .concat((Array.isArray(titleChanges.defended) ? titleChanges.defended : []).map((title) => ({ ...title, state: "defended" })));
+    const chips = [];
+    const badgePreview = masteryBadges.length
+      ? masteryBadges.slice(0, 1).concat(badges.filter((badge) => badge.category !== "mastery").slice(0, 1))
+      : badges.slice(0, 2);
+    badgePreview.forEach((badge) => {
+      chips.push({
+        label: badge.category === "mastery" ? "Mastery Progress" : "Badge Earned",
+        value: badge.name,
+        detail: getBadgeCategoryLabel(badge.category)
+      });
+    });
+    titles.slice(0, 2).forEach((title) => {
+      chips.push({
+        label: title.state === "claimed" ? "Title Claimed" : "Title Defended",
+        value: title.name,
+        detail: "Local title"
+      });
+    });
+    const overflow = Math.max(0, badges.length + titles.length - chips.length);
+    if (!chips.length) return "";
+    return `
+      <div class="result-reward-strip" aria-label="New rewards">
+        ${chips.map((chip) => `
+          <span class="result-reward-chip">
+            <strong>${escapeHtml(chip.label)}</strong>
+            <b>${escapeHtml(chip.value)}</b>
+            <small>${escapeHtml(chip.detail)}</small>
+          </span>
+        `).join("")}
+        ${overflow ? `<span class="result-reward-chip"><strong>More Rewards</strong><b>+${overflow}</b><small>Saved to profile</small></span>` : ""}
+      </div>
+    `;
+  }
+
+  renderResultImprovementNotes(summary) {
+    const notes = this.getCompetitiveFeedbackItems(summary).slice(0, 2);
+    if (!notes.length) return "";
+    return `
+      <div class="result-improvement-panel">
+        <span class="eyebrow">Next Target</span>
+        <div class="result-improvement-list">
+          ${notes.map((item) => `
+            <span>
+              <strong>${escapeHtml(item.title)}</strong>
+              <em>${escapeHtml(item.detail)}</em>
+            </span>
+          `).join("")}
+        </div>
+      </div>
+    `;
+  }
+
   renderPlayerTitlePanel(player) {
     if (!player) return "";
     const titles = this.profiles.getPlayerTitles(player);
@@ -28124,9 +28233,6 @@ class NeonRoadRally {
               ? `Heat hit the limit at ${progressPercent}% progress.`
               : `Crashed into ${crashReason} at ${progressPercent}% progress.`)));
     const boardMetricText = summary.scoreSaved ? leaderboardText : "Not saved";
-    const timeMetricLabel = status === "finished" ? "Time" : "Elapsed";
-    const paceMetricLabel = status === "finished" ? "PB Delta" : "Progress";
-    const paceMetricText = status === "finished" ? paceDeltaText : `${progressPercent}%`;
     const restartLabel = summary.challengeMode ? "Retry Challenge" : (summary.partyMode ? "Replay This Turn" : "Race Again");
     const resultEyebrow = summary.challengeMode
       ? "Challenge Run Result"
@@ -28136,36 +28242,52 @@ class NeonRoadRally {
     const routeLine = summary.officialRouteId
       ? `${summary.officialRouteName} · Official Seed ${summary.officialSeed || summary.seed}`
       : `Custom Road · Seed ${summary.seed}`;
+    const setupLine = `${summary.trackName} · ${summary.raceTypeLabel || getRaceTypeLabel(summary.raceTypeId)} · ${summary.speedClassLabel}`;
+    const timeAttackLabel = status === "finished" ? "Time Attack" : "Progress";
+    const timeAttackValue = status === "finished" ? resultTimeText : `${progressPercent}%`;
+    const timeAttackPlacement = this.getTimeAttackPlacementText(summary);
+    const timeAttackDetail = status === "finished"
+      ? `PB Delta: ${paceDeltaText}`
+      : "No finish time";
+    const scoreAttackPlacement = this.getScoreAttackPlacementText(summary);
+    const scoreAttackDetail = summary.scoreSaved
+      ? (summary.newPersonalBest ? "New score PB" : "Score saved locally")
+      : "Debug run not saved";
+    const rewardStrip = this.renderResultRewardStrip(summary);
+    const improvementNotes = this.renderResultImprovementNotes(summary);
     this.layer.classList.remove("is-empty");
     this.layer.innerHTML = `
       <section class="panel score-results-panel">
         <div class="score-hero ${summary.newHighScore ? "is-high-score" : ""}">
-          <div>
+          <div class="result-hero-copy">
             <span class="eyebrow">${escapeHtml(resultEyebrow)}</span>
             <h2>${escapeHtml(resultHeadline)}</h2>
             <p class="result-outcome-line">${escapeHtml(outcomeDetail)}</p>
-            <p class="hint">${summary.challengeMode ? `${escapeHtml(summary.challengeName)} · ` : ""}${escapeHtml(routeLine)} · ${escapeHtml(summary.trackName)} · ${escapeHtml(summary.raceTypeLabel || getRaceTypeLabel(summary.raceTypeId))} · ${escapeHtml(summary.speedClassLabel)}.</p>
-            ${this.renderTitleCallouts(summary) || this.renderNewBadgeCallouts(summary) || this.renderChallengeCallouts(summary) ? `<div class="score-callout-row">${this.renderTitleCallouts(summary)}${this.renderNewBadgeCallouts(summary)}${this.renderChallengeCallouts(summary)}</div>` : ""}
+            <p class="result-route-line">${summary.challengeMode ? `${escapeHtml(summary.challengeName)} · ` : ""}${escapeHtml(routeLine)}</p>
+            <p class="hint">${escapeHtml(setupLine)}.</p>
           </div>
-          <div class="final-score-card">
-            <span>Score</span>
-            <strong id="finalScoreValue" class="tally-score" data-tally-value="${escapeAttr(summary.finalScore)}">0</strong>
-            <div class="result-hero-metrics">
-              <span><b>${escapeHtml(timeMetricLabel)}</b><em>${escapeHtml(resultTimeText)}</em></span>
-              <span><b>${escapeHtml(paceMetricLabel)}</b><em>${escapeHtml(paceMetricText)}</em></span>
-              <span><b>Board</b><em>${escapeHtml(boardMetricText)}</em></span>
+          <div class="result-metric-stack">
+            <div class="result-primary-metric">
+              <span>${escapeHtml(timeAttackLabel)}</span>
+              <strong>${escapeHtml(timeAttackValue)}</strong>
+              <small><b>${escapeHtml(timeAttackPlacement)}</b><em>${escapeHtml(timeAttackDetail)}</em></small>
+            </div>
+            <div class="result-secondary-metric">
+              <span>Score Attack</span>
+              <strong id="finalScoreValue" class="tally-score">${formatScore(summary.finalScore)}</strong>
+              <small><b>${escapeHtml(scoreAttackPlacement)}</b><em>${escapeHtml(scoreAttackDetail)}</em></small>
             </div>
           </div>
-          </div>
-          ${this.renderRunHighlightPanel(summary)}
-          ${this.renderPursuitResultPanel(summary)}
-          ${this.renderChallengeResultPanel(summary)}
+        </div>
+        ${rewardStrip}
+        ${improvementNotes}
+        ${this.renderPursuitResultPanel(summary)}
+        ${this.renderChallengeResultPanel(summary)}
         <div class="row score-action-row">
           <button class="small-button primary" data-action="restart">${escapeHtml(restartLabel)}</button>
-          ${summary.partyMode ? "" : `<button class="small-button" data-action="preRace">Change Setup</button>`}
-          <button class="small-button" data-action="leaderboard" data-view="${LEADERBOARD_VIEW_SCORE_ATTACK}" data-track-id="${escapeAttr(summary.trackId)}" data-race-type-id="${escapeAttr(summary.raceTypeId)}" data-speed-class-id="${escapeAttr(summary.speedClass)}" data-official-route-id="${escapeAttr(summary.officialRouteId || "")}">Score Attack Board</button>
-          <button class="small-button" data-action="leaderboard" data-view="${LEADERBOARD_VIEW_TIME_ATTACK}" data-track-id="${escapeAttr(summary.trackId)}" data-race-type-id="${escapeAttr(summary.raceTypeId)}" data-speed-class-id="${escapeAttr(summary.speedClass)}" data-official-route-id="${escapeAttr(summary.officialRouteId || "")}">Time Attack Board</button>
-          <button class="small-button" data-action="players">Driver Garage</button>
+          ${summary.partyMode ? "" : `<button class="small-button" data-action="preRace">Change Route</button>`}
+          <button class="small-button" data-action="leaderboard" data-view="${LEADERBOARD_VIEW_TIME_ATTACK}" data-track-id="${escapeAttr(summary.trackId)}" data-race-type-id="${escapeAttr(summary.raceTypeId)}" data-speed-class-id="${escapeAttr(summary.speedClass)}" data-official-route-id="${escapeAttr(summary.officialRouteId || "")}">View Leaderboard</button>
+          <button class="small-button" data-action="leaderboard" data-view="${LEADERBOARD_VIEW_SCORE_ATTACK}" data-track-id="${escapeAttr(summary.trackId)}" data-race-type-id="${escapeAttr(summary.raceTypeId)}" data-speed-class-id="${escapeAttr(summary.speedClass)}" data-official-route-id="${escapeAttr(summary.officialRouteId || "")}">Score Board</button>
           <button class="small-button" data-action="title">Back to Title</button>
         </div>
         <details class="result-details-block">
@@ -28173,6 +28295,7 @@ class NeonRoadRally {
           <h2>Score Breakdown</h2>
           ${this.renderScoreBreakdown(summary)}
           ${this.renderMedalChips(summary.medals)}
+          ${this.renderTitleCallouts(summary) || this.renderNewBadgeCallouts(summary) || this.renderChallengeCallouts(summary) ? `<div class="score-callout-row">${this.renderTitleCallouts(summary)}${this.renderNewBadgeCallouts(summary)}${this.renderChallengeCallouts(summary)}</div>` : ""}
           ${this.renderBadgeEarnedPanel(summary)}
           <h2>${summary.officialRouteId ? "Official Score Attack" : "Score Attack Leaderboard"}</h2>
           <p class="hint">${summary.officialRouteId ? `${escapeHtml(summary.officialRouteName)} Top 20. Open Time Attack for precise finish times on this Official Race.` : "Highest score wins. Custom Road records stay outside the Official 10 competition."}</p>
