@@ -34,24 +34,42 @@ const { chromium } = loadPlaywright();
 const BRAVE_PATH = "/Applications/Brave Browser.app/Contents/MacOS/Brave Browser";
 const BASE_URL = process.env.NRR_SMOKE_URL || "http://127.0.0.1:8085/";
 
-const OFFICIAL_ROUTES = [
-  ["sunset-highway-arcade", "Sunset Highway / Arcade", "SUNSET-ARCADE-OFFICIAL"],
-  ["sunset-highway-pro", "Sunset Highway / Pro", "SUNSET-PRO-OFFICIAL"],
-  ["sunset-highway-turbo", "Sunset Highway / Turbo", "SUNSET-TURBO-OFFICIAL"],
-  ["sunset-highway-overdrive", "Sunset Highway / Overdrive", "SUNSET-OVERDRIVE-OFFICIAL"],
-  ["sunset-highway-redline", "Sunset Highway / Redline", "SUNSET-REDLINE-OFFICIAL"],
-  ["redline-run-arcade", "Redline Run / Arcade", "REDLINE-ARCADE-OFFICIAL"],
-  ["redline-run-pro", "Redline Run / Pro", "REDLINE-PRO-OFFICIAL"],
-  ["redline-run-turbo", "Redline Run / Turbo", "REDLINE-TURBO-OFFICIAL"],
-  ["redline-run-overdrive", "Redline Run / Overdrive", "REDLINE-OVERDRIVE-OFFICIAL"],
-  ["redline-run-redline", "Redline Run / Redline", "REDLINE-REDLINE-OFFICIAL"]
-];
+const TRACK_ROUTES = {
+  "sunset-highway": [
+    { id: "sunset-neon-palm-sprint", name: "Neon Palm Sprint", seed: "SUNSET-PALM-SPRINT-TURBO", speedClass: "Turbo", feelTag: "clean speed" },
+    { id: "sunset-boostline-pier", name: "Boostline Pier", seed: "SUNSET-BOOSTLINE-PIER-TURBO", speedClass: "Turbo", feelTag: "boost line" },
+    { id: "sunset-glass-city-climb", name: "Glass City Climb", seed: "SUNSET-GLASS-CITY-CLIMB-TURBO", speedClass: "Turbo", feelTag: "ramp route" },
+    { id: "sunset-orange-sky-switchback", name: "Orange Sky Switchback", seed: "SUNSET-SKY-SWITCHBACK-OVERDRIVE", speedClass: "Overdrive", feelTag: "lane discipline" },
+    { id: "sunset-cactus-cutback", name: "Cactus Cutback", seed: "SUNSET-CACTUS-CUTBACK-OVERDRIVE", speedClass: "Overdrive", feelTag: "traffic pressure" },
+    { id: "sunset-radio-tower-run", name: "Radio Tower Run", seed: "SUNSET-RADIO-TOWER-OVERDRIVE", speedClass: "Overdrive", feelTag: "final push" },
+    { id: "sunset-heatwave-express", name: "Heatwave Express", seed: "SUNSET-HEATWAVE-EXPRESS-REDLINE", speedClass: "Redline", feelTag: "clean speed" },
+    { id: "sunset-mirage-merge", name: "Mirage Merge", seed: "SUNSET-MIRAGE-MERGE-REDLINE", speedClass: "Redline", feelTag: "lane discipline" },
+    { id: "sunset-afterburner-mile", name: "Afterburner Mile", seed: "SUNSET-AFTERBURNER-MILE-REDLINE", speedClass: "Redline", feelTag: "boost line" },
+    { id: "sunset-last-light-gauntlet", name: "Last Light Gauntlet", seed: "SUNSET-LAST-LIGHT-REDLINE", speedClass: "Redline", feelTag: "final push" }
+  ],
+  "redline-run": [
+    { id: "redline-tunnel-spark-sprint", name: "Tunnel Spark Sprint", seed: "REDLINE-TUNNEL-SPARK-TURBO", speedClass: "Turbo", feelTag: "clean speed" },
+    { id: "redline-neon-gate-dash", name: "Neon Gate Dash", seed: "REDLINE-NEON-GATE-TURBO", speedClass: "Turbo", feelTag: "lane discipline" },
+    { id: "redline-service-lane-slalom", name: "Service Lane Slalom", seed: "REDLINE-SERVICE-LANE-TURBO", speedClass: "Turbo", feelTag: "traffic pressure" },
+    { id: "redline-overpass-charge", name: "Overpass Charge", seed: "REDLINE-OVERPASS-CHARGE-OD", speedClass: "Overdrive", feelTag: "final push" },
+    { id: "redline-switchyard-boostline", name: "Switchyard Boostline", seed: "REDLINE-SWITCHYARD-BOOST-OD", speedClass: "Overdrive", feelTag: "boost line" },
+    { id: "redline-concrete-ribbon", name: "Concrete Ribbon", seed: "REDLINE-CONCRETE-RIBBON-OD", speedClass: "Overdrive", feelTag: "clean speed" },
+    { id: "redline-midnight-merge", name: "Midnight Merge", seed: "REDLINE-MIDNIGHT-MERGE-REDLINE", speedClass: "Redline", feelTag: "lane discipline" },
+    { id: "redline-reactor-ramp", name: "Reactor Ramp", seed: "REDLINE-REACTOR-RAMP-REDLINE", speedClass: "Redline", feelTag: "ramp route" },
+    { id: "redline-city-limits-blaze", name: "City Limits Blaze", seed: "REDLINE-CITY-LIMITS-REDLINE", speedClass: "Redline", feelTag: "traffic pressure" },
+    { id: "redline-finale", name: "Redline Finale", seed: "REDLINE-FINALE-REDLINE", speedClass: "Redline", feelTag: "final push" }
+  ]
+};
 
 const OFFICIAL_SCENARIOS = [
-  { id: "sunset-highway-arcade", name: "Sunset Highway / Arcade", seed: "SUNSET-ARCADE-OFFICIAL", score: 112300, time: 42.123 },
-  { id: "sunset-highway-redline", name: "Sunset Highway / Redline", seed: "SUNSET-REDLINE-OFFICIAL", score: 284500, time: 28.456 },
-  { id: "redline-run-turbo", name: "Redline Run / Turbo", seed: "REDLINE-TURBO-OFFICIAL", score: 219800, time: 35.789 }
+  { routeId: "sunset-neon-palm-sprint", trackId: "sunset-highway", raceType: "classic", score: 112300, time: 42.123 },
+  { routeId: "sunset-last-light-gauntlet", trackId: "sunset-highway", raceType: "classic", score: 284500, time: 28.456 },
+  { routeId: "redline-switchyard-boostline", trackId: "redline-run", raceType: "fuelRun", score: 219800, time: 35.789 }
 ];
+
+function routeById(routeId) {
+  return Object.values(TRACK_ROUTES).flat().find((route) => route.id === routeId);
+}
 
 function assert(condition, message, details = {}) {
   if (!condition) {
@@ -68,7 +86,7 @@ function assertIncludes(text, expected, label = expected) {
   assert(
     text.toLowerCase().includes(String(expected).toLowerCase()),
     `Missing expected text: ${label}`,
-    { snippet: text.slice(0, 800) }
+    { snippet: text.slice(0, 1000) }
   );
 }
 
@@ -84,40 +102,96 @@ async function openSoloSetup(page) {
   await page.waitForFunction(() => window.neonRoadRally?.screen === "preRace", null, { timeout: 5000 });
 }
 
-async function assertOfficialSetup(page) {
-  const text = await bodyText(page);
-  assertIncludes(text, "Official Race Setup");
-  assertIncludes(text, "Official 10");
-  assertIncludes(text, "Custom Road / Practice");
-  assertIncludes(text, "SUNSET-ARCADE-OFFICIAL");
+async function selectTrack(page, trackId) {
+  const card = page.locator(`[data-track-card="${trackId}"]`);
+  const count = await card.count();
+  assert(count === 1, `Expected one track card for ${trackId}`, { count });
+  await card.click();
+  await page.waitForFunction(
+    (id) => document.querySelector(`input[name="preRaceTrack"][value="${id}"]`)?.checked === true,
+    trackId,
+    { timeout: 5000 }
+  );
+}
 
-  const routeIds = await page.$$eval("[data-official-route-id]", (nodes) => nodes.map((node) => node.dataset.officialRouteId));
-  for (const [id, name, seed] of OFFICIAL_ROUTES) {
-    assert(routeIds.includes(id), `Missing official route card: ${id}`);
-    assertIncludes(text, name);
-    assertIncludes(text, seed);
+async function setRaceType(page, raceType) {
+  const button = page.locator(`[data-race-type-choice="preRace"][data-value="${raceType}"]`);
+  const count = await button.count();
+  assert(count === 1, `Expected one race type button for ${raceType}`, { count });
+  await button.click();
+  await page.waitForFunction(
+    (value) => document.querySelector("#preRaceType")?.value === value,
+    raceType,
+    { timeout: 5000 }
+  );
+}
+
+async function assertTrackOfficial10(page, trackId, label) {
+  await selectTrack(page, trackId);
+  const routes = TRACK_ROUTES[trackId];
+  const text = await bodyText(page);
+  assertIncludes(text, `${label} Official 10`);
+  assertIncludes(text, "Custom Road / Practice");
+  assert(!text.includes("Pursuit"), "Pursuit should not appear in normal setup", { snippet: text.slice(0, 1200) });
+
+  const cards = await page.$$eval(".official-route-grid [data-official-route-id]", (nodes) => (
+    nodes.map((node) => ({
+      id: node.dataset.officialRouteId,
+      text: node.textContent || ""
+    }))
+  ));
+  assert(cards.length === 10, `Expected 10 official route cards for ${trackId}`, { cards });
+  for (const route of routes) {
+    const card = cards.find((item) => item.id === route.id);
+    assert(card, `Missing official route card: ${route.id}`, { cards });
+    assertIncludes(card.text, route.name);
+    assertIncludes(card.text, route.speedClass);
+    assertIncludes(card.text, route.feelTag);
+    assertIncludes(card.text, route.seed);
+    assert(!/Arcade|Pro/i.test(`${route.name} ${route.speedClass}`), "Official cards should not use Arcade/Pro", { route });
   }
 
   const raceTypeValues = await page.$$eval("#preRaceType option", (options) => options.map((option) => option.value));
-  assert(raceTypeValues.includes("classic"), "Classic missing from solo setup race types", { raceTypeValues });
-  assert(raceTypeValues.includes("fuelRun"), "Fuel Run missing from solo setup race types", { raceTypeValues });
+  assert(raceTypeValues.includes("classic"), "Classic missing from official setup race types", { raceTypeValues });
+  assert(raceTypeValues.includes("fuelRun"), "Fuel Run missing from official setup race types", { raceTypeValues });
   assert(!raceTypeValues.includes("pursuit"), "Pursuit should not appear in normal solo setup", { raceTypeValues });
 }
 
-async function selectOfficialRoute(page, routeId, expectedSeed) {
+async function selectOfficialRoute(page, routeId) {
+  const route = routeById(routeId);
+  assert(route, `Unknown official route ${routeId}`);
   const locator = page.locator(`.official-route-grid [data-official-route-id="${routeId}"]`);
   const count = await locator.count();
   assert(count === 1, `Expected one route card for ${routeId}`, { count });
   await locator.click();
   await page.waitForFunction(
-    (seed) => document.querySelector("#roadSeedInput")?.value === seed,
-    expectedSeed,
+    ({ seed, name }) => (
+      document.querySelector("#roadSeedInput")?.value === seed
+      && document.querySelector("#soloSetupActionSummary")?.textContent?.includes(name)
+    ),
+    { seed: route.seed, name: route.name },
     { timeout: 5000 }
   );
 }
 
 async function finishCurrentRace(page, score, time) {
   await page.waitForFunction(() => window.neonRoadRally?.screen === "game", null, { timeout: 5000 });
+  await page.waitForTimeout(350);
+  const telemetry = await page.evaluate(() => {
+    const run = window.neonRoadRally?.run || {};
+    return {
+      speedClassId: run.speedClassId || "",
+      raceTypeId: run.raceTypeId || "",
+      frameSampleCount: run.frameSampleCount || 0,
+      averageFrameMs: Number((run.averageFrameMs || 0).toFixed(2)),
+      worstFrameMs: Number((run.frameTimeMaxMs || 0).toFixed(2)),
+      averageFps: Number((run.averageFps || 0).toFixed(1)),
+      slowFramePercent: Number((run.slowFramePercent || 0).toFixed(2)),
+      performanceEffectScale: Number((run.performanceEffectScale || 1).toFixed(2))
+    };
+  });
+  assert(telemetry.frameSampleCount > 0, "Frame telemetry should collect samples on race screen", { telemetry });
+  assert(telemetry.averageFrameMs > 0, "Frame telemetry should report average frame time", { telemetry });
   await page.evaluate(({ runScore, runTime }) => {
     const app = window.neonRoadRally;
     const run = app.run;
@@ -135,19 +209,31 @@ async function finishCurrentRace(page, score, time) {
     run.nearMisses = 1;
     run.laneMoves = 2;
     run.slowdownHits = 0;
+    if (run.raceTypeId === "fuelRun") {
+      run.fuel = Math.max(run.fuel || 0, run.fuelMax || 80);
+      run.gasCansCollected = Math.max(run.gasCansCollected || 0, 1);
+      run.gasCansSpawned = Math.max(run.gasCansSpawned || 0, 1);
+    }
     app.endRace("finished", "Official Routes Smoke Finish");
   }, { runScore: score, runTime: time });
   await page.waitForFunction(() => window.neonRoadRally?.screen === "score", null, { timeout: 5000 });
+  return telemetry;
 }
 
-async function runOfficialScenario(page, scenario) {
-  await selectOfficialRoute(page, scenario.id, scenario.seed);
+async function runOfficialScenario(page, scenario, options = {}) {
+  const route = routeById(scenario.routeId);
+  await selectTrack(page, scenario.trackId);
+  await setRaceType(page, scenario.raceType);
+  await selectOfficialRoute(page, scenario.routeId);
+  const readyText = await page.locator(".solo-setup-action").innerText();
+  assertIncludes(readyText, "Official Race");
+  assertIncludes(readyText, route.name);
   await clickAction(page, "startSeededRace");
-  await finishCurrentRace(page, scenario.score, scenario.time);
+  const telemetry = await finishCurrentRace(page, scenario.score, scenario.time);
   const text = await bodyText(page);
   assertIncludes(text, "Official Race Result");
-  assertIncludes(text, scenario.name);
-  assertIncludes(text, scenario.seed);
+  assertIncludes(text, route.name);
+  assertIncludes(text, route.seed);
   assertIncludes(text, `${scenario.time.toFixed(3)}s`);
   assertIncludes(text, "PB Delta");
   assertIncludes(text, "Top 20");
@@ -155,30 +241,85 @@ async function runOfficialScenario(page, scenario) {
   const detailText = await bodyText(page);
   assertIncludes(detailText, "Competition");
   assertIncludes(detailText, "Official Route");
-  await clickAction(page, "preRace");
+  if (options.returnToSetup !== false) {
+    await clickAction(page, "preRace");
+    await page.waitForFunction(() => window.neonRoadRally?.screen === "preRace", null, { timeout: 5000 });
+  }
+  return { routeId: scenario.routeId, telemetry };
+}
+
+async function assertOfficialTimeBoard(page) {
+  await clickAction(page, "leaderboard", '[data-view="timeAttack"]');
+  await page.waitForFunction(() => window.neonRoadRally?.screen === "leaderboard", null, { timeout: 5000 });
+  const text = await bodyText(page);
+  assertIncludes(text, "Time Attack");
+  assertIncludes(text, "Official Time Attack");
+  assertIncludes(text, "Switchyard Boostline");
+  assertIncludes(text, "35.789s");
+  assertIncludes(text, "Fuel Run");
+  await page.evaluate(() => window.neonRoadRally?.showPreRaceScreen());
   await page.waitForFunction(() => window.neonRoadRally?.screen === "preRace", null, { timeout: 5000 });
 }
 
+async function selectPracticeSpeed(page, speedClassId) {
+  await page.selectOption("#preRaceSpeedClass", speedClassId);
+  await page.waitForFunction(
+    (id) => document.querySelector("#preRaceSpeedClass")?.value === id,
+    speedClassId,
+    { timeout: 5000 }
+  );
+}
+
 async function runCustomScenario(page) {
+  await selectTrack(page, "sunset-highway");
+  await setRaceType(page, "classic");
+  await clickAction(page, "randomSeed");
+  await page.waitForFunction(() => window.neonRoadRally?.screen === "preRace", null, { timeout: 5000 });
+
+  const speedOptions = await page.$$eval("#preRaceSpeedClass option", (options) => options.map((option) => option.value));
+  assert(speedOptions.includes("arcade"), "Arcade should remain available in Custom Road / Practice", { speedOptions });
+  assert(speedOptions.includes("pro"), "Pro should remain available in Custom Road / Practice", { speedOptions });
+
+  await selectPracticeSpeed(page, "arcade");
+  let readyText = await page.locator(".solo-setup-action").innerText();
+  assertIncludes(readyText, "Custom Road");
+  assertIncludes(readyText, "Arcade");
+
+  await selectPracticeSpeed(page, "pro");
+  readyText = await page.locator(".solo-setup-action").innerText();
+  assertIncludes(readyText, "Custom Road");
+  assertIncludes(readyText, "Pro");
+
+  await selectPracticeSpeed(page, "turbo");
   const seed = "CUSTOM-OFFICIAL-SMOKE";
   const input = page.locator("#roadSeedInput");
   await input.fill(seed);
+  await page.waitForFunction(
+    (expectedSeed) => document.querySelector("#roadSeedInput")?.value === expectedSeed,
+    seed,
+    { timeout: 5000 }
+  );
+  readyText = await page.locator(".solo-setup-action").innerText();
+  assertIncludes(readyText, "Custom Road");
+  assertIncludes(readyText, seed);
   await clickAction(page, "startSeededRace");
-  await finishCurrentRace(page, 98100, 48.321);
+  const telemetry = await finishCurrentRace(page, 98100, 48.321);
   const text = await bodyText(page);
   assertIncludes(text, "Custom Road Result");
   assertIncludes(text, "Custom Road");
   assertIncludes(text, seed);
   assert(!text.includes("Official Race Result"), "Custom result should not present as Official Race");
-  await clickAction(page, "leaderboard", '[data-view="scoreAttack"]');
-  await page.waitForFunction(() => window.neonRoadRally?.screen === "leaderboard", null, { timeout: 5000 });
+  return { routeId: "custom-road", telemetry };
 }
 
 async function assertLeaderboards(page) {
+  await clickAction(page, "leaderboard", '[data-view="scoreAttack"]');
+  await page.waitForFunction(() => window.neonRoadRally?.screen === "leaderboard", null, { timeout: 5000 });
   let text = await bodyText(page);
   assertIncludes(text, "Score Attack");
   assertIncludes(text, "Official 10");
   assertIncludes(text, "Official Score Attack");
+  assertIncludes(text, "Neon Palm Sprint");
   assertIncludes(text, "Custom Road Scores");
   assertIncludes(text, "Practice, manual seed, and Challenge records preserved below Official 10");
   assertIncludes(text, "CUSTOM-OFFICIAL-SMOKE");
@@ -191,13 +332,11 @@ async function assertLeaderboards(page) {
 
   await clickAction(page, "setLeaderboardView", '[data-view="timeAttack"]');
   await page.waitForFunction(() => window.neonRoadRally?.leaderboardView === "timeAttack", null, { timeout: 5000 });
-  await clickAction(page, "leaderboard", '[data-view="timeAttack"][data-official-route-id="redline-run-turbo"]');
-  await page.waitForFunction(() => window.neonRoadRally?.screen === "leaderboard", null, { timeout: 5000 });
   text = await bodyText(page);
   assertIncludes(text, "Time Attack");
   assertIncludes(text, "Official Time Attack");
-  assertIncludes(text, "Redline Run / Turbo");
-  assertIncludes(text, "35.789s");
+  assertIncludes(text, "Neon Palm Sprint");
+  assertIncludes(text, "42.123s");
   assertIncludes(text, "Custom Road Times");
   assertIncludes(text, "48.321s");
 }
@@ -227,19 +366,32 @@ async function run() {
     });
 
     await openSoloSetup(page);
-    await assertOfficialSetup(page);
-    for (const scenario of OFFICIAL_SCENARIOS) {
-      await runOfficialScenario(page, scenario);
+    await assertTrackOfficial10(page, "sunset-highway", "Sunset Highway");
+    await assertTrackOfficial10(page, "redline-run", "Redline Run");
+
+    await selectTrack(page, "sunset-highway");
+    const telemetrySamples = [];
+    for (let index = 0; index < OFFICIAL_SCENARIOS.length; index += 1) {
+      telemetrySamples.push(await runOfficialScenario(page, OFFICIAL_SCENARIOS[index], { returnToSetup: index < OFFICIAL_SCENARIOS.length - 1 }));
     }
-    await runCustomScenario(page);
+    await assertOfficialTimeBoard(page);
+    telemetrySamples.push(await runCustomScenario(page));
     await assertLeaderboards(page);
 
     assert(consoleIssues.length === 0, "Console warnings/errors found", { consoleIssues });
     console.log("OFFICIAL_ROUTES_BROWSER_SMOKE_OK");
     console.log(JSON.stringify({
-      officialRoutes: OFFICIAL_ROUTES.map(([id, name, seed]) => ({ id, name, seed })),
-      checkedOfficialScenarios: OFFICIAL_SCENARIOS.map(({ id, name, seed }) => ({ id, name, seed })),
+      officialRoutes: Object.fromEntries(Object.entries(TRACK_ROUTES).map(([trackId, routes]) => [
+        trackId,
+        routes.map(({ id, name, seed, speedClass, feelTag }) => ({ id, name, seed, speedClass, feelTag }))
+      ])),
+      checkedOfficialScenarios: OFFICIAL_SCENARIOS.map((scenario) => ({
+        ...scenario,
+        name: routeById(scenario.routeId).name,
+        seed: routeById(scenario.routeId).seed
+      })),
       customSeed: "CUSTOM-OFFICIAL-SMOKE",
+      frameTelemetry: telemetrySamples,
       consoleIssues
     }, null, 2));
   } finally {

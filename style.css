@@ -807,8 +807,8 @@ button {
 
 .official-route-grid {
   display: grid;
-  gap: 8px;
-  grid-template-columns: repeat(auto-fit, minmax(175px, 1fr));
+  gap: 10px;
+  grid-template-columns: repeat(auto-fit, minmax(205px, 1fr));
 }
 
 .compact-official-route-grid {
@@ -816,42 +816,69 @@ button {
 }
 
 .official-route-card {
+  position: relative;
   display: grid;
-  gap: 4px;
-  min-height: 92px;
-  border: 1px solid rgba(255, 228, 94, 0.26);
+  gap: 6px;
+  min-height: 118px;
+  border: 1px solid rgba(40, 246, 255, 0.34);
   border-radius: 7px;
-  padding: 10px;
-  background: rgba(8, 14, 34, 0.82);
+  padding: 12px;
+  background:
+    linear-gradient(180deg, rgba(255, 228, 94, 0.08), rgba(40, 246, 255, 0.035)),
+    rgba(8, 14, 34, 0.9);
   color: var(--text);
   cursor: pointer;
   text-align: left;
+  overflow: hidden;
+}
+
+.official-route-card::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 4px;
+  background: linear-gradient(180deg, var(--yellow), var(--cyan));
+  opacity: 0.72;
 }
 
 .official-route-card strong,
 .official-route-card span,
-.official-route-card small {
+.official-route-card small,
+.official-route-card em {
   display: block;
+  position: relative;
+  z-index: 1;
 }
 
 .official-route-card strong {
   color: #fff;
-  font-size: 0.82rem;
+  font-size: 0.92rem;
   line-height: 1.15;
   text-transform: uppercase;
 }
 
 .official-route-card span {
-  color: var(--yellow);
-  font-family: ui-monospace, "SFMono-Regular", Consolas, monospace;
-  font-size: 0.72rem;
-  overflow-wrap: anywhere;
+  color: var(--green);
+  font-size: 0.74rem;
+  font-weight: 900;
+  text-transform: uppercase;
 }
 
 .official-route-card small {
   color: var(--muted);
   font-size: 0.72rem;
   line-height: 1.25;
+}
+
+.official-route-card em {
+  align-self: end;
+  color: rgba(246, 251, 255, 0.58);
+  font-family: ui-monospace, "SFMono-Regular", Consolas, monospace;
+  font-size: 0.64rem;
+  font-style: normal;
+  font-weight: 750;
+  letter-spacing: 0;
+  overflow-wrap: anywhere;
 }
 
 .official-route-card:hover,
@@ -864,9 +891,26 @@ button {
 .official-route-card.is-selected {
   border-color: var(--green);
   background:
-    linear-gradient(135deg, rgba(68, 255, 153, 0.16), rgba(40, 246, 255, 0.08)),
+    linear-gradient(135deg, rgba(68, 255, 153, 0.18), rgba(40, 246, 255, 0.1)),
     rgba(8, 18, 28, 0.94);
-  box-shadow: inset 0 0 18px rgba(68, 255, 153, 0.12);
+  box-shadow:
+    inset 0 0 18px rgba(68, 255, 153, 0.12),
+    0 0 18px rgba(68, 255, 153, 0.1);
+}
+
+.official-route-card.is-selected::before {
+  background: linear-gradient(180deg, var(--green), var(--yellow));
+  opacity: 1;
+}
+
+.official-rules-toggle {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.official-rules-field {
+  margin-bottom: 4px;
 }
 
 .race-type-card {

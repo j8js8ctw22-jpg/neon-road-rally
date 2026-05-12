@@ -2585,24 +2585,44 @@ const NORMAL_SPEED_CLASS_IDS = ["arcade", "pro", "turbo", "overdrive", "redline"
 const TRAINING_SPEED_CLASS_IDS = ["sunday", "rookie"];
 const SPEED_CLASS_ORDER = TRAINING_SPEED_CLASS_IDS.concat(NORMAL_SPEED_CLASS_IDS);
 const SPEED_DEMON_AVERAGE_SPEED_THRESHOLD = 3600;
-const OFFICIAL_ROUTE_TRACK_IDS = ["sunset-highway", "redline-run"];
-const OFFICIAL_ROUTES = OFFICIAL_ROUTE_TRACK_IDS.flatMap((trackId) => {
-  const trackLabel = trackId === "redline-run" ? "Redline Run" : "Sunset Highway";
-  const seedPrefix = trackId === "redline-run" ? "REDLINE" : "SUNSET";
-  return NORMAL_SPEED_CLASS_IDS.map((speedClassId) => {
-    const speedClass = SPEED_CLASSES.find((item) => item.id === speedClassId) || SPEED_CLASSES[0];
-    return {
-      id: `${trackId}-${speedClassId}`,
-      trackId,
-      raceTypeId: DEFAULT_RACE_TYPE_ID,
-      speedClassId,
-      name: `${trackLabel} / ${speedClass.label}`,
-      shortName: `${trackLabel.replace(" Highway", "")} / ${speedClass.label}`,
-      seed: normalizeRoadSeed(`${seedPrefix}-${speedClassId.toUpperCase()}-OFFICIAL`, DEFAULT_ROAD_SEED)
-    };
-  });
+const OFFICIAL_ROUTE_RACE_TYPE_IDS = [DEFAULT_RACE_TYPE_ID, FUEL_RUN_RACE_TYPE_ID];
+const OFFICIAL_ROUTE_DEFINITIONS = [
+  { id: "sunset-neon-palm-sprint", name: "Neon Palm Sprint", trackId: "sunset-highway", speedClassId: "turbo", seed: "SUNSET-PALM-SPRINT-TURBO", feelTag: "clean speed" },
+  { id: "sunset-boostline-pier", name: "Boostline Pier", trackId: "sunset-highway", speedClassId: "turbo", seed: "SUNSET-BOOSTLINE-PIER-TURBO", feelTag: "boost line" },
+  { id: "sunset-glass-city-climb", name: "Glass City Climb", trackId: "sunset-highway", speedClassId: "turbo", seed: "SUNSET-GLASS-CITY-CLIMB-TURBO", feelTag: "ramp route" },
+  { id: "sunset-orange-sky-switchback", name: "Orange Sky Switchback", trackId: "sunset-highway", speedClassId: "overdrive", seed: "SUNSET-SKY-SWITCHBACK-OVERDRIVE", feelTag: "lane discipline" },
+  { id: "sunset-cactus-cutback", name: "Cactus Cutback", trackId: "sunset-highway", speedClassId: "overdrive", seed: "SUNSET-CACTUS-CUTBACK-OVERDRIVE", feelTag: "traffic pressure" },
+  { id: "sunset-radio-tower-run", name: "Radio Tower Run", trackId: "sunset-highway", speedClassId: "overdrive", seed: "SUNSET-RADIO-TOWER-OVERDRIVE", feelTag: "final push" },
+  { id: "sunset-heatwave-express", name: "Heatwave Express", trackId: "sunset-highway", speedClassId: "redline", seed: "SUNSET-HEATWAVE-EXPRESS-REDLINE", feelTag: "clean speed" },
+  { id: "sunset-mirage-merge", name: "Mirage Merge", trackId: "sunset-highway", speedClassId: "redline", seed: "SUNSET-MIRAGE-MERGE-REDLINE", feelTag: "lane discipline" },
+  { id: "sunset-afterburner-mile", name: "Afterburner Mile", trackId: "sunset-highway", speedClassId: "redline", seed: "SUNSET-AFTERBURNER-MILE-REDLINE", feelTag: "boost line" },
+  { id: "sunset-last-light-gauntlet", name: "Last Light Gauntlet", trackId: "sunset-highway", speedClassId: "redline", seed: "SUNSET-LAST-LIGHT-REDLINE", feelTag: "final push" },
+  { id: "redline-tunnel-spark-sprint", name: "Tunnel Spark Sprint", trackId: "redline-run", speedClassId: "turbo", seed: "REDLINE-TUNNEL-SPARK-TURBO", feelTag: "clean speed" },
+  { id: "redline-neon-gate-dash", name: "Neon Gate Dash", trackId: "redline-run", speedClassId: "turbo", seed: "REDLINE-NEON-GATE-TURBO", feelTag: "lane discipline" },
+  { id: "redline-service-lane-slalom", name: "Service Lane Slalom", trackId: "redline-run", speedClassId: "turbo", seed: "REDLINE-SERVICE-LANE-TURBO", feelTag: "traffic pressure" },
+  { id: "redline-overpass-charge", name: "Overpass Charge", trackId: "redline-run", speedClassId: "overdrive", seed: "REDLINE-OVERPASS-CHARGE-OD", feelTag: "final push" },
+  { id: "redline-switchyard-boostline", name: "Switchyard Boostline", trackId: "redline-run", speedClassId: "overdrive", seed: "REDLINE-SWITCHYARD-BOOST-OD", feelTag: "boost line" },
+  { id: "redline-concrete-ribbon", name: "Concrete Ribbon", trackId: "redline-run", speedClassId: "overdrive", seed: "REDLINE-CONCRETE-RIBBON-OD", feelTag: "clean speed" },
+  { id: "redline-midnight-merge", name: "Midnight Merge", trackId: "redline-run", speedClassId: "redline", seed: "REDLINE-MIDNIGHT-MERGE-REDLINE", feelTag: "lane discipline" },
+  { id: "redline-reactor-ramp", name: "Reactor Ramp", trackId: "redline-run", speedClassId: "redline", seed: "REDLINE-REACTOR-RAMP-REDLINE", feelTag: "ramp route" },
+  { id: "redline-city-limits-blaze", name: "City Limits Blaze", trackId: "redline-run", speedClassId: "redline", seed: "REDLINE-CITY-LIMITS-REDLINE", feelTag: "traffic pressure" },
+  { id: "redline-finale", name: "Redline Finale", trackId: "redline-run", speedClassId: "redline", seed: "REDLINE-FINALE-REDLINE", feelTag: "final push" }
+];
+const OFFICIAL_ROUTES = OFFICIAL_ROUTE_DEFINITIONS.map((route, index) => {
+  const speedClass = SPEED_CLASSES.find((item) => item.id === route.speedClassId) || SPEED_CLASSES[0];
+  const track = TRACKS.find((item) => item.id === route.trackId) || TRACKS[0];
+  return {
+    ...route,
+    order: index,
+    raceTypeIds: OFFICIAL_ROUTE_RACE_TYPE_IDS.slice(),
+    raceTypeId: DEFAULT_RACE_TYPE_ID,
+    speedClassLabel: speedClass.label,
+    trackName: track.name,
+    shortName: route.name,
+    seed: normalizeRoadSeed(route.seed, DEFAULT_ROAD_SEED)
+  };
 });
-const DEFAULT_OFFICIAL_ROUTE_ID = "sunset-highway-arcade";
+const DEFAULT_OFFICIAL_ROUTE_ID = "sunset-neon-palm-sprint";
 const OFFICIAL_ROUTE_ID_SET = new Set(OFFICIAL_ROUTES.map((route) => route.id));
 
 const RACE_TYPES = [
@@ -3494,25 +3514,52 @@ function getOfficialRouteById(value) {
   return OFFICIAL_ROUTES.find((route) => route.id === id) || null;
 }
 
+function getOfficialRoutesForTrack(trackId) {
+  const safeTrackId = normalizeTrackId(trackId, DEFAULT_TRACK_ID);
+  return OFFICIAL_ROUTES.filter((route) => route.trackId === safeTrackId);
+}
+
 function getDefaultOfficialRoute() {
   return getOfficialRouteById(DEFAULT_OFFICIAL_ROUTE_ID) || OFFICIAL_ROUTES[0] || null;
 }
 
-function getOfficialRouteForSetup(trackId, speedClassId, raceTypeId = DEFAULT_RACE_TYPE_ID) {
+function getDefaultOfficialRouteForTrack(trackId) {
   const safeTrackId = normalizeTrackId(trackId, DEFAULT_TRACK_ID);
+  return getOfficialRoutesForTrack(safeTrackId)[0] || getDefaultOfficialRoute();
+}
+
+function officialRouteSupportsRaceType(route, raceTypeId) {
+  if (!route) return false;
+  const safeRaceTypeId = normalizeRaceTypeId(raceTypeId, DEFAULT_RACE_TYPE_ID);
+  return (Array.isArray(route.raceTypeIds) ? route.raceTypeIds : [route.raceTypeId || DEFAULT_RACE_TYPE_ID]).includes(safeRaceTypeId);
+}
+
+function getOfficialRouteForSetup(trackId, speedClassId, raceTypeId = DEFAULT_RACE_TYPE_ID, routeId = "") {
+  const route = getOfficialRouteById(routeId);
+  if (route) {
+    const safeTrackId = normalizeTrackId(trackId, route.trackId);
+    const safeSpeedClassId = normalizeSpeedClassId(speedClassId, route.speedClassId);
+    const safeRaceTypeId = normalizeRaceTypeId(raceTypeId, DEFAULT_RACE_TYPE_ID);
+    return route.trackId === safeTrackId && route.speedClassId === safeSpeedClassId && officialRouteSupportsRaceType(route, safeRaceTypeId)
+      ? route
+      : null;
+  }
   const safeSpeedClassId = normalizeSpeedClassId(speedClassId, DEFAULT_SPEED_CLASS_ID);
   const safeRaceTypeId = normalizeRaceTypeId(raceTypeId, DEFAULT_RACE_TYPE_ID);
-  if (safeRaceTypeId !== DEFAULT_RACE_TYPE_ID) return null;
   return OFFICIAL_ROUTES.find((route) => (
-    route.trackId === safeTrackId
+    route.trackId === normalizeTrackId(trackId, DEFAULT_TRACK_ID)
     && route.speedClassId === safeSpeedClassId
-    && route.raceTypeId === safeRaceTypeId
+    && officialRouteSupportsRaceType(route, safeRaceTypeId)
   )) || null;
 }
 
-function getOfficialRouteForRun(trackId, speedClassId, raceTypeId, seed) {
-  const route = getOfficialRouteForSetup(trackId, speedClassId, raceTypeId);
+function getOfficialRouteForRun(trackId, speedClassId, raceTypeId, seed, routeId = "") {
+  const route = getOfficialRouteById(routeId);
   if (!route) return null;
+  const safeTrackId = normalizeTrackId(trackId, DEFAULT_TRACK_ID);
+  const safeSpeedClassId = normalizeSpeedClassId(speedClassId, DEFAULT_SPEED_CLASS_ID);
+  const safeRaceTypeId = normalizeRaceTypeId(raceTypeId, DEFAULT_RACE_TYPE_ID);
+  if (route.trackId !== safeTrackId || route.speedClassId !== safeSpeedClassId || !officialRouteSupportsRaceType(route, safeRaceTypeId)) return null;
   return normalizeRoadSeed(seed, "") === route.seed ? route : null;
 }
 
@@ -5229,7 +5276,7 @@ function normalizeLeaderboardEntry(entry) {
   const partyMode = Boolean(entry.partyMode);
   const officialRoute = partyMode || challengeId
     ? null
-    : getOfficialRouteForRun(trackId, speedClass, raceType, entry.seed);
+    : getOfficialRouteForRun(trackId, speedClass, raceType, entry.seed, entry.officialRouteId);
   return {
     runId: normalizeStorageId(entry.runId || entry.id, ""),
     playerName: sanitizePlayerName(entry.playerName, "PLAYER"),
@@ -5329,7 +5376,7 @@ function normalizePlaytestRunSummary(entry) {
     : null;
   const officialRoute = entry.partyMode || challenge
     ? null
-    : getOfficialRouteForRun(track?.id, raceModeId, raceTypeId, entry.roadSeed || entry.seed);
+    : getOfficialRouteForRun(track?.id, raceModeId, raceTypeId, entry.roadSeed || entry.seed, entry.officialRouteId);
   const sectionDurations = normalizeSectionDurationMap(entry.sectionDurations);
   return {
     runId: normalizeStorageId(entry.runId || entry.id, uid()),
@@ -5420,6 +5467,15 @@ function normalizePlaytestRunSummary(entry) {
     longestCenterLaneStreak: normalizeNonNegativeNumber(entry.longestCenterLaneStreak, 0, 24 * 60 * 60),
     averageSpeed: normalizeNonNegativeNumber(entry.averageSpeed, 0, 99999),
     maxSpeed: normalizeNonNegativeNumber(entry.maxSpeed, 0, 99999),
+    averageFrameMs: normalizeNonNegativeNumber(entry.averageFrameMs, 0, 250),
+    averageFps: normalizeNonNegativeNumber(entry.averageFps, 0, 1000),
+    worstFrameMs: normalizeNonNegativeNumber(entry.worstFrameMs || entry.frameTimeMaxMs, 0, 250),
+    recentAverageFrameMs: normalizeNonNegativeNumber(entry.recentAverageFrameMs || entry.frameTimeRecentAvgMs, 0, 250),
+    recentWorstFrameMs: normalizeNonNegativeNumber(entry.recentWorstFrameMs || entry.frameTimeRecentMaxMs, 0, 250),
+    slowFramePercent: normalizeNonNegativeNumber(entry.slowFramePercent, 0, 100),
+    slowFrameCount: normalizeNonNegativeInteger(entry.slowFrameCount || entry.frameTimeSlowCount, 0, 999999),
+    frameSampleCount: normalizeNonNegativeInteger(entry.frameSampleCount, 0, 999999),
+    performanceEffectScale: clampNumber(Number(entry.performanceEffectScale), 0.62, 1, 1),
     finalSectionId: normalizeStorageId(entry.finalSectionId, ""),
     finalSectionName: sanitizeName(entry.finalSectionName, "", DISPLAY_TEXT_MAX_LENGTH),
     sectionDurations,
@@ -14099,6 +14155,12 @@ class Renderer {
     }, "visualIntensity", 1, 0.65, 1.55);
   }
 
+  getPerformanceEffectScale() {
+    const run = this.game.run;
+    if (!run || this.game.screen !== "game") return 1;
+    return clampNumber(run.performanceEffectScale, 0.62, 1, 1);
+  }
+
   getMusicIdentityAtmosphere() {
     if (this.game.screen !== "game") return null;
     const identity = this.game.audio?.getMusicIdentityLayer?.();
@@ -14138,11 +14200,12 @@ class Renderer {
     const speedRatio = this.getVisualSpeedRatio();
     const visualIntensity = this.getRaceVisualIntensity();
     const theme = this.getCurrentTrackVisualTheme();
-    const sceneryDensity = (TRACK_VISUALS.sceneryDensity || 1) * clampNumber(theme.sceneryDensity, 0.3, 1.4, 1);
+    const effectScale = this.getPerformanceEffectScale();
+    const sceneryDensity = (TRACK_VISUALS.sceneryDensity || 1) * clampNumber(theme.sceneryDensity, 0.3, 1.4, 1) * lerp(0.72, 1, effectScale);
     const spacing = TRACK_VISUALS.scenerySpacing / Math.max(0.55, sceneryDensity);
     const sceneryScrollScale = 0.22 + speedRatio * 0.12;
     const scroll = (scrollSource * sceneryScrollScale) % spacing;
-    const count = Math.ceil(this.height / spacing) + 4;
+    const count = Math.ceil(this.height / spacing) + (effectScale < 0.75 ? 3 : 4);
     const leftMin = 16;
     const leftMax = Math.max(leftMin + 8, road.x - 36);
     const rightMin = Math.min(this.width - 16, road.x + road.w + 36);
@@ -14191,7 +14254,7 @@ class Renderer {
     }
 
     const parallaxScroll = (scrollSource * (0.12 + speedRatio * 0.07)) % 120;
-    ctx.globalAlpha = alpha * 0.16;
+    ctx.globalAlpha = alpha * 0.16 * lerp(0.68, 1, effectScale);
     ctx.strokeStyle = theme.guardrailColor || "#28f6ff";
     ctx.lineWidth = 1;
     for (let y = this.road.y + parallaxScroll - 120; y < this.height + 120; y += 120) {
@@ -14512,8 +14575,9 @@ class Renderer {
     const color = identity.color || "#28f6ff";
     const intensity = clampNumber(identity.intensity, 0, 2, 0);
     const readProtection = this.getCriticalReadProtection();
-    const edgeAlpha = clamp((identity.edgePulse || 0) * (0.38 + pulse * 0.44) * (0.72 + intensity * 0.16), 0, 0.22) * alpha * (1 - readProtection * 0.32);
-    const lowEnergyAlpha = clamp((identity.lowEnergy || 0) * (0.42 + pulse * 0.22) * (0.7 + intensity * 0.12), 0, 0.16) * alpha * (1 - readProtection * 0.42);
+    const effectScale = this.getPerformanceEffectScale();
+    const edgeAlpha = clamp((identity.edgePulse || 0) * (0.38 + pulse * 0.44) * (0.72 + intensity * 0.16), 0, 0.22) * alpha * (1 - readProtection * 0.32) * lerp(0.78, 1, effectScale);
+    const lowEnergyAlpha = clamp((identity.lowEnergy || 0) * (0.42 + pulse * 0.22) * (0.7 + intensity * 0.12), 0, 0.16) * alpha * (1 - readProtection * 0.42) * lerp(0.58, 1, effectScale);
     if (edgeAlpha <= 0.006 && lowEnergyAlpha <= 0.006) return;
 
     ctx.save();
@@ -14521,7 +14585,7 @@ class Renderer {
     if (edgeAlpha > 0.006) {
       ctx.strokeStyle = rgbaFromHex(color, edgeAlpha);
       ctx.shadowColor = color;
-      ctx.shadowBlur = 9 + intensity * 7;
+      ctx.shadowBlur = (9 + intensity * 7) * lerp(0.68, 1, effectScale);
       ctx.lineWidth = 2 + intensity * 0.7;
       ctx.beginPath();
       ctx.moveTo(road.x + 10, road.y);
@@ -14533,7 +14597,7 @@ class Renderer {
     }
 
     if (lowEnergyAlpha > 0.006) {
-      const spacing = clamp(156 - (identity.pulseRate || 0) * 22 - intensity * 12, 92, 168);
+      const spacing = clamp(156 - (identity.pulseRate || 0) * 22 - intensity * 12, 92, 168) / Math.max(0.75, effectScale);
       const bandHeight = 3 + intensity * 1.5;
       const scroll = (scrollSource * (0.12 + (identity.pulseRate || 0) * 0.035)) % spacing;
       for (let y = road.y - spacing + scroll; y < road.y + road.h + spacing; y += spacing) {
@@ -14633,9 +14697,10 @@ class Renderer {
     const visualIntensity = this.getRaceVisualIntensity();
     const speedFeel = this.getSpeedFeelIntensity();
     const theme = this.getCurrentTrackVisualTheme();
-    const intensity = TRACK_VISUALS.roadDetailIntensity * clampNumber(theme.roadDetailIntensity, 0.2, 1.4, 1) * alpha * clamp(visualIntensity + speedFeel * 0.16, 0.78, 1.28);
-    const bandSpacing = TRACK_VISUALS.asphaltBandSpacing;
-    const seamSpacing = TRACK_VISUALS.roadSeamSpacing;
+    const effectScale = this.getPerformanceEffectScale();
+    const intensity = TRACK_VISUALS.roadDetailIntensity * clampNumber(theme.roadDetailIntensity, 0.2, 1.4, 1) * alpha * clamp(visualIntensity + speedFeel * 0.16, 0.78, 1.28) * lerp(0.82, 1, effectScale);
+    const bandSpacing = TRACK_VISUALS.asphaltBandSpacing / Math.max(0.84, effectScale);
+    const seamSpacing = TRACK_VISUALS.roadSeamSpacing / Math.max(0.82, effectScale);
     const bandScroll = (scrollSource * 0.28) % bandSpacing;
     const seamScroll = (scrollSource * 0.62) % seamSpacing;
     const speedRatio = this.getVisualSpeedRatio();
@@ -14671,7 +14736,7 @@ class Renderer {
       ctx.fillRect(x + 3, road.y, road.laneW - 6, road.h);
     }
 
-    const grainCount = Math.round(14 + speedRatio * 12 + speedFeel * 8);
+    const grainCount = Math.round((14 + speedRatio * 12 + speedFeel * 8) * lerp(0.48, 1, effectScale));
     ctx.globalAlpha = intensity * 0.28;
     ctx.fillStyle = "rgba(246, 251, 255, 0.12)";
     for (let i = 0; i < grainCount; i += 1) {
@@ -14691,17 +14756,18 @@ class Renderer {
     const visualIntensity = this.getRaceVisualIntensity();
     const speedFeel = this.getSpeedFeelIntensity();
     const theme = this.getCurrentTrackVisualTheme();
-    const lightSpacing = TRACK_VISUALS.edgeLightSpacing;
-    const reflectorSpacing = TRACK_VISUALS.reflectorSpacing;
+    const effectScale = this.getPerformanceEffectScale();
+    const lightSpacing = TRACK_VISUALS.edgeLightSpacing / Math.max(0.76, effectScale);
+    const reflectorSpacing = TRACK_VISUALS.reflectorSpacing / Math.max(0.82, effectScale);
     const lightScroll = (scrollSource * (0.72 + speedRatio * 0.42 + speedFeel * 0.16) * clamp(visualIntensity, 0.92, 1.12)) % lightSpacing;
     const reflectorScroll = (scrollSource * (0.58 + speedFeel * 0.1)) % reflectorSpacing;
 
     ctx.save();
     const shoulderGlow = ctx.createLinearGradient(road.x - 34, 0, road.x + road.w + 34, 0);
-    shoulderGlow.addColorStop(0, rgbaFromHex(theme.edgeColor || "#28f6ff", alpha * (0.18 + speedFeel * 0.08)));
+    shoulderGlow.addColorStop(0, rgbaFromHex(theme.edgeColor || "#28f6ff", alpha * (0.18 + speedFeel * 0.08) * lerp(0.76, 1, effectScale)));
     shoulderGlow.addColorStop(0.11, "rgba(0, 0, 0, 0)");
     shoulderGlow.addColorStop(0.89, "rgba(0, 0, 0, 0)");
-    shoulderGlow.addColorStop(1, rgbaFromHex(theme.edgeAltColor || "#ff3fd1", alpha * (0.18 + speedFeel * 0.08)));
+    shoulderGlow.addColorStop(1, rgbaFromHex(theme.edgeAltColor || "#ff3fd1", alpha * (0.18 + speedFeel * 0.08) * lerp(0.76, 1, effectScale)));
     ctx.globalCompositeOperation = "lighter";
     ctx.fillStyle = shoulderGlow;
     ctx.fillRect(road.x - 34, road.y, road.w + 68, road.h);
@@ -14711,7 +14777,7 @@ class Renderer {
       const t = clamp((y - road.y) / Math.max(1, road.h), 0, 1);
       const size = lerp(3, 7, t);
       const color = Math.floor(y / lightSpacing) % 2 ? (theme.edgeAltColor || "#ff3fd1") : (theme.edgeColor || "#28f6ff");
-      ctx.shadowBlur = 12 * visualIntensity + speedFeel * 8;
+      ctx.shadowBlur = (12 * visualIntensity + speedFeel * 8) * lerp(0.68, 1, effectScale);
       ctx.shadowColor = color;
       ctx.fillStyle = color;
       ctx.fillRect(road.x - 14, y, size, size * 2.3);
@@ -14733,13 +14799,14 @@ class Renderer {
     const road = this.road;
     const speedRatio = this.getVisualSpeedRatio();
     const visualIntensity = this.getRaceVisualIntensity();
-    const panelSpacing = 118;
+    const effectScale = this.getPerformanceEffectScale();
+    const panelSpacing = 118 / Math.max(0.76, effectScale);
     const scroll = (scrollSource * (0.82 + speedRatio * 0.58)) % panelSpacing;
     const chevronColor = theme.chevronColor || "#ff2d55";
     ctx.save();
     ctx.globalAlpha = alpha * clamp(0.42 + speedRatio * 0.32, 0.42, 0.84);
     ctx.strokeStyle = theme.guardrailColor || chevronColor;
-    ctx.shadowBlur = 14 * visualIntensity;
+    ctx.shadowBlur = 14 * visualIntensity * lerp(0.68, 1, effectScale);
     ctx.shadowColor = chevronColor;
     ctx.lineWidth = 2;
     for (let y = road.y - panelSpacing + scroll; y < road.y + road.h + panelSpacing; y += panelSpacing) {
@@ -15243,6 +15310,7 @@ class Renderer {
     const boostPunchDuration = ARCADE_FEEL.boostStreakPunchMs / 1000;
     const boostPunch = boostPunchDuration > 0 ? clamp((run.boostStreakPunchTimer || 0) / boostPunchDuration, 0, 1) : 0;
     const readProtection = this.getCriticalReadProtection();
+    const effectScale = this.getPerformanceEffectScale();
     const intensity = (run.boostTimer > 0 ? 0.5 : (run.padBoostTimer > 0 ? 0.45 : (sectionEnergy ? 0.16 : 0.2)))
       * TRACK_VISUALS.speedStreakIntensity
       * clampNumber(theme.speedStreakIntensity, 0.4, 1.8, 1)
@@ -15250,8 +15318,9 @@ class Renderer {
       * clamp(visualIntensity, 0.8, 1.35)
       * (1 + boostPunch * 0.7)
       * (0.9 + speedFeel * 0.22 + speedClass * 0.14)
-      * (1 - readProtection * 0.22);
-    const lineCount = Math.round((run.boostTimer > 0 ? 42 : (run.padBoostTimer > 0 ? 34 : (sectionEnergy ? 22 : 18))) * (0.85 + speedRatio * 0.42 + speedClass * 0.16) * clamp(visualIntensity, 0.92, 1.18) * (1 + boostPunch * 0.48) * (1 - readProtection * 0.18));
+      * (1 - readProtection * 0.22)
+      * lerp(0.8, 1, effectScale);
+    const lineCount = Math.round((run.boostTimer > 0 ? 42 : (run.padBoostTimer > 0 ? 34 : (sectionEnergy ? 22 : 18))) * (0.85 + speedRatio * 0.42 + speedClass * 0.16) * clamp(visualIntensity, 0.92, 1.18) * (1 + boostPunch * 0.48) * (1 - readProtection * 0.18) * lerp(0.52, 1, effectScale));
     ctx.save();
     ctx.globalAlpha = clamp(intensity, 0, 0.82);
     ctx.strokeStyle = boosting ? (theme.boostStreakColor || "#28f6ff") : (theme.speedStreakColor || "#f6fbff");
@@ -16455,6 +16524,11 @@ class Renderer {
     const currentResultStatus = run.ended
       ? getRunStatusLabel(run.finished ? "finished" : (run.endReason === "Out of Fuel" ? "outOfFuel" : "crashed"), run.endReason)
       : (run.raceActive ? "Running" : "Countdown");
+    const frameAvg = run.averageFrameMs || 0;
+    const frameRecentAvg = run.frameTimeRecentAvgMs || 0;
+    const frameWorst = run.frameTimeMaxMs || 0;
+    const frameRecentWorst = run.frameTimeRecentMaxMs || 0;
+    const frameFps = run.averageFps || (frameAvg > 0 ? 1000 / frameAvg : 0);
     const lines = [
       "DEBUG `",
       `playtest result: ${currentResultStatus}`,
@@ -16463,6 +16537,8 @@ class Renderer {
       `playtest boost: manual ${run.manualBoostsUsed || 0} fuel ${run.boostsUsedInFuelRun || 0} pads ${run.boostPadsCollected || 0} ramps ${run.rampsUsed || 0} targets ${run.rampTargetsCleared || 0}/${run.rampTargetsAssigned || 0}`,
       `playtest director: waves ${directorDebug.waveCount || 0} meaningful ${directorDebug.meaningfulWaveCount || 0} support ${directorDebug.supportWaveCount || 0}`,
       `playtest launch: first10 ${directorDebug.wavesFirst10Seconds || 0} launch ${directorDebug.launchWaveCount || 0}/${directorDebug.launchMeaningfulWaveCount || 0} hardest ${directorDebug.hardestPressureObserved || 0}`,
+      `perf: avg ${frameAvg.toFixed(1)}ms (${frameFps.toFixed(0)}fps) recent ${frameRecentAvg.toFixed(1)}ms worst ${frameWorst.toFixed(1)}ms recent max ${frameRecentWorst.toFixed(1)}ms slow ${(run.slowFramePercent || 0).toFixed(1)}%`,
+      `effect scale: ${clampNumber(run.performanceEffectScale, 0.62, 1, 1).toFixed(2)} samples ${run.frameSampleCount || 0} slow ${run.frameTimeSlowCount || 0}`,
       `race type: ${directorDebug.raceType}`,
       `mode: ${run.speedClass?.label || getSpeedClassLabel(run.speedClassId)} score x${(run.scoreMultiplier || 1).toFixed(2)}`,
       `seed: ${directorDebug.seed}`,
@@ -18198,11 +18274,11 @@ class NeonRoadRally {
     this.debugMode = false;
     this.debugSpeedScale = 1;
     this.attractDistance = 0;
-    const defaultOfficialRoute = getOfficialRouteForSetup(DEFAULT_TRACK_ID, this.profiles.data.speedClassId, DEFAULT_RACE_TYPE_ID)
-      || getDefaultOfficialRoute();
+    const defaultOfficialRoute = getDefaultOfficialRouteForTrack(DEFAULT_TRACK_ID);
     this.pendingRoadSeed = defaultOfficialRoute?.seed || generateReadableRoadSeed();
     this.pendingRaceTypeId = DEFAULT_RACE_TYPE_ID;
     this.pendingTrackId = defaultOfficialRoute?.trackId || DEFAULT_TRACK_ID;
+    this.pendingOfficialRouteId = defaultOfficialRoute?.id || DEFAULT_OFFICIAL_ROUTE_ID;
     this.partySetup = null;
     this.partySession = null;
     this.guideTab = "basics";
@@ -18452,6 +18528,17 @@ class NeonRoadRally {
       speedSampleSeconds: 0,
       speedWeightedSum: 0,
       maxSpeedObserved: getTrackCruiseSpeed(track, 0, speedClass.id),
+      frameSampleCount: 0,
+      frameTimeSumMs: 0,
+      frameTimeMaxMs: 0,
+      frameTimeRecentSamples: [],
+      frameTimeRecentAvgMs: 0,
+      frameTimeRecentMaxMs: 0,
+      frameTimeSlowCount: 0,
+      averageFrameMs: 0,
+      averageFps: 0,
+      slowFramePercent: 0,
+      performanceEffectScale: 1,
       hardestPressureObserved: 0,
       eventScore: 0,
       bonuses: {
@@ -18590,11 +18677,48 @@ class NeonRoadRally {
     };
   }
 
+  getFrameEffectScaleForRun(run) {
+    if (!run) return 1;
+    const recentAvg = run.frameTimeRecentAvgMs || run.averageFrameMs || 0;
+    const recentMax = run.frameTimeRecentMaxMs || run.frameTimeMaxMs || 0;
+    const slowPercent = run.slowFramePercent || 0;
+    if (recentAvg >= 30 || recentMax >= 58 || slowPercent >= 38) return 0.66;
+    if (recentAvg >= 24 || recentMax >= 44 || slowPercent >= 20) return 0.8;
+    if (recentAvg >= 19 || recentMax >= 34 || slowPercent >= 9) return 0.9;
+    return 1;
+  }
+
+  recordFrameTelemetry(frameDt) {
+    const run = this.run;
+    if (!run || this.screen !== "game" || run.paused || run.debugFrozen) return;
+    const frameMs = clampNumber(frameDt * 1000, 0, 250, 0);
+    if (frameMs <= 0) return;
+    run.frameSampleCount = (run.frameSampleCount || 0) + 1;
+    run.frameTimeSumMs = (run.frameTimeSumMs || 0) + frameMs;
+    run.frameTimeMaxMs = Math.max(run.frameTimeMaxMs || 0, frameMs);
+    if (frameMs >= 34) run.frameTimeSlowCount = (run.frameTimeSlowCount || 0) + 1;
+    const samples = Array.isArray(run.frameTimeRecentSamples) ? run.frameTimeRecentSamples : [];
+    samples.push(frameMs);
+    while (samples.length > 90) samples.shift();
+    run.frameTimeRecentSamples = samples;
+    const recentSum = samples.reduce((sum, value) => sum + value, 0);
+    run.frameTimeRecentAvgMs = samples.length ? recentSum / samples.length : 0;
+    run.frameTimeRecentMaxMs = samples.length ? Math.max(...samples) : 0;
+    run.averageFrameMs = run.frameSampleCount ? run.frameTimeSumMs / run.frameSampleCount : 0;
+    run.averageFps = run.averageFrameMs > 0 ? 1000 / run.averageFrameMs : 0;
+    run.slowFramePercent = run.frameSampleCount ? (run.frameTimeSlowCount || 0) / run.frameSampleCount * 100 : 0;
+    run.performanceEffectScale = this.getFrameEffectScaleForRun(run);
+  }
+
   loop(time) {
-    const dt = Math.min(0.05, (time - this.lastFrame) / 1000 || 0);
+    const rawDt = Math.max(0, (time - this.lastFrame) / 1000 || 0);
+    const dt = Math.min(0.05, rawDt);
     this.lastFrame = time;
     const debugFrozen = this.screen === "game" && this.run?.debugFrozen;
     this.lastDt = debugFrozen ? 0 : dt;
+    if (this.screen === "game" && this.run && !this.run.ended && !debugFrozen) {
+      this.recordFrameTelemetry(rawDt);
+    }
     if (this.screen === "game" && !this.run.paused && !this.run.ended && !debugFrozen) {
       if (!this.run.pendingEndStatus) this.input.update(dt);
       this.updateRun(dt);
@@ -19486,6 +19610,13 @@ class NeonRoadRally {
       this.showPlayerScreen("Add a driver, then start your first run.");
       return;
     }
+    const route = getDefaultOfficialRouteForTrack(this.pendingTrackId || DEFAULT_TRACK_ID);
+    if (route) {
+      this.pendingOfficialRouteId = route.id;
+      this.pendingTrackId = route.trackId;
+      this.pendingRaceTypeId = DEFAULT_RACE_TYPE_ID;
+      this.pendingRoadSeed = route.seed;
+    }
     this.showPreRaceScreen();
   }
 
@@ -19681,21 +19812,23 @@ class NeonRoadRally {
     this.updateAudioMusicState();
     const configuredSeed = this.configureRunSeed(challenge ? challenge.seed : (options.seed ?? this.pendingRoadSeed), track, speedClass.id, raceType.id);
     if (partyMode) this.run.partySeed = configuredSeed;
+    const requestedOfficialRouteId = options.officialRouteId || this.pendingOfficialRouteId || "";
     const officialRoute = !partyMode && !challenge
-      ? getOfficialRouteForRun(track.id, speedClass.id, raceType.id, configuredSeed)
+      ? getOfficialRouteForRun(track.id, speedClass.id, raceType.id, configuredSeed, requestedOfficialRouteId)
       : null;
     this.run.officialRouteId = officialRoute?.id || "";
     this.run.officialRouteName = officialRoute?.name || "";
     this.run.officialSeed = officialRoute?.seed || "";
     this.run.competitionKind = getCompetitionKindLabel(officialRoute);
     const bestTimeRecord = officialRoute
-      ? this.getOfficialBestTimeRecord(player.id, officialRoute.id)
+      ? this.getOfficialBestTimeRecord(player.id, officialRoute.id, raceType.id)
       : this.profiles.getBestTimeRecord(player.id, track.id, raceType.id, speedClass.id);
     this.run.comparableBestTimeMs = bestTimeRecord?.finishTimeMs ?? null;
     this.run.comparableBestTimeSeconds = this.run.comparableBestTimeMs === null ? null : getFinishTimeSecondsPrecise(this.run.comparableBestTimeMs);
     this.updatePaceFeedback();
     this.pendingRaceTypeId = raceType.id;
     this.pendingTrackId = baseTrack.id;
+    this.pendingOfficialRouteId = officialRoute?.id || "";
     if (this.input) this.input.clearGameplayInput();
     this.obstacles.reset(track);
     this.setScreen("game");
@@ -20276,6 +20409,15 @@ class NeonRoadRally {
       longestCenterLaneStreak: run.longestCenterLaneStreak || 0,
       averageSpeed,
       maxSpeed: run.maxSpeedObserved || run.currentSpeed || 0,
+      averageFrameMs: run.averageFrameMs || 0,
+      averageFps: run.averageFps || 0,
+      worstFrameMs: run.frameTimeMaxMs || 0,
+      recentAverageFrameMs: run.frameTimeRecentAvgMs || 0,
+      recentWorstFrameMs: run.frameTimeRecentMaxMs || 0,
+      slowFramePercent: run.slowFramePercent || 0,
+      slowFrameCount: run.frameTimeSlowCount || 0,
+      frameSampleCount: run.frameSampleCount || 0,
+      performanceEffectScale: run.performanceEffectScale || 1,
       finalSectionId: run.currentSectionId || "",
       finalSectionName: run.currentSectionLabel || "",
       sectionDurations: normalizeSectionDurationMap(run.sectionDurations),
@@ -20476,14 +20618,14 @@ class NeonRoadRally {
     const player = run.player || this.profiles.getCurrentPlayer() || this.profiles.ensureDefaultPlayer();
     const profilePlayer = this.profiles.getPlayerById(player.id) || player;
     const officialRoute = !run.partyMode && !run.challengeMode
-      ? (getOfficialRouteById(run.officialRouteId) || getOfficialRouteForRun(run.track.id, run.speedClassId, run.raceTypeId, run.roadSeed))
+      ? getOfficialRouteForRun(run.track.id, run.speedClassId, run.raceTypeId, run.roadSeed, run.officialRouteId)
       : null;
     const competitionKind = getCompetitionKindLabel(officialRoute);
-    const previousOfficialScoreRecord = officialRoute ? this.getOfficialBestScoreRecord(player.id, officialRoute.id) : null;
+    const previousOfficialScoreRecord = officialRoute ? this.getOfficialBestScoreRecord(player.id, officialRoute.id, run.raceTypeId) : null;
     const previousBestScore = officialRoute ? (previousOfficialScoreRecord?.score || 0) : (profilePlayer.bestScore || 0);
     const leaderboard = this.profiles.data.leaderboard || [];
     const boardEntriesBefore = officialRoute
-      ? this.getOfficialScoreAttackRows(officialRoute.id, { entries: leaderboard })
+      ? this.getOfficialScoreAttackRows(officialRoute.id, { entries: leaderboard, raceTypeId: run.raceTypeId })
       : leaderboard.slice(0, LEADERBOARD_MAX_ENTRIES);
     const topTwentyCutoff = boardEntriesBefore.length < LEADERBOARD_MAX_ENTRIES ? -1 : Math.min(...boardEntriesBefore.slice(0, LEADERBOARD_MAX_ENTRIES).map((item) => item.score || 0));
     const debugSpeedScaleActive = Math.abs((this.debugSpeedScale || 1) - 1) > 0.001;
@@ -20491,7 +20633,7 @@ class NeonRoadRally {
     const finishTimeSecondsPrecise = finishTimeMs === null ? null : getFinishTimeSecondsPrecise(finishTimeMs);
     const previousBestTimeRecord = status === "finished"
       ? (officialRoute
-        ? this.getOfficialBestTimeRecord(player.id, officialRoute.id)
+        ? this.getOfficialBestTimeRecord(player.id, officialRoute.id, run.raceTypeId)
         : this.profiles.getBestTimeRecord(player.id, run.track.id, run.raceTypeId, run.speedClassId))
       : null;
     const previousBestTimeMs = previousBestTimeRecord?.finishTimeMs ?? null;
@@ -20502,7 +20644,7 @@ class NeonRoadRally {
     const paceAheadTime = personalBestTimeDelta !== null && personalBestTimeDelta < 0 ? Math.abs(personalBestTimeDelta) : (run.paceAheadTime ?? null);
     const paceBehindTime = personalBestTimeDelta !== null && personalBestTimeDelta > 0 ? personalBestTimeDelta : (run.paceBehindTime ?? null);
     const isNewPersonalBest = !debugSpeedScaleActive && run.score > previousBestScore;
-    const entersTopTwenty = !debugSpeedScaleActive && (leaderboard.length < LEADERBOARD_MAX_ENTRIES || run.score > topTwentyCutoff);
+    const entersTopTwenty = !debugSpeedScaleActive && (boardEntriesBefore.length < LEADERBOARD_MAX_ENTRIES || run.score > topTwentyCutoff);
     const previousTitleBoard = this.profiles.getTitleBoard();
     const entry = debugSpeedScaleActive ? null : this.profiles.recordScore({
       runId: run.runId,
@@ -20546,7 +20688,7 @@ class NeonRoadRally {
     });
     const updatedProfilePlayer = this.profiles.getPlayerById(player.id) || profilePlayer;
     const boardEntriesAfter = officialRoute
-      ? this.getOfficialScoreAttackRows(officialRoute.id)
+      ? this.getOfficialScoreAttackRows(officialRoute.id, { raceTypeId: run.raceTypeId })
       : this.profiles.data.leaderboard.slice(0, LEADERBOARD_MAX_ENTRIES);
     const rawTopTwentyRank = entry
       ? boardEntriesAfter.findIndex((item) => item.runId && item.runId === entry.runId) + 1
@@ -20556,7 +20698,7 @@ class NeonRoadRally {
       ? Math.max(1, Math.round(topTwentyCutoff - run.score + 1))
       : 0;
     const officialBestScoreAfter = officialRoute && !debugSpeedScaleActive
-      ? this.getOfficialBestScoreRecord(player.id, officialRoute.id)
+      ? this.getOfficialBestScoreRecord(player.id, officialRoute.id, run.raceTypeId)
       : previousOfficialScoreRecord;
     const scoreBreakdown = this.buildRunScoreBreakdown(run);
     const averageSpeed = run.speedSampleSeconds > 0
@@ -20626,6 +20768,15 @@ class NeonRoadRally {
       paceFeedbackSampleCount: run.paceFeedbackSampleCount || 0,
       averageSpeed,
       maxSpeed: run.maxSpeedObserved || run.currentSpeed || 0,
+      averageFrameMs: run.averageFrameMs || 0,
+      averageFps: run.averageFps || 0,
+      worstFrameMs: run.frameTimeMaxMs || 0,
+      recentAverageFrameMs: run.frameTimeRecentAvgMs || 0,
+      recentWorstFrameMs: run.frameTimeRecentMaxMs || 0,
+      slowFramePercent: run.slowFramePercent || 0,
+      slowFrameCount: run.frameTimeSlowCount || 0,
+      frameSampleCount: run.frameSampleCount || 0,
+      performanceEffectScale: run.performanceEffectScale || 1,
       bonuses: { ...run.bonuses },
       penalties: run.penalties,
       slowdownHits: run.slowdownHits || 0,
@@ -20732,7 +20883,7 @@ class NeonRoadRally {
     }
     const timeUpdate = this.profiles.recordBestFinishTime(summary);
     if (summary.officialRouteId && summary.scoreSaved && summary.status === "finished") {
-      const officialBestTime = this.getOfficialBestTimeRecord(summary.playerId, summary.officialRouteId);
+      const officialBestTime = this.getOfficialBestTimeRecord(summary.playerId, summary.officialRouteId, summary.raceTypeId);
       if (officialBestTime) {
         summary.bestTimeMs = officialBestTime.finishTimeMs;
         summary.bestTimeSecondsPrecise = officialBestTime.finishTimeSecondsPrecise;
@@ -23441,6 +23592,7 @@ class NeonRoadRally {
       .map((run) => normalizeOptionalFiniteNumber(run.paceBehindTime, 0, 24 * 60 * 60))
       .filter((value) => value !== null);
     const paceFeedbackRuns = runs.filter((run) => (Number(run.paceFeedbackSampleCount) || 0) > 0 || (Number(run.paceFeedbackActiveTime) || 0) > 0);
+    const frameTelemetryRuns = runs.filter((run) => (Number(run.frameSampleCount) || 0) > 0);
     const fuelRuns = runs.filter((run) => run.raceTypeId === FUEL_RUN_RACE_TYPE_ID);
     const fuelFinishes = fuelRuns.filter((run) => run.status === "finished");
     const pursuitRuns = runs.filter((run) => run.raceTypeId === PURSUIT_RACE_TYPE_ID);
@@ -23529,6 +23681,14 @@ class NeonRoadRally {
         averagePaceFeedbackActiveTime: this.averagePlaytestField(paceFeedbackRuns, "paceFeedbackActiveTime"),
         paceFeedbackRunCount: paceFeedbackRuns.length,
         averageLaneChanges: this.averagePlaytestField(runs, "laneChanges"),
+        frameTelemetryRunCount: frameTelemetryRuns.length,
+        averageFrameMs: this.averagePlaytestField(frameTelemetryRuns, "averageFrameMs"),
+        averageFps: this.averagePlaytestField(frameTelemetryRuns, "averageFps"),
+        worstFrameMs: frameTelemetryRuns.reduce((max, run) => Math.max(max, Number(run.worstFrameMs) || 0), 0),
+        averageSlowFramePercent: this.averagePlaytestField(frameTelemetryRuns, "slowFramePercent"),
+        minPerformanceEffectScale: frameTelemetryRuns.length
+          ? frameTelemetryRuns.reduce((min, run) => Math.min(min, clampNumber(Number(run.performanceEffectScale), 0.62, 1, 1)), 1)
+          : 1,
       averageCenterLaneTime: this.averagePlaytestField(runs, "centerLaneTime"),
       totalNewBadges: runs.reduce((sum, run) => sum + (Array.isArray(run.newlyEarnedBadges) ? run.newlyEarnedBadges.length : 0), 0),
       totalMasteryBadgeUnlocks: masteryBadgeIds.length,
@@ -23709,6 +23869,12 @@ class NeonRoadRally {
           paceFeedbackRunCount: aggregate.paceFeedbackRunCount,
           averagePaceFeedbackActiveTimeSeconds: roundStatNumber(aggregate.averagePaceFeedbackActiveTime, 2),
           averageLaneChanges: Number(aggregate.averageLaneChanges.toFixed(2)),
+          frameTelemetryRunCount: aggregate.frameTelemetryRunCount,
+          averageFrameMs: roundStatNumber(aggregate.averageFrameMs, 2),
+          averageFps: roundStatNumber(aggregate.averageFps, 1),
+          worstFrameMs: roundStatNumber(aggregate.worstFrameMs, 2),
+          averageSlowFramePercent: roundStatNumber(aggregate.averageSlowFramePercent, 2),
+          minPerformanceEffectScale: roundStatNumber(aggregate.minPerformanceEffectScale, 2),
           averageCenterLaneTimeSeconds: Number(aggregate.averageCenterLaneTime.toFixed(2)),
         totalNewBadges: aggregate.totalNewBadges,
         totalMasteryBadgeUnlocks: aggregate.totalMasteryBadgeUnlocks,
@@ -24399,6 +24565,11 @@ class NeonRoadRally {
             <div class="score-card"><strong>PB Delta Avg</strong><span>${pbDeltaText}</span></div>
             <div class="score-card"><strong>Pace Feedback Runs</strong><span>${aggregate.paceFeedbackRunCount}</span></div>
             <div class="score-card"><strong>Avg Lane Changes</strong><span>${this.formatPlaytestDecimal(aggregate.averageLaneChanges)}</span></div>
+            <div class="score-card"><strong>Frame Telemetry Runs</strong><span>${aggregate.frameTelemetryRunCount}</span></div>
+            <div class="score-card"><strong>Avg Frame Time</strong><span>${this.formatPlaytestDecimal(aggregate.averageFrameMs, 1)}ms / ${this.formatPlaytestDecimal(aggregate.averageFps, 0)}fps</span></div>
+            <div class="score-card"><strong>Worst Frame</strong><span>${this.formatPlaytestDecimal(aggregate.worstFrameMs, 1)}ms</span></div>
+            <div class="score-card"><strong>Slow Frames</strong><span>${this.formatPlaytestDecimal(aggregate.averageSlowFramePercent, 1)}% avg</span></div>
+            <div class="score-card"><strong>Effect Scale Min</strong><span>${this.formatPlaytestDecimal(aggregate.minPerformanceEffectScale, 2)}</span></div>
           <div class="score-card"><strong>Avg Center-Lane Time</strong><span>${formatTime(aggregate.averageCenterLaneTime)}</span></div>
           <div class="score-card"><strong>New Badges</strong><span>${aggregate.totalNewBadges}</span></div>
           <div class="score-card"><strong>Mastery Unlocks</strong><span>${aggregate.totalMasteryBadgeUnlocks}</span></div>
@@ -24608,7 +24779,9 @@ class NeonRoadRally {
   syncRaceTypeExplainCards(groupName, selectedRaceTypeId) {
     const selectedId = normalizeRaceTypeId(selectedRaceTypeId, DEFAULT_RACE_TYPE_ID);
     document.querySelectorAll(`[data-race-type-choice="${groupName}"]`).forEach((card) => {
-      card.classList.toggle("is-selected", card.dataset.value === selectedId);
+      const selected = card.dataset.value === selectedId;
+      card.classList.toggle("is-selected", selected);
+      if (card.classList.contains("small-button")) card.classList.toggle("primary", selected);
     });
   }
 
@@ -24707,87 +24880,74 @@ class NeonRoadRally {
     this.setScreen("preRace");
     this.audio.playMusic("title", false);
     const player = this.profiles.getCurrentPlayer();
-    const speedClass = getSpeedClassConfig(this.profiles.data.speedClassId);
-    const track = getTrackById(this.pendingTrackId || DEFAULT_TRACK_ID);
+    const selectedOfficialRoute = getOfficialRouteById(this.pendingOfficialRouteId);
+    const track = getTrackById(selectedOfficialRoute?.trackId || this.pendingTrackId || DEFAULT_TRACK_ID);
     const requestedRaceTypeId = normalizeRaceTypeId(this.pendingRaceTypeId || DEFAULT_RACE_TYPE_ID, DEFAULT_RACE_TYPE_ID);
     const raceType = getRaceTypeConfig(trackSupportsRaceType(track, requestedRaceTypeId) && isPlayerFacingRaceType(requestedRaceTypeId) ? requestedRaceTypeId : DEFAULT_RACE_TYPE_ID);
-    const seed = this.resolveRoadSeed(this.pendingRoadSeed);
-    const officialRoute = getOfficialRouteForRun(track.id, speedClass.id, raceType.id, seed);
+    const officialRoute = selectedOfficialRoute && selectedOfficialRoute.trackId === track.id && officialRouteSupportsRaceType(selectedOfficialRoute, raceType.id)
+      ? selectedOfficialRoute
+      : null;
+    const speedClass = getSpeedClassConfig(officialRoute?.speedClassId || this.profiles.data.speedClassId);
+    const seed = officialRoute ? officialRoute.seed : this.resolveRoadSeed(this.pendingRoadSeed);
     const competitionKind = getCompetitionKindLabel(officialRoute);
+    const trackRoutes = getOfficialRoutesForTrack(track.id);
     this.pendingRoadSeed = seed;
     this.pendingTrackId = track.id;
     this.pendingRaceTypeId = raceType.id;
+    this.pendingOfficialRouteId = officialRoute?.id || "";
     this.layer.classList.remove("is-empty");
     this.layer.innerHTML = `
       <section class="panel compact pre-race-panel">
         <div class="form-stack">
           <div>
-            <span class="eyebrow">Official Race Setup</span>
-            <h2>Official 10</h2>
-            <p class="hint">Official Race is the default competitive path. Custom Road practice and manual seeds stay available below.</p>
-          </div>
-          <div class="setup-step-strip" aria-label="Solo setup checklist">
-            <span><strong>1</strong>Driver</span>
-            <span><strong>2</strong>Route</span>
-            <span><strong>3</strong>Track</span>
-            <span><strong>4</strong>Speed</span>
-            <span><strong>5</strong>Seed</span>
-          </div>
-          <div class="score-grid mode-context-grid">
-            <div class="score-card"><strong>Driver</strong><span>${escapeHtml(player.name)}</span></div>
-            <div class="score-card"><strong>Route</strong><span id="preRaceRouteSummary">${escapeHtml(officialRoute?.name || competitionKind)}</span></div>
-            <div class="score-card"><strong>Race Type</strong><span id="preRaceTypeSummary">${escapeHtml(raceType.label)}</span></div>
-            <div class="score-card"><strong>Track</strong><span id="preRaceTrackSummary">${escapeHtml(track.name)}</span></div>
-            <div class="score-card"><strong>Speed Class</strong><span id="preRaceModeSummary">${escapeHtml(speedClass.label)} · x${speedClass.scoreMultiplier.toFixed(2)}</span></div>
-            <div class="score-card"><strong>Road Seed</strong><span id="preRaceSeedSummary" class="is-compact">${escapeHtml(seed)}</span></div>
-          </div>
-          <div class="setup-sticky-action solo-setup-action" aria-label="Start current solo setup">
-            <div>
-              <span class="eyebrow" id="soloSetupCompetitionLabel">${escapeHtml(competitionKind)}</span>
-              <strong id="soloSetupActionSummary">${escapeHtml(officialRoute?.name || `${raceType.label} · ${track.name} · ${speedClass.label}`)}</strong>
-              <small id="soloSetupActionSeed">${escapeHtml(officialRoute ? "Official Seed" : "Custom Road Seed")} ${escapeHtml(seed)}</small>
-            </div>
-            <button class="small-button primary" data-action="startSeededRace">Start Race</button>
+            <span class="eyebrow">Official Race Board</span>
+            <h2>Choose Tonight's Race</h2>
+            <p class="hint">Official competitive routes use Turbo, Overdrive, and Redline. Arcade and Pro live in Custom Road / Practice below.</p>
           </div>
           <div class="setup-section-heading">
-            <span class="eyebrow">Official Race</span>
-            <strong>Pick one of the fixed Classic routes.</strong>
+            <span class="eyebrow">1 · Track</span>
+            <strong>Pick the official board.</strong>
           </div>
-          ${this.renderOfficialRouteChoiceGrid(officialRoute?.id || "")}
+          ${this.renderTrackSelect("preRaceTrack", track.id)}
           <div class="setup-section-heading">
-            <span class="eyebrow">Race Type</span>
-            <strong>Choose the rules for this run.</strong>
+            <span class="eyebrow">2 · ${escapeHtml(track.name)} Official 10</span>
+            <strong>${trackRoutes.length} named routes · Turbo / Overdrive / Redline only.</strong>
           </div>
-          <div class="field">
+          <div class="field official-rules-field">
             <label class="setup-hidden-label" for="preRaceType">Race Type</label>
             <select id="preRaceType" class="setup-hidden-select" aria-hidden="true" tabindex="-1">
               ${this.renderRaceTypeOptionsForTrack(track, raceType.id)}
             </select>
-            ${this.renderRaceTypeExplainCards(track, raceType.id, "preRace")}
+            ${this.renderOfficialRouteRaceTypeButtons(raceType.id, "preRace")}
+          </div>
+          ${this.renderOfficialRouteChoiceGrid(officialRoute?.id || "", track.id, raceType.id)}
+          <div class="setup-sticky-action solo-setup-action" aria-label="Ready to race">
+            <div>
+              <span class="eyebrow" id="soloSetupCompetitionLabel">${escapeHtml(competitionKind)}</span>
+              <strong id="soloSetupActionSummary">${escapeHtml(officialRoute?.name || `${raceType.label} · ${track.name} · ${speedClass.label}`)}</strong>
+              <small id="soloSetupActionSeed">${escapeHtml(officialRoute ? `${raceType.label} · ${speedClass.label} · ${officialRoute.feelTag}` : `${raceType.label} · ${speedClass.label} · Custom Road Seed ${seed}`)}</small>
+            </div>
+            <button class="small-button primary" data-action="startSeededRace">Start Race</button>
+          </div>
+          <div class="score-grid mode-context-grid">
+            <div class="score-card"><strong>Driver</strong><span>${escapeHtml(player.name)}</span></div>
+            <div class="score-card"><strong>Board</strong><span id="preRaceTrackSummary">${escapeHtml(track.name)} Official 10</span></div>
+            <div class="score-card"><strong>Route</strong><span id="preRaceRouteSummary">${escapeHtml(officialRoute?.name || competitionKind)}</span></div>
+            <div class="score-card"><strong>Rules</strong><span id="preRaceTypeSummary">${escapeHtml(raceType.label)}</span></div>
+            <div class="score-card"><strong>Speed</strong><span id="preRaceModeSummary">${escapeHtml(speedClass.label)} · x${speedClass.scoreMultiplier.toFixed(2)}</span></div>
+            <div class="score-card"><strong>Seed</strong><span id="preRaceSeedSummary" class="is-compact">${escapeHtml(seed)}</span></div>
           </div>
           <div class="setup-section-heading">
-            <span class="eyebrow">Track</span>
-            <strong>Pick the road and music feel.</strong>
+            <span class="eyebrow">Custom Road / Practice</span>
+            <strong>Training speeds, manual seeds, and random roads stay here.</strong>
           </div>
           <div class="field">
-            <label>Track</label>
-            ${this.renderTrackSelect("preRaceTrack", track.id)}
-          </div>
-          <div class="setup-section-heading">
-            <span class="eyebrow">Speed Class</span>
-            <strong>Pick how fast decisions arrive.</strong>
-          </div>
-          <div class="field">
-            <label for="preRaceSpeedClass">Speed Class</label>
-            <p class="hint mode-ladder-note">Arcade is the normal family start. Pro and Turbo are faster. Overdrive and Redline are expert-speed dares.</p>
+            <label for="preRaceSpeedClass">Practice Speed</label>
+            <p class="hint mode-ladder-note">Arcade and Pro are practice speeds. Picking a speed or typing a seed switches Ready to Race into Custom Road.</p>
             ${this.renderSpeedClassLadder(track, speedClass.id)}
             <select id="preRaceSpeedClass" class="setup-hidden-select" aria-hidden="true" tabindex="-1">
               ${this.renderSpeedClassOptionsForTrack(track, speedClass.id)}
             </select>
-          </div>
-          <div class="setup-section-heading">
-            <span class="eyebrow">Custom Road / Practice</span>
-            <strong>Type a manual seed or roll a random road.</strong>
           </div>
           <div class="seed-display" aria-live="polite">
             <span>Road Seed</span>
@@ -24797,7 +24957,8 @@ class NeonRoadRally {
             <label for="roadSeedInput">Type a Seed</label>
             <input id="roadSeedInput" type="text" maxlength="32" value="${escapeAttr(seed)}" autocomplete="off" spellcheck="false" inputmode="text">
           </div>
-          <p class="hint">Same seed, track, speed class, and race type repeats the same road. Missed boosts and slower routes cost time.</p>
+          <input id="officialRouteInput" type="hidden" value="${escapeAttr(officialRoute?.id || "")}">
+          <p class="hint">Same seed, track, speed class, and race type repeats the same road. Custom Road records are preserved outside the Official 10 boards.</p>
           <p id="fuelRunBoostHint" class="hint" ${raceType.id === FUEL_RUN_RACE_TYPE_ID ? "" : "hidden"}>Fuel: the bar drains while you race. Grab gas cans; manual boost pauses fuel drain.</p>
           <div class="row setup-action-row">
             <button class="small-button" data-action="randomSeed">Random Seed</button>
@@ -24815,6 +24976,7 @@ class NeonRoadRally {
   bindPreRaceSeedControls() {
     const input = document.getElementById("roadSeedInput");
     const display = document.getElementById("roadSeedDisplay");
+    const officialRouteInput = document.getElementById("officialRouteInput");
     const raceTypeSelect = document.getElementById("preRaceType");
     const raceTypeSummary = document.getElementById("preRaceTypeSummary");
     const routeSummary = document.getElementById("preRaceRouteSummary");
@@ -24828,19 +24990,31 @@ class NeonRoadRally {
     const soloSetupActionSummary = document.getElementById("soloSetupActionSummary");
     const soloSetupActionSeed = document.getElementById("soloSetupActionSeed");
     if (!input || !display) return;
-    const seedMatchesOfficialRoute = () => {
-      const seed = normalizeRoadSeed(input.value, "");
-      return Boolean(seed && OFFICIAL_ROUTES.some((route) => route.seed === seed));
-    };
-    const syncOfficialSeedForCurrentSetup = () => {
-      if (!seedMatchesOfficialRoute()) return;
+    const setOfficialRoute = (route, options = {}) => {
       const track = this.getSelectedTrackFromInputs("preRaceTrack", this.pendingTrackId || DEFAULT_TRACK_ID);
-      const speedClassId = normalizeSpeedClassId(modeSelect?.value || this.profiles.data.speedClassId, DEFAULT_SPEED_CLASS_ID);
-      const raceTypeId = normalizeRaceTypeId(raceTypeSelect?.value || this.pendingRaceTypeId || DEFAULT_RACE_TYPE_ID, DEFAULT_RACE_TYPE_ID);
-      const route = getOfficialRouteForSetup(track.id, speedClassId, raceTypeId);
-      if (!route) return;
-      input.value = route.seed;
-      this.pendingRoadSeed = route.seed;
+      const selectedRoute = route || (options.defaultForTrack ? getDefaultOfficialRouteForTrack(track.id) : null);
+      if (!selectedRoute) {
+        if (officialRouteInput) officialRouteInput.value = "";
+        this.pendingOfficialRouteId = "";
+        return;
+      }
+      const routeTrack = getTrackById(selectedRoute.trackId);
+      const raceTypeId = officialRouteSupportsRaceType(selectedRoute, raceTypeSelect?.value)
+        ? normalizeRaceTypeId(raceTypeSelect.value, DEFAULT_RACE_TYPE_ID)
+        : DEFAULT_RACE_TYPE_ID;
+      const trackInput = document.querySelector(`input[name="preRaceTrack"][value="${selectedRoute.trackId}"]`);
+      if (trackInput) trackInput.checked = true;
+      if (raceTypeSelect) raceTypeSelect.value = raceTypeId;
+      if (modeSelect) modeSelect.value = selectedRoute.speedClassId;
+      if (officialRouteInput) officialRouteInput.value = selectedRoute.id;
+      input.value = selectedRoute.seed;
+      this.pendingTrackId = selectedRoute.trackId;
+      this.pendingRaceTypeId = raceTypeId;
+      this.pendingRoadSeed = selectedRoute.seed;
+      this.pendingOfficialRouteId = selectedRoute.id;
+      this.syncTrackSelectCards("preRaceTrack", selectedRoute.trackId);
+      this.syncRaceTypeSelectForTrack(raceTypeSelect, routeTrack);
+      this.syncSpeedClassSelectForTrack(modeSelect, routeTrack);
     };
     const updateDisplay = () => {
       const normalized = normalizeRoadSeed(input.value, "");
@@ -24849,8 +25023,13 @@ class NeonRoadRally {
       const speedClass = getSpeedClassConfig(modeSelect?.value || this.profiles.data.speedClassId);
       const raceTypeId = normalizeRaceTypeId(raceTypeSelect?.value || this.pendingRaceTypeId || DEFAULT_RACE_TYPE_ID, DEFAULT_RACE_TYPE_ID);
       const raceType = getRaceTypeConfig(trackSupportsRaceType(track, raceTypeId) && isPlayerFacingRaceType(raceTypeId) ? raceTypeId : DEFAULT_RACE_TYPE_ID);
-      const officialRoute = getOfficialRouteForRun(track.id, speedClass.id, raceType.id, normalized);
+      const officialRoute = getOfficialRouteForRun(track.id, speedClass.id, raceType.id, normalized, officialRouteInput?.value || this.pendingOfficialRouteId);
       const competitionKind = getCompetitionKindLabel(officialRoute);
+      if (!officialRoute && officialRouteInput) officialRouteInput.value = "";
+      this.pendingOfficialRouteId = officialRoute?.id || "";
+      this.pendingRoadSeed = normalized;
+      this.pendingRaceTypeId = raceType.id;
+      this.pendingTrackId = track.id;
       this.syncModeLadderMetrics(track);
       display.textContent = normalized || "Random seed on start";
       if (seedSummary) {
@@ -24874,7 +25053,7 @@ class NeonRoadRally {
         fuelRunBoostHint.hidden = raceType.id !== FUEL_RUN_RACE_TYPE_ID;
       }
       if (trackSummary) {
-        trackSummary.textContent = track.name;
+        trackSummary.textContent = `${track.name} Official 10`;
       }
       if (soloSetupActionSummary) {
         soloSetupActionSummary.textContent = officialRoute?.name || `${raceType.label} · ${track.name} · ${speedClass.label}`;
@@ -24883,7 +25062,9 @@ class NeonRoadRally {
         soloSetupCompetitionLabel.textContent = competitionKind;
       }
       if (soloSetupActionSeed) {
-        soloSetupActionSeed.textContent = `${officialRoute ? "Official Seed" : "Custom Road Seed"} ${normalized || "Random on start"}`;
+        soloSetupActionSeed.textContent = officialRoute
+          ? `${raceType.label} · ${speedClass.label} · ${officialRoute.feelTag}`
+          : `${raceType.label} · ${speedClass.label} · Custom Road Seed ${normalized || "Random on start"}`;
       }
       if (musicSummary) {
         musicSummary.textContent = getTrackMusicStatus(track);
@@ -24897,8 +25078,14 @@ class NeonRoadRally {
       const safeRaceTypeId = this.syncRaceTypeSelectForTrack(raceTypeSelect, track);
       this.pendingRaceTypeId = safeRaceTypeId;
       this.syncSpeedClassSelectForTrack(modeSelect, track);
-      syncOfficialSeedForCurrentSetup();
-      updateDisplay();
+      const route = getDefaultOfficialRouteForTrack(track.id);
+      if (route) {
+        this.pendingOfficialRouteId = route.id;
+        this.pendingRoadSeed = route.seed;
+        this.showPreRaceScreen();
+      } else {
+        updateDisplay();
+      }
     };
     document.querySelectorAll('input[name="preRaceTrack"]').forEach((inputEl) => {
       inputEl.addEventListener("change", syncTrackDependentControls);
@@ -24917,30 +25104,22 @@ class NeonRoadRally {
         if (!raceTypeSelect) return;
         raceTypeSelect.value = normalizeRaceTypeId(card.dataset.value, DEFAULT_RACE_TYPE_ID);
         this.pendingRaceTypeId = raceTypeSelect.value;
-        syncOfficialSeedForCurrentSetup();
-        updateDisplay();
+        this.showPreRaceScreen();
       });
     });
     document.querySelectorAll(".official-route-card[data-official-route-id]").forEach((card) => {
       card.addEventListener("click", () => {
         const route = getOfficialRouteById(card.dataset.officialRouteId);
         if (!route) return;
-        const trackInput = document.querySelector(`input[name="preRaceTrack"][value="${route.trackId}"]`);
-        if (trackInput) trackInput.checked = true;
-        if (raceTypeSelect) raceTypeSelect.value = route.raceTypeId;
-        if (modeSelect) modeSelect.value = route.speedClassId;
-        input.value = route.seed;
-        this.pendingTrackId = route.trackId;
-        this.pendingRaceTypeId = route.raceTypeId;
-        this.pendingRoadSeed = route.seed;
-        this.profiles.updateSpeedClass(route.speedClassId);
-        this.syncTrackSelectCards("preRaceTrack", route.trackId);
-        this.syncRaceTypeSelectForTrack(raceTypeSelect, getTrackById(route.trackId));
-        this.syncSpeedClassSelectForTrack(modeSelect, getTrackById(route.trackId));
+        setOfficialRoute(route);
         updateDisplay();
       });
     });
-    input.addEventListener("input", updateDisplay);
+    input.addEventListener("input", () => {
+      if (officialRouteInput) officialRouteInput.value = "";
+      this.pendingOfficialRouteId = "";
+      updateDisplay();
+    });
     input.addEventListener("blur", () => {
       const normalized = normalizeRoadSeed(input.value, "");
       if (normalized) {
@@ -24962,28 +25141,30 @@ class NeonRoadRally {
       modeSelect.addEventListener("change", () => {
         const speedClass = getSpeedClassConfig(modeSelect.value);
         this.profiles.updateSpeedClass(speedClass.id);
-        syncOfficialSeedForCurrentSetup();
+        if (officialRouteInput) officialRouteInput.value = "";
+        this.pendingOfficialRouteId = "";
         updateDisplay();
       });
     }
     if (raceTypeSelect) {
       raceTypeSelect.addEventListener("change", () => {
         this.pendingRaceTypeId = normalizeRaceTypeId(raceTypeSelect.value, DEFAULT_RACE_TYPE_ID);
-        syncOfficialSeedForCurrentSetup();
         updateDisplay();
       });
     }
-    syncTrackDependentControls();
+    updateDisplay();
   }
 
   handleRandomSeed() {
     this.pendingRoadSeed = generateReadableRoadSeed();
+    this.pendingOfficialRouteId = "";
     this.showPreRaceScreen("Custom Road seed ready.");
   }
 
   handleStartSeededRace() {
     if (this.screen !== "preRace") return;
     const input = document.getElementById("roadSeedInput");
+    const officialRouteInput = document.getElementById("officialRouteInput");
     const modeSelect = document.getElementById("preRaceSpeedClass");
     const raceTypeSelect = document.getElementById("preRaceType");
     const track = this.getSelectedTrackFromInputs("preRaceTrack", this.pendingTrackId || DEFAULT_TRACK_ID);
@@ -24991,12 +25172,14 @@ class NeonRoadRally {
     const speedClassId = normalizeSpeedClassId(modeSelect?.value, this.profiles.data.speedClassId);
     const requestedRaceTypeId = normalizeRaceTypeId(raceTypeSelect?.value, DEFAULT_RACE_TYPE_ID);
     const raceTypeId = trackSupportsRaceType(track, requestedRaceTypeId) && isPlayerFacingRaceType(requestedRaceTypeId) ? requestedRaceTypeId : DEFAULT_RACE_TYPE_ID;
+    const officialRouteId = normalizeOfficialRouteId(officialRouteInput?.value || this.pendingOfficialRouteId, "");
     this.profiles.updateSpeedClass(speedClassId);
     this.pendingRoadSeed = seed;
     this.pendingRaceTypeId = raceTypeId;
     this.pendingTrackId = track.id;
+    this.pendingOfficialRouteId = getOfficialRouteForRun(track.id, speedClassId, raceTypeId, seed, officialRouteId)?.id || "";
     if (input) input.value = seed;
-    this.startRace({ seed, speedClassId, raceTypeId, track });
+    this.startRace({ seed, speedClassId, raceTypeId, track, officialRouteId: this.pendingOfficialRouteId });
   }
 
   createDefaultPartySetup() {
@@ -27085,12 +27268,14 @@ class NeonRoadRally {
     const route = getOfficialRouteById(routeId);
     if (!route) return [];
     const maxRows = normalizeNonNegativeInteger(options.limit, 0, LEADERBOARD_STORAGE_MAX_ENTRIES) || LEADERBOARD_MAX_ENTRIES;
+    const raceTypeId = normalizeRaceTypeId(options.raceTypeId || route.raceTypeId || DEFAULT_RACE_TYPE_ID, DEFAULT_RACE_TYPE_ID);
     const entries = Array.isArray(options.entries) ? options.entries : this.profiles.data.leaderboard || [];
     return entries
       .map((entry) => normalizeLeaderboardEntry(entry))
       .filter((entry) => (
         entry
         && entry.officialRouteId === route.id
+        && entry.raceType === raceTypeId
         && !entry.partyMode
         && !isExperimentalRaceType(entry.raceType || entry.raceTypeId)
       ))
@@ -27113,24 +27298,26 @@ class NeonRoadRally {
       .slice(0, maxRows);
   }
 
-  getOfficialBestScoreRecord(playerId, routeId) {
+  getOfficialBestScoreRecord(playerId, routeId, raceTypeId = DEFAULT_RACE_TYPE_ID) {
     const safePlayerId = normalizeStorageId(playerId, "");
     if (!safePlayerId) return null;
-    return this.getOfficialScoreAttackRows(routeId, { limit: LEADERBOARD_STORAGE_MAX_ENTRIES })
+    return this.getOfficialScoreAttackRows(routeId, { limit: LEADERBOARD_STORAGE_MAX_ENTRIES, raceTypeId })
       .filter((entry) => normalizeStorageId(entry.playerId, "") === safePlayerId)
       .sort((a, b) => b.score - a.score || String(a.date).localeCompare(String(b.date)))[0] || null;
   }
 
-  getOfficialBestTimeRecord(playerId, routeId) {
+  getOfficialBestTimeRecord(playerId, routeId, raceTypeId = DEFAULT_RACE_TYPE_ID) {
     const route = getOfficialRouteById(routeId);
     const safePlayerId = normalizeStorageId(playerId, "");
     if (!route || !safePlayerId) return null;
-    const currentPacing = getActivePacingRulesVersion(route.raceTypeId);
+    const safeRaceTypeId = normalizeRaceTypeId(raceTypeId, DEFAULT_RACE_TYPE_ID);
+    const currentPacing = getActivePacingRulesVersion(safeRaceTypeId);
     return (this.profiles.data.leaderboard || [])
       .map((entry) => normalizeLeaderboardEntry(entry))
       .filter((entry) => (
         entry
         && entry.officialRouteId === route.id
+        && entry.raceType === safeRaceTypeId
         && normalizeStorageId(entry.playerId, "") === safePlayerId
         && normalizeRunStatus(entry.status) === "finished"
         && normalizePacingRulesVersion(entry.pacingRulesVersion, getMissingPacingRulesFallback(entry.raceType)) === currentPacing
@@ -27148,14 +27335,15 @@ class NeonRoadRally {
       ? getTrackById(requestedOfficialRoute.trackId)
       : getTrackById(options.trackId || this.leaderboardTrackId || this.pendingTrackId || DEFAULT_TRACK_ID);
     const requestedRaceTypeId = requestedOfficialRoute
-      ? requestedOfficialRoute.raceTypeId
+      ? normalizeRaceTypeId(options.raceTypeId || this.leaderboardRaceTypeId || DEFAULT_RACE_TYPE_ID, DEFAULT_RACE_TYPE_ID)
       : normalizeRaceTypeId(options.raceTypeId || this.leaderboardRaceTypeId || this.pendingRaceTypeId || DEFAULT_RACE_TYPE_ID, DEFAULT_RACE_TYPE_ID);
     const raceTypes = getRaceTypesForTrack(track, { includeExperimental: options.includeExperimental === true });
-    const raceTypeId = raceTypes.some((raceType) => raceType.id === requestedRaceTypeId) ? requestedRaceTypeId : DEFAULT_RACE_TYPE_ID;
+    const routeSupportsRaceType = requestedOfficialRoute ? officialRouteSupportsRaceType(requestedOfficialRoute, requestedRaceTypeId) : true;
+    const raceTypeId = raceTypes.some((raceType) => raceType.id === requestedRaceTypeId) && routeSupportsRaceType ? requestedRaceTypeId : DEFAULT_RACE_TYPE_ID;
     const speedClassId = requestedOfficialRoute
       ? requestedOfficialRoute.speedClassId
       : normalizeSpeedClassId(options.speedClassId || this.leaderboardSpeedClassId || this.profiles.data.speedClassId, DEFAULT_SPEED_CLASS_ID);
-    const officialRoute = getOfficialRouteForSetup(track.id, speedClassId, raceTypeId);
+    const officialRoute = requestedOfficialRoute || null;
     return {
       track,
       trackId: track.id,
@@ -27187,18 +27375,38 @@ class NeonRoadRally {
     `;
   }
 
-  renderOfficialRoutePicker(selectedRouteId, view = this.leaderboardView) {
-    const selectedId = normalizeOfficialRouteId(selectedRouteId, DEFAULT_OFFICIAL_ROUTE_ID);
+  getOfficialRouteRecordSummary(route, raceTypeId = DEFAULT_RACE_TYPE_ID) {
+    const safeRaceTypeId = normalizeRaceTypeId(raceTypeId, DEFAULT_RACE_TYPE_ID);
+    const player = this.profiles.getCurrentPlayer();
+    const leader = this.getOfficialScoreAttackRows(route.id, { raceTypeId: safeRaceTypeId, limit: 1 })[0] || null;
+    const pbScore = player ? this.getOfficialBestScoreRecord(player.id, route.id, safeRaceTypeId) : null;
+    const pbTime = player ? this.getOfficialBestTimeRecord(player.id, route.id, safeRaceTypeId) : null;
+    const timeRows = this.getTimeAttackLeaderboardRows({
+      trackId: route.trackId,
+      raceTypeId: safeRaceTypeId,
+      speedClassId: route.speedClassId
+    }, { legacy: false, limit: LEADERBOARD_STORAGE_MAX_ENTRIES })
+      .filter((entry) => entry.officialRouteId === route.id)
+      .slice(0, 1);
+    const timeLeader = timeRows[0] || null;
+    return {
+      leaderScoreText: leader ? `${leader.playerName} ${formatScore(leader.score)}` : "No score yet",
+      leaderTimeText: timeLeader ? `${timeLeader.playerName} ${formatFinishTimeMs(timeLeader.finishTimeMs)}` : "No time yet",
+      pbText: pbScore || pbTime
+        ? `${pbScore ? `PB ${formatScore(pbScore.score)}` : "No score PB"} · ${pbTime ? formatFinishTimeMs(pbTime.finishTimeMs) : "No time PB"}`
+        : "No PB yet"
+    };
+  }
+
+  renderOfficialRouteRaceTypeButtons(selectedRaceTypeId = DEFAULT_RACE_TYPE_ID, groupName = "preRace") {
+    const selectedId = normalizeRaceTypeId(selectedRaceTypeId, DEFAULT_RACE_TYPE_ID);
     return `
-      <div class="official-route-grid compact-official-route-grid" aria-label="Official 10 routes">
-        ${OFFICIAL_ROUTES.map((route) => {
-          const scoreLeader = this.getOfficialScoreAttackRows(route.id, { limit: 1 })[0] || null;
-          const scoreText = scoreLeader ? `${scoreLeader.playerName} ${formatScore(scoreLeader.score)}` : "No score yet";
+      <div class="official-rules-toggle" aria-label="Official race rules">
+        ${OFFICIAL_ROUTE_RACE_TYPE_IDS.map((raceTypeId) => {
+          const raceType = getRaceTypeConfig(raceTypeId);
           return `
-            <button class="official-route-card ${route.id === selectedId ? "is-selected" : ""}" type="button" data-action="leaderboard" data-view="${escapeAttr(view)}" data-official-route-id="${escapeAttr(route.id)}">
-              <strong>${escapeHtml(route.name)}</strong>
-              <span>${escapeHtml(route.seed)}</span>
-              <small>${escapeHtml(scoreText)}</small>
+            <button class="small-button ${raceTypeId === selectedId ? "primary" : ""}" type="button" data-race-type-choice="${escapeAttr(groupName)}" data-value="${escapeAttr(raceTypeId)}">
+              ${escapeHtml(raceType.label)}
             </button>
           `;
         }).join("")}
@@ -27206,17 +27414,46 @@ class NeonRoadRally {
     `;
   }
 
-  renderOfficialRouteChoiceGrid(selectedRouteId) {
+  renderOfficialRoutePicker(selectedRouteId, view = this.leaderboardView, options = {}) {
+    const selectedId = normalizeOfficialRouteId(selectedRouteId, DEFAULT_OFFICIAL_ROUTE_ID);
+    const trackId = normalizeTrackId(options.trackId || getOfficialRouteById(selectedId)?.trackId, DEFAULT_TRACK_ID);
+    const raceTypeId = normalizeRaceTypeId(options.raceTypeId || this.leaderboardRaceTypeId || DEFAULT_RACE_TYPE_ID, DEFAULT_RACE_TYPE_ID);
+    const routes = getOfficialRoutesForTrack(trackId);
+    return `
+      <div class="official-route-grid compact-official-route-grid" aria-label="Official 10 routes">
+        ${routes.map((route) => {
+          const stats = this.getOfficialRouteRecordSummary(route, raceTypeId);
+          return `
+            <button class="official-route-card ${route.id === selectedId ? "is-selected" : ""}" type="button" data-action="leaderboard" data-view="${escapeAttr(view)}" data-official-route-id="${escapeAttr(route.id)}" data-race-type-id="${escapeAttr(raceTypeId)}">
+              <strong>${escapeHtml(route.name)}</strong>
+              <span>${escapeHtml(route.speedClassLabel)} · ${escapeHtml(route.feelTag)}</span>
+              <small>${escapeHtml(view === LEADERBOARD_VIEW_TIME_ATTACK ? stats.leaderTimeText : stats.leaderScoreText)}</small>
+              <em>${escapeHtml(route.seed)}</em>
+            </button>
+          `;
+        }).join("")}
+      </div>
+    `;
+  }
+
+  renderOfficialRouteChoiceGrid(selectedRouteId, trackId = DEFAULT_TRACK_ID, raceTypeId = DEFAULT_RACE_TYPE_ID) {
     const selectedId = normalizeOfficialRouteId(selectedRouteId, "");
+    const safeTrackId = normalizeTrackId(trackId, DEFAULT_TRACK_ID);
+    const safeRaceTypeId = normalizeRaceTypeId(raceTypeId, DEFAULT_RACE_TYPE_ID);
+    const routes = getOfficialRoutesForTrack(safeTrackId);
     return `
       <div class="official-route-grid" aria-label="Official 10 routes">
-        ${OFFICIAL_ROUTES.map((route) => `
+        ${routes.map((route) => {
+          const stats = this.getOfficialRouteRecordSummary(route, safeRaceTypeId);
+          return `
           <button class="official-route-card ${route.id === selectedId ? "is-selected" : ""}" type="button" data-official-route-id="${escapeAttr(route.id)}">
             <strong>${escapeHtml(route.name)}</strong>
-            <span>${escapeHtml(route.seed)}</span>
-            <small>Score Attack + Time Attack</small>
+            <span>${escapeHtml(route.speedClassLabel)} · ${escapeHtml(route.feelTag)}</span>
+            <small>${escapeHtml(stats.pbText)}</small>
+            <em>${escapeHtml(route.seed)}</em>
           </button>
-        `).join("")}
+        `;
+        }).join("")}
       </div>
     `;
   }
@@ -27258,7 +27495,7 @@ class NeonRoadRally {
       );
       const officialRoute = source.partyMode || source.challengeId
         ? null
-        : getOfficialRouteForRun(trackId, speedClassId, raceTypeId, source.seed || source.roadSeed);
+        : getOfficialRouteForRun(trackId, speedClassId, raceTypeId, source.seed || source.roadSeed, source.officialRouteId);
       const row = {
         ...source,
         trackId,
@@ -27374,8 +27611,16 @@ class NeonRoadRally {
     this.syncLeaderboardFilterState(filter);
     const entries = this.profiles.data.leaderboard;
     const visibleScoreEntries = entries.filter((entry) => !isExperimentalRaceType(entry.raceType || entry.raceTypeId));
-    const officialRoute = filter.officialRoute || (activeView === LEADERBOARD_VIEW_SCORE_ATTACK ? getDefaultOfficialRoute() : null);
-    const officialScoreEntries = officialRoute ? this.getOfficialScoreAttackRows(officialRoute.id) : [];
+    const officialRoute = filter.officialRoute || (activeView === LEADERBOARD_VIEW_SCORE_ATTACK ? getDefaultOfficialRouteForTrack(filter.trackId) : null);
+    if (officialRoute) {
+      this.syncLeaderboardFilterState({
+        ...filter,
+        speedClassId: officialRoute.speedClassId,
+        officialRouteId: officialRoute.id,
+        officialRoute
+      });
+    }
+    const officialScoreEntries = officialRoute ? this.getOfficialScoreAttackRows(officialRoute.id, { raceTypeId: filter.raceTypeId }) : [];
     const customScoreEntries = this.getCustomScoreAttackRows();
     const partyScoreEntries = visibleScoreEntries.filter((entry) => entry.partyMode);
     const currentTimeRows = activeView === LEADERBOARD_VIEW_TIME_ATTACK
@@ -27392,7 +27637,7 @@ class NeonRoadRally {
         .filter((entry) => !entry.officialRouteId || entry.officialRouteId !== officialRoute.id)
         .slice(0, LEADERBOARD_MAX_ENTRIES)
       : [];
-    const setupLabel = officialRoute && filter.raceTypeId === DEFAULT_RACE_TYPE_ID
+    const setupLabel = officialRoute && officialRouteSupportsRaceType(officialRoute, filter.raceTypeId)
       ? `${officialRoute.name} · Official Seed ${officialRoute.seed}`
       : `${filter.track.name} · ${getRaceTypeLabel(filter.raceTypeId)} · ${getSpeedClassLabel(filter.speedClassId)}`;
     const activeVersion = getActivePacingRulesVersion(filter.raceTypeId);
@@ -27403,10 +27648,11 @@ class NeonRoadRally {
         <h2>${activeView === LEADERBOARD_VIEW_TIME_ATTACK ? "Time Attack" : "Score Attack"}</h2>
         ${this.renderLeaderboardTabs(activeView)}
         <div class="leaderboard-section-heading">
-          <span class="eyebrow">Official 10</span>
-          <strong>Fixed Classic routes for Score Attack and Time Attack records</strong>
+          <span class="eyebrow">${escapeHtml(filter.track.name)} Official 10</span>
+          <strong>Named Turbo, Overdrive, and Redline routes for Score Attack and Time Attack</strong>
         </div>
-        ${this.renderOfficialRoutePicker(officialRoute?.id || DEFAULT_OFFICIAL_ROUTE_ID, activeView)}
+        ${this.renderOfficialRouteRaceTypeButtons(filter.raceTypeId, "leaderboard")}
+        ${this.renderOfficialRoutePicker(officialRoute?.id || DEFAULT_OFFICIAL_ROUTE_ID, activeView, { trackId: filter.trackId, raceTypeId: filter.raceTypeId })}
         ${activeView === LEADERBOARD_VIEW_TIME_ATTACK ? `
           <p class="hint">Time Attack Board: ${escapeHtml(setupLabel)} · ${escapeHtml(activeVersion)}. ${officialRoute ? "Finished Official Race runs rank here by precise time." : "Finished runs rank here by precise time for this filter."}</p>
           ${this.renderTimeAttackControls(filter)}
@@ -27434,7 +27680,7 @@ class NeonRoadRally {
             </ol>
           ` : ""}
         ` : `
-          <p class="hint">Score Attack Board: highest score wins on fixed Official Race routes. Experimental Pursuit records stay preserved in Playtest Tools.</p>
+          <p class="hint">Score Attack Board: highest score wins on the selected Official Route and race rules. Experimental Pursuit records stay preserved in Playtest Tools.</p>
           <div class="leaderboard-section-heading">
             <span class="eyebrow">Official Score Attack</span>
             <strong>${escapeHtml(officialRoute?.name || "Official Race")}</strong>
@@ -27470,6 +27716,15 @@ class NeonRoadRally {
       </section>
     `;
     this.bindLayerButtons();
+    document.querySelectorAll('[data-race-type-choice="leaderboard"]').forEach((button) => {
+      button.addEventListener("click", () => {
+        this.showLeaderboard(activeView, {
+          officialRouteId: officialRoute?.id || DEFAULT_OFFICIAL_ROUTE_ID,
+          raceTypeId: button.dataset.value,
+          trackId: filter.trackId
+        });
+      });
+    });
     if (activeView === LEADERBOARD_VIEW_TIME_ATTACK) this.bindLeaderboardControls();
   }
 
@@ -27481,7 +27736,7 @@ class NeonRoadRally {
       return;
     }
     const leaderboard = summary.officialRouteId
-      ? this.getOfficialScoreAttackRows(summary.officialRouteId)
+      ? this.getOfficialScoreAttackRows(summary.officialRouteId, { raceTypeId: summary.raceTypeId })
       : this.profiles.data.leaderboard
         .filter((entry) => !isExperimentalRaceType(entry.raceType || entry.raceTypeId))
         .slice(0, LEADERBOARD_MAX_ENTRIES);
