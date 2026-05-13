@@ -136,11 +136,13 @@ async function startCustomRun(page, route) {
 
 async function exerciseDrift(page, directionKey, expectedDirection, options = {}) {
   const holdMs = options.holdMs ?? 320;
+  const stabilityWaitMs = options.stabilityWaitMs ?? 180;
   const releaseMode = options.releaseMode || "shift";
   const before = await page.evaluate(() => {
     const run = window.neonRoadRally.run;
     return {
       targetLane: run.targetLane,
+      renderLaneFloat: Number((run.renderLaneFloat || 0).toFixed(3)),
       laneMoves: run.laneMoves,
       speed: run.currentSpeed
     };
@@ -152,6 +154,12 @@ async function exerciseDrift(page, directionKey, expectedDirection, options = {}
     return run.driftActive === true && run.driftDirection === direction && (run.driftChargeSeconds || 0) > 0.08;
   }, expectedDirection, { timeout: 5000 });
   if (holdMs > 0) await page.waitForTimeout(holdMs);
+  if (holdMs >= 800) {
+    await page.waitForFunction(() => {
+      const run = window.neonRoadRally?.run || {};
+      return Boolean(run.driftFullChargeReady) || (run.driftChargeSeconds || 0) >= 1.045;
+    }, null, { timeout: 1500 });
+  }
   const active = await page.evaluate(() => {
     const app = window.neonRoadRally;
     const run = app.run;
@@ -161,9 +169,11 @@ async function exerciseDrift(page, directionKey, expectedDirection, options = {}
       driftDirection: run.driftDirection,
       driftChargeSeconds: Number((run.driftChargeSeconds || 0).toFixed(3)),
       driftChargeRatio: Number((run.driftChargeRatio || 0).toFixed(3)),
+      driftDashDistance: Number((run.driftDashDistance || 0).toFixed(3)),
       fullChargeReady: Boolean(run.driftFullChargeReady),
       fullChargeCueActive: (run.driftFullChargeCueTimer || 0) > 0 || Boolean(run.driftFullChargeReady),
       targetLane: run.targetLane,
+      renderLaneFloat: Number((run.renderLaneFloat || 0).toFixed(3)),
       laneMoves: run.laneMoves,
       visualCueActive: (run.driftSkidSparkTimer || 0) > 0,
       hitbox: {
@@ -175,19 +185,35 @@ async function exerciseDrift(page, directionKey, expectedDirection, options = {}
   assert(active.driftActive, "Drift should become active while Shift and steering are held", { active });
   assert(active.driftDirection === expectedDirection, "Drift direction should match steering direction", { active });
   assert(active.visualCueActive, "Drift skid/spark cue should be active", { active });
-  assert(active.targetLane === before.targetLane, "Shift + steering should not change target lane", { before, active });
   assert(active.laneMoves === before.laneMoves, "Shift + steering should not count a lane move", { before, active });
-  if (holdMs >= 3000) {
-    assert(active.fullChargeReady, "Full-charge drift should mark the charge as ready", { active });
-    assert(active.fullChargeCueActive, "Full-charge drift should expose a visual cue state", { active });
+  assert(active.driftDashDistance > 0, "Shift + steering should start a cross-lane drift dash immediately", { before, active });
+  assert(active.renderLaneFloat >= 0 && active.renderLaneFloat <= 4, "Active drift dash should stay inside road bounds", { before, active });
+  if (expectedDirection < 0) {
+    assert(active.renderLaneFloat < before.renderLaneFloat, "Left drift dash should move the car left immediately", { before, active });
+  } else {
+    assert(active.renderLaneFloat > before.renderLaneFloat, "Right drift dash should move the car right immediately", { before, active });
   }
-  await page.waitForTimeout(180);
+  if (holdMs >= 800) {
+    assert(active.fullChargeReady, "Max-hold drift dash should mark the cue as ready", { active });
+    assert(active.fullChargeCueActive, "Max-hold drift dash should expose a visual cue state", { active });
+  }
+  await page.waitForTimeout(stabilityWaitMs);
   const held = await page.evaluate(() => {
     const run = window.neonRoadRally.run;
-    return { targetLane: run.targetLane, laneMoves: run.laneMoves };
+    return {
+      targetLane: run.targetLane,
+      renderLaneFloat: Number((run.renderLaneFloat || 0).toFixed(3)),
+      driftDashDistance: Number((run.driftDashDistance || 0).toFixed(3)),
+      laneMoves: run.laneMoves
+    };
   });
-  assert(held.targetLane === active.targetLane, "Holding drift should not keep changing lanes", { before, active, held });
   assert(held.laneMoves === active.laneMoves, "Holding drift should not repeat lane moves", { before, active, held });
+  assert(held.renderLaneFloat >= 0 && held.renderLaneFloat <= 4, "Held drift dash should stay inside road bounds", { before, active, held });
+  if (expectedDirection < 0) {
+    assert(held.renderLaneFloat <= active.renderLaneFloat + 0.05, "Holding left drift dash should continue or hold its leftward cut", { before, active, held });
+  } else {
+    assert(held.renderLaneFloat >= active.renderLaneFloat - 0.05, "Holding right drift dash should continue or hold its rightward cut", { before, active, held });
+  }
 
   if (releaseMode === "direction") {
     await page.keyboard.up(directionKey);
@@ -207,9 +233,17 @@ async function exerciseDrift(page, directionKey, expectedDirection, options = {}
       driftBoostMultiplier: Number((run.driftBoostMultiplier || 1).toFixed(3)),
       driftReleaseBurstTimer: Number((run.driftReleaseBurstTimer || 0).toFixed(3)),
       driftBoostsReleased: run.driftBoostsReleased || 0,
+      driftDashesCompleted: run.driftDashesCompleted || 0,
+      driftDashTime: Number((run.driftDashTime || 0).toFixed(3)),
+      driftLanesCrossed: Number((run.driftLanesCrossed || 0).toFixed(3)),
+      longestDriftDashLanes: Number((run.longestDriftDashLanes || 0).toFixed(3)),
       driftsStarted: run.driftsStarted || 0,
+      maxDriftHold: Number((run.maxDriftHold || 0).toFixed(3)),
       maxDriftCharge: Number((run.maxDriftCharge || 0).toFixed(3)),
       fullRelease: Boolean(run.driftLastReleaseFullCharge),
+      targetLane: run.targetLane,
+      renderLaneFloat: Number((run.renderLaneFloat || 0).toFixed(3)),
+      laneMoves: run.laneMoves,
       currentSpeed: Number((run.currentSpeed || 0).toFixed(2)),
       previousSpeed: Number((previousSpeed || 0).toFixed(2))
     };
@@ -217,7 +251,11 @@ async function exerciseDrift(page, directionKey, expectedDirection, options = {}
   assert(release.driftBoostTimer > 0, "Drift release should create a timed speed boost", { release });
   assert(release.driftBoostMultiplier > 1, "Drift release should raise the speed multiplier", { release });
   assert(release.driftReleaseBurstTimer > 0, "Drift release burst visual cue should be active", { release });
-  assert(release.driftBoostsReleased >= 1 && release.driftsStarted >= 1, "Drift telemetry should increment", { release });
+  assert(release.driftBoostsReleased >= 1 && release.driftsStarted >= 1 && release.driftDashesCompleted >= 1, "Drift telemetry should increment", { release });
+  assert(release.driftLanesCrossed > 0 && release.longestDriftDashLanes > 0, "Drift dash telemetry should record lanes crossed", { release });
+  assert(Number.isInteger(release.targetLane) && release.targetLane >= 0 && release.targetLane <= 4, "Drift dash release should settle to a valid lane", { release });
+  assert(release.renderLaneFloat >= 0 && release.renderLaneFloat <= 4, "Released drift dash should remain inside road bounds", { release });
+  assert(release.laneMoves === before.laneMoves, "Drift dash release should not count as normal lane movement", { before, release });
   return { before, active, release };
 }
 
@@ -255,29 +293,40 @@ async function forceFinishWithDriftNote(page) {
     run.manualBoosts = Math.max(0, run.manualBoosts || 0);
     run.driftsStarted = Math.max(run.driftsStarted || 0, 2);
     run.driftBoostsReleased = Math.max(run.driftBoostsReleased || 0, 2);
-    run.driftBoostTime = Math.max(run.driftBoostTime || 0, 1.9);
-    run.longestDrift = Math.max(run.longestDrift || 0, 3);
-    run.maxDriftCharge = Math.max(run.maxDriftCharge || 0, 3);
+    run.driftDashesCompleted = Math.max(run.driftDashesCompleted || 0, 2);
+    run.driftBoostTime = Math.max(run.driftBoostTime || 0, 1.1);
+    run.driftDashTime = Math.max(run.driftDashTime || 0, 1.2);
+    run.driftLanesCrossed = Math.max(run.driftLanesCrossed || 0, 2.2);
+    run.longestDriftDashLanes = Math.max(run.longestDriftDashLanes || 0, 2.1);
+    run.longestDrift = Math.max(run.longestDrift || 0, 1.05);
+    run.maxDriftCharge = Math.max(run.maxDriftCharge || 0, 1.05);
+    run.maxDriftHold = Math.max(run.maxDriftHold || 0, 1.05);
+    run.driftNearMisses = 0;
     run.slowdownHits = 0;
     app.endRace("finished", "Drift Browser Smoke Finish");
   });
   await page.waitForFunction(() => window.neonRoadRally?.screen === "score", null, { timeout: 5000 });
   const text = await bodyText(page);
   assertIncludes(text, "Official Race Result");
-  assertIncludes(text, "Full drift boost");
+  assertIncludes(text, "Big drift cut");
   const summary = await page.evaluate(() => {
     const result = window.neonRoadRally.lastSummary || {};
     return {
       driftResultNote: result.driftResultNote || "",
       driftsStarted: result.driftsStarted || 0,
       driftBoostsReleased: result.driftBoostsReleased || 0,
+      driftDashesCompleted: result.driftDashesCompleted || 0,
       driftBoostTime: Number((result.driftBoostTime || 0).toFixed(3)),
+      driftDashTime: Number((result.driftDashTime || 0).toFixed(3)),
       longestDrift: Number((result.longestDrift || 0).toFixed(3)),
       maxDriftCharge: Number((result.maxDriftCharge || 0).toFixed(3)),
+      maxDriftHold: Number((result.maxDriftHold || 0).toFixed(3)),
+      driftLanesCrossed: Number((result.driftLanesCrossed || 0).toFixed(3)),
+      longestDriftDashLanes: Number((result.longestDriftDashLanes || 0).toFixed(3)),
       raceTypeId: result.raceTypeId || ""
     };
   });
-  assert(summary.driftResultNote === "Full drift boost", "Result summary should keep the full-charge drift note", { summary });
+  assert(summary.driftResultNote === "Big drift cut", "Result summary should keep the drift dash note", { summary });
   return summary;
 }
 
@@ -336,7 +385,7 @@ async function main() {
       raceTypeId: "classic",
       seed: "DRIFT-ARCADE-SHORT"
     });
-    const arcadeShortDrift = await exerciseDrift(page, "a", -1, { holdMs: 260, releaseMode: "direction" });
+    const arcadeShortDrift = await exerciseDrift(page, "a", -1, { holdMs: 120, stabilityWaitMs: 30, releaseMode: "direction" });
     const arcadeControls = await assertLaneAndSpaceBoostStillWork(page);
 
     await startCustomRun(page, {
@@ -345,10 +394,10 @@ async function main() {
       raceTypeId: "classic",
       seed: "DRIFT-ARCADE-FULL"
     });
-    const arcadeFullDrift = await exerciseDrift(page, "d", 1, { holdMs: 3250, releaseMode: "shift" });
-    assert(arcadeFullDrift.release.driftBoostMultiplier > arcadeShortDrift.release.driftBoostMultiplier, "Arcade full drift should release a stronger boost than short drift", { arcadeShortDrift, arcadeFullDrift });
-    assert(arcadeFullDrift.release.driftBoostTimer > arcadeShortDrift.release.driftBoostTimer, "Arcade full drift should release a longer boost than short drift", { arcadeShortDrift, arcadeFullDrift });
-    assert(arcadeFullDrift.release.fullRelease, "Arcade full drift should mark the release as full charge", { arcadeFullDrift });
+    const arcadeFullDrift = await exerciseDrift(page, "d", 1, { holdMs: 950, releaseMode: "shift" });
+    assert(arcadeFullDrift.release.driftBoostMultiplier > arcadeShortDrift.release.driftBoostMultiplier, "Arcade long drift dash should release a stronger boost than short drift dash", { arcadeShortDrift, arcadeFullDrift });
+    assert(arcadeFullDrift.release.driftBoostTimer > arcadeShortDrift.release.driftBoostTimer, "Arcade long drift dash should release a longer boost than short drift dash", { arcadeShortDrift, arcadeFullDrift });
+    assert(arcadeFullDrift.release.fullRelease, "Arcade long drift dash should mark the release as a max dash", { arcadeFullDrift });
 
     await startOfficialRun(page, {
       routeId: "sunset-neon-palm-sprint",
@@ -357,7 +406,7 @@ async function main() {
       raceTypeId: "classic",
       seed: "SUNSET-PALM-SPRINT-TURBO"
     });
-    const turboShortDrift = await exerciseDrift(page, "a", -1, { holdMs: 260, releaseMode: "shift" });
+    const turboShortDrift = await exerciseDrift(page, "a", -1, { holdMs: 120, stabilityWaitMs: 30, releaseMode: "shift" });
 
     await startOfficialRun(page, {
       routeId: "sunset-neon-palm-sprint",
@@ -366,9 +415,9 @@ async function main() {
       raceTypeId: "classic",
       seed: "SUNSET-PALM-SPRINT-TURBO"
     });
-    const turboFullDrift = await exerciseDrift(page, "ArrowRight", 1, { holdMs: 3250, releaseMode: "direction" });
-    assert(turboFullDrift.release.driftBoostMultiplier > turboShortDrift.release.driftBoostMultiplier, "Turbo full drift should release a stronger boost than short drift", { turboShortDrift, turboFullDrift });
-    assert(turboFullDrift.release.driftBoostTimer > turboShortDrift.release.driftBoostTimer, "Turbo full drift should release a longer boost than short drift", { turboShortDrift, turboFullDrift });
+    const turboFullDrift = await exerciseDrift(page, "ArrowRight", 1, { holdMs: 950, releaseMode: "direction" });
+    assert(turboFullDrift.release.driftBoostMultiplier > turboShortDrift.release.driftBoostMultiplier, "Turbo long drift dash should release a stronger boost than short drift dash", { turboShortDrift, turboFullDrift });
+    assert(turboFullDrift.release.driftBoostTimer > turboShortDrift.release.driftBoostTimer, "Turbo long drift dash should release a longer boost than short drift dash", { turboShortDrift, turboFullDrift });
     const finishSummary = await forceFinishWithDriftNote(page);
 
     await startOfficialRun(page, {

@@ -3005,15 +3005,14 @@ function getBoostlineResultNote(summary = {}) {
 function getDriftResultNote(summary = {}) {
   const status = normalizeRunStatus(summary.status);
   const driftBoosts = Math.max(0, summary.driftBoostsReleased || 0);
-  const longestDrift = Math.max(0, summary.longestDrift || 0);
-  const maxDriftCharge = Math.max(longestDrift, summary.maxDriftCharge || 0);
+  const driftDashes = Math.max(0, summary.driftDashesCompleted || 0);
+  const longestDashLanes = Math.max(0, summary.longestDriftDashLanes || 0);
   const nearMisses = Math.max(0, summary.driftNearMisses || 0);
   const crashedWhileDrifting = Math.max(0, summary.crashesWhileDrifting || 0);
   if (status === "crashed" && crashedWhileDrifting > 0) return "Crashed while drifting";
-  if (driftBoosts > 0 && maxDriftCharge >= DRIFT_TUNING.maxChargeSeconds * 0.98) return "Full drift boost";
   if (nearMisses > 0) return "Risky drift line";
-  if (driftBoosts > 0 && longestDrift >= DRIFT_TUNING.minChargeSeconds) return "Strong drift boost";
-  if (status === "finished" && driftBoosts > 0 && (summary.slowdownHits || 0) === 0) return "Clean drift finish";
+  if (longestDashLanes >= 1.75) return "Big drift cut";
+  if (driftDashes > 0 || driftBoosts > 0) return "Clean drift dash";
   return "";
 }
 
@@ -3378,18 +3377,21 @@ const SPEED_TUNING = {
 };
 
 const DRIFT_TUNING = {
-  minChargeSeconds: 0.25,
-  maxChargeSeconds: 3,
-  minBoostDuration: 0.55,
-  maxBoostDuration: 1.9,
-  minBoostMultiplier: 1.07,
-  maxBoostMultiplier: 1.27,
-  releaseCooldownSeconds: 0.65,
-  leanLaneOffset: 0.24,
+  minChargeSeconds: 0.15,
+  maxChargeSeconds: 1.05,
+  minBoostDuration: 0.45,
+  maxBoostDuration: 0.9,
+  minBoostMultiplier: 1.06,
+  maxBoostMultiplier: 1.16,
+  releaseCooldownSeconds: 0.55,
+  leanLaneOffset: 0.08,
   dangerLaneReach: 0.48,
-  releaseBurstSeconds: 0.42,
-  skidSparkSeconds: 0.2,
-  fullChargeCueSeconds: 0.5
+  releaseBurstSeconds: 0.32,
+  skidSparkSeconds: 0.16,
+  fullChargeCueSeconds: 0.24,
+  dashLanesPerSecond: 3.8,
+  fullBoostDashLanes: 2,
+  minBoostDashLanes: 0.14
 };
 
 const ARCADE_FEEL = {
@@ -5911,8 +5913,13 @@ function normalizePlaytestRunSummary(entry) {
     driftsStarted: normalizeNonNegativeInteger(entry.driftsStarted, 0, 999),
     driftBoostsReleased: normalizeNonNegativeInteger(entry.driftBoostsReleased, 0, 999),
     driftBoostTime: normalizeNonNegativeNumber(entry.driftBoostTime, 0, 24 * 60 * 60),
+    driftDashesCompleted: normalizeNonNegativeInteger(entry.driftDashesCompleted, 0, 999),
+    driftDashTime: normalizeNonNegativeNumber(entry.driftDashTime, 0, 24 * 60 * 60),
     longestDrift: normalizeNonNegativeNumber(entry.longestDrift, 0, DRIFT_TUNING.maxChargeSeconds),
     maxDriftCharge: normalizeNonNegativeNumber(entry.maxDriftCharge || entry.longestDrift, 0, DRIFT_TUNING.maxChargeSeconds),
+    maxDriftHold: normalizeNonNegativeNumber(entry.maxDriftHold || entry.maxDriftCharge || entry.longestDrift, 0, DRIFT_TUNING.maxChargeSeconds),
+    driftLanesCrossed: normalizeNonNegativeNumber(entry.driftLanesCrossed, 0, LANES * 999),
+    longestDriftDashLanes: normalizeNonNegativeNumber(entry.longestDriftDashLanes, 0, LANES - 1),
     driftNearMisses: normalizeNonNegativeInteger(entry.driftNearMisses, 0, 999),
     crashesWhileDrifting: normalizeNonNegativeInteger(entry.crashesWhileDrifting, 0, 999),
     boostPadsCollected: normalizeNonNegativeInteger(entry.boostPadsCollected, 0, 999),
@@ -6384,6 +6391,32 @@ function getDriftBoostForCharge(chargeSeconds = 0) {
     };
   }
   const shaped = Math.pow(fullRatio, 0.85);
+  return {
+    ratio,
+    duration: lerp(DRIFT_TUNING.minBoostDuration, DRIFT_TUNING.maxBoostDuration, shaped),
+    multiplier: lerp(DRIFT_TUNING.minBoostMultiplier, DRIFT_TUNING.maxBoostMultiplier, shaped)
+  };
+}
+
+function getDriftDashLaneDistanceForHold(holdSeconds = 0) {
+  const hold = clampNumber(holdSeconds, 0, DRIFT_TUNING.maxChargeSeconds, 0);
+  return hold * DRIFT_TUNING.dashLanesPerSecond;
+}
+
+function getNearestValidLane(laneFloat = TRACK_DIRECTOR.centerLane) {
+  return Math.round(clampNumber(laneFloat, 0, LANES - 1, TRACK_DIRECTOR.centerLane));
+}
+
+function getDriftDashBoostForRelease(holdSeconds = 0, lanesCrossed = 0) {
+  const crossed = Math.max(0, lanesCrossed || 0);
+  if (crossed < DRIFT_TUNING.minBoostDashLanes) {
+    return { ratio: 0, duration: 0, multiplier: 1 };
+  }
+  const holdRatio = getDriftChargeRatio(holdSeconds);
+  const laneRatio = clamp(crossed / Math.max(0.001, DRIFT_TUNING.fullBoostDashLanes), 0, 1);
+  const ratio = clamp(Math.min(holdRatio, 0.35 + laneRatio * 0.65), 0, 1);
+  if (ratio <= 0) return { ratio: 0, duration: 0, multiplier: 1 };
+  const shaped = Math.pow(ratio, 0.82);
   return {
     ratio,
     duration: lerp(DRIFT_TUNING.minBoostDuration, DRIFT_TUNING.maxBoostDuration, shaped),
@@ -7380,7 +7413,7 @@ const AUDIO_TEST_SFX = [
   { key: "boostActive", label: "Boost Active" },
   { key: "boostEnd", label: "Boost End" },
   { key: "driftStart", label: "Drift Start" },
-  { key: "driftFullCharge", label: "Drift Full" },
+  { key: "driftFullCharge", label: "Drift Dash Max" },
   { key: "driftRelease", label: "Drift Release" },
   { key: "rampApproach", label: "Ramp Approach" },
   { key: "rampTakeoff", label: "Jump" },
@@ -19528,6 +19561,10 @@ class NeonRoadRally {
       driftChargeSeconds: 0,
       driftChargeRatio: 0,
       maxDriftCharge: 0,
+      maxDriftHold: 0,
+      driftDashStartLaneFloat: 2,
+      driftDashDistance: 0,
+      driftDashLastLaneFloat: 2,
       driftFullChargeReady: false,
       driftFullChargeCuePlayed: false,
       driftCooldownTimer: 0,
@@ -19536,6 +19573,10 @@ class NeonRoadRally {
       driftsStarted: 0,
       driftBoostsReleased: 0,
       driftBoostTime: 0,
+      driftDashesCompleted: 0,
+      driftDashTime: 0,
+      driftLanesCrossed: 0,
+      longestDriftDashLanes: 0,
       longestDrift: 0,
       driftNearMisses: 0,
       crashesWhileDrifting: 0,
@@ -20593,6 +20634,10 @@ class NeonRoadRally {
 
   updateLaneVisual(dt) {
     const run = this.run;
+    if (run.driftActive) {
+      run.playerLaneFloat = clampNumber(run.renderLaneFloat, 0, LANES - 1, run.targetLane);
+      return;
+    }
     const target = clamp(run.targetLane, 0, LANES - 1);
     const diff = target - run.renderLaneFloat;
     run.laneChangeDuration = INPUT_CONFIG.laneChangeDurationSeconds;
@@ -20943,6 +20988,9 @@ class NeonRoadRally {
       run.driftDirection = 0;
       run.driftChargeSeconds = 0;
       run.driftChargeRatio = 0;
+      run.driftDashDistance = 0;
+      run.driftDashStartLaneFloat = Number.isFinite(run.renderLaneFloat) ? run.renderLaneFloat : run.targetLane;
+      run.driftDashLastLaneFloat = run.driftDashStartLaneFloat;
       run.driftFullChargeReady = false;
       run.driftFullChargeCuePlayed = false;
     }
@@ -21006,11 +21054,22 @@ class NeonRoadRally {
     const run = this.run;
     if (!run || run.paused || run.ended || !run.raceActive || run.airborne) return false;
     const driftDirection = direction < 0 ? -1 : 1;
+    const startLaneFloat = clampNumber(
+      Number.isFinite(run.renderLaneFloat) ? run.renderLaneFloat : run.targetLane,
+      0,
+      LANES - 1,
+      TRACK_DIRECTOR.centerLane
+    );
     run.driftActive = true;
     run.driftDirection = driftDirection;
     run.driftLastDirection = driftDirection;
     run.driftChargeSeconds = 0;
     run.driftChargeRatio = 0;
+    run.driftDashStartLaneFloat = startLaneFloat;
+    run.driftDashLastLaneFloat = startLaneFloat;
+    run.driftDashDistance = 0;
+    run.renderLaneFloat = startLaneFloat;
+    run.playerLaneFloat = startLaneFloat;
     run.driftFullChargeReady = false;
     run.driftFullChargeCuePlayed = false;
     run.driftLastReleaseFullCharge = false;
@@ -21027,20 +21086,39 @@ class NeonRoadRally {
   releaseDriftBoost(reason = "release") {
     const run = this.run;
     if (!run || !run.driftActive) return null;
-    const chargeSeconds = Math.max(0, run.driftChargeSeconds || 0);
+    const holdSeconds = Math.max(0, run.driftChargeSeconds || 0);
     const direction = run.driftDirection < 0 ? -1 : 1;
-    const boost = getDriftBoostForCharge(chargeSeconds);
-    const fullRelease = boost.ratio >= 0.99;
+    const startLaneFloat = clampNumber(run.driftDashStartLaneFloat, 0, LANES - 1, run.renderLaneFloat);
+    const currentLaneFloat = clampNumber(run.renderLaneFloat, 0, LANES - 1, startLaneFloat);
+    const lanesCrossed = Math.abs(currentLaneFloat - startLaneFloat);
+    const settleLane = getNearestValidLane(currentLaneFloat);
+    const boost = getDriftDashBoostForRelease(holdSeconds, lanesCrossed);
+    const fullRelease = lanesCrossed >= DRIFT_TUNING.fullBoostDashLanes * 0.98 || boost.ratio >= 0.98;
     run.driftActive = false;
     run.driftLastDirection = direction;
     run.driftDirection = 0;
     run.driftChargeSeconds = 0;
     run.driftChargeRatio = 0;
+    run.driftDashDistance = lanesCrossed;
+    run.driftDashLastLaneFloat = currentLaneFloat;
+    run.renderLaneFloat = currentLaneFloat;
+    run.playerLaneFloat = currentLaneFloat;
+    run.targetLane = settleLane;
+    run.laneChangeStartLane = currentLaneFloat;
+    run.laneChangeTargetLane = settleLane;
+    run.laneChangeDistance = Math.max(0.001, Math.abs(settleLane - currentLaneFloat));
+    run.laneChangeElapsed = 0;
+    run.laneChangeProgress = run.laneChangeDistance <= 0.001 ? 1 : 0;
     run.driftFullChargeReady = false;
     run.driftFullChargeCuePlayed = false;
     run.driftLastReleaseFullCharge = fullRelease;
     run.driftCooldownTimer = Math.max(run.driftCooldownTimer || 0, DRIFT_TUNING.releaseCooldownSeconds);
-    if (boost.duration <= 0 || boost.multiplier <= 1) return boost;
+    run.driftDashesCompleted = Math.max(0, (run.driftDashesCompleted || 0) + 1);
+    run.driftDashTime = Math.max(0, (run.driftDashTime || 0) + holdSeconds);
+    run.driftLanesCrossed = Math.max(0, (run.driftLanesCrossed || 0) + lanesCrossed);
+    run.longestDriftDashLanes = Math.max(run.longestDriftDashLanes || 0, lanesCrossed);
+    run.maxDriftHold = Math.max(run.maxDriftHold || 0, holdSeconds);
+    if (boost.duration <= 0 || boost.multiplier <= 1) return { ...boost, reason, lanesCrossed, settleLane };
 
     run.driftBoostsReleased = Math.max(0, (run.driftBoostsReleased || 0) + 1);
     if (boost.duration >= (run.driftBoostTimer || 0) || boost.multiplier > (run.driftBoostMultiplier || 1)) {
@@ -21056,8 +21134,8 @@ class NeonRoadRally {
       maxInstances: 1,
       volume: this.audio.sfxVolume * (0.44 + boost.ratio * (fullRelease ? 0.42 : 0.24))
     });
-    if (boost.ratio >= 0.3) {
-      this.addFloatingScoreText(fullRelease ? "FULL DRIFT" : "DRIFT BOOST", {
+    if (boost.ratio >= 0.18) {
+      this.addFloatingScoreText(lanesCrossed >= 1.5 ? "BIG CUT" : "DRIFT DASH", {
         color: fullRelease ? "#44ff99" : "#ffe45e",
         size: fullRelease ? 19 : 17,
         life: fullRelease ? 0.68 : 0.52,
@@ -21065,7 +21143,7 @@ class NeonRoadRally {
         vy: fullRelease ? -42 : -36
       });
     }
-    return { ...boost, reason };
+    return { ...boost, reason, lanesCrossed, settleLane };
   }
 
   updateDriftState(dt) {
@@ -21105,6 +21183,16 @@ class NeonRoadRally {
     run.driftChargeRatio = getDriftChargeRatio(run.driftChargeSeconds);
     run.longestDrift = Math.max(run.longestDrift || 0, run.driftChargeSeconds || 0);
     run.maxDriftCharge = Math.max(run.maxDriftCharge || 0, run.driftChargeSeconds || 0);
+    run.maxDriftHold = Math.max(run.maxDriftHold || 0, run.driftChargeSeconds || 0);
+    const startLaneFloat = clampNumber(run.driftDashStartLaneFloat, 0, LANES - 1, run.renderLaneFloat);
+    const dashLaneDistance = getDriftDashLaneDistanceForHold(run.driftChargeSeconds);
+    const dashLaneFloat = clampNumber(startLaneFloat + run.driftDirection * dashLaneDistance, 0, LANES - 1, startLaneFloat);
+    run.renderLaneFloat = dashLaneFloat;
+    run.playerLaneFloat = dashLaneFloat;
+    run.targetLane = getNearestValidLane(dashLaneFloat);
+    run.laneChangeTargetLane = run.targetLane;
+    run.driftDashLastLaneFloat = dashLaneFloat;
+    run.driftDashDistance = Math.abs(dashLaneFloat - startLaneFloat);
     if (run.driftChargeSeconds >= DRIFT_TUNING.maxChargeSeconds - 0.001) {
       run.driftFullChargeReady = true;
       if (!run.driftFullChargeCuePlayed) {
@@ -21621,8 +21709,13 @@ class NeonRoadRally {
       driftsStarted: summary.driftsStarted || 0,
       driftBoostsReleased: summary.driftBoostsReleased || 0,
       driftBoostTime: summary.driftBoostTime || 0,
+      driftDashesCompleted: summary.driftDashesCompleted || 0,
+      driftDashTime: summary.driftDashTime || 0,
       longestDrift: summary.longestDrift || 0,
       maxDriftCharge: summary.maxDriftCharge || summary.longestDrift || 0,
+      maxDriftHold: summary.maxDriftHold || summary.maxDriftCharge || summary.longestDrift || 0,
+      driftLanesCrossed: summary.driftLanesCrossed || 0,
+      longestDriftDashLanes: summary.longestDriftDashLanes || 0,
       driftNearMisses: summary.driftNearMisses || 0,
       crashesWhileDrifting: summary.crashesWhileDrifting || 0,
       boostPadsCollected: run.boostPadsCollected || 0,
@@ -22050,8 +22143,13 @@ class NeonRoadRally {
       driftsStarted: run.driftsStarted || 0,
       driftBoostsReleased: run.driftBoostsReleased || 0,
       driftBoostTime: run.driftBoostTime || 0,
+      driftDashesCompleted: run.driftDashesCompleted || 0,
+      driftDashTime: run.driftDashTime || 0,
       longestDrift: run.longestDrift || 0,
       maxDriftCharge: run.maxDriftCharge || run.longestDrift || 0,
+      maxDriftHold: run.maxDriftHold || run.maxDriftCharge || run.longestDrift || 0,
+      driftLanesCrossed: run.driftLanesCrossed || 0,
+      longestDriftDashLanes: run.longestDriftDashLanes || 0,
       driftNearMisses: run.driftNearMisses || 0,
       crashesWhileDrifting: run.crashesWhileDrifting || 0,
       boostPadsCollected: run.boostPadsCollected || 0,
@@ -28054,14 +28152,15 @@ class NeonRoadRally {
       const driftNote = summary.driftResultNote || getDriftResultNote(summary);
       if (driftNote) {
         const driftBoosts = Math.max(0, summary.driftBoostsReleased || 0);
-        const longestDrift = Math.max(0, summary.longestDrift || 0);
+        const driftDashes = Math.max(0, summary.driftDashesCompleted || 0);
+        const longestDashLanes = Math.max(0, summary.longestDriftDashLanes || 0);
         const driftDetail = driftNote === "Crashed while drifting"
           ? "Drift footprint was exposed on impact."
-          : (driftNote === "Full drift boost"
-            ? `Full charge release · ${formatTime(Math.max(longestDrift, summary.maxDriftCharge || 0))} drift.`
+          : (driftNote === "Big drift cut"
+            ? `${longestDashLanes.toFixed(1)} lanes crossed on the biggest cut.`
             : (driftNote === "Risky drift line"
             ? `${Math.max(0, summary.driftNearMisses || 0)} drift near miss${Math.max(0, summary.driftNearMisses || 0) === 1 ? "" : "es"}.`
-            : `${driftBoosts} release${driftBoosts === 1 ? "" : "s"} · longest ${formatTime(longestDrift)}.`));
+            : `${driftDashes || driftBoosts} dash${(driftDashes || driftBoosts) === 1 ? "" : "es"} · ${longestDashLanes.toFixed(1)} lane best.`));
         add(driftNote, driftDetail);
       }
       if (status === "finished") {
@@ -29543,7 +29642,7 @@ class NeonRoadRally {
           ` : ""}
           <div class="score-card"><strong>Score Attack Result</strong><span class="is-compact">${formatScore(summary.finalScore)} · ${escapeHtml(leaderboardText)}</span></div>
           <div class="score-card"><strong>Time Attack Result</strong><span class="is-compact">${escapeHtml(resultTimeText)} · ${escapeHtml(paceDeltaText)}</span></div>
-          ${summary.driftsStarted || summary.driftBoostsReleased ? `<div class="score-card"><strong>Drift</strong><span class="is-compact">${Math.max(0, summary.driftBoostsReleased || 0)} boosts · longest ${escapeHtml(formatTime(summary.longestDrift || 0))} · max charge ${escapeHtml(formatTime(summary.maxDriftCharge || summary.longestDrift || 0))}${summary.driftNearMisses ? ` · ${Math.max(0, summary.driftNearMisses || 0)} risky` : ""}</span></div>` : ""}
+          ${summary.driftsStarted || summary.driftDashesCompleted || summary.driftBoostsReleased ? `<div class="score-card"><strong>Drift</strong><span class="is-compact">${Math.max(0, summary.driftDashesCompleted || 0)} dashes · best ${Number(summary.longestDriftDashLanes || 0).toFixed(1)} lanes · hold ${escapeHtml(formatTime(summary.maxDriftHold || summary.maxDriftCharge || summary.longestDrift || 0))}${summary.driftNearMisses ? ` · ${Math.max(0, summary.driftNearMisses || 0)} risky` : ""}</span></div>` : ""}
           <div class="score-card"><strong>Competition</strong><span>${escapeHtml(summary.competitionKind || (summary.officialRouteId ? "Official Race" : "Custom Road"))}</span></div>
           ${summary.officialRouteId ? `<div class="score-card"><strong>Official Route</strong><span class="is-compact">${escapeHtml(summary.officialRouteName)}</span></div>` : ""}
           <div class="score-card"><strong>Track</strong><span>${escapeHtml(summary.trackName)}</span></div>
