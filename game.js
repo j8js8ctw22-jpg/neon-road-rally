@@ -3009,7 +3009,7 @@ function getDriftResultNote(summary = {}) {
   const longestDashLanes = Math.max(0, summary.longestDriftDashLanes || 0);
   const nearMisses = Math.max(0, summary.driftNearMisses || 0);
   const crashedWhileDrifting = Math.max(0, summary.crashesWhileDrifting || 0);
-  if (status === "crashed" && crashedWhileDrifting > 0) return "Crashed while drifting";
+  if (status === "crashed" && crashedWhileDrifting > 0) return "Crashed during drift dash";
   if (nearMisses > 0) return "Risky drift line";
   if (longestDashLanes >= 1.75) return "Big drift cut";
   if (driftDashes > 0 || driftBoosts > 0) return "Clean drift dash";
@@ -14507,6 +14507,10 @@ class Renderer {
     window.addEventListener("resize", () => this.resize());
   }
 
+  getRaceControlHintText() {
+    return "SHIFT+A/D DRIFT";
+  }
+
   resize() {
     const rect = this.canvas.getBoundingClientRect();
     const dpr = Math.max(1, Math.min(2, window.devicePixelRatio || 1));
@@ -17404,6 +17408,7 @@ class Renderer {
     }
     if (run.challengeMode) contextParts.push(`CHALLENGE ${run.challengeName}`);
     if (run.partyMode) contextParts.push(`PARTY ${run.partyTurnNumber}/${run.partyTotalPlayers}`);
+    if (w >= 760) contextParts.push(this.getRaceControlHintText());
     if (w >= 840) contextParts.push(`SEED ${formatRoadSeed(run.roadSeed)}`);
     const statusX = w >= 760 ? barX + barW + 18 : barX;
     const statusY = w >= 760 ? 38 : 50;
@@ -24515,10 +24520,12 @@ class NeonRoadRally {
     if (this.run.paused) {
       if (this.input) this.input.clearGameplayInput();
       this.audio.stopMusic(0.15);
+      const controlHint = this.renderer?.getRaceControlHintText ? this.renderer.getRaceControlHintText() : "SHIFT+A/D DRIFT";
       this.layer.innerHTML = `
         <section class="panel pause-card">
           <h2>Paused</h2>
           <p class="hint">Esc resumes. Restart uses the same current setup.</p>
+          <p class="hint">${escapeHtml(controlHint)} cuts across lanes. Release Shift or direction to settle.</p>
           <p class="hint">Audio: M toggles music. N toggles SFX. Full audio controls are in Settings.</p>
           <div class="row" style="justify-content:center">
             <button class="small-button" data-action="resume">Resume</button>
@@ -24712,13 +24719,14 @@ class NeonRoadRally {
       basics: [
         {
           title: "Basic Controls",
-          chips: ["Arrows / WASD", "Space Boost", "Enter", "F Fullscreen"],
+          chips: ["A/D Lanes", "Shift+A/D Drift", "Space Boost", "Enter"],
           points: [
-            "Arrow keys or WASD move the car.",
-            "Left/Right: tap once to change one lane.",
-            "Holding left/right does not sweep lanes. Each lane change needs a fresh tap.",
-            "Up/Down: hold to move forward or back on screen.",
-            "Space uses manual boost. Enter selects or continues. F toggles fullscreen if supported."
+            "A/D or Left/Right: tap once to change one lane.",
+            "Shift + A/D or Shift + Left/Right: drift dash across lanes.",
+            "Release Shift or the drift direction to settle into the lane.",
+            "Cut across lanes fast. Great for reaching boosts and dodging traffic.",
+            "Mistime it and you can clip traffic.",
+            "W/S or Up/Down moves forward and back. Space uses manual boost."
           ]
         },
         {
@@ -24928,7 +24936,7 @@ class NeonRoadRally {
       ? "One driver. Choose race type, track, speed, and seed."
       : "Create a local driver first, then choose race type, track, speed, and seed.";
     const keyboardHint = hasDriver
-      ? "Enter starts Solo. Arrows/WASD drive. Space boosts. F toggles fullscreen."
+      ? "Enter starts Solo. A/D change lanes. Shift+A/D drift dash. Space boosts."
       : "Enter opens Driver Garage. Add a driver, then start a solo race.";
     const audioStatus = `${this.audio.masterMuted ? "Audio Muted" : "Audio On"} / Music ${this.audio.musicMuted ? "Muted" : "On"} / SFX ${this.audio.sfxMuted ? "Muted" : "On"}`;
     this.layer.classList.remove("is-empty");
@@ -26595,6 +26603,7 @@ class NeonRoadRally {
           </div>
           <input id="officialRouteInput" type="hidden" value="${escapeAttr(officialRoute?.id || "")}">
           <p class="hint">Same seed, track, speed class, and race type repeats the same road. Custom Road records are preserved outside the Official 10 boards.</p>
+          <p class="hint">Drift dash: Shift+A/D cuts across lanes fast for boosts and traffic gaps; release to settle.</p>
           <p id="fuelRunBoostHint" class="hint" ${raceType.id === FUEL_RUN_RACE_TYPE_ID ? "" : "hidden"}>Fuel: the bar drains while you race. Grab gas cans; manual boost pauses fuel drain.</p>
           <div class="row setup-action-row">
             <button class="small-button" data-action="randomSeed">Random Seed</button>
@@ -28202,16 +28211,13 @@ class NeonRoadRally {
       };
       const driftNote = summary.driftResultNote || getDriftResultNote(summary);
       if (driftNote) {
-        const driftBoosts = Math.max(0, summary.driftBoostsReleased || 0);
-        const driftDashes = Math.max(0, summary.driftDashesCompleted || 0);
-        const longestDashLanes = Math.max(0, summary.longestDriftDashLanes || 0);
-        const driftDetail = driftNote === "Crashed while drifting"
-          ? "Drift footprint was exposed on impact."
+        const driftDetail = driftNote === "Crashed during drift dash"
+          ? "You clipped traffic during the cut."
           : (driftNote === "Big drift cut"
-            ? `${longestDashLanes.toFixed(1)} lanes crossed on the biggest cut.`
+            ? "Strong lane cut opened a faster line."
             : (driftNote === "Risky drift line"
-            ? `${Math.max(0, summary.driftNearMisses || 0)} drift near miss${Math.max(0, summary.driftNearMisses || 0) === 1 ? "" : "es"}.`
-            : `${driftDashes || driftBoosts} dash${(driftDashes || driftBoosts) === 1 ? "" : "es"} · ${longestDashLanes.toFixed(1)} lane best.`));
+            ? "Good speed, but the cut passed close to traffic."
+            : "Drift dash helped your racing line."));
         add(driftNote, driftDetail);
       }
       if (status === "finished") {

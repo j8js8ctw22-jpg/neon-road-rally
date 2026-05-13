@@ -87,6 +87,33 @@ async function assertNormalSetupHiddenModes(page) {
   assert(!raceTypeValues.includes("pursuit"), "Pursuit should not be a player-facing race type", { raceTypeValues });
 }
 
+async function assertDriftDashTeachingCopy(page) {
+  await page.evaluate(() => window.neonRoadRally.showHowToPlayScreen("basics"));
+  await page.waitForFunction(() => window.neonRoadRally?.screen === "howToPlay", null, { timeout: 5000 });
+  const guideText = await bodyText(page);
+  assertIncludes(guideText, "A/D or Left/Right: tap once to change one lane.");
+  assertIncludes(guideText, "Shift + A/D or Shift + Left/Right: drift dash across lanes.");
+  assertIncludes(guideText, "Release Shift or the drift direction to settle into the lane.");
+  assertIncludes(guideText, "Cut across lanes fast.");
+  assertIncludes(guideText, "Great for reaching boosts and dodging traffic.");
+  assertIncludes(guideText, "Mistime it and you can clip traffic.");
+  assertIncludes(guideText, "Space uses manual boost.");
+
+  await openSoloSetup(page);
+  const setupText = await bodyText(page);
+  assertIncludes(setupText, "Drift dash: Shift+A/D cuts across lanes fast for boosts and traffic gaps; release to settle.");
+}
+
+async function assertPauseDriftHint(page) {
+  await page.evaluate(() => window.neonRoadRally.togglePause());
+  await page.waitForFunction(() => Boolean(window.neonRoadRally?.run?.paused), null, { timeout: 5000 });
+  const text = await bodyText(page);
+  assertIncludes(text, "SHIFT+A/D DRIFT");
+  assertIncludes(text, "Release Shift or direction to settle.");
+  await page.evaluate(() => window.neonRoadRally.togglePause());
+  await page.waitForFunction(() => window.neonRoadRally?.run && !window.neonRoadRally.run.paused, null, { timeout: 5000 });
+}
+
 async function startOfficialRun(page, route) {
   await page.evaluate((config) => {
     const app = window.neonRoadRally;
@@ -352,6 +379,39 @@ async function forceFinishWithDriftNote(page) {
   return summary;
 }
 
+async function forceCrashWithDriftDashNote(page) {
+  await page.evaluate(() => {
+    const app = window.neonRoadRally;
+    const run = app.run;
+    run.countdownTimer = 0;
+    run.raceActive = true;
+    run.elapsed = 12.345;
+    run.distance = Math.max(run.distance || 0, run.track.distanceToFinish * 0.35);
+    run.driftsStarted = Math.max(run.driftsStarted || 0, 1);
+    run.driftDashesCompleted = Math.max(run.driftDashesCompleted || 0, 1);
+    run.driftDashTime = Math.max(run.driftDashTime || 0, 0.35);
+    run.driftLanesCrossed = Math.max(run.driftLanesCrossed || 0, 0.8);
+    run.longestDriftDashLanes = Math.max(run.longestDriftDashLanes || 0, 0.8);
+    run.crashesWhileDrifting = Math.max(run.crashesWhileDrifting || 0, 1);
+    run.driftActive = true;
+    app.endRace("crashed", "Drift dash traffic clip");
+  });
+  await page.waitForFunction(() => window.neonRoadRally?.screen === "score", null, { timeout: 5000 });
+  const text = await bodyText(page);
+  assertIncludes(text, "Crashed during drift dash");
+  const summary = await page.evaluate(() => {
+    const result = window.neonRoadRally.lastSummary || {};
+    return {
+      driftResultNote: result.driftResultNote || "",
+      crashesWhileDrifting: result.crashesWhileDrifting || 0,
+      status: result.status || ""
+    };
+  });
+  assert(summary.driftResultNote === "Crashed during drift dash", "Crash result should explain drift dash impact clearly", { summary });
+  assert(summary.crashesWhileDrifting >= 1, "Crash summary should preserve drift crash telemetry", { summary });
+  return summary;
+}
+
 async function assertPartyAndGarageSanity(page) {
   const party = await page.evaluate(() => {
     const app = window.neonRoadRally;
@@ -400,6 +460,7 @@ async function main() {
     await page.goto(BASE_URL, { waitUntil: "networkidle" });
     await createDriver(page);
     await assertNormalSetupHiddenModes(page);
+    await assertDriftDashTeachingCopy(page);
 
     await startCustomRun(page, {
       trackId: "sunset-highway",
@@ -407,6 +468,7 @@ async function main() {
       raceTypeId: "classic",
       seed: "DRIFT-ARCADE-SHORT"
     });
+    await assertPauseDriftHint(page);
     const arcadeShortDrift = await exerciseDrift(page, "a", -1, { holdMs: 120, stabilityWaitMs: 30, releaseMode: "direction" });
     const arcadeControls = await assertLaneAndSpaceBoostStillWork(page);
 
@@ -441,6 +503,14 @@ async function main() {
     assert(turboFullDrift.release.driftBoostMultiplier > turboShortDrift.release.driftBoostMultiplier, "Turbo long drift dash should release a stronger boost than short drift dash", { turboShortDrift, turboFullDrift });
     assert(turboFullDrift.release.driftBoostTimer > turboShortDrift.release.driftBoostTimer, "Turbo long drift dash should release a longer boost than short drift dash", { turboShortDrift, turboFullDrift });
     const finishSummary = await forceFinishWithDriftNote(page);
+
+    await startCustomRun(page, {
+      trackId: "sunset-highway",
+      speedClassId: "arcade",
+      raceTypeId: "classic",
+      seed: "DRIFT-CRASH-NOTE"
+    });
+    const crashSummary = await forceCrashWithDriftDashNote(page);
     const repeatedQuickDrifts = await exerciseRepeatedQuickDriftDashes(page);
 
     await startOfficialRun(page, {
@@ -466,6 +536,7 @@ async function main() {
       repeatedQuickDrifts,
       fuelDrift,
       finishSummary,
+      crashSummary,
       consoleIssues
     }, null, 2));
   } finally {
