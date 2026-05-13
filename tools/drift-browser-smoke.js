@@ -100,11 +100,43 @@ async function startOfficialRun(page, route) {
     app.run.countdownTimer = 0;
     app.run.raceActive = true;
     app.run.elapsed = 0.1;
+    if (app.obstacles) {
+      app.obstacles.obstacles = [];
+      if (!app.__driftSmokeOriginalObstacleUpdate && typeof app.obstacles.update === "function") {
+        app.__driftSmokeOriginalObstacleUpdate = app.obstacles.update.bind(app.obstacles);
+      }
+      app.obstacles.update = () => {};
+    }
   }, route);
   await page.waitForFunction(() => window.neonRoadRally?.screen === "game", null, { timeout: 5000 });
 }
 
-async function exerciseDrift(page, directionKey, expectedDirection) {
+async function startCustomRun(page, route) {
+  await page.evaluate((config) => {
+    const app = window.neonRoadRally;
+    app.startRace({
+      trackId: config.trackId,
+      speedClassId: config.speedClassId,
+      raceTypeId: config.raceTypeId,
+      seed: config.seed
+    });
+    app.run.countdownTimer = 0;
+    app.run.raceActive = true;
+    app.run.elapsed = 0.1;
+    if (app.obstacles) {
+      app.obstacles.obstacles = [];
+      if (!app.__driftSmokeOriginalObstacleUpdate && typeof app.obstacles.update === "function") {
+        app.__driftSmokeOriginalObstacleUpdate = app.obstacles.update.bind(app.obstacles);
+      }
+      app.obstacles.update = () => {};
+    }
+  }, route);
+  await page.waitForFunction(() => window.neonRoadRally?.screen === "game", null, { timeout: 5000 });
+}
+
+async function exerciseDrift(page, directionKey, expectedDirection, options = {}) {
+  const holdMs = options.holdMs ?? 320;
+  const releaseMode = options.releaseMode || "shift";
   const before = await page.evaluate(() => {
     const run = window.neonRoadRally.run;
     return {
@@ -119,6 +151,7 @@ async function exerciseDrift(page, directionKey, expectedDirection) {
     const run = window.neonRoadRally?.run || {};
     return run.driftActive === true && run.driftDirection === direction && (run.driftChargeSeconds || 0) > 0.08;
   }, expectedDirection, { timeout: 5000 });
+  if (holdMs > 0) await page.waitForTimeout(holdMs);
   const active = await page.evaluate(() => {
     const app = window.neonRoadRally;
     const run = app.run;
@@ -128,6 +161,8 @@ async function exerciseDrift(page, directionKey, expectedDirection) {
       driftDirection: run.driftDirection,
       driftChargeSeconds: Number((run.driftChargeSeconds || 0).toFixed(3)),
       driftChargeRatio: Number((run.driftChargeRatio || 0).toFixed(3)),
+      fullChargeReady: Boolean(run.driftFullChargeReady),
+      fullChargeCueActive: (run.driftFullChargeCueTimer || 0) > 0 || Boolean(run.driftFullChargeReady),
       targetLane: run.targetLane,
       laneMoves: run.laneMoves,
       visualCueActive: (run.driftSkidSparkTimer || 0) > 0,
@@ -140,6 +175,12 @@ async function exerciseDrift(page, directionKey, expectedDirection) {
   assert(active.driftActive, "Drift should become active while Shift and steering are held", { active });
   assert(active.driftDirection === expectedDirection, "Drift direction should match steering direction", { active });
   assert(active.visualCueActive, "Drift skid/spark cue should be active", { active });
+  assert(active.targetLane === before.targetLane, "Shift + steering should not change target lane", { before, active });
+  assert(active.laneMoves === before.laneMoves, "Shift + steering should not count a lane move", { before, active });
+  if (holdMs >= 3000) {
+    assert(active.fullChargeReady, "Full-charge drift should mark the charge as ready", { active });
+    assert(active.fullChargeCueActive, "Full-charge drift should expose a visual cue state", { active });
+  }
   await page.waitForTimeout(180);
   const held = await page.evaluate(() => {
     const run = window.neonRoadRally.run;
@@ -148,12 +189,17 @@ async function exerciseDrift(page, directionKey, expectedDirection) {
   assert(held.targetLane === active.targetLane, "Holding drift should not keep changing lanes", { before, active, held });
   assert(held.laneMoves === active.laneMoves, "Holding drift should not repeat lane moves", { before, active, held });
 
-  await page.keyboard.up("Shift");
+  if (releaseMode === "direction") {
+    await page.keyboard.up(directionKey);
+  } else {
+    await page.keyboard.up("Shift");
+  }
   await page.waitForFunction(() => {
     const run = window.neonRoadRally?.run || {};
     return !run.driftActive && (run.driftBoostTimer || 0) > 0 && (run.driftBoostMultiplier || 1) > 1;
   }, null, { timeout: 5000 });
-  await page.keyboard.up(directionKey);
+  if (releaseMode === "direction") await page.keyboard.up("Shift");
+  else await page.keyboard.up(directionKey);
   const release = await page.evaluate((previousSpeed) => {
     const run = window.neonRoadRally.run;
     return {
@@ -162,6 +208,8 @@ async function exerciseDrift(page, directionKey, expectedDirection) {
       driftReleaseBurstTimer: Number((run.driftReleaseBurstTimer || 0).toFixed(3)),
       driftBoostsReleased: run.driftBoostsReleased || 0,
       driftsStarted: run.driftsStarted || 0,
+      maxDriftCharge: Number((run.maxDriftCharge || 0).toFixed(3)),
+      fullRelease: Boolean(run.driftLastReleaseFullCharge),
       currentSpeed: Number((run.currentSpeed || 0).toFixed(2)),
       previousSpeed: Number((previousSpeed || 0).toFixed(2))
     };
@@ -207,15 +255,16 @@ async function forceFinishWithDriftNote(page) {
     run.manualBoosts = Math.max(0, run.manualBoosts || 0);
     run.driftsStarted = Math.max(run.driftsStarted || 0, 2);
     run.driftBoostsReleased = Math.max(run.driftBoostsReleased || 0, 2);
-    run.driftBoostTime = Math.max(run.driftBoostTime || 0, 1.2);
-    run.longestDrift = Math.max(run.longestDrift || 0, 0.82);
+    run.driftBoostTime = Math.max(run.driftBoostTime || 0, 1.9);
+    run.longestDrift = Math.max(run.longestDrift || 0, 3);
+    run.maxDriftCharge = Math.max(run.maxDriftCharge || 0, 3);
     run.slowdownHits = 0;
     app.endRace("finished", "Drift Browser Smoke Finish");
   });
   await page.waitForFunction(() => window.neonRoadRally?.screen === "score", null, { timeout: 5000 });
   const text = await bodyText(page);
   assertIncludes(text, "Official Race Result");
-  assertIncludes(text, "Strong drift boost");
+  assertIncludes(text, "Full drift boost");
   const summary = await page.evaluate(() => {
     const result = window.neonRoadRally.lastSummary || {};
     return {
@@ -224,10 +273,11 @@ async function forceFinishWithDriftNote(page) {
       driftBoostsReleased: result.driftBoostsReleased || 0,
       driftBoostTime: Number((result.driftBoostTime || 0).toFixed(3)),
       longestDrift: Number((result.longestDrift || 0).toFixed(3)),
+      maxDriftCharge: Number((result.maxDriftCharge || 0).toFixed(3)),
       raceTypeId: result.raceTypeId || ""
     };
   });
-  assert(summary.driftResultNote === "Strong drift boost", "Result summary should keep the drift note", { summary });
+  assert(summary.driftResultNote === "Full drift boost", "Result summary should keep the full-charge drift note", { summary });
   return summary;
 }
 
@@ -280,6 +330,26 @@ async function main() {
     await createDriver(page);
     await assertNormalSetupHiddenModes(page);
 
+    await startCustomRun(page, {
+      trackId: "sunset-highway",
+      speedClassId: "arcade",
+      raceTypeId: "classic",
+      seed: "DRIFT-ARCADE-SHORT"
+    });
+    const arcadeShortDrift = await exerciseDrift(page, "a", -1, { holdMs: 260, releaseMode: "direction" });
+    const arcadeControls = await assertLaneAndSpaceBoostStillWork(page);
+
+    await startCustomRun(page, {
+      trackId: "sunset-highway",
+      speedClassId: "arcade",
+      raceTypeId: "classic",
+      seed: "DRIFT-ARCADE-FULL"
+    });
+    const arcadeFullDrift = await exerciseDrift(page, "d", 1, { holdMs: 3250, releaseMode: "shift" });
+    assert(arcadeFullDrift.release.driftBoostMultiplier > arcadeShortDrift.release.driftBoostMultiplier, "Arcade full drift should release a stronger boost than short drift", { arcadeShortDrift, arcadeFullDrift });
+    assert(arcadeFullDrift.release.driftBoostTimer > arcadeShortDrift.release.driftBoostTimer, "Arcade full drift should release a longer boost than short drift", { arcadeShortDrift, arcadeFullDrift });
+    assert(arcadeFullDrift.release.fullRelease, "Arcade full drift should mark the release as full charge", { arcadeFullDrift });
+
     await startOfficialRun(page, {
       routeId: "sunset-neon-palm-sprint",
       trackId: "sunset-highway",
@@ -287,8 +357,18 @@ async function main() {
       raceTypeId: "classic",
       seed: "SUNSET-PALM-SPRINT-TURBO"
     });
-    const classicDrift = await exerciseDrift(page, "a", -1);
-    const classicControls = await assertLaneAndSpaceBoostStillWork(page);
+    const turboShortDrift = await exerciseDrift(page, "a", -1, { holdMs: 260, releaseMode: "shift" });
+
+    await startOfficialRun(page, {
+      routeId: "sunset-neon-palm-sprint",
+      trackId: "sunset-highway",
+      speedClassId: "turbo",
+      raceTypeId: "classic",
+      seed: "SUNSET-PALM-SPRINT-TURBO"
+    });
+    const turboFullDrift = await exerciseDrift(page, "ArrowRight", 1, { holdMs: 3250, releaseMode: "direction" });
+    assert(turboFullDrift.release.driftBoostMultiplier > turboShortDrift.release.driftBoostMultiplier, "Turbo full drift should release a stronger boost than short drift", { turboShortDrift, turboFullDrift });
+    assert(turboFullDrift.release.driftBoostTimer > turboShortDrift.release.driftBoostTimer, "Turbo full drift should release a longer boost than short drift", { turboShortDrift, turboFullDrift });
     const finishSummary = await forceFinishWithDriftNote(page);
 
     await startOfficialRun(page, {
@@ -298,7 +378,7 @@ async function main() {
       raceTypeId: "fuelRun",
       seed: "REDLINE-SWITCHYARD-BOOST-OD"
     });
-    const fuelDrift = await exerciseDrift(page, "d", 1);
+    const fuelDrift = await exerciseDrift(page, "d", 1, { holdMs: 320, releaseMode: "shift" });
     await assertPartyAndGarageSanity(page);
 
     if (consoleIssues.length) {
@@ -306,8 +386,11 @@ async function main() {
     }
     console.log("DRIFT_BROWSER_SMOKE_OK");
     console.log(JSON.stringify({
-      classicDrift,
-      classicControls,
+      arcadeShortDrift,
+      arcadeFullDrift,
+      arcadeControls,
+      turboShortDrift,
+      turboFullDrift,
       fuelDrift,
       finishSummary,
       consoleIssues

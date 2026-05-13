@@ -150,27 +150,57 @@ vm.runInContext(`
     return game;
   }
 
-  const fakeGame = makeFakeGame();
-  const input = new InputManager(fakeGame);
-  input.onKeyDown(keyEvent("Shift", "ShiftLeft"));
-  assert.strictEqual(fakeGame.driftInputs.at(-1).direction, 0, "Shift alone should not drift");
-  assert.strictEqual(fakeGame.laneMoves.length, 0, "Shift alone should not request a lane move");
+  {
+    const fakeGame = makeFakeGame();
+    const input = new InputManager(fakeGame);
+    input.onKeyDown(keyEvent("a", "KeyA"));
+    assert.strictEqual(fakeGame.laneMoves.at(-1), -1, "A without Shift should preserve one-lane left movement");
+    assert.strictEqual(fakeGame.driftInputs.at(-1).direction, 0, "A without Shift should not start drift");
+  }
 
-  input.onKeyDown(keyEvent("a", "KeyA"));
-  assert.strictEqual(fakeGame.laneMoves.at(-1), -1, "A should preserve one-lane left movement");
-  assert.strictEqual(fakeGame.driftInputs.at(-1).direction, -1, "Shift + A should start left drift input");
-  input.onKeyUp(keyEvent("Shift", "ShiftLeft"));
-  assert.strictEqual(fakeGame.driftInputs.at(-1).direction, 0, "Releasing Shift should clear drift input");
-  input.onKeyUp(keyEvent("a", "KeyA"));
+  {
+    const fakeGame = makeFakeGame();
+    const input = new InputManager(fakeGame);
+    input.onKeyDown(keyEvent("d", "KeyD"));
+    assert.strictEqual(fakeGame.laneMoves.at(-1), 1, "D without Shift should preserve one-lane right movement");
+    assert.strictEqual(fakeGame.driftInputs.at(-1).direction, 0, "D without Shift should not start drift");
+  }
 
-  input.onKeyDown(keyEvent("Shift", "ShiftLeft"));
-  input.onKeyDown(keyEvent("d", "KeyD"));
-  assert.strictEqual(fakeGame.laneMoves.at(-1), 1, "D should preserve one-lane right movement");
-  assert.strictEqual(fakeGame.driftInputs.at(-1).direction, 1, "Shift + D should start right drift input");
+  {
+    const fakeGame = makeFakeGame();
+    const input = new InputManager(fakeGame);
+    input.onKeyDown(keyEvent("Shift", "ShiftLeft"));
+    assert.strictEqual(fakeGame.driftInputs.at(-1).direction, 0, "Shift alone should not drift");
+    assert.strictEqual(fakeGame.laneMoves.length, 0, "Shift alone should not request a lane move");
 
-  const shortBoost = getDriftBoostForCharge(0.2);
-  const longBoost = getDriftBoostForCharge(1.2);
-  const cappedBoost = getDriftBoostForCharge(3);
+    input.onKeyDown(keyEvent("a", "KeyA"));
+    assert.strictEqual(fakeGame.laneMoves.length, 0, "Shift + A should not request a lane move");
+    assert.strictEqual(fakeGame.driftInputs.at(-1).direction, -1, "Shift + A should start left drift input");
+    input.onKeyUp(keyEvent("a", "KeyA"));
+    assert.strictEqual(fakeGame.driftInputs.at(-1).direction, 0, "Releasing A while Shift is held should clear drift input");
+  }
+
+  {
+    const fakeGame = makeFakeGame();
+    const input = new InputManager(fakeGame);
+    input.onKeyDown(keyEvent("Shift", "ShiftLeft"));
+    input.onKeyDown(keyEvent("ArrowRight", ""));
+    assert.strictEqual(fakeGame.laneMoves.length, 0, "Shift + ArrowRight should not request a lane move");
+    assert.strictEqual(fakeGame.driftInputs.at(-1).direction, 1, "Shift + ArrowRight should start right drift input");
+    input.onKeyUp(keyEvent("Shift", "ShiftLeft"));
+    assert.strictEqual(fakeGame.driftInputs.at(-1).direction, 0, "Releasing Shift should clear drift input");
+  }
+
+  {
+    const fakeGame = makeFakeGame();
+    const input = new InputManager(fakeGame);
+    input.onKeyDown(keyEvent(" ", "Space"));
+    assert.strictEqual(fakeGame.manualBoosts, 1, "Space boost should still request a manual boost");
+  }
+
+  const shortBoost = getDriftBoostForCharge(0.25);
+  const longBoost = getDriftBoostForCharge(3);
+  const cappedBoost = getDriftBoostForCharge(8);
   assert(shortBoost.multiplier > 1 && shortBoost.duration > 0, "Short drifts should provide a small boost");
   assert(longBoost.multiplier > shortBoost.multiplier, "Longer drifts should give a larger boost");
   assert(longBoost.duration > shortBoost.duration, "Longer drifts should last longer");
@@ -179,9 +209,13 @@ vm.runInContext(`
 
   const app = Object.create(NeonRoadRally.prototype);
   app.renderer = makeHarnessRenderer();
+  const sfxPlayed = [];
   app.audio = {
     sfxVolume: 1,
-    playSfx() { return true; },
+    playSfx(key) {
+      sfxPlayed.push(key);
+      return true;
+    },
     triggerMusicEvent() {}
   };
   app.addFloatingScoreText = () => {};
@@ -197,6 +231,11 @@ vm.runInContext(`
     driftActive: false,
     driftDirection: 0,
     driftChargeSeconds: 0,
+    driftChargeRatio: 0,
+    maxDriftCharge: 0,
+    driftFullChargeReady: false,
+    driftFullChargeCuePlayed: false,
+    driftFullChargeCueTimer: 0,
     driftCooldownTimer: 0,
     driftBoostTimer: 0,
     driftBoostMultiplier: 1,
@@ -220,10 +259,29 @@ vm.runInContext(`
   assert(app.run.driftBoostTimer > 0, "Release should start drift boost timer");
   assert(app.run.driftBoostMultiplier > 1, "Release should apply drift speed multiplier");
   assert.strictEqual(app.run.driftBoostsReleased, 1, "Release should count drift boost telemetry");
+  const shortRelease = {
+    timer: app.run.driftBoostTimer,
+    multiplier: app.run.driftBoostMultiplier
+  };
+
+  app.run.driftCooldownTimer = 0;
+  app.setDriftInput(1, true);
+  app.updateDriftState(3.25);
+  assert.strictEqual(app.run.driftActive, true, "Shift + D should activate right drift state");
+  assert.strictEqual(app.run.driftDirection, 1, "Right drift should keep right direction");
+  assert(app.run.driftFullChargeReady, "A 3-second drift should mark full charge ready");
+  assert(app.run.driftChargeRatio >= 0.999, "Full drift charge ratio should reach cap");
+  assert(app.run.maxDriftCharge <= DRIFT_TUNING.maxChargeSeconds, "Max drift charge should be capped");
+  assert(sfxPlayed.includes("driftFullCharge"), "Full charge should play the full-charge SFX hook");
+  app.setDriftInput(0, false);
+  app.updateDriftState(0.016);
+  assert(app.run.driftBoostMultiplier > shortRelease.multiplier, "A 3-second drift should release a stronger boost than a short drift");
+  assert(app.run.driftBoostTimer > shortRelease.timer, "A 3-second drift should release a longer boost than a short drift");
+  assert.strictEqual(app.run.driftBoostsReleased, 2, "Full release should count another drift boost");
 
   const baseBox = { x: 100, y: 50, w: 40, h: 80 };
-  const leftRun = { driftActive: true, driftDirection: -1, driftChargeSeconds: 1.2 };
-  const rightRun = { driftActive: true, driftDirection: 1, driftChargeSeconds: 1.2 };
+  const leftRun = { driftActive: true, driftDirection: -1, driftChargeSeconds: DRIFT_TUNING.maxChargeSeconds };
+  const rightRun = { driftActive: true, driftDirection: 1, driftChargeSeconds: DRIFT_TUNING.maxChargeSeconds };
   const leftBox = getDriftAdjustedPlayerHitbox(baseBox, leftRun, 120);
   const rightBox = getDriftAdjustedPlayerHitbox(baseBox, rightRun, 120);
   assert(leftBox.x < baseBox.x && leftBox.w > baseBox.w, "Left drift danger footprint should extend left");
