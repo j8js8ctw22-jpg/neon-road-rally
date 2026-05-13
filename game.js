@@ -3002,6 +3002,19 @@ function getBoostlineResultNote(summary = {}) {
   return "Clean Boostline finish";
 }
 
+function getDriftResultNote(summary = {}) {
+  const status = normalizeRunStatus(summary.status);
+  const driftBoosts = Math.max(0, summary.driftBoostsReleased || 0);
+  const longestDrift = Math.max(0, summary.longestDrift || 0);
+  const nearMisses = Math.max(0, summary.driftNearMisses || 0);
+  const crashedWhileDrifting = Math.max(0, summary.crashesWhileDrifting || 0);
+  if (status === "crashed" && crashedWhileDrifting > 0) return "Crashed while drifting";
+  if (nearMisses > 0) return "Risky drift line";
+  if (driftBoosts > 0 && longestDrift >= DRIFT_TUNING.minChargeSeconds) return "Strong drift boost";
+  if (status === "finished" && driftBoosts > 0 && (summary.slowdownHits || 0) === 0) return "Clean drift finish";
+  return "";
+}
+
 const RACE_TYPES = [
   {
     id: DEFAULT_RACE_TYPE_ID,
@@ -3360,6 +3373,20 @@ const SPEED_TUNING = {
   padBoostDuration: 1.7,
   maxBoostOverrunMultiplier: 1.2,
   roadStripeScrollScale: 0.82
+};
+
+const DRIFT_TUNING = {
+  minChargeSeconds: 0.2,
+  maxChargeSeconds: 1.2,
+  minBoostDuration: 0.32,
+  maxBoostDuration: 1.1,
+  minBoostMultiplier: 1.045,
+  maxBoostMultiplier: 1.14,
+  releaseCooldownSeconds: 0.22,
+  leanLaneOffset: 0.22,
+  dangerLaneReach: 0.36,
+  releaseBurstSeconds: 0.34,
+  skidSparkSeconds: 0.18
 };
 
 const ARCADE_FEEL = {
@@ -5878,6 +5905,12 @@ function normalizePlaytestRunSummary(entry) {
     finishProgressPercent: clampNumber(progressPercent, 0, 100, 0),
     endReason: sanitizeName(entry.endReason || entry.reason, "", DISPLAY_TEXT_MAX_LENGTH),
     boostsUsed: normalizeNonNegativeInteger(entry.boostsUsed || entry.manualBoostsUsed, 0, 99),
+    driftsStarted: normalizeNonNegativeInteger(entry.driftsStarted, 0, 999),
+    driftBoostsReleased: normalizeNonNegativeInteger(entry.driftBoostsReleased, 0, 999),
+    driftBoostTime: normalizeNonNegativeNumber(entry.driftBoostTime, 0, 24 * 60 * 60),
+    longestDrift: normalizeNonNegativeNumber(entry.longestDrift, 0, DRIFT_TUNING.maxChargeSeconds),
+    driftNearMisses: normalizeNonNegativeInteger(entry.driftNearMisses, 0, 999),
+    crashesWhileDrifting: normalizeNonNegativeInteger(entry.crashesWhileDrifting, 0, 999),
     boostPadsCollected: normalizeNonNegativeInteger(entry.boostPadsCollected, 0, 999),
     boostPadsReachableSeen: normalizeNonNegativeInteger(entry.boostPadsReachableSeen, 0, 999),
     boostPadsMissedReachable: normalizeNonNegativeInteger(entry.boostPadsMissedReachable, 0, 999),
@@ -6318,6 +6351,61 @@ function expandRect(rect, xPadding, yPadding) {
     y: rect.y - yPadding,
     w: rect.w + xPadding * 2,
     h: rect.h + yPadding * 2
+  };
+}
+
+function getDriftChargeRatio(chargeSeconds = 0) {
+  const charge = clampNumber(chargeSeconds, 0, DRIFT_TUNING.maxChargeSeconds, 0);
+  if (charge <= 0) return 0;
+  const fullWindowRatio = charge / Math.max(0.001, DRIFT_TUNING.maxChargeSeconds);
+  const shortWindowRatio = clamp(charge / Math.max(0.001, DRIFT_TUNING.minChargeSeconds), 0, 1) * 0.28;
+  return clamp(Math.max(fullWindowRatio, shortWindowRatio), 0, 1);
+}
+
+function getDriftBoostForCharge(chargeSeconds = 0) {
+  const ratio = getDriftChargeRatio(chargeSeconds);
+  if (ratio <= 0) {
+    return { ratio: 0, duration: 0, multiplier: 1 };
+  }
+  const shaped = Math.pow(ratio, 0.85);
+  return {
+    ratio,
+    duration: lerp(DRIFT_TUNING.minBoostDuration, DRIFT_TUNING.maxBoostDuration, shaped),
+    multiplier: lerp(DRIFT_TUNING.minBoostMultiplier, DRIFT_TUNING.maxBoostMultiplier, shaped)
+  };
+}
+
+function isRunDrifting(run) {
+  return Boolean(run?.driftActive && run.driftDirection);
+}
+
+function getRunDriftVisualIntensity(run) {
+  if (!run) return 0;
+  if (isRunDrifting(run)) return clamp(getDriftChargeRatio(run.driftChargeSeconds || 0), 0.12, 1);
+  const releaseRatio = DRIFT_TUNING.releaseBurstSeconds > 0
+    ? clamp((run.driftReleaseBurstTimer || 0) / DRIFT_TUNING.releaseBurstSeconds, 0, 1)
+    : 0;
+  return releaseRatio * 0.62;
+}
+
+function getDriftAdjustedPlayerHitbox(baseBox, run, laneWidth = 0) {
+  if (!baseBox || !isRunDrifting(run)) return baseBox;
+  const direction = run.driftDirection < 0 ? -1 : 1;
+  const intensity = clamp(getDriftChargeRatio(run.driftChargeSeconds || 0), 0.12, 1);
+  const extension = Math.max(0, laneWidth * DRIFT_TUNING.dangerLaneReach * intensity);
+  if (direction < 0) {
+    return {
+      x: baseBox.x - extension,
+      y: baseBox.y,
+      w: baseBox.w + extension,
+      h: baseBox.h
+    };
+  }
+  return {
+    x: baseBox.x,
+    y: baseBox.y,
+    w: baseBox.w + extension,
+    h: baseBox.h
   };
 }
 
@@ -7275,6 +7363,8 @@ const AUDIO_TEST_SFX = [
   { key: "boostPickup", label: "Boost" },
   { key: "boostActive", label: "Boost Active" },
   { key: "boostEnd", label: "Boost End" },
+  { key: "driftStart", label: "Drift Start" },
+  { key: "driftRelease", label: "Drift Release" },
   { key: "rampApproach", label: "Ramp Approach" },
   { key: "rampTakeoff", label: "Jump" },
   { key: "rampLanding", label: "Landing" },
@@ -7511,6 +7601,8 @@ class AudioManager {
       boostPickup: 120,
       boostActive: 240,
       boostEnd: 260,
+      driftStart: 180,
+      driftRelease: 120,
       slowdown: 250,
       oil: 250,
       ramp: 220,
@@ -7557,6 +7649,8 @@ class AudioManager {
       boostPickup: tone([{ type: "sawtooth", frequency: 260, endFrequency: 860, duration: 0.18, gain: 0.3 }, { type: "sine", frequency: 620, endFrequency: 1240, start: 0.02, duration: 0.14, gain: 0.18 }], 0.22),
       boostActive: tone([{ type: "sawtooth", frequency: 180, endFrequency: 420, duration: 0.16, gain: 0.18 }, { noise: true, duration: 0.2, gain: 0.045 }], 0.22),
       boostEnd: tone([{ type: "triangle", frequency: 360, endFrequency: 180, duration: 0.14, gain: 0.12 }], 0.16),
+      driftStart: tone([{ noise: true, duration: 0.11, gain: 0.045 }, { type: "triangle", frequency: 190, endFrequency: 260, duration: 0.12, gain: 0.08 }], 0.14),
+      driftRelease: tone([{ type: "sawtooth", frequency: 230, endFrequency: 640, duration: 0.16, gain: 0.18 }, { noise: true, start: 0.02, duration: 0.11, gain: 0.045 }], 0.22),
       rampApproach: tone([{ type: "triangle", frequency: 260, endFrequency: 340, duration: 0.12, gain: 0.1 }, { type: "triangle", frequency: 390, endFrequency: 500, start: 0.1, duration: 0.12, gain: 0.09 }], 0.24),
       rampTakeoff: tone([{ type: "triangle", frequency: 220, endFrequency: 560, duration: 0.2, gain: 0.24 }, { noise: true, duration: 0.11, gain: 0.06 }], 0.24),
       rampLanding: tone([{ type: "square", frequency: 150, endFrequency: 84, duration: 0.16, gain: 0.18 }, { noise: true, duration: 0.1, gain: 0.08 }], 0.2),
@@ -8470,6 +8564,7 @@ class InputManager {
       if (this.shouldSuppressGameplayInput(keyId)) {
         this.suppressedUntilKeyup.add(keyId);
         this.releaseGameplayKey(keyId);
+        this.updateDriftInput();
         return;
       }
       if (keyId === "escape") {
@@ -8487,6 +8582,9 @@ class InputManager {
       } else if (keyId === "boost") {
         this.lastBoostEdgeTime = performance.now();
         this.game.useManualBoost();
+      }
+      if (keyId === "left" || keyId === "right" || keyId === "shift") {
+        this.updateDriftInput();
       }
       return;
     }
@@ -8537,6 +8635,9 @@ class InputManager {
       this.heldVerticalKeys.delete("down");
       this.updateVerticalInput();
     }
+    if (keyId === "left" || keyId === "right" || keyId === "shift") {
+      this.updateDriftInput();
+    }
   }
 
   update(dt) {
@@ -8551,6 +8652,7 @@ class InputManager {
     if (key === "ArrowUp" || lower === "w") return "up";
     if (key === "ArrowDown" || lower === "s") return "down";
     if (key === " " || key === "Spacebar" || event.code === "Space") return "boost";
+    if (key === "Shift" || event.code === "ShiftLeft" || event.code === "ShiftRight") return "shift";
     if (key === "Escape") return "escape";
     if (key === "Enter") return "enter";
     return "";
@@ -8558,7 +8660,7 @@ class InputManager {
 
   shouldPreventDefault(keyId, key) {
     if (["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", " ", "Spacebar", "Enter", "Escape"].includes(key)) return true;
-    return this.game.screen === "game" && ["left", "right", "up", "down", "boost"].includes(keyId);
+    return this.game.screen === "game" && ["left", "right", "up", "down", "boost", "shift"].includes(keyId);
   }
 
   isEditableTarget(target) {
@@ -8567,11 +8669,11 @@ class InputManager {
   }
 
   isControlKey(keyId) {
-    return ["left", "right", "up", "down", "boost", "escape", "enter"].includes(keyId);
+    return ["left", "right", "up", "down", "boost", "shift", "escape", "enter"].includes(keyId);
   }
 
   shouldSuppressGameplayInput(keyId) {
-    if (!["left", "right", "up", "down", "boost"].includes(keyId)) return false;
+    if (!["left", "right", "up", "down", "boost", "shift"].includes(keyId)) return false;
     const run = this.game.run;
     return !run || run.ended || run.paused || !run.raceActive || this.suppressedUntilKeyup.has(keyId);
   }
@@ -8593,6 +8695,9 @@ class InputManager {
       this.heldVerticalKeys.delete(keyId);
       this.updateVerticalInput();
     }
+    if (keyId === "left" || keyId === "right" || keyId === "shift") {
+      this.updateDriftInput();
+    }
   }
 
   clearGameplayInput() {
@@ -8600,20 +8705,30 @@ class InputManager {
     this.suppressedUntilKeyup.clear();
     this.heldVerticalKeys.clear();
     this.game.setVerticalInput(0);
+    this.game.clearDriftInput({ release: false });
   }
 
   clearCountdownInputLocks() {
-    ["left", "right", "up", "down", "boost"].forEach((keyId) => {
+    ["left", "right", "up", "down", "boost", "shift"].forEach((keyId) => {
       if (this.activeKeys.has(keyId)) this.suppressedUntilKeyup.add(keyId);
     });
     this.heldVerticalKeys.clear();
     this.game.setVerticalInput(0);
+    this.game.clearDriftInput({ release: false });
   }
 
   updateVerticalInput() {
     const up = this.heldVerticalKeys.has("up");
     const down = this.heldVerticalKeys.has("down");
     this.game.setVerticalInput(up === down ? 0 : (up ? -1 : 1));
+  }
+
+  updateDriftInput() {
+    const shiftHeld = this.activeKeys.has("shift") && !this.suppressedUntilKeyup.has("shift");
+    const leftHeld = this.activeKeys.has("left") && !this.suppressedUntilKeyup.has("left");
+    const rightHeld = this.activeKeys.has("right") && !this.suppressedUntilKeyup.has("right");
+    const direction = shiftHeld && leftHeld !== rightHeld ? (leftHeld ? -1 : 1) : 0;
+    this.game.setDriftInput(direction, shiftHeld);
   }
 
   getDebugInfo() {
@@ -14167,6 +14282,7 @@ class CollisionSystem {
         this.game.addScoreEvent("nearMiss", 150);
         this.game.audio.playSfx("nearMiss");
         run.nearMisses += 1;
+        if (isRunDrifting(run)) run.driftNearMisses = Math.max(0, (run.driftNearMisses || 0) + 1);
         run.collisionState = `near miss ${info.label}`;
       }
     }
@@ -14459,14 +14575,28 @@ class Renderer {
   getPlayerFloatingAnchor() {
     const run = this.game.run;
     return {
-      x: this.laneCenter(run.renderLaneFloat),
+      x: this.getPlayerVisualCenterX(),
       y: this.getPlayerScreenY()
     };
   }
 
+  getPlayerDriftLeanOffset() {
+    const run = this.game.run;
+    if (!run) return 0;
+    const direction = isRunDrifting(run) ? run.driftDirection : (run.driftLastDirection || 0);
+    if (!direction) return 0;
+    const intensity = getRunDriftVisualIntensity(run);
+    return direction * this.road.laneW * DRIFT_TUNING.leanLaneOffset * intensity;
+  }
+
+  getPlayerVisualCenterX() {
+    const run = this.game.run;
+    return this.laneCenter(run.renderLaneFloat) + this.getPlayerDriftLeanOffset();
+  }
+
   getPlayerVisualRect() {
     const run = this.game.run;
-    const x = this.laneCenter(run.renderLaneFloat);
+    const x = this.getPlayerVisualCenterX();
     const y = this.getPlayerScreenY();
     const size = getPlayerCarDrawSize(run.player.car, {
       airborne: run.airborne,
@@ -14498,7 +14628,8 @@ class Renderer {
   }
 
   getPlayerHitbox() {
-    return this.getPlayerHitboxFromVisualRect(this.getPlayerVisualRect());
+    const baseBox = this.getPlayerHitboxFromVisualRect(this.getPlayerVisualRect());
+    return getDriftAdjustedPlayerHitbox(baseBox, this.game.run, this.road.laneW);
   }
 
   getObstacleScreenPosition(obstacle) {
@@ -14794,7 +14925,7 @@ class Renderer {
     const trailPunchDuration = ARCADE_FEEL.boostTrailPunchMs / 1000;
     const boostPunch = boostPunchDuration > 0 ? clamp((run.boostStreakPunchTimer || 0) / boostPunchDuration, 0, 1) : 0;
     const trailPunch = trailPunchDuration > 0 ? clamp((run.boostTrailPunchTimer || 0) / trailPunchDuration, 0, 1) : 0;
-    const activeBoost = (run.boostTimer > 0 ? 0.34 : 0) + (run.padBoostTimer > 0 ? 0.48 : 0);
+    const activeBoost = (run.boostTimer > 0 ? 0.34 : 0) + (run.padBoostTimer > 0 ? 0.48 : 0) + (run.driftBoostTimer > 0 ? 0.2 : 0);
     return clamp(activeBoost + boostPunch * 0.28 + trailPunch * 0.18, 0, 1);
   }
 
@@ -15228,6 +15359,7 @@ class Renderer {
     this.drawNearMissSpark();
     this.drawPursuitChasePresence();
     this.drawAirborneRoadShadow();
+    this.drawDriftCues();
     this.drawPlayer();
     this.drawCrashSparks();
     this.drawBumpFlash();
@@ -15909,23 +16041,99 @@ class Renderer {
     ctx.restore();
   }
 
+  drawDriftCues() {
+    const run = this.game.run;
+    if (!run || this.game.screen !== "game") return;
+    const active = isRunDrifting(run);
+    const release = (run.driftReleaseBurstTimer || 0) > 0;
+    if (!active && !release) return;
+    const direction = active ? run.driftDirection : (run.driftLastDirection || 0);
+    if (!direction) return;
+    const x = this.getPlayerVisualCenterX();
+    const y = this.getPlayerScreenY();
+    const intensity = clamp(getRunDriftVisualIntensity(run), 0, 1);
+    if (intensity <= 0.01) return;
+    const size = getPlayerCarDrawSize(run.player.car, {
+      airborne: false,
+      laneWidth: this.road.laneW
+    }, this.game.carSprites);
+    const ctx = this.ctx;
+    const side = direction < 0 ? -1 : 1;
+    const effectScale = this.getPerformanceEffectScale();
+    ctx.save();
+    ctx.globalCompositeOperation = "lighter";
+    if (active) {
+      const sparkAlpha = clamp(0.22 + intensity * 0.48, 0.18, 0.72) * effectScale;
+      ctx.strokeStyle = "#ffe45e";
+      ctx.shadowColor = "#ffe45e";
+      ctx.shadowBlur = 8 + intensity * 8;
+      ctx.lineWidth = Math.max(2, 2.2 * intensity);
+      ctx.globalAlpha = sparkAlpha;
+      for (let i = 0; i < 3; i += 1) {
+        const rearY = y + size.h * (0.24 + i * 0.1);
+        const startX = x + side * size.w * (0.34 + i * 0.05);
+        ctx.beginPath();
+        ctx.moveTo(startX, rearY);
+        ctx.lineTo(startX - side * this.road.laneW * (0.14 + intensity * 0.1), rearY + 16 + i * 4);
+        ctx.stroke();
+      }
+      ctx.globalAlpha = sparkAlpha * 0.5;
+      ctx.fillStyle = "#28f6ff";
+      for (let i = 0; i < 4; i += 1) {
+        const jitter = Math.sin((run.elapsed || 0) * 18 + i * 1.7) * 5;
+        ctx.fillRect(
+          x + side * (size.w * 0.44 + i * 4),
+          y + size.h * 0.3 + i * 7 + jitter,
+          2 + intensity * 3,
+          2 + intensity * 2
+        );
+      }
+    }
+    if (release) {
+      const releaseRatio = DRIFT_TUNING.releaseBurstSeconds > 0
+        ? clamp((run.driftReleaseBurstTimer || 0) / DRIFT_TUNING.releaseBurstSeconds, 0, 1)
+        : 0;
+      ctx.globalAlpha = clamp(releaseRatio * 0.72, 0, 0.72) * effectScale;
+      ctx.strokeStyle = "#28f6ff";
+      ctx.shadowColor = "#28f6ff";
+      ctx.shadowBlur = 18;
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.ellipse(x - side * size.w * 0.08, y + size.h * 0.2, size.w * (0.72 + (1 - releaseRatio) * 0.26), size.h * 0.42, 0, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.strokeStyle = "#ffe45e";
+      ctx.globalAlpha *= 0.76;
+      for (let i = 0; i < 3; i += 1) {
+        const rayY = y + size.h * (0.25 + i * 0.12);
+        ctx.beginPath();
+        ctx.moveTo(x - side * size.w * 0.3, rayY);
+        ctx.lineTo(x - side * this.road.laneW * (0.46 + i * 0.08), rayY + 14 + i * 6);
+        ctx.stroke();
+      }
+    }
+    ctx.restore();
+  }
+
   drawPlayer() {
     const run = this.game.run;
-    const x = this.laneCenter(run.renderLaneFloat);
+    const x = this.getPlayerVisualCenterX();
     const y = this.getPlayerScreenY();
     const landingDuration = ARCADE_FEEL.rampLandingPulseMs / 1000;
     const boostTrailDuration = ARCADE_FEEL.boostTrailPunchMs / 1000;
     const landingPulse = landingDuration > 0 ? clamp((run.rampLandingPulseTimer || 0) / landingDuration, 0, 1) : 0;
     const boostTrailPunch = boostTrailDuration > 0 ? clamp((run.boostTrailPunchTimer || 0) / boostTrailDuration, 0, 1) : 0;
+    const driftVisualIntensity = getRunDriftVisualIntensity(run);
     drawPlayerCar(this.ctx, x, y, run.player.car, {
-      boosting: run.boostTimer > 0 || run.padBoostTimer > 0,
+      boosting: run.boostTimer > 0 || run.padBoostTimer > 0 || run.driftBoostTimer > 0,
       airborne: run.airborne,
       airborneLift: run.jumpOffset || 0,
       landingPulse,
-      boostTrailIntensity: run.boostTimer > 0 ? 0.92 + boostTrailPunch * 0.46 : (run.padBoostTimer > 0 ? 0.84 + boostTrailPunch * 0.42 : 0),
+      boostTrailIntensity: run.boostTimer > 0 ? 0.92 + boostTrailPunch * 0.46 : (run.padBoostTimer > 0 ? 0.84 + boostTrailPunch * 0.42 : (run.driftBoostTimer > 0 ? 0.62 + boostTrailPunch * 0.28 : 0)),
       laneWidth: this.road.laneW,
       laneChanging: Math.abs(run.renderLaneFloat - run.targetLane) > 0.02,
       laneDelta: run.targetLane - run.renderLaneFloat,
+      driftDirection: isRunDrifting(run) ? run.driftDirection : (run.driftLastDirection || 0),
+      driftIntensity: driftVisualIntensity,
       verticalInput: run.verticalInput,
       crashFlash: run.crashFlash
     }, this.game.carSprites);
@@ -18051,7 +18259,8 @@ function drawSpritePlayerCar(ctx, x, y, carConfig, state, sprite) {
   const boostTrail = getCarBoostTrailColor(carConfig);
   const targetWidth = getPlayerSpriteTargetWidth(carConfig, state);
   const spriteBox = getScaledSpriteBox(sprite, targetWidth);
-  const laneTilt = clamp(state.laneDelta || 0, -1, 1) * 0.06;
+  const driftTilt = clampNumber(state.driftIntensity, 0, 1, 0) * clampNumber(state.driftDirection, -1, 1, 0) * 0.075;
+  const laneTilt = clamp(state.laneDelta || 0, -1, 1) * 0.06 + driftTilt;
   const landingPulse = clampNumber(state.landingPulse, 0, 1, 0);
   const airborneLift = Math.max(0, state.airborneLift || 0);
   const liftRatio = clamp(airborneLift / 56, 0, 1);
@@ -18157,7 +18366,8 @@ function drawCanvasPlayerCar(ctx, x, y, carConfig, state) {
   const glass = carConfig.windowColor || DEFAULT_CAR.windowColor;
   const style = CAR_BODY_STYLES.some((item) => item.id === carConfig.bodyStyle) ? carConfig.bodyStyle : DEFAULT_CAR.bodyStyle;
   const { scale, w, h } = getCanvasPlayerCarRenderSize(state);
-  const laneTilt = clamp(state.laneDelta || 0, -1, 1) * 0.06;
+  const driftTilt = clampNumber(state.driftIntensity, 0, 1, 0) * clampNumber(state.driftDirection, -1, 1, 0) * 0.075;
+  const laneTilt = clamp(state.laneDelta || 0, -1, 1) * 0.06 + driftTilt;
   const landingPulse = clampNumber(state.landingPulse, 0, 1, 0);
   const airborneLift = Math.max(0, state.airborneLift || 0);
   const liftRatio = clamp(airborneLift / 56, 0, 1);
@@ -19255,6 +19465,22 @@ class NeonRoadRally {
       boostMultiplier: 1,
       manualBoosts: 3,
       manualBoostsUsed: 0,
+      driftInputDirection: 0,
+      driftInputShift: false,
+      driftActive: false,
+      driftDirection: 0,
+      driftLastDirection: 0,
+      driftChargeSeconds: 0,
+      driftChargeRatio: 0,
+      driftCooldownTimer: 0,
+      driftBoostTimer: 0,
+      driftBoostMultiplier: 1,
+      driftsStarted: 0,
+      driftBoostsReleased: 0,
+      driftBoostTime: 0,
+      longestDrift: 0,
+      driftNearMisses: 0,
+      crashesWhileDrifting: 0,
       boostPadsCollected: 0,
       boostPadsReachableSeen: 0,
       boostPadsMissedReachable: 0,
@@ -19417,6 +19643,8 @@ class NeonRoadRally {
       boostFlashTimer: 0,
       boostStreakPunchTimer: 0,
       boostTrailPunchTimer: 0,
+      driftReleaseBurstTimer: 0,
+      driftSkidSparkTimer: 0,
       boostAudioActive: false,
       finishFlashTimer: 0,
       finishStripeTimer: 0,
@@ -19520,6 +19748,8 @@ class NeonRoadRally {
     run.boostFlashTimer = Math.max(0, (run.boostFlashTimer || 0) - dt);
     run.boostStreakPunchTimer = Math.max(0, (run.boostStreakPunchTimer || 0) - dt);
     run.boostTrailPunchTimer = Math.max(0, (run.boostTrailPunchTimer || 0) - dt);
+    run.driftReleaseBurstTimer = Math.max(0, (run.driftReleaseBurstTimer || 0) - dt);
+    run.driftSkidSparkTimer = Math.max(0, (run.driftSkidSparkTimer || 0) - dt);
     run.finishFlashTimer = Math.max(0, (run.finishFlashTimer || 0) - dt);
     run.finishStripeTimer = Math.max(0, (run.finishStripeTimer || 0) - dt);
     run.crashBeatTimer = Math.max(0, (run.crashBeatTimer || 0) - dt);
@@ -19574,7 +19804,7 @@ class NeonRoadRally {
       return { id: "menu", label: "Menu", sectionId: "menu", intensity: 0, raceTypeId: "menu" };
     }
     const speedRatio = clamp((run.currentSpeed || 0) / Math.max(1, run.track?.maxSpeed || 1), 0, 1.8);
-    const boosted = run.boostTimer > 0 || run.padBoostTimer > 0;
+    const boosted = run.boostTimer > 0 || run.padBoostTimer > 0 || run.driftBoostTimer > 0;
     const active = Boolean(run.raceActive && !run.ended);
     const airborne = Boolean(run.airborne);
     const fuelCritical = Boolean(isFuelRunRaceType(run.raceTypeId) && run.criticalFuelActive);
@@ -20128,6 +20358,9 @@ class NeonRoadRally {
   queueCrashImpact(reason) {
     const run = this.run;
     if (!run || run.ended || run.pendingEndStatus) return;
+    if (isRunDrifting(run)) {
+      run.crashesWhileDrifting = Math.max(0, (run.crashesWhileDrifting || 0) + 1);
+    }
     run.pendingEndStatus = "crashed";
     run.pendingEndReason = reason || run.lastCollision || "Crash";
     run.hitPauseTimer = ARCADE_FEEL.crashPauseMs / 1000;
@@ -20232,13 +20465,15 @@ class NeonRoadRally {
       run.jumpOffset = 0;
       run.airborne = false;
     }
+    this.updateDriftState(dt);
 
     const progress = clamp(run.distance / run.track.distanceToFinish, 0, 1);
     const rawBase = getTrackRawCruiseSpeed(run.track, progress, run.speedClassId);
     const base = clamp(rawBase, SPEED_TUNING.minSpeed, run.track.maxSpeed);
     const manualBoost = run.boostTimer > 0 ? SPEED_TUNING.manualBoostMultiplier : 1;
     const padBoost = run.padBoostTimer > 0 ? SPEED_TUNING.padBoostMultiplier : 1;
-    const boostMultiplier = manualBoost * padBoost;
+    const driftBoost = run.driftBoostTimer > 0 ? clampNumber(run.driftBoostMultiplier, 1, DRIFT_TUNING.maxBoostMultiplier, 1) : 1;
+    const boostMultiplier = manualBoost * padBoost * driftBoost;
     const slowdown = run.slowdownTimer > 0 ? run.slowdownFactor : 1;
     const debugScale = this.debugSpeedScale || 1;
     const unclampedSpeed = base * boostMultiplier * slowdown * debugScale;
@@ -20629,6 +20864,27 @@ class NeonRoadRally {
     this.run.verticalInput = clamp(direction, -1, 1);
   }
 
+  setDriftInput(direction, shiftHeld = false) {
+    const run = this.run;
+    if (!run) return;
+    const driftDirection = shiftHeld && direction !== 0 ? (direction < 0 ? -1 : 1) : 0;
+    run.driftInputDirection = driftDirection;
+    run.driftInputShift = Boolean(shiftHeld);
+  }
+
+  clearDriftInput(options = {}) {
+    const run = this.run;
+    if (!run) return;
+    run.driftInputDirection = 0;
+    run.driftInputShift = false;
+    if (options.release === false) {
+      run.driftActive = false;
+      run.driftDirection = 0;
+      run.driftChargeSeconds = 0;
+      run.driftChargeRatio = 0;
+    }
+  }
+
   performLaneMove(direction) {
     const run = this.run;
     const nextLane = clamp(run.targetLane + direction, 0, LANES - 1);
@@ -20681,6 +20937,104 @@ class NeonRoadRally {
       maxInstances: 2,
       volume: this.audio.sfxVolume * 0.96
     });
+  }
+
+  startDrift(direction) {
+    const run = this.run;
+    if (!run || run.paused || run.ended || !run.raceActive || run.airborne) return false;
+    const driftDirection = direction < 0 ? -1 : 1;
+    run.driftActive = true;
+    run.driftDirection = driftDirection;
+    run.driftLastDirection = driftDirection;
+    run.driftChargeSeconds = 0;
+    run.driftChargeRatio = 0;
+    run.driftsStarted = Math.max(0, (run.driftsStarted || 0) + 1);
+    run.driftSkidSparkTimer = Math.max(run.driftSkidSparkTimer || 0, DRIFT_TUNING.skidSparkSeconds);
+    this.audio.playSfx("driftStart", {
+      cooldownMs: 180,
+      maxInstances: 1,
+      volume: this.audio.sfxVolume * 0.36
+    });
+    return true;
+  }
+
+  releaseDriftBoost(reason = "release") {
+    const run = this.run;
+    if (!run || !run.driftActive) return null;
+    const chargeSeconds = Math.max(0, run.driftChargeSeconds || 0);
+    const direction = run.driftDirection < 0 ? -1 : 1;
+    const boost = getDriftBoostForCharge(chargeSeconds);
+    run.driftActive = false;
+    run.driftLastDirection = direction;
+    run.driftDirection = 0;
+    run.driftChargeSeconds = 0;
+    run.driftChargeRatio = 0;
+    run.driftCooldownTimer = Math.max(run.driftCooldownTimer || 0, DRIFT_TUNING.releaseCooldownSeconds);
+    if (boost.duration <= 0 || boost.multiplier <= 1) return boost;
+
+    run.driftBoostsReleased = Math.max(0, (run.driftBoostsReleased || 0) + 1);
+    if (boost.duration >= (run.driftBoostTimer || 0) || boost.multiplier > (run.driftBoostMultiplier || 1)) {
+      run.driftBoostTimer = Math.max(run.driftBoostTimer || 0, boost.duration);
+      run.driftBoostMultiplier = Math.max(run.driftBoostMultiplier || 1, boost.multiplier);
+    }
+    run.driftReleaseBurstTimer = Math.max(run.driftReleaseBurstTimer || 0, DRIFT_TUNING.releaseBurstSeconds);
+    run.driftSkidSparkTimer = Math.max(run.driftSkidSparkTimer || 0, DRIFT_TUNING.skidSparkSeconds);
+    run.boostTrailPunchTimer = Math.max(run.boostTrailPunchTimer || 0, ARCADE_FEEL.boostTrailPunchMs / 1000 * 0.46);
+    run.screenShake = Math.max(run.screenShake || 0, 0.12 + boost.ratio * 0.08);
+    this.audio.playSfx("driftRelease", {
+      cooldownMs: 120,
+      maxInstances: 1,
+      volume: this.audio.sfxVolume * (0.44 + boost.ratio * 0.24)
+    });
+    if (boost.ratio >= 0.38) {
+      this.addFloatingScoreText("DRIFT BOOST", {
+        color: "#ffe45e",
+        size: 17,
+        life: 0.52,
+        yOffset: -86,
+        vy: -36
+      });
+    }
+    return { ...boost, reason };
+  }
+
+  updateDriftState(dt) {
+    const run = this.run;
+    if (!run || !run.raceActive || run.ended) return;
+    const previousBoostTimer = Math.max(0, run.driftBoostTimer || 0);
+    run.driftBoostTimer = Math.max(0, previousBoostTimer - dt);
+    if (previousBoostTimer > 0) {
+      run.driftBoostTime = Math.max(0, (run.driftBoostTime || 0) + Math.min(previousBoostTimer, dt));
+    }
+    if (run.driftBoostTimer <= 0) run.driftBoostMultiplier = 1;
+    run.driftCooldownTimer = Math.max(0, (run.driftCooldownTimer || 0) - dt);
+
+    const wantsDirection = run.driftInputShift && run.driftInputDirection
+      ? (run.driftInputDirection < 0 ? -1 : 1)
+      : 0;
+    const canDrift = !run.paused && !run.airborne && wantsDirection !== 0;
+    if (!canDrift) {
+      if (run.driftActive) this.releaseDriftBoost("input-release");
+      return;
+    }
+
+    if (run.driftActive && run.driftDirection !== wantsDirection) {
+      this.releaseDriftBoost("direction-change");
+    }
+    if (!run.driftActive && (run.driftCooldownTimer || 0) <= 0) {
+      this.startDrift(wantsDirection);
+    }
+    if (!run.driftActive) return;
+
+    run.driftChargeSeconds = clampNumber(
+      (run.driftChargeSeconds || 0) + dt,
+      0,
+      DRIFT_TUNING.maxChargeSeconds,
+      0
+    );
+    run.driftChargeRatio = getDriftChargeRatio(run.driftChargeSeconds);
+    run.longestDrift = Math.max(run.longestDrift || 0, run.driftChargeSeconds || 0);
+    run.driftSkidSparkTimer = Math.max(run.driftSkidSparkTimer || 0, DRIFT_TUNING.skidSparkSeconds * 0.55);
   }
 
   launchJump(obstacle = null) {
@@ -21179,6 +21533,12 @@ class NeonRoadRally {
       finishProgressPercent: summary.progress * 100,
       endReason: summary.reason,
       boostsUsed: summary.manualBoostsUsed,
+      driftsStarted: summary.driftsStarted || 0,
+      driftBoostsReleased: summary.driftBoostsReleased || 0,
+      driftBoostTime: summary.driftBoostTime || 0,
+      longestDrift: summary.longestDrift || 0,
+      driftNearMisses: summary.driftNearMisses || 0,
+      crashesWhileDrifting: summary.crashesWhileDrifting || 0,
       boostPadsCollected: run.boostPadsCollected || 0,
       boostPadsReachableSeen: run.boostPadsReachableSeen || 0,
       boostPadsMissedReachable: run.boostPadsMissedReachable || 0,
@@ -21601,6 +21961,12 @@ class NeonRoadRally {
       slowdownHits: run.slowdownHits || 0,
       nearMisses: run.nearMisses || 0,
       manualBoostsUsed: run.manualBoostsUsed || 0,
+      driftsStarted: run.driftsStarted || 0,
+      driftBoostsReleased: run.driftBoostsReleased || 0,
+      driftBoostTime: run.driftBoostTime || 0,
+      longestDrift: run.longestDrift || 0,
+      driftNearMisses: run.driftNearMisses || 0,
+      crashesWhileDrifting: run.crashesWhileDrifting || 0,
       boostPadsCollected: run.boostPadsCollected || 0,
       boostPadsReachableSeen: run.boostPadsReachableSeen || 0,
       boostPadsMissedReachable: run.boostPadsMissedReachable || 0,
@@ -21687,6 +22053,7 @@ class NeonRoadRally {
     if (isBoostlineRaceType(summary.raceTypeId)) {
       summary.boostlineResultNote = getBoostlineResultNote(summary);
     }
+    summary.driftResultNote = getDriftResultNote(summary);
     summary.medals = this.buildRunMedals(summary, run, previousBestScore);
     if (summary.challengeMode) {
       summary.challengeResult = this.buildChallengeResult(summary);
@@ -25954,7 +26321,6 @@ class NeonRoadRally {
             ${this.renderOfficialRouteRaceTypeButtons(raceType.id, "preRace")}
           </div>
           ${this.renderOfficialRouteChoiceGrid(officialRoute?.id || "", track.id, raceType.id)}
-          ${this.renderBoostlinePrototypeCard(track.id)}
           <div class="setup-sticky-action solo-setup-action" aria-label="Ready to race">
             <div>
               <span class="eyebrow" id="soloSetupCompetitionLabel">${escapeHtml(competitionKind)}</span>
@@ -27598,6 +27964,17 @@ class NeonRoadRally {
       const add = (title, detail) => {
         if (items.length < 4) items.push({ title, detail });
       };
+      const driftNote = summary.driftResultNote || getDriftResultNote(summary);
+      if (driftNote) {
+        const driftBoosts = Math.max(0, summary.driftBoostsReleased || 0);
+        const longestDrift = Math.max(0, summary.longestDrift || 0);
+        const driftDetail = driftNote === "Crashed while drifting"
+          ? "Drift footprint was exposed on impact."
+          : (driftNote === "Risky drift line"
+            ? `${Math.max(0, summary.driftNearMisses || 0)} drift near miss${Math.max(0, summary.driftNearMisses || 0) === 1 ? "" : "es"}.`
+            : `${driftBoosts} release${driftBoosts === 1 ? "" : "s"} · longest ${formatTime(longestDrift)}.`);
+        add(driftNote, driftDetail);
+      }
       if (status === "finished") {
         if (summary.newPersonalBestTime) {
           add("New personal best", formatPersonalBestTimeDeltaText(summary));
@@ -29077,6 +29454,7 @@ class NeonRoadRally {
           ` : ""}
           <div class="score-card"><strong>Score Attack Result</strong><span class="is-compact">${formatScore(summary.finalScore)} · ${escapeHtml(leaderboardText)}</span></div>
           <div class="score-card"><strong>Time Attack Result</strong><span class="is-compact">${escapeHtml(resultTimeText)} · ${escapeHtml(paceDeltaText)}</span></div>
+          ${summary.driftsStarted || summary.driftBoostsReleased ? `<div class="score-card"><strong>Drift</strong><span class="is-compact">${Math.max(0, summary.driftBoostsReleased || 0)} boosts · longest ${escapeHtml(formatTime(summary.longestDrift || 0))}${summary.driftNearMisses ? ` · ${Math.max(0, summary.driftNearMisses || 0)} risky` : ""}</span></div>` : ""}
           <div class="score-card"><strong>Competition</strong><span>${escapeHtml(summary.competitionKind || (summary.officialRouteId ? "Official Race" : "Custom Road"))}</span></div>
           ${summary.officialRouteId ? `<div class="score-card"><strong>Official Route</strong><span class="is-compact">${escapeHtml(summary.officialRouteName)}</span></div>` : ""}
           <div class="score-card"><strong>Track</strong><span>${escapeHtml(summary.trackName)}</span></div>

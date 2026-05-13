@@ -73,7 +73,7 @@ const ROUTES = {
 };
 
 function getRouteList() {
-  const ids = String(process.env.NRR_PERF_ROUTE_IDS || "sunset-neon-palm-sprint,sunset-last-light-gauntlet,boostline-neon-palm")
+  const ids = String(process.env.NRR_PERF_ROUTE_IDS || "sunset-neon-palm-sprint,sunset-last-light-gauntlet")
     .split(",")
     .map((id) => id.trim())
     .filter(Boolean);

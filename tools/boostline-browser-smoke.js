@@ -104,16 +104,17 @@ async function captureBoostlineSignature(page, dt = 0.4) {
 async function startBoostline(page) {
   await createDriverAndOpenSetup(page);
   const text = await bodyText(page);
-  assertIncludes(text, "Experimental Prototype");
-  assertIncludes(text, "Neon Palm Boostline");
-  assertIncludes(text, "fixed boost/ramp line");
+  assert(!text.includes("Experimental Prototype"), "Boostline prototype label should not appear in normal solo setup", { snippet: text.slice(0, 1200) });
+  assert(!text.includes("Neon Palm Boostline"), "Boostline prototype route should not appear in normal solo setup", { snippet: text.slice(0, 1200) });
   assert(!text.includes("Pursuit"), "Pursuit should not appear in normal solo setup", { snippet: text.slice(0, 1200) });
   const normalRouteCards = await page.locator(".official-route-grid [data-official-route-id]").count();
   nodeAssert.strictEqual(normalRouteCards, 10, "Boostline should not be added to the normal Official 10 grid");
+  const boostlineStartActions = await page.locator('[data-action="startBoostlinePrototype"]').count();
+  nodeAssert.strictEqual(boostlineStartActions, 0, "Boostline prototype start action should stay out of normal solo setup");
   const raceTypeValues = await page.$$eval("#preRaceType option", (options) => options.map((option) => option.value));
   assert(!raceTypeValues.includes("boostline"), "Boostline should not appear in the normal race type toggle", { raceTypeValues });
   assert(!raceTypeValues.includes("pursuit"), "Pursuit should not appear in the normal race type toggle", { raceTypeValues });
-  await clickAction(page, "startBoostlinePrototype");
+  await page.evaluate(() => window.neonRoadRally.handleStartBoostlinePrototype());
   await waitForScreen(page, "game");
   const run = await page.evaluate(() => {
     const activeRun = window.neonRoadRally.run || {};
