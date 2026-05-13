@@ -414,6 +414,16 @@ button {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
+.title-utility-row .small-button {
+  min-height: 36px;
+  border-color: rgba(184, 198, 217, 0.28);
+  padding: 8px 10px;
+  background: rgba(5, 8, 20, 0.56);
+  color: var(--muted);
+  font-size: 0.72rem;
+  text-align: center;
+}
+
 .title-dev-row {
   border-top: 1px solid rgba(255, 255, 255, 0.1);
   padding-top: 10px;
@@ -1489,6 +1499,30 @@ button:disabled {
   background:
     linear-gradient(180deg, rgba(40, 246, 255, 0.06), rgba(255, 63, 209, 0.04)),
     rgba(5, 8, 20, 0.66);
+}
+
+.garage-section.is-wide {
+  grid-column: 1 / -1;
+}
+
+#garageDriverList {
+  order: 1;
+}
+
+#garageRenameDriver {
+  order: 2;
+}
+
+#garageCarStyle {
+  order: 3;
+}
+
+#garageAddDriver {
+  order: 4;
+}
+
+#garageRewards {
+  order: 5;
 }
 
 .garage-section-heading {

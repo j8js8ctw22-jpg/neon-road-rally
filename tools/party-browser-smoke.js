@@ -63,6 +63,10 @@ async function run() {
     await page.getByRole("button", { name: new RegExp(text, "i") }).first().click();
   }
 
+  async function clickAction(action) {
+    await page.locator(`[data-action="${action}"]`).first().click();
+  }
+
   async function expectText(text) {
     await page.getByText(new RegExp(text, "i")).filter({ visible: true }).first().waitFor({ timeout: 5000 });
   }
@@ -197,19 +201,19 @@ async function run() {
   await clickText("Driver Garage");
   await page.waitForFunction(() => window.neonRoadRally?.screen === "players", null, { timeout: 5000 });
   await expectText("Driver Garage");
-  await page.getByRole("button", { name: /Back|Title/i }).first().click();
+  await clickAction("title");
   await page.waitForFunction(() => window.neonRoadRally?.screen === "title", null, { timeout: 5000 });
 
   await clickText("Leaderboard");
   await page.waitForFunction(() => window.neonRoadRally?.screen === "leaderboard", null, { timeout: 5000 });
   await expectText("Score Attack");
   await expectText("Time Attack");
-  await page.getByRole("button", { name: /Back|Title/i }).first().click();
+  await clickAction("title");
   await page.waitForFunction(() => window.neonRoadRally?.screen === "title", null, { timeout: 5000 });
 
   await clickText("Settings");
   await page.waitForFunction(() => window.neonRoadRally?.screen === "settings", null, { timeout: 5000 });
-  await clickText("Playtest Report");
+  await clickText("Playtest Tools");
   await page.waitForFunction(() => window.neonRoadRally?.screen === "playtestReport", null, { timeout: 5000 });
   await expectText("Playtest Report");
 

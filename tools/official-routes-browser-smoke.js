@@ -37,14 +37,14 @@ const BASE_URL = process.env.NRR_SMOKE_URL || "http://127.0.0.1:8085/";
 const TRACK_ROUTES = {
   "sunset-highway": [
     { id: "sunset-neon-palm-sprint", name: "Neon Palm Sprint", seed: "SUNSET-PALM-SPRINT-TURBO", speedClass: "Turbo", feelTag: "clean speed" },
-    { id: "sunset-boostline-pier", name: "Boostline Pier", seed: "SUNSET-BOOSTLINE-PIER-TURBO", speedClass: "Turbo", feelTag: "boost line" },
+    { id: "sunset-boostline-pier", name: "Pier Boost Sprint", seed: "SUNSET-BOOSTLINE-PIER-TURBO", speedClass: "Turbo", feelTag: "boost chain" },
     { id: "sunset-glass-city-climb", name: "Glass City Climb", seed: "SUNSET-GLASS-CITY-CLIMB-TURBO", speedClass: "Turbo", feelTag: "ramp route" },
     { id: "sunset-orange-sky-switchback", name: "Orange Sky Switchback", seed: "SUNSET-SKY-SWITCHBACK-OVERDRIVE", speedClass: "Overdrive", feelTag: "lane discipline" },
     { id: "sunset-cactus-cutback", name: "Cactus Cutback", seed: "SUNSET-CACTUS-CUTBACK-OVERDRIVE", speedClass: "Overdrive", feelTag: "traffic pressure" },
     { id: "sunset-radio-tower-run", name: "Radio Tower Run", seed: "SUNSET-RADIO-TOWER-OVERDRIVE", speedClass: "Overdrive", feelTag: "final push" },
     { id: "sunset-heatwave-express", name: "Heatwave Express", seed: "SUNSET-HEATWAVE-EXPRESS-REDLINE", speedClass: "Redline", feelTag: "clean speed" },
     { id: "sunset-mirage-merge", name: "Mirage Merge", seed: "SUNSET-MIRAGE-MERGE-REDLINE", speedClass: "Redline", feelTag: "lane discipline" },
-    { id: "sunset-afterburner-mile", name: "Afterburner Mile", seed: "SUNSET-AFTERBURNER-MILE-REDLINE", speedClass: "Redline", feelTag: "boost line" },
+    { id: "sunset-afterburner-mile", name: "Afterburner Mile", seed: "SUNSET-AFTERBURNER-MILE-REDLINE", speedClass: "Redline", feelTag: "boost chain" },
     { id: "sunset-last-light-gauntlet", name: "Last Light Gauntlet", seed: "SUNSET-LAST-LIGHT-REDLINE", speedClass: "Redline", feelTag: "final push" }
   ],
   "redline-run": [
@@ -52,7 +52,7 @@ const TRACK_ROUTES = {
     { id: "redline-neon-gate-dash", name: "Neon Gate Dash", seed: "REDLINE-NEON-GATE-TURBO", speedClass: "Turbo", feelTag: "lane discipline" },
     { id: "redline-service-lane-slalom", name: "Service Lane Slalom", seed: "REDLINE-SERVICE-LANE-TURBO", speedClass: "Turbo", feelTag: "traffic pressure" },
     { id: "redline-overpass-charge", name: "Overpass Charge", seed: "REDLINE-OVERPASS-CHARGE-OD", speedClass: "Overdrive", feelTag: "final push" },
-    { id: "redline-switchyard-boostline", name: "Switchyard Boostline", seed: "REDLINE-SWITCHYARD-BOOST-OD", speedClass: "Overdrive", feelTag: "boost line" },
+    { id: "redline-switchyard-boostline", name: "Switchyard Charge", seed: "REDLINE-SWITCHYARD-BOOST-OD", speedClass: "Overdrive", feelTag: "boost chain" },
     { id: "redline-concrete-ribbon", name: "Concrete Ribbon", seed: "REDLINE-CONCRETE-RIBBON-OD", speedClass: "Overdrive", feelTag: "clean speed" },
     { id: "redline-midnight-merge", name: "Midnight Merge", seed: "REDLINE-MIDNIGHT-MERGE-REDLINE", speedClass: "Redline", feelTag: "lane discipline" },
     { id: "redline-reactor-ramp", name: "Reactor Ramp", seed: "REDLINE-REACTOR-RAMP-REDLINE", speedClass: "Redline", feelTag: "ramp route" },
@@ -264,7 +264,7 @@ async function assertOfficialTimeBoard(page) {
   const text = await bodyText(page);
   assertIncludes(text, "Time Attack");
   assertIncludes(text, "Official Time Attack");
-  assertIncludes(text, "Switchyard Boostline");
+  assertIncludes(text, "Switchyard Charge");
   assertIncludes(text, "35.789s");
   assertIncludes(text, "Fuel Run");
   await page.evaluate(() => window.neonRoadRally?.showPreRaceScreen());
