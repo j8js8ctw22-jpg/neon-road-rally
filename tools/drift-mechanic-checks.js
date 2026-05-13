@@ -206,10 +206,15 @@ vm.runInContext(`
   const longBoost = getDriftDashBoostForRelease(1.05, longDashDistance);
   const cappedBoost = getDriftDashBoostForRelease(5, LANES);
   assert(Math.abs(DRIFT_TUNING.maxChargeSeconds - 1.05) <= 0.06, "Max drift dash hold should cap around 1.05 seconds");
+  assert(DRIFT_TUNING.releaseCooldownSeconds <= 0.25, "Drift dash cooldown should stay short for responsive repeated inputs");
   assert(tapDashDistance > 0 && tapDashDistance < 0.6, "Tap drift dash should make a small lane cut");
-  assert(shortDashDistance > 0.95 && shortDashDistance < 1.35, "Short drift dash should move roughly one lane");
+  assert(shortDashDistance > 1.05 && shortDashDistance < 1.45, "Short drift dash should move roughly one lane");
   assert(longDashDistance > shortDashDistance, "Longer drift dash should cross farther than a short dash");
   assert(cappedDashDistance <= LANES - 1 + 0.05, "Capped drift dash distance should fit inside the road width");
+  assert.strictEqual(getDriftMajoritySettleLane(2.5, 1), 2, "Right drift release below 51% should settle back");
+  assert.strictEqual(getDriftMajoritySettleLane(2.51, 1), 3, "Right drift release at 51% should settle into the entered lane");
+  assert.strictEqual(getDriftMajoritySettleLane(1.5, -1), 2, "Left drift release below 51% should settle back");
+  assert.strictEqual(getDriftMajoritySettleLane(1.49, -1), 1, "Left drift release at 51% should settle into the entered lane");
   assert(shortBoost.multiplier > 1 && shortBoost.duration > 0, "Short clean drift dashes should provide a small boost");
   assert(longBoost.multiplier > shortBoost.multiplier, "Longer drift dashes should release a stronger boost");
   assert(longBoost.duration > shortBoost.duration, "Longer drift dashes should release a longer boost");
@@ -266,6 +271,9 @@ vm.runInContext(`
     driftDashTime: 0,
     driftLanesCrossed: 0,
     longestDriftDashLanes: 0,
+    driftSettleLane: 2,
+    driftSettleDelta: 0,
+    driftSettledByMajorityThreshold: false,
     longestDrift: 0,
     boostTrailPunchTimer: 0,
     screenShake: 0,
@@ -274,16 +282,26 @@ vm.runInContext(`
   const startingLane = app.run.targetLane;
   const startingLaneMoves = app.run.laneMoves;
   app.setDriftInput(-1, true);
+  assert.strictEqual(app.run.driftActive, true, "Shift + A should start drift dash during input handling");
+  assert.strictEqual(app.run.driftDirection, -1, "Immediate left drift dash should keep left direction");
+  assert.strictEqual(app.run.laneMoves, startingLaneMoves, "Immediate Shift + A should not trigger normal lane-change telemetry");
+  assert(app.run.renderLaneFloat < startingLane, "Shift + A should move the car immediately before the next simulation tick");
+  const immediateLaneFloat = app.run.renderLaneFloat;
   app.updateDriftState(0.2);
   assert.strictEqual(app.run.driftActive, true, "Shift + A should activate left drift dash state");
   assert.strictEqual(app.run.driftDirection, -1, "Left drift dash should keep left direction");
   assert.strictEqual(app.run.laneMoves, startingLaneMoves, "Shift + A should not trigger normal lane-change telemetry");
   assert(app.run.renderLaneFloat < startingLane, "Left drift dash should immediately move across the lane");
+  assert(app.run.renderLaneFloat < immediateLaneFloat, "Held left drift dash should continue moving after the immediate impulse");
   assert(app.run.driftDashDistance > 0.6, "A held drift dash should build measurable cross-lane distance");
   app.setDriftInput(0, false);
-  app.updateDriftState(0.016);
+  const releasedLaneFloat = app.run.renderLaneFloat;
   assert.strictEqual(app.run.driftActive, false, "Release should end active drift dash");
   assert(Number.isInteger(app.run.targetLane) && app.run.targetLane >= 0 && app.run.targetLane < LANES, "Release should settle to a valid lane");
+  assert.strictEqual(app.run.renderLaneFloat, app.run.targetLane, "Release should snap the car into the chosen lane immediately");
+  assert.strictEqual(app.run.playerLaneFloat, app.run.targetLane, "Release should stop player lane travel immediately");
+  app.updateDriftState(0.016);
+  assert.strictEqual(app.run.renderLaneFloat, releasedLaneFloat, "Drift dash should not keep sliding after release");
   assert(app.run.driftBoostTimer > 0, "Clean release should start a small drift dash boost timer");
   assert(app.run.driftBoostMultiplier > 1, "Clean release should apply a small drift dash speed multiplier");
   assert.strictEqual(app.run.driftDashesCompleted, 1, "Release should count drift dash telemetry");
@@ -305,6 +323,8 @@ vm.runInContext(`
   app.run.laneChangeProgress = 1;
   app.run.driftCooldownTimer = 0;
   app.setDriftInput(1, true);
+  assert.strictEqual(app.run.driftActive, true, "Shift + D should start immediately after cooldown clears");
+  assert(app.run.renderLaneFloat > 0, "Immediate right drift dash should move before the next simulation tick");
   app.updateDriftState(0.85);
   assert.strictEqual(app.run.driftActive, true, "Shift + D should activate right drift dash state");
   assert.strictEqual(app.run.driftDirection, 1, "Right drift dash should keep right direction");
@@ -319,13 +339,49 @@ vm.runInContext(`
   assert(app.run.maxDriftHold >= 1.04, "Max drift hold should reach the 1.05-second cap");
   assert(sfxPlayed.includes("driftFullCharge"), "Max-hold dash should play the full-charge SFX hook");
   app.setDriftInput(0, false);
-  app.updateDriftState(0.016);
   assert(app.run.targetLane >= 3 && app.run.targetLane < LANES, "Long drift dash release should settle near the crossed-to lane");
+  assert.strictEqual(app.run.renderLaneFloat, app.run.targetLane, "Long release should stop on its settled lane immediately");
   assert(app.run.longestDriftDashLanes > shortRelease.lanes, "Longer drift dash should record more lanes crossed than a tap/short dash");
   assert(app.run.driftBoostMultiplier > shortRelease.multiplier, "Longer drift dash should release a stronger boost than a short dash");
   assert(app.run.driftBoostTimer > shortRelease.timer, "Longer drift dash should release a longer boost than a short dash");
   assert.strictEqual(app.run.driftDashesCompleted, 2, "Full release should count another drift dash");
   assert.strictEqual(app.run.driftBoostsReleased, 2, "Full release should count another drift boost");
+
+  app.run.driftCooldownTimer = DRIFT_TUNING.releaseCooldownSeconds;
+  app.setDriftInput(-1, true);
+  assert.strictEqual(app.run.driftActive, false, "Cooldown should block only the tiny lockout window");
+  app.updateDriftState(DRIFT_TUNING.releaseCooldownSeconds + 0.01);
+  assert.strictEqual(app.run.driftActive, true, "Held drift input should start as soon as the short cooldown expires");
+  app.setDriftInput(0, false);
+
+  function runSettleProbe(direction, laneFloat) {
+    Object.assign(app.run, {
+      raceActive: true,
+      paused: false,
+      ended: false,
+      airborne: false,
+      driftActive: true,
+      driftDirection: direction,
+      driftChargeSeconds: 0.2,
+      driftChargeRatio: getDriftChargeRatio(0.2),
+      driftDashStartLaneFloat: direction > 0 ? Math.floor(laneFloat) : Math.ceil(laneFloat),
+      renderLaneFloat: laneFloat,
+      playerLaneFloat: laneFloat,
+      driftCooldownTimer: 0
+    });
+    return app.releaseDriftBoost("settle-probe");
+  }
+  runSettleProbe(1, 2.5);
+  assert.strictEqual(app.run.targetLane, 2, "Right drift at 50% should settle back to the previous lane");
+  assert.strictEqual(app.run.renderLaneFloat, 2, "Right drift at 50% should snap back immediately");
+  assert.strictEqual(app.run.driftSettledByMajorityThreshold, true, "Release should record majority-threshold settling");
+  runSettleProbe(1, 2.51);
+  assert.strictEqual(app.run.targetLane, 3, "Right drift at 51% should settle into the entered lane");
+  assert.strictEqual(app.run.renderLaneFloat, 3, "Right drift at 51% should snap into the entered lane immediately");
+  runSettleProbe(-1, 1.5);
+  assert.strictEqual(app.run.targetLane, 2, "Left drift at 50% should settle back to the previous lane");
+  runSettleProbe(-1, 1.49);
+  assert.strictEqual(app.run.targetLane, 1, "Left drift at 51% should settle into the entered lane");
 
   app.run.targetLane = 0;
   app.run.renderLaneFloat = 0;
@@ -372,6 +428,9 @@ vm.runInContext(`
   console.log(JSON.stringify({
     dashHoldWindowSeconds: [DRIFT_TUNING.minChargeSeconds, DRIFT_TUNING.maxChargeSeconds],
     dashLanesPerSecond: DRIFT_TUNING.dashLanesPerSecond,
+    initialDashSeconds: DRIFT_TUNING.initialDashSeconds,
+    settleMajorityThreshold: DRIFT_TUNING.settleMajorityThreshold,
+    releaseCooldownSeconds: DRIFT_TUNING.releaseCooldownSeconds,
     maxDashLaneDistance: Number(cappedDashDistance.toFixed(3)),
     boostMultiplier: {
       short: Number(shortBoost.multiplier.toFixed(3)),

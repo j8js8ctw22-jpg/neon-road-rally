@@ -244,6 +244,9 @@ async function exerciseDrift(page, directionKey, expectedDirection, options = {}
       targetLane: run.targetLane,
       renderLaneFloat: Number((run.renderLaneFloat || 0).toFixed(3)),
       laneMoves: run.laneMoves,
+      driftSettleLane: run.driftSettleLane,
+      driftSettleDelta: Number((run.driftSettleDelta || 0).toFixed(3)),
+      driftSettledByMajorityThreshold: Boolean(run.driftSettledByMajorityThreshold),
       currentSpeed: Number((run.currentSpeed || 0).toFixed(2)),
       previousSpeed: Number((previousSpeed || 0).toFixed(2))
     };
@@ -255,8 +258,27 @@ async function exerciseDrift(page, directionKey, expectedDirection, options = {}
   assert(release.driftLanesCrossed > 0 && release.longestDriftDashLanes > 0, "Drift dash telemetry should record lanes crossed", { release });
   assert(Number.isInteger(release.targetLane) && release.targetLane >= 0 && release.targetLane <= 4, "Drift dash release should settle to a valid lane", { release });
   assert(release.renderLaneFloat >= 0 && release.renderLaneFloat <= 4, "Released drift dash should remain inside road bounds", { release });
+  assert(release.renderLaneFloat === release.targetLane, "Drift dash release should stop sliding and snap to the settled lane", { release });
+  assert(release.driftSettleLane === release.targetLane, "Release telemetry should record the settled lane", { release });
+  assert(release.driftSettleDelta <= 0.51, "Release settle delta should stay inside the majority threshold window", { release });
+  assert(release.driftSettledByMajorityThreshold, "Release should record majority-threshold settling", { release });
   assert(release.laneMoves === before.laneMoves, "Drift dash release should not count as normal lane movement", { before, release });
   return { before, active, release };
+}
+
+async function exerciseRepeatedQuickDriftDashes(page) {
+  await startCustomRun(page, {
+    trackId: "sunset-highway",
+    speedClassId: "arcade",
+    raceTypeId: "classic",
+    seed: "DRIFT-REPEAT-QUICK"
+  });
+  const first = await exerciseDrift(page, "d", 1, { holdMs: 55, stabilityWaitMs: 0, releaseMode: "direction" });
+  await page.waitForTimeout(240);
+  const second = await exerciseDrift(page, "a", -1, { holdMs: 55, stabilityWaitMs: 0, releaseMode: "shift" });
+  assert(second.release.driftsStarted >= first.release.driftsStarted + 1, "A second quick drift dash should start after the short cooldown", { first, second });
+  assert(second.release.driftDashesCompleted >= first.release.driftDashesCompleted + 1, "A second quick drift dash should complete after the short cooldown", { first, second });
+  return { first, second, cooldownWaitMs: 240 };
 }
 
 async function assertLaneAndSpaceBoostStillWork(page) {
@@ -419,6 +441,7 @@ async function main() {
     assert(turboFullDrift.release.driftBoostMultiplier > turboShortDrift.release.driftBoostMultiplier, "Turbo long drift dash should release a stronger boost than short drift dash", { turboShortDrift, turboFullDrift });
     assert(turboFullDrift.release.driftBoostTimer > turboShortDrift.release.driftBoostTimer, "Turbo long drift dash should release a longer boost than short drift dash", { turboShortDrift, turboFullDrift });
     const finishSummary = await forceFinishWithDriftNote(page);
+    const repeatedQuickDrifts = await exerciseRepeatedQuickDriftDashes(page);
 
     await startOfficialRun(page, {
       routeId: "redline-switchyard-boostline",
@@ -440,6 +463,7 @@ async function main() {
       arcadeControls,
       turboShortDrift,
       turboFullDrift,
+      repeatedQuickDrifts,
       fuelDrift,
       finishSummary,
       consoleIssues
