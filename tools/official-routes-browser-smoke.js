@@ -304,12 +304,14 @@ async function runOfficialScenario(page, scenario, options = {}) {
   const text = await bodyText(page);
   assertIncludes(text, "Official Race Result");
   assertIncludes(text, route.name);
-  assertIncludes(text, route.seed);
+  assert(!text.includes(route.seed), "Official result first view should not expose raw route seed", { routeId: route.id });
   assertIncludes(text, `${scenario.time.toFixed(3)}s`);
   assertIncludes(text, "PB Delta");
   assertIncludes(text, "Top 20");
   if (scenario.expectFeedback) assertIncludes(text, scenario.expectFeedback);
   await page.locator(".result-details-block summary").click();
+  const detailSeed = await page.locator(".seed-copy").inputValue();
+  assert(detailSeed === route.seed, "Official route seed should remain available in result details", { routeId: route.id, detailSeed });
   const detailText = await bodyText(page);
   assertIncludes(detailText, "Competition");
   assertIncludes(detailText, "Official Route");
@@ -416,8 +418,11 @@ async function runManualOfficialSeedScenario(page) {
   const text = await bodyText(page);
   assertIncludes(text, "Official Race Result");
   assertIncludes(text, route.name);
-  assertIncludes(text, route.seed);
+  assert(!text.includes(route.seed), "Official result first view should not expose raw route seed", { routeId: route.id });
   assert(!text.includes("Custom Road Result"), "Official seed manual run should not present as Custom Road");
+  await page.locator(".result-details-block summary").click();
+  const detailSeed = await page.locator(".seed-copy").inputValue();
+  assert(detailSeed === route.seed, "Manual official seed should remain available in result details", { routeId: route.id, detailSeed });
   await clickAction(page, "preRace");
   await page.waitForFunction(() => window.neonRoadRally?.screen === "preRace", null, { timeout: 5000 });
   return { routeId: route.id, telemetry, manualSeed: route.seed };

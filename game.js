@@ -25581,7 +25581,7 @@ class NeonRoadRally {
           <div class="eyebrow">Local Arcade Racer</div>
           <h1 class="game-title"><span>Neon</span><span>Road</span><span>Rally</span></h1>
           <p class="subtitle title-tagline">Five tracks. One clean line. Beat the board.</p>
-          <p class="subtitle">Run Official Race for the competitive route list, or use Custom Road / Practice when you want a seed lab.</p>
+          <p class="subtitle">Run Official Race for the competitive route list, or use Custom Road / Practice when you want your own road.</p>
           <div class="title-status-grid">
             <div class="title-status-card ${player ? "title-driver-status" : ""}">
               <div>
@@ -29968,12 +29968,13 @@ class NeonRoadRally {
   renderScoreAttackRows(entries, recentEntry = null) {
     return entries.length ? entries.map((entry, index) => {
       const recent = entry === recentEntry || (recentEntry?.runId && entry.runId && recentEntry.runId === entry.runId);
+      const seedMeta = entry.officialRouteId ? "" : ` · Seed ${escapeHtml(formatRoadSeed(entry.seed))}`;
       return `
       <li class="leaderboard-item ${recent ? "is-recent" : ""}">
         <span class="leaderboard-rank">#${index + 1}</span>
         <span>
           <strong>${escapeHtml(entry.playerName)}</strong>
-          <span class="meta">${entry.officialRouteId ? `Official Race: ${escapeHtml(getOfficialRouteEntryDisplayName(entry))} · ` : "Custom Road · "}${entry.challengeId ? `Challenge: ${escapeHtml(entry.challengeName || entry.challengeId)} · ` : ""}${entry.partyMode ? `Party ${escapeHtml(getPartyRoundTypeLabel(entry.partyRoundType))} R${entry.partyRoundIndex || 1} · ` : ""}${escapeHtml(entry.carName)} · ${escapeHtml(entry.trackName)} · ${escapeHtml(getRaceTypeLabel(entry.raceType))} · ${escapeHtml(getSpeedClassLabel(entry.raceMode || entry.speedClass))} · Seed ${escapeHtml(formatRoadSeed(entry.seed))} · ${escapeHtml(getRunOutcomeLabel(entry))} · ${formatRunElapsedTime(entry)}${formatPacingRulesLabel(entry) ? ` · ${escapeHtml(formatPacingRulesLabel(entry))}` : ""}${entry.raceType === FUEL_RUN_RACE_TYPE_ID ? ` · Fuel ${Math.max(0, entry.fuelRemaining || 0)}` : ""}${entry.raceType === PURSUIT_RACE_TYPE_ID ? ` · Heat ${Math.round(entry.heatAtEnd || 0)} · Roadblocks ${Math.max(0, entry.roadblocksCleared || 0)}` : ""}${formatShortDate(entry.date) ? ` · ${escapeHtml(formatShortDate(entry.date))}` : ""}</span>
+          <span class="meta">${entry.officialRouteId ? `Official Race: ${escapeHtml(getOfficialRouteEntryDisplayName(entry))} · ` : "Custom Road · "}${entry.challengeId ? `Challenge: ${escapeHtml(entry.challengeName || entry.challengeId)} · ` : ""}${entry.partyMode ? `Party ${escapeHtml(getPartyRoundTypeLabel(entry.partyRoundType))} R${entry.partyRoundIndex || 1} · ` : ""}${escapeHtml(entry.carName)} · ${escapeHtml(entry.trackName)} · ${escapeHtml(getRaceTypeLabel(entry.raceType))} · ${escapeHtml(getSpeedClassLabel(entry.raceMode || entry.speedClass))}${seedMeta} · ${escapeHtml(getRunOutcomeLabel(entry))} · ${formatRunElapsedTime(entry)}${formatPacingRulesLabel(entry) ? ` · ${escapeHtml(formatPacingRulesLabel(entry))}` : ""}${entry.raceType === FUEL_RUN_RACE_TYPE_ID ? ` · Fuel ${Math.max(0, entry.fuelRemaining || 0)}` : ""}${entry.raceType === PURSUIT_RACE_TYPE_ID ? ` · Heat ${Math.round(entry.heatAtEnd || 0)} · Roadblocks ${Math.max(0, entry.roadblocksCleared || 0)}` : ""}${formatShortDate(entry.date) ? ` · ${escapeHtml(formatShortDate(entry.date))}` : ""}</span>
         </span>
         <span class="leaderboard-score">${formatScore(entry.score)}</span>
       </li>
@@ -30058,16 +30059,19 @@ class NeonRoadRally {
   }
 
   renderTimeAttackRows(rows, emptyText) {
-    return rows.length ? rows.map((entry, index) => `
-      <li class="leaderboard-item">
-        <span class="leaderboard-rank">#${index + 1}</span>
-        <span>
-          <strong>${escapeHtml(entry.playerName)}</strong>
-          <span class="meta">${entry.officialRouteId ? `Official Race: ${escapeHtml(getOfficialRouteEntryDisplayName(entry))} · ` : "Custom Road · "}${escapeHtml(entry.carName || "CAR")} · ${escapeHtml(entry.trackName)} · ${escapeHtml(getRaceTypeLabel(entry.raceType))} · ${escapeHtml(getSpeedClassLabel(entry.raceMode || entry.speedClass))} · Seed ${escapeHtml(formatRoadSeed(entry.seed))} · Score ${formatScore(entry.score)}${formatPacingRulesLabel(entry) ? ` · ${escapeHtml(formatPacingRulesLabel(entry))}` : ""}${formatShortDate(entry.date) ? ` · ${escapeHtml(formatShortDate(entry.date))}` : ""}</span>
-        </span>
-        <span class="leaderboard-score">${formatFinishTimeMs(entry.finishTimeMs)}</span>
-      </li>
-    `).join("") : `<li class="leaderboard-item"><span class="meta">${escapeHtml(emptyText)}</span></li>`;
+    return rows.length ? rows.map((entry, index) => {
+      const seedMeta = entry.officialRouteId ? "" : ` · Seed ${escapeHtml(formatRoadSeed(entry.seed))}`;
+      return `
+        <li class="leaderboard-item">
+          <span class="leaderboard-rank">#${index + 1}</span>
+          <span>
+            <strong>${escapeHtml(entry.playerName)}</strong>
+            <span class="meta">${entry.officialRouteId ? `Official Race: ${escapeHtml(getOfficialRouteEntryDisplayName(entry))} · ` : "Custom Road · "}${escapeHtml(entry.carName || "CAR")} · ${escapeHtml(entry.trackName)} · ${escapeHtml(getRaceTypeLabel(entry.raceType))} · ${escapeHtml(getSpeedClassLabel(entry.raceMode || entry.speedClass))}${seedMeta} · Score ${formatScore(entry.score)}${formatPacingRulesLabel(entry) ? ` · ${escapeHtml(formatPacingRulesLabel(entry))}` : ""}${formatShortDate(entry.date) ? ` · ${escapeHtml(formatShortDate(entry.date))}` : ""}</span>
+          </span>
+          <span class="leaderboard-score">${formatFinishTimeMs(entry.finishTimeMs)}</span>
+        </li>
+      `;
+    }).join("") : `<li class="leaderboard-item"><span class="meta">${escapeHtml(emptyText)}</span></li>`;
   }
 
   renderTimeAttackControls(filter) {
@@ -30153,7 +30157,7 @@ class NeonRoadRally {
         .slice(0, LEADERBOARD_MAX_ENTRIES)
       : [];
     const setupLabel = officialRoute && officialRouteSupportsRaceType(officialRoute, boardFilter.raceTypeId)
-      ? `${getOfficialRouteDisplayName(officialRoute)} · Official Seed ${officialRoute.seed}`
+      ? `${getOfficialRouteDisplayName(officialRoute)} · Official route`
       : `${boardFilter.track.name} · ${getRaceTypeLabel(boardFilter.raceTypeId)} · ${getSpeedClassLabel(boardFilter.speedClassId)}`;
     this.layer.classList.remove("is-empty");
     this.layer.innerHTML = `
@@ -30194,7 +30198,7 @@ class NeonRoadRally {
             </ol>
           ` : ""}
         ` : `
-          <p class="hint">Score Attack Board: highest score wins on the selected Official Route and race rules. Practice and experimental records stay out of normal Official boards.</p>
+          <p class="hint">Score Attack Board: highest score wins on the selected Official Route and race rules. Practice records stay outside Official boards.</p>
           <div class="leaderboard-section-heading">
             <span class="eyebrow">Official Score Attack</span>
             <strong>${escapeHtml(officialRoute ? getOfficialRouteDisplayName(officialRoute) : "Official Race")}</strong>
@@ -30298,7 +30302,7 @@ class NeonRoadRally {
         : (boostlineRun ? "Boostline Prototype Result" : (summary.officialRouteId ? "Official Race Result" : "Custom Road Result")));
     const officialRouteDisplayName = getOfficialRouteEntryDisplayName(summary);
     const routeLine = summary.officialRouteId
-      ? `${officialRouteDisplayName} · Official Seed ${summary.officialSeed || summary.seed}`
+      ? `${officialRouteDisplayName} · Official route`
       : `Custom Road · Seed ${summary.seed}`;
     const setupLine = `${summary.trackName} · ${summary.raceTypeLabel || getRaceTypeLabel(summary.raceTypeId)} · ${summary.speedClassLabel}`;
     const timeAttackLabel = status === "finished" ? (boostlineRun ? "Finish Time" : "Time Attack") : "Progress";
