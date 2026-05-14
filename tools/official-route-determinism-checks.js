@@ -103,8 +103,33 @@ vm.runInContext(`
   const app = Object.create(NeonRoadRally.prototype);
   app.renderer = makeHarnessRenderer();
 
+  const newNormalTrackIds = ["midnight-ridge", "blackout-run", "prism-highway"];
+  const firstOfficialRouteIds = [
+    "sunset-neon-palm-sprint",
+    "redline-tunnel-spark-sprint",
+    "midnight-ridge-lantern-sprint",
+    "blackout-headlight-mile",
+    "prism-pinkline-sprint"
+  ];
+  const newTrackExpectedSpeedCounts = { turbo: 4, overdrive: 3, redline: 3 };
+  for (const trackId of newNormalTrackIds) {
+    const routes = getOfficialRoutesForTrack(trackId);
+    assert.strictEqual(routes.length, 10, trackId + " should register an Official 10");
+    assert.deepStrictEqual(
+      routes.reduce((counts, route) => {
+        counts[route.speedClassId] = (counts[route.speedClassId] || 0) + 1;
+        return counts;
+      }, {}),
+      newTrackExpectedSpeedCounts,
+      trackId + " should use 4 Turbo, 3 Overdrive, and 3 Redline official routes"
+    );
+    assert(routes.every((route) => officialRouteSupportsRaceType(route, DEFAULT_RACE_TYPE_ID)), trackId + " official routes should support Classic");
+    assert(routes.every((route) => officialRouteSupportsRaceType(route, FUEL_RUN_RACE_TYPE_ID)), trackId + " official routes should support Fuel Run");
+    assert(routes.every((route) => !["arcade", "pro"].includes(route.speedClassId)), trackId + " official routes should exclude Arcade and Pro");
+  }
+
   const audit = app.runOfficialRouteDeterminismAudit({
-    routeIds: ["sunset-neon-palm-sprint", "redline-tunnel-spark-sprint"],
+    routeIds: firstOfficialRouteIds,
     raceTypeIds: [DEFAULT_RACE_TYPE_ID, FUEL_RUN_RACE_TYPE_ID],
     repeats: 5,
     waveLimit: 36,
@@ -121,6 +146,11 @@ vm.runInContext(`
   assert(redlineClassic?.signatureHash, "Redline Run official route should produce a route signature");
   assert(palmClassic.signatureHashes.every((hash) => hash === palmClassic.signatureHash), "Neon Palm Sprint signatures should repeat exactly");
   assert(redlineClassic.signatureHashes.every((hash) => hash === redlineClassic.signatureHash), "Redline official signatures should repeat exactly");
+  for (const routeId of firstOfficialRouteIds.slice(2)) {
+    const row = audit.routeAudits.find((item) => item.routeId === routeId && item.raceTypeId === DEFAULT_RACE_TYPE_ID);
+    assert(row?.signatureHash, routeId + " should produce a route signature");
+    assert(row.signatureHashes.every((hash) => hash === row.signatureHash), routeId + " signatures should repeat exactly");
+  }
 
   function assertFrameCadenceStable(routeId, raceTypeId, label) {
     const dts = [1 / 60, 1 / 50, 1 / 40, 1 / 30];
@@ -146,24 +176,24 @@ vm.runInContext(`
     return signatures.map((row) => ({ dt: row.dt, hash: row.signature.hash }));
   }
 
-  const frameCadenceAudits = [
-    {
-      routeId: "sunset-neon-palm-sprint",
-      raceTypeId: DEFAULT_RACE_TYPE_ID,
-      signatures: assertFrameCadenceStable("sunset-neon-palm-sprint", DEFAULT_RACE_TYPE_ID, "Neon Palm Sprint Classic")
-    },
-    {
-      routeId: "redline-tunnel-spark-sprint",
-      raceTypeId: DEFAULT_RACE_TYPE_ID,
-      signatures: assertFrameCadenceStable("redline-tunnel-spark-sprint", DEFAULT_RACE_TYPE_ID, "Tunnel Spark Sprint Classic")
-    }
-  ];
+  const frameCadenceRouteIds = ["sunset-neon-palm-sprint", "redline-tunnel-spark-sprint"];
+  const frameCadenceAudits = frameCadenceRouteIds.map((routeId) => ({
+    routeId,
+    raceTypeId: DEFAULT_RACE_TYPE_ID,
+    signatures: assertFrameCadenceStable(routeId, DEFAULT_RACE_TYPE_ID, getOfficialRouteDisplayName(routeId) + " Classic")
+  }));
 
   const palmManualClassic = getOfficialRouteForRun("sunset-highway", "turbo", DEFAULT_RACE_TYPE_ID, "SUNSET-PALM-SPRINT-TURBO", "");
   const palmManualFuel = getOfficialRouteForRun("sunset-highway", "turbo", FUEL_RUN_RACE_TYPE_ID, "SUNSET-PALM-SPRINT-TURBO", "");
+  const midnightManualClassic = getOfficialRouteForRun("midnight-ridge", "turbo", DEFAULT_RACE_TYPE_ID, "MIDNIGHT-RIDGE-LANTERN-TURBO", "");
+  const blackoutManualClassic = getOfficialRouteForRun("blackout-run", "turbo", DEFAULT_RACE_TYPE_ID, "BLACKOUT-HEADLIGHT-MILE-TURBO", "");
+  const prismManualClassic = getOfficialRouteForRun("prism-highway", "turbo", DEFAULT_RACE_TYPE_ID, "PRISM-PINKLINE-SPRINT-TURBO", "");
   const customManual = getOfficialRouteForRun("sunset-highway", "turbo", DEFAULT_RACE_TYPE_ID, "CUSTOM-NOT-OFFICIAL-SEED", "");
   assert.strictEqual(palmManualClassic?.id, "sunset-neon-palm-sprint", "Manual Classic official seed should normalize to Neon Palm Sprint");
   assert.strictEqual(palmManualFuel?.id, "sunset-neon-palm-sprint", "Manual Fuel Run official seed should normalize to Neon Palm Sprint");
+  assert.strictEqual(midnightManualClassic?.id, "midnight-ridge-lantern-sprint", "Manual Midnight Ridge official seed should normalize to Ridge Lantern Sprint");
+  assert.strictEqual(blackoutManualClassic?.id, "blackout-headlight-mile", "Manual Blackout Run official seed should normalize to Headlight Mile");
+  assert.strictEqual(prismManualClassic?.id, "prism-pinkline-sprint", "Manual Prism Highway official seed should normalize to Pinkline Sprint");
   assert.strictEqual(customManual, null, "Non-official manual seed should not normalize");
 
   const officialEntry = normalizeLeaderboardEntry({
@@ -210,6 +240,15 @@ vm.runInContext(`
       seed: "SUNSET-PALM-SPRINT-TURBO",
       normalizedRouteId: palmManualClassic.id
     },
+    newTrackOfficial10: Object.fromEntries(newNormalTrackIds.map((trackId) => [
+      trackId,
+      getOfficialRoutesForTrack(trackId).map((route) => ({
+        routeId: route.id,
+        routeName: route.name,
+        seed: route.seed,
+        speedClassId: route.speedClassId
+      }))
+    ])),
     customSeedRemainsCustom: audit.customSeedRemainsCustom
   }, null, 2));
 `, context, { filename: "official-route-determinism-checks" });

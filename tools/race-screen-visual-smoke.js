@@ -181,6 +181,57 @@ async function installVisualSmokeHelpers(page) {
       };
     }
 
+    function pixelAt(ctx, canvas, x, y) {
+      const game = app();
+      const scaleX = canvas.width / Math.max(1, game.renderer.width);
+      const scaleY = canvas.height / Math.max(1, game.renderer.height);
+      const sx = Math.max(0, Math.min(canvas.width - 1, Math.round(x * scaleX)));
+      const sy = Math.max(0, Math.min(canvas.height - 1, Math.round(y * scaleY)));
+      const data = ctx.getImageData(sx, sy, 1, 1).data;
+      const luma = data[0] * 0.2126 + data[1] * 0.7152 + data[2] * 0.0722;
+      const chroma = Math.max(data[0], data[1], data[2]) - Math.min(data[0], data[1], data[2]);
+      return {
+        r: data[0],
+        g: data[1],
+        b: data[2],
+        a: data[3],
+        luma: Number(luma.toFixed(2)),
+        chroma
+      };
+    }
+
+    function canvasReadabilitySample() {
+      const game = app();
+      game.renderer.render();
+      const canvas = game.canvas;
+      const ctx = canvas.getContext("2d");
+      const road = game.renderer.road;
+      const roadCenterX = road.x + road.w * 0.5;
+      const roadCenterY = road.y + road.h * 0.56;
+      const laneDividerX = road.x + road.laneW * 2;
+      const rightEdgeX = road.x + road.w + 8;
+      const scanYs = [0.2, 0.32, 0.44, 0.56, 0.68, 0.8].map((ratio) => road.y + road.h * ratio);
+      const laneSamples = scanYs.map((y) => pixelAt(ctx, canvas, laneDividerX, y));
+      const edgeSamples = scanYs.map((y) => pixelAt(ctx, canvas, rightEdgeX, y));
+      const roadSamples = [
+        pixelAt(ctx, canvas, roadCenterX, roadCenterY),
+        pixelAt(ctx, canvas, road.x + road.w * 0.32, road.y + road.h * 0.48),
+        pixelAt(ctx, canvas, road.x + road.w * 0.68, road.y + road.h * 0.64)
+      ];
+      const maxLuma = (samples) => Math.max(...samples.map((sample) => sample.luma));
+      const avgLuma = (samples) => samples.reduce((sum, sample) => sum + sample.luma, 0) / Math.max(1, samples.length);
+      const maxChroma = Math.max(...laneSamples.concat(edgeSamples, roadSamples).map((sample) => sample.chroma));
+      return {
+        roadAverageLuma: Number(avgLuma(roadSamples).toFixed(2)),
+        laneDividerMaxLuma: maxLuma(laneSamples),
+        edgeMaxLuma: maxLuma(edgeSamples),
+        maxChroma,
+        laneSamples,
+        edgeSamples,
+        roadSamples
+      };
+    }
+
     function visibleObjects() {
       const game = app();
       const run = game.run;
@@ -232,7 +283,11 @@ async function installVisualSmokeHelpers(page) {
       return {
         label,
         screen: game.screen,
+        trackId: run.track?.id || "",
+        trackName: run.track?.name || "",
+        visualIdentity: run.track?.visualTheme?.identity || "",
         raceTypeId: run.raceTypeId || "",
+        speedClassId: run.speedClassId || "",
         status: run.ended ? (run.finished ? "finished" : "ended") : "running",
         endReason: run.endReason || "",
         distance: Math.round(run.distance || 0),
@@ -296,6 +351,49 @@ async function installVisualSmokeHelpers(page) {
           bustedBeat: Number((run.pursuitBustedBeatTimer || 0).toFixed(3))
         }
       };
+    }
+
+    function testTrackTheme(trackId, options = {}) {
+      const speedClassId = options.speedClassId || "turbo";
+      const raceTypeId = options.raceTypeId || "classic";
+      primeRun({
+        raceTypeId,
+        speedClassId,
+        trackId,
+        seed: `VISUAL-${trackId.toUpperCase()}-${speedClassId.toUpperCase()}`
+      });
+      const ahead = Math.max(playerAhead() + 240, 430);
+      makeObstacle("slowCar", 2, ahead);
+      makeObstacle("boostPad", 1, ahead + 220);
+      if (options.includeFuelAndBarrier) {
+        makeObstacle("barrier", 0, ahead + 360, {
+          waveType: "visualSmokeTrackTheme",
+          waveLabel: "Visual smoke track theme barrier"
+        });
+        makeObstacle("gasCan", 4, ahead + 500, {
+          waveType: "visualSmokeTrackTheme",
+          waveLabel: "Visual smoke track theme fuel"
+        });
+      }
+      makeObstacle("ramp", 3, ahead + 640, {
+        waveType: "visualSmokeTrackTheme",
+        waveLabel: "Visual smoke track theme"
+      });
+      return {
+        trackId,
+        speedClassId,
+        raceTypeId,
+        snapshot: snapshot(`track-theme-${trackId}`),
+        readability: canvasReadabilitySample()
+      };
+    }
+
+    function testBlackoutSpeedReadability(speedClassId) {
+      return testTrackTheme("blackout-run", {
+        speedClassId,
+        raceTypeId: "fuelRun",
+        includeFuelAndBarrier: true
+      });
     }
 
     function testClassicBoost() {
@@ -558,6 +656,8 @@ async function installVisualSmokeHelpers(page) {
       testPursuitBusted,
       testPartyClassic,
       testPartyFuel,
+      testTrackTheme,
+      testBlackoutSpeedReadability,
       menuScreens
     };
   });
@@ -601,6 +701,7 @@ async function run() {
   const consoleIssues = [];
   page.on("console", (msg) => {
     if (["warning", "error"].includes(msg.type())) {
+      if (msg.type() === "warning" && msg.text().includes("Canvas2D: Multiple readback operations")) return;
       consoleIssues.push(`${msg.type()}: ${msg.text()}`);
     }
   });
@@ -690,6 +791,81 @@ async function run() {
       warningPulse: fuel.critical.fuel.warningPulse,
       music: fuel.critical.music
     };
+
+    const trackThemes = await page.evaluate(() => (
+      ["midnight-ridge", "blackout-run", "prism-highway"].map((trackId) => window.__nrrVisualSmoke.testTrackTheme(trackId))
+    ));
+    for (const themeResult of trackThemes) {
+      const { snapshot, readability, trackId } = themeResult;
+      assert(snapshot.screen === "game" && snapshot.trackId === trackId, `${trackId} visual smoke did not start on the requested track`, snapshot);
+      assert(snapshot.canvas.hasDrawSurface, `${trackId} canvas should have a drawable surface`, snapshot.canvas);
+      ["slowCar", "boostPad", "ramp"].forEach((type) => {
+        assert(snapshot.visibleTypes.includes(type), `${trackId} should keep ${type} visible for readability`, snapshot);
+      });
+      assert(
+        readability.laneDividerMaxLuma > readability.roadAverageLuma + 6,
+        `${trackId} lane paint should separate from the road surface`,
+        readability
+      );
+      assert(
+        readability.edgeMaxLuma > readability.roadAverageLuma + 4,
+        `${trackId} road edge glints should separate from the road surface`,
+        readability
+      );
+      if (trackId === "prism-highway") {
+        assert(readability.maxChroma >= 30, "Prism Highway should render visible color variation without relying on text", readability);
+      }
+    }
+    report.observed.newTrackThemes = trackThemes.map((item) => ({
+      trackId: item.trackId,
+      speedClassId: item.speedClassId,
+      visibleTypes: item.snapshot.visibleTypes,
+      visualIdentity: item.snapshot.visualIdentity,
+      readability: {
+        roadAverageLuma: item.readability.roadAverageLuma,
+        laneDividerMaxLuma: item.readability.laneDividerMaxLuma,
+        edgeMaxLuma: item.readability.edgeMaxLuma,
+        maxChroma: item.readability.maxChroma
+      }
+    }));
+
+    const blackoutSpeedReadability = await page.evaluate(() => (
+      ["turbo", "overdrive", "redline"].map((speedClassId) => window.__nrrVisualSmoke.testBlackoutSpeedReadability(speedClassId))
+    ));
+    for (const speedResult of blackoutSpeedReadability) {
+      const { snapshot, readability, speedClassId } = speedResult;
+      assert(snapshot.screen === "game" && snapshot.trackId === "blackout-run", `Blackout Run ${speedClassId} visual smoke did not start correctly`, snapshot);
+      assert(snapshot.speedClassId === speedClassId, `Blackout Run ${speedClassId} smoke used the wrong speed class`, snapshot);
+      ["barrier", "boostPad", "gasCan", "ramp", "slowCar"].forEach((type) => {
+        assert(snapshot.visibleTypes.includes(type), `Blackout Run ${speedClassId} should keep ${type} visible`, snapshot);
+      });
+      assert(
+        readability.laneDividerMaxLuma > readability.roadAverageLuma + 8,
+        `Blackout Run ${speedClassId} lane paint should stay readable against the dark road`,
+        readability
+      );
+      assert(
+        readability.edgeMaxLuma > readability.roadAverageLuma + 6,
+        `Blackout Run ${speedClassId} road edge glints should stay readable against the dark road`,
+        readability
+      );
+      assert(
+        readability.maxChroma <= 70,
+        `Blackout Run ${speedClassId} should stay restrained rather than colorful`,
+        readability
+      );
+    }
+    report.observed.blackoutSpeedReadability = blackoutSpeedReadability.map((item) => ({
+      speedClassId: item.speedClassId,
+      visibleTypes: item.snapshot.visibleTypes,
+      raceTypeId: item.snapshot.raceTypeId,
+      readability: {
+        roadAverageLuma: item.readability.roadAverageLuma,
+        laneDividerMaxLuma: item.readability.laneDividerMaxLuma,
+        edgeMaxLuma: item.readability.edgeMaxLuma,
+        maxChroma: item.readability.maxChroma
+      }
+    }));
 
     const pursuit = await page.evaluate(() => window.__nrrVisualSmoke.testPursuitRoadblockAndEscaped());
     assert(pursuit.warning.pursuit.roadblockAhead, "Pursuit roadblock warning was not active", pursuit.warning.pursuit);

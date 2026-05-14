@@ -58,13 +58,60 @@ const TRACK_ROUTES = {
     { id: "redline-reactor-ramp", name: "Reactor Ramp", seed: "REDLINE-REACTOR-RAMP-REDLINE", speedClass: "Redline", feelTag: "ramp route" },
     { id: "redline-city-limits-blaze", name: "City Limits Blaze", seed: "REDLINE-CITY-LIMITS-REDLINE", speedClass: "Redline", feelTag: "traffic pressure" },
     { id: "redline-finale", name: "Redline Finale", seed: "REDLINE-FINALE-REDLINE", speedClass: "Redline", feelTag: "final push" }
+  ],
+  "midnight-ridge": [
+    { id: "midnight-ridge-lantern-sprint", name: "Ridge Lantern Sprint", seed: "MIDNIGHT-RIDGE-LANTERN-TURBO", speedClass: "Turbo", feelTag: "clean speed" },
+    { id: "midnight-cliffside-cutback", name: "Cliffside Cutback", seed: "MIDNIGHT-CLIFFSIDE-CUTBACK-TURBO", speedClass: "Turbo", feelTag: "lane discipline" },
+    { id: "midnight-switchback-glow", name: "Switchback Glow", seed: "MIDNIGHT-SWITCHBACK-GLOW-TURBO", speedClass: "Turbo", feelTag: "drift timing" },
+    { id: "midnight-pine-shadow-run", name: "Pine Shadow Run", seed: "MIDNIGHT-PINE-SHADOW-TURBO", speedClass: "Turbo", feelTag: "ridge line" },
+    { id: "midnight-guardrail-gamble", name: "Guardrail Gamble", seed: "MIDNIGHT-GUARDRAIL-GAMBLE-OVERDRIVE", speedClass: "Overdrive", feelTag: "risk line" },
+    { id: "midnight-moonlit-descent", name: "Moonlit Descent", seed: "MIDNIGHT-MOONLIT-DESCENT-OVERDRIVE", speedClass: "Overdrive", feelTag: "descent pressure" },
+    { id: "midnight-summit-driftline", name: "Summit Driftline", seed: "MIDNIGHT-SUMMIT-DRIFTLINE-OVERDRIVE", speedClass: "Overdrive", feelTag: "drift timing" },
+    { id: "midnight-black-peak-charge", name: "Black Peak Charge", seed: "MIDNIGHT-BLACK-PEAK-REDLINE", speedClass: "Redline", feelTag: "final push" },
+    { id: "midnight-last-ridge-drop", name: "Last Ridge Drop", seed: "MIDNIGHT-LAST-RIDGE-REDLINE", speedClass: "Redline", feelTag: "lane discipline" },
+    { id: "midnight-no-return-pass", name: "No-Return Pass", seed: "MIDNIGHT-NO-RETURN-PASS-REDLINE", speedClass: "Redline", feelTag: "final push" }
+  ],
+  "blackout-run": [
+    { id: "blackout-headlight-mile", name: "Headlight Mile", seed: "BLACKOUT-HEADLIGHT-MILE-TURBO", speedClass: "Turbo", feelTag: "headlight read" },
+    { id: "blackout-reflector-gate", name: "Reflector Gate", seed: "BLACKOUT-REFLECTOR-GATE-TURBO", speedClass: "Turbo", feelTag: "lane discipline" },
+    { id: "blackout-dark-lane-dash", name: "Dark Lane Dash", seed: "BLACKOUT-DARK-LANE-DASH-TURBO", speedClass: "Turbo", feelTag: "clean speed" },
+    { id: "blackout-white-line-fever", name: "White Line Fever", seed: "BLACKOUT-WHITE-LINE-FEVER-TURBO", speedClass: "Turbo", feelTag: "white line" },
+    { id: "blackout-blind-curve-cut", name: "Blind Curve Cut", seed: "BLACKOUT-BLIND-CURVE-OVERDRIVE", speedClass: "Overdrive", feelTag: "precision" },
+    { id: "blackout-phantom-merge", name: "Phantom Merge", seed: "BLACKOUT-PHANTOM-MERGE-OVERDRIVE", speedClass: "Overdrive", feelTag: "traffic shadow" },
+    { id: "blackout-low-beam-sprint", name: "Low Beam Sprint", seed: "BLACKOUT-LOW-BEAM-SPRINT-OVERDRIVE", speedClass: "Overdrive", feelTag: "clean speed" },
+    { id: "blackout-lights-out-charge", name: "Lights Out Charge", seed: "BLACKOUT-LIGHTS-OUT-REDLINE", speedClass: "Redline", feelTag: "final push" },
+    { id: "blackout-black-glass-run", name: "Black Glass Run", seed: "BLACKOUT-BLACK-GLASS-REDLINE", speedClass: "Redline", feelTag: "lane discipline" },
+    { id: "blackout-no-moon-finale", name: "No Moon Finale", seed: "BLACKOUT-NO-MOON-FINALE-REDLINE", speedClass: "Redline", feelTag: "final push" }
+  ],
+  "prism-highway": [
+    { id: "prism-pinkline-sprint", name: "Pinkline Sprint", seed: "PRISM-PINKLINE-SPRINT-TURBO", speedClass: "Turbo", feelTag: "clean speed" },
+    { id: "prism-rainbow-ramp-rush", name: "Rainbow Ramp Rush", seed: "PRISM-RAINBOW-RAMP-TURBO", speedClass: "Turbo", feelTag: "ramp route" },
+    { id: "prism-neon-ribbon-run", name: "Neon Ribbon Run", seed: "PRISM-NEON-RIBBON-TURBO", speedClass: "Turbo", feelTag: "boost chain" },
+    { id: "prism-candy-sky-cut", name: "Candy Sky Cut", seed: "PRISM-CANDY-SKY-CUT-TURBO", speedClass: "Turbo", feelTag: "lane discipline" },
+    { id: "prism-violet-boostway", name: "Violet Boostway", seed: "PRISM-VIOLET-BOOSTWAY-OVERDRIVE", speedClass: "Overdrive", feelTag: "boost chain" },
+    { id: "prism-glowwave-merge", name: "Glowwave Merge", seed: "PRISM-GLOWWAVE-MERGE-OVERDRIVE", speedClass: "Overdrive", feelTag: "traffic pressure" },
+    { id: "prism-starburst-switch", name: "Starburst Switch", seed: "PRISM-STARBURST-SWITCH-OVERDRIVE", speedClass: "Overdrive", feelTag: "lane discipline" },
+    { id: "prism-hot-pink-redline", name: "Hot Pink Redline", seed: "PRISM-HOT-PINK-REDLINE", speedClass: "Redline", feelTag: "final push" },
+    { id: "prism-spectrum-surge", name: "Spectrum Surge", seed: "PRISM-SPECTRUM-SURGE-REDLINE", speedClass: "Redline", feelTag: "boost chain" },
+    { id: "prism-finale", name: "Prism Finale", seed: "PRISM-FINALE-REDLINE", speedClass: "Redline", feelTag: "final push" }
   ]
 };
+
+const NORMAL_TRACKS = [
+  { id: "sunset-highway", name: "Sunset Highway" },
+  { id: "redline-run", name: "Redline Run" },
+  { id: "midnight-ridge", name: "Midnight Ridge" },
+  { id: "blackout-run", name: "Blackout Run" },
+  { id: "prism-highway", name: "Prism Highway" }
+];
 
 const OFFICIAL_SCENARIOS = [
   { routeId: "sunset-neon-palm-sprint", trackId: "sunset-highway", raceType: "classic", score: 112300, time: 42.123, feedback: { boostPadsCollected: 3, bestBoostPadChain: 2, rampsUsed: 1, rampTargetsCleared: 0 }, expectFeedback: "Strong boost route" },
   { routeId: "sunset-glass-city-climb", trackId: "sunset-highway", raceType: "classic", score: 132400, time: 39.654, feedback: { boostPadsCollected: 1, bestBoostPadChain: 0, rampsUsed: 2, rampTargetsCleared: 2 }, expectFeedback: "Strong ramp route" },
   { routeId: "sunset-last-light-gauntlet", trackId: "sunset-highway", raceType: "classic", score: 284500, time: 28.456 },
+  { routeId: "midnight-ridge-lantern-sprint", trackId: "midnight-ridge", raceType: "classic", score: 126400, time: 43.219 },
+  { routeId: "blackout-headlight-mile", trackId: "blackout-run", raceType: "classic", score: 121900, time: 43.876 },
+  { routeId: "prism-pinkline-sprint", trackId: "prism-highway", raceType: "classic", score: 129700, time: 42.884 },
   { routeId: "redline-switchyard-boostline", trackId: "redline-run", raceType: "fuelRun", score: 219800, time: 35.789, feedback: { boostPadsCollected: 2, bestBoostPadChain: 2, rampsUsed: 1, rampTargetsCleared: 1, gasCansCollected: 2, gasCansSpawned: 2 }, expectFeedback: "Strong boost route" }
 ];
 
@@ -103,6 +150,19 @@ async function openSoloSetup(page) {
   await page.waitForFunction(() => window.neonRoadRally?.screen === "preRace", null, { timeout: 5000 });
 }
 
+async function assertNormalTrackCards(page, inputName = "preRaceTrack") {
+  const cards = await page.$$eval(`input[name="${inputName}"]`, (nodes) => nodes.map((node) => ({
+    id: node.value,
+    label: node.closest("[data-track-card]")?.textContent || ""
+  })));
+  assert(cards.length === NORMAL_TRACKS.length, `Expected ${NORMAL_TRACKS.length} normal track cards for ${inputName}`, { cards });
+  for (const track of NORMAL_TRACKS) {
+    const card = cards.find((item) => item.id === track.id);
+    assert(card, `Missing normal track card: ${track.id}`, { cards });
+    assertIncludes(card.label, track.name);
+  }
+}
+
 async function selectTrack(page, trackId) {
   const card = page.locator(`[data-track-card="${trackId}"]`);
   const count = await card.count();
@@ -134,6 +194,7 @@ async function assertTrackOfficial10(page, trackId, label) {
   assertIncludes(text, `${label} Official 10`);
   assertIncludes(text, "Custom Road / Practice");
   assert(!text.includes("Pursuit"), "Pursuit should not appear in normal setup", { snippet: text.slice(0, 1200) });
+  assert(!text.includes("Boostline Prototype"), "Boostline prototype should not appear in normal setup", { snippet: text.slice(0, 1200) });
 
   const cards = await page.$$eval(".official-route-grid [data-official-route-id]", (nodes) => (
     nodes.map((node) => ({
@@ -156,6 +217,7 @@ async function assertTrackOfficial10(page, trackId, label) {
   assert(raceTypeValues.includes("classic"), "Classic missing from official setup race types", { raceTypeValues });
   assert(raceTypeValues.includes("fuelRun"), "Fuel Run missing from official setup race types", { raceTypeValues });
   assert(!raceTypeValues.includes("pursuit"), "Pursuit should not appear in normal solo setup", { raceTypeValues });
+  assert(!raceTypeValues.includes("boostline"), "Boostline should not appear in normal solo setup", { raceTypeValues });
 }
 
 async function selectOfficialRoute(page, routeId) {
@@ -280,8 +342,10 @@ async function selectPracticeSpeed(page, speedClassId) {
   );
 }
 
-async function runCustomScenario(page) {
-  await selectTrack(page, "sunset-highway");
+async function runCustomScenario(page, options = {}) {
+  const trackId = options.trackId || "sunset-highway";
+  const seed = options.seed || "CUSTOM-OFFICIAL-SMOKE";
+  await selectTrack(page, trackId);
   await setRaceType(page, "classic");
   await clickAction(page, "randomSeed");
   await page.waitForFunction(() => window.neonRoadRally?.screen === "preRace", null, { timeout: 5000 });
@@ -301,7 +365,6 @@ async function runCustomScenario(page) {
   assertIncludes(readyText, "Pro");
 
   await selectPracticeSpeed(page, "turbo");
-  const seed = "CUSTOM-OFFICIAL-SMOKE";
   const input = page.locator("#roadSeedInput");
   await input.fill(seed);
   await page.waitForFunction(
@@ -319,6 +382,10 @@ async function runCustomScenario(page) {
   assertIncludes(text, "Custom Road");
   assertIncludes(text, seed);
   assert(!text.includes("Official Race Result"), "Custom result should not present as Official Race");
+  if (options.returnToSetup) {
+    await clickAction(page, "preRace");
+    await page.waitForFunction(() => window.neonRoadRally?.screen === "preRace", null, { timeout: 5000 });
+  }
   return { routeId: "custom-road", telemetry };
 }
 
@@ -391,6 +458,35 @@ async function assertLeaderboards(page) {
   assert(!customTimeSection.includes("sunset-palm-sprint-turbo"), "Official seed should not appear in Custom Road Times");
 }
 
+async function assertNewTrackLeaderboards(page) {
+  await page.evaluate(() => window.neonRoadRally?.showLeaderboard("timeAttack", { trackId: "midnight-ridge" }));
+  await page.waitForFunction(() => window.neonRoadRally?.screen === "leaderboard", null, { timeout: 5000 });
+  let text = await bodyText(page);
+  assertIncludes(text, "Time Attack");
+  assertIncludes(text, "Midnight Ridge Official 10");
+  assertIncludes(text, "Ridge Lantern Sprint");
+
+  await page.selectOption("#leaderboardTrack", "blackout-run");
+  await page.dispatchEvent("#leaderboardTrack", "change");
+  await page.waitForFunction(
+    () => document.querySelector("#leaderboardTrack")?.value === "blackout-run"
+      && document.body.innerText.includes("Headlight Mile"),
+    null,
+    { timeout: 5000 }
+  );
+  text = await bodyText(page);
+  assertIncludes(text, "Blackout Run Official 10");
+  assertIncludes(text, "Headlight Mile");
+
+  await page.evaluate(() => window.neonRoadRally?.showLeaderboard("scoreAttack", { officialRouteId: "prism-pinkline-sprint" }));
+  await page.waitForFunction(() => window.neonRoadRally?.leaderboardView === "scoreAttack", null, { timeout: 5000 });
+  text = await bodyText(page);
+  assertIncludes(text, "Score Attack");
+  assertIncludes(text, "Prism Highway Official 10");
+  assertIncludes(text, "Pinkline Sprint");
+  assertIncludes(text, "Official Score Attack");
+}
+
 async function run() {
   const browser = await chromium.launch({
     headless: true,
@@ -416,8 +512,10 @@ async function run() {
     });
 
     await openSoloSetup(page);
-    await assertTrackOfficial10(page, "sunset-highway", "Sunset Highway");
-    await assertTrackOfficial10(page, "redline-run", "Redline Run");
+    await assertNormalTrackCards(page);
+    for (const track of NORMAL_TRACKS) {
+      await assertTrackOfficial10(page, track.id, track.name);
+    }
 
     await selectTrack(page, "sunset-highway");
     const telemetrySamples = [];
@@ -426,8 +524,12 @@ async function run() {
     }
     await assertOfficialTimeBoard(page);
     telemetrySamples.push(await runManualOfficialSeedScenario(page));
+    telemetrySamples.push(await runCustomScenario(page, { trackId: "midnight-ridge", seed: "CUSTOM-MIDNIGHT-RIDGE", returnToSetup: true }));
+    telemetrySamples.push(await runCustomScenario(page, { trackId: "blackout-run", seed: "CUSTOM-BLACKOUT-RUN", returnToSetup: true }));
+    telemetrySamples.push(await runCustomScenario(page, { trackId: "prism-highway", seed: "CUSTOM-PRISM-HIGHWAY", returnToSetup: true }));
     telemetrySamples.push(await runCustomScenario(page));
     await assertLeaderboards(page);
+    await assertNewTrackLeaderboards(page);
 
     const playtestRouteTelemetry = await page.evaluate(() => {
       const runs = window.neonRoadRally?.playtestReports?.getRuns?.() || [];

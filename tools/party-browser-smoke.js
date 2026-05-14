@@ -33,6 +33,13 @@ const { chromium } = loadPlaywright();
 
 const BRAVE_PATH = "/Applications/Brave Browser.app/Contents/MacOS/Brave Browser";
 const BASE_URL = process.env.NRR_SMOKE_URL || "http://127.0.0.1:8085/";
+const NORMAL_TRACKS = [
+  { id: "sunset-highway", name: "Sunset Highway" },
+  { id: "redline-run", name: "Redline Run" },
+  { id: "midnight-ridge", name: "Midnight Ridge" },
+  { id: "blackout-run", name: "Blackout Run" },
+  { id: "prism-highway", name: "Prism Highway" }
+];
 
 async function run() {
   const browser = await chromium.launch({
@@ -74,6 +81,35 @@ async function run() {
   async function setPartyOption(selector, value, expectedText) {
     await page.selectOption(selector, value);
     if (expectedText) await expectText(expectedText);
+  }
+
+  async function assertPartyTrackSelection() {
+    const cards = await page.$$eval('input[name="partyTrack"]', (nodes) => nodes.map((node) => ({
+      id: node.value,
+      label: node.closest("[data-track-card]")?.textContent || ""
+    })));
+    if (cards.length !== NORMAL_TRACKS.length) {
+      throw new Error(`Party setup expected ${NORMAL_TRACKS.length} normal tracks, saw ${cards.length}: ${JSON.stringify(cards)}`);
+    }
+    for (const track of NORMAL_TRACKS) {
+      const card = cards.find((item) => item.id === track.id);
+      if (!card || !card.label.includes(track.name)) {
+        throw new Error(`Party setup missing normal track ${track.name}: ${JSON.stringify(cards)}`);
+      }
+      await page.locator(`[data-track-card="${track.id}"]`).click();
+      await page.waitForFunction(
+        (id) => document.querySelector(`input[name="partyTrack"][value="${id}"]`)?.checked === true,
+        track.id,
+        { timeout: 5000 }
+      );
+      const raceTypes = await page.$$eval("#partyRaceType option", (options) => options.map((option) => option.value));
+      if (!raceTypes.includes("classic") || !raceTypes.includes("fuelRun")) {
+        throw new Error(`${track.name} Party setup should expose Classic and Fuel Run only: ${raceTypes.join(", ")}`);
+      }
+      if (raceTypes.includes("pursuit") || raceTypes.includes("boostline")) {
+        throw new Error(`${track.name} Party setup should not expose Pursuit or Boostline: ${raceTypes.join(", ")}`);
+      }
+    }
   }
 
   async function finishCurrentPartyRun(fields = {}) {
@@ -125,6 +161,7 @@ async function run() {
     app.showPartySetupScreen();
   });
   await expectText("3/8");
+  await assertPartyTrackSelection();
   await setPartyOption("#partyRaceType", "classic", "Classic Race");
   await setPartyOption("#partyStartingOrder", "rosterOrder", "Roster Order");
   await setPartyOption("#partyStartingOrder", "randomOnce", "Random Once");

@@ -147,6 +147,27 @@ async function main() {
         turbo: [53, 56],
         overdrive: [50, 53],
         redline: [48, 50]
+      },
+      "midnight-ridge": {
+        arcade: [74, 76],
+        pro: [66, 69],
+        turbo: [56, 59],
+        overdrive: [50, 53],
+        redline: [47, 50]
+      },
+      "blackout-run": {
+        arcade: [74, 76],
+        pro: [66, 69],
+        turbo: [56, 59],
+        overdrive: [50, 53],
+        redline: [47, 50]
+      },
+      "prism-highway": {
+        arcade: [74, 76],
+        pro: [66, 69],
+        turbo: [56, 59],
+        overdrive: [50, 53],
+        redline: [47, 50]
       }
     };
 
@@ -191,8 +212,15 @@ async function main() {
 
     const app = Object.create(NeonRoadRally.prototype);
     app.renderer = makeHarnessRenderer();
+    const firstOfficialRouteIds = [
+      "sunset-neon-palm-sprint",
+      "redline-tunnel-spark-sprint",
+      "midnight-ridge-lantern-sprint",
+      "blackout-headlight-mile",
+      "prism-pinkline-sprint"
+    ];
     const officialRouteAudit = app.runOfficialRouteDeterminismAudit({
-      routeIds: ["sunset-neon-palm-sprint", "redline-tunnel-spark-sprint"],
+      routeIds: firstOfficialRouteIds,
       raceTypeIds: [DEFAULT_RACE_TYPE_ID, FUEL_RUN_RACE_TYPE_ID],
       repeats: 4,
       waveLimit: 32,
@@ -409,7 +437,7 @@ async function main() {
     });
     assert.strictEqual(lane57517Fuel.gasCanOverlaps, 0, "LANE-57517 Fuel Run should avoid gas can overlaps");
     assert.strictEqual(lane57517Fuel.routeReadabilityFailures, 0, "LANE-57517 Fuel Run should preserve readable routes");
-    for (const trackId of ["sunset-highway", "redline-run"]) {
+    for (const trackId of ["sunset-highway", "redline-run", "midnight-ridge", "blackout-run", "prism-highway"]) {
       const summary = await app.runSpawnSafetySimulationCore({
         runs: 2,
         speedClassIds: ["arcade"],
@@ -574,7 +602,7 @@ async function main() {
 
     const matrixSpeedClasses = ["arcade", "pro", "turbo", "overdrive", "redline"];
     const feelMatrix = [];
-    for (const trackId of ["sunset-highway", "redline-run"]) {
+    for (const trackId of ["sunset-highway", "redline-run", "midnight-ridge", "blackout-run", "prism-highway"]) {
       for (const raceTypeId of [DEFAULT_RACE_TYPE_ID, FUEL_RUN_RACE_TYPE_ID]) {
         const summary = await app.runSpawnSafetySimulationCore({
           runs: 4,
@@ -589,6 +617,8 @@ async function main() {
         console.log("ROAD_DIRECTOR_FEEL_SAMPLE " + JSON.stringify(compact));
         assertFeelSafety(summary, trackId + " " + raceTypeId);
       }
+    }
+    for (const trackId of ["sunset-highway", "redline-run"]) {
       const pursuitSummary = await app.runSpawnSafetySimulationCore({
         runs: 4,
         speedClassIds: matrixSpeedClasses,

@@ -20,7 +20,7 @@ const PLAYTEST_REPORT_VERSION = 1;
 const PLAYTEST_REPORT_MAX_RUNS = 200;
 const LOCAL_PLAYER_NAME_MAX_LENGTH = 20;
 const LOCAL_CAR_NAME_MAX_LENGTH = 24;
-const ROAD_SEED_MAX_LENGTH = 32;
+const ROAD_SEED_MAX_LENGTH = 48;
 const DISPLAY_TEXT_MAX_LENGTH = 48;
 const STORAGE_ID_MAX_LENGTH = 64;
 const LOCAL_PLAYER_MAX_COUNT = 16;
@@ -2816,6 +2816,170 @@ const TRACKS = [
   }
 ];
 
+function cloneTrackSections(sections = []) {
+  return sections.map((section) => ({
+    ...section,
+    extraWaveWeights: section.extraWaveWeights ? { ...section.extraWaveWeights } : undefined,
+    waveWeightMultipliers: section.waveWeightMultipliers ? { ...section.waveWeightMultipliers } : undefined
+  }));
+}
+
+function createNormalTrackVariant(config) {
+  const base = TRACKS[0];
+  return {
+    ...base,
+    id: config.id,
+    name: config.name,
+    description: config.description,
+    cardIdentity: config.cardIdentity,
+    music: base.music,
+    musicFallback: base.musicFallback,
+    musicOptional: true,
+    musicStatus: "Uses shared rally music until a dedicated track theme is added.",
+    recommendedModes: config.recommendedModes,
+    fuelRunSupport: true,
+    pursuitSupport: false,
+    boostlineSupport: false,
+    themeTags: Array.isArray(config.themeTags) ? config.themeTags.slice() : [],
+    visualTheme: {
+      ...(base.visualTheme || {}),
+      ...(config.visualTheme || {})
+    },
+    roadDirectorProfile: { ...(base.roadDirectorProfile || {}) },
+    allowedObjectMix: { ...(base.allowedObjectMix || {}) },
+    sections: cloneTrackSections(base.sections),
+    distanceMultiplierByMode: { ...(base.distanceMultiplierByMode || {}) },
+    paceDistanceMultiplierByMode: { ...(base.paceDistanceMultiplierByMode || {}) },
+    obstacleSettings: { ...(base.obstacleSettings || {}) }
+  };
+}
+
+TRACKS.push(
+  createNormalTrackVariant({
+    id: "midnight-ridge",
+    name: "Midnight Ridge",
+    description: "Cold late-night mountain racing with cliff-road edges, switchback pressure, sparse lights, and distant town glow.",
+    cardIdentity: "Technical-feeling mountain ridge visuals with dark cliffs, guardrail glints, switchback pressure, and readable lane work.",
+    recommendedModes: ["Classic", "Fuel Run", "Party Mode", "Turbo / Overdrive"],
+    themeTags: ["mountain", "night", "technical", "drift dash"],
+    visualTheme: {
+      identity: "midnight-ridge",
+      skyTop: "#030713",
+      skyMid: "#0b1526",
+      skyHorizon: "#1d2f46",
+      skyBottom: "#060d18",
+      horizonGlow: "rgba(94, 143, 190, 0.2)",
+      sunAlpha: 0,
+      roadOuter: "#070b13",
+      roadInner: "#0c1320",
+      roadShoulder: "#121927",
+      edgeColor: "#9fb8d3",
+      edgeAltColor: "#77d6ff",
+      lanePrimary: "rgba(230, 242, 255, 0.92)",
+      laneSecondary: "rgba(141, 205, 255, 0.78)",
+      reflectorColor: "#f3f7ff",
+      speedStreakColor: "rgba(121, 184, 226, 0.42)",
+      boostStreakColor: "rgba(89, 219, 255, 0.58)",
+      finishLabel: "RIDGE",
+      roadsidePrimaryLabel: "RIDGE",
+      roadsideSecondaryLabels: ["PASS", "DROP"],
+      sceneryDensity: 0.72,
+      roadDetailIntensity: 0.72,
+      speedStreakIntensity: 0.76,
+      mountainScenery: true,
+      ridgeTownLights: true,
+      ridgeGuardrail: true,
+      sharpLaneMarkers: true,
+      mountainSilhouetteColor: "rgba(5, 10, 21, 0.94)",
+      farMountainSilhouetteColor: "rgba(18, 31, 49, 0.76)",
+      townLightColor: "rgba(214, 230, 255, 0.5)",
+      guardrailColor: "rgba(159, 184, 211, 0.7)"
+    }
+  }),
+  createNormalTrackVariant({
+    id: "blackout-run",
+    name: "Blackout Run",
+    description: "Nearly unlit precision racing where headlights, reflective paint, and sparse glints define the road.",
+    cardIdentity: "Dark, minimal precision road built around headlight cones, white/yellow lane paint, reflective edges, and clean silhouettes.",
+    recommendedModes: ["Classic", "Fuel Run", "Party Mode", "Turbo / Overdrive"],
+    themeTags: ["dark", "headlights", "precision", "minimal"],
+    visualTheme: {
+      identity: "blackout-run",
+      skyTop: "#000103",
+      skyMid: "#02040a",
+      skyHorizon: "#070b12",
+      skyBottom: "#010205",
+      horizonGlow: "rgba(255, 244, 205, 0.06)",
+      sunAlpha: 0,
+      roadOuter: "#010205",
+      roadInner: "#05070c",
+      roadShoulder: "#020307",
+      edgeColor: "#f4f5f7",
+      edgeAltColor: "#ffd36f",
+      lanePrimary: "rgba(249, 250, 251, 0.96)",
+      laneSecondary: "rgba(255, 211, 111, 0.86)",
+      reflectorColor: "#ffffff",
+      speedStreakColor: "rgba(244, 245, 247, 0.24)",
+      boostStreakColor: "rgba(125, 229, 255, 0.48)",
+      finishLabel: "BLACKOUT",
+      roadsidePrimaryLabel: "LOW",
+      roadsideSecondaryLabels: ["BEAM", "LINE"],
+      sceneryDensity: 0.42,
+      roadDetailIntensity: 0.24,
+      speedStreakIntensity: 0.48,
+      blackoutScenery: true,
+      headlightCone: true,
+      reflectiveObstacleEdges: true,
+      sharpLaneMarkers: true,
+      mountainSilhouetteColor: "rgba(0, 1, 4, 0.96)",
+      farMountainSilhouetteColor: "rgba(5, 7, 12, 0.88)",
+      guardrailColor: "rgba(244, 245, 247, 0.42)",
+      townLightColor: "rgba(255, 236, 176, 0.22)"
+    }
+  }),
+  createNormalTrackVariant({
+    id: "prism-highway",
+    name: "Prism Highway",
+    description: "A bright neon showpiece with magenta, cyan, violet, electric blue, and rainbow road ribbons.",
+    cardIdentity: "Colorful arcade showpiece with rainbow lane ribbons, pink/cyan glow, and fast surreal highway energy.",
+    recommendedModes: ["Classic", "Fuel Run", "Party Mode", "Turbo / Redline"],
+    themeTags: ["rainbow", "neon", "arcade", "showpiece"],
+    visualTheme: {
+      identity: "prism-highway",
+      skyTop: "#281159",
+      skyMid: "#7a1f8d",
+      skyHorizon: "#0db4d8",
+      skyBottom: "#12092b",
+      horizonGlow: "rgba(255, 58, 216, 0.34)",
+      sunAlpha: 0.34,
+      roadOuter: "#150728",
+      roadInner: "#111d46",
+      roadShoulder: "#32105c",
+      edgeColor: "#22f3ff",
+      edgeAltColor: "#ff3edb",
+      lanePrimary: "rgba(125, 244, 255, 0.9)",
+      laneSecondary: "rgba(255, 89, 216, 0.88)",
+      reflectorColor: "#ffe45e",
+      speedStreakColor: "rgba(255, 62, 219, 0.7)",
+      boostStreakColor: "rgba(34, 243, 255, 0.72)",
+      finishLabel: "PRISM",
+      roadsidePrimaryLabel: "PRISM",
+      roadsideSecondaryLabels: ["GLOW", "FAST"],
+      sceneryDensity: 0.78,
+      roadDetailIntensity: 0.66,
+      speedStreakIntensity: 1.18,
+      prismScenery: true,
+      prismRibbons: true,
+      prismHorizon: true,
+      sharpLaneMarkers: true,
+      skylineColor: "rgba(12, 8, 34, 0.7)",
+      cityWindowColor: "rgba(34, 243, 255, 0.5)",
+      guardrailColor: "rgba(255, 62, 219, 0.58)",
+      chevronColor: "#22f3ff"
+    }
+  })
+);
+
 const SPEED_CLASSES = [
   { id: "sunday", label: "Sunday Drive", startSpeed: 700, endSpeed: 1100, scoreMultiplier: 0.75, distanceMultiplier: 0.82, description: "Training cruise.", training: true },
   { id: "rookie", label: "Rookie", startSpeed: 950, endSpeed: 1500, scoreMultiplier: 0.9, distanceMultiplier: 0.92, description: "Training warmup.", training: true },
@@ -2853,7 +3017,37 @@ const OFFICIAL_ROUTE_DEFINITIONS = [
   { id: "redline-midnight-merge", name: "Midnight Merge", trackId: "redline-run", speedClassId: "redline", seed: "REDLINE-MIDNIGHT-MERGE-REDLINE", feelTag: "lane discipline" },
   { id: "redline-reactor-ramp", name: "Reactor Ramp", trackId: "redline-run", speedClassId: "redline", seed: "REDLINE-REACTOR-RAMP-REDLINE", feelTag: "ramp route" },
   { id: "redline-city-limits-blaze", name: "City Limits Blaze", trackId: "redline-run", speedClassId: "redline", seed: "REDLINE-CITY-LIMITS-REDLINE", feelTag: "traffic pressure" },
-  { id: "redline-finale", name: "Redline Finale", trackId: "redline-run", speedClassId: "redline", seed: "REDLINE-FINALE-REDLINE", feelTag: "final push" }
+  { id: "redline-finale", name: "Redline Finale", trackId: "redline-run", speedClassId: "redline", seed: "REDLINE-FINALE-REDLINE", feelTag: "final push" },
+  { id: "midnight-ridge-lantern-sprint", name: "Ridge Lantern Sprint", trackId: "midnight-ridge", speedClassId: "turbo", seed: "MIDNIGHT-RIDGE-LANTERN-TURBO", feelTag: "clean speed" },
+  { id: "midnight-cliffside-cutback", name: "Cliffside Cutback", trackId: "midnight-ridge", speedClassId: "turbo", seed: "MIDNIGHT-CLIFFSIDE-CUTBACK-TURBO", feelTag: "lane discipline" },
+  { id: "midnight-switchback-glow", name: "Switchback Glow", trackId: "midnight-ridge", speedClassId: "turbo", seed: "MIDNIGHT-SWITCHBACK-GLOW-TURBO", feelTag: "drift timing" },
+  { id: "midnight-pine-shadow-run", name: "Pine Shadow Run", trackId: "midnight-ridge", speedClassId: "turbo", seed: "MIDNIGHT-PINE-SHADOW-TURBO", feelTag: "ridge line" },
+  { id: "midnight-guardrail-gamble", name: "Guardrail Gamble", trackId: "midnight-ridge", speedClassId: "overdrive", seed: "MIDNIGHT-GUARDRAIL-GAMBLE-OVERDRIVE", feelTag: "risk line" },
+  { id: "midnight-moonlit-descent", name: "Moonlit Descent", trackId: "midnight-ridge", speedClassId: "overdrive", seed: "MIDNIGHT-MOONLIT-DESCENT-OVERDRIVE", feelTag: "descent pressure" },
+  { id: "midnight-summit-driftline", name: "Summit Driftline", trackId: "midnight-ridge", speedClassId: "overdrive", seed: "MIDNIGHT-SUMMIT-DRIFTLINE-OVERDRIVE", feelTag: "drift timing" },
+  { id: "midnight-black-peak-charge", name: "Black Peak Charge", trackId: "midnight-ridge", speedClassId: "redline", seed: "MIDNIGHT-BLACK-PEAK-REDLINE", feelTag: "final push" },
+  { id: "midnight-last-ridge-drop", name: "Last Ridge Drop", trackId: "midnight-ridge", speedClassId: "redline", seed: "MIDNIGHT-LAST-RIDGE-REDLINE", feelTag: "lane discipline" },
+  { id: "midnight-no-return-pass", name: "No-Return Pass", trackId: "midnight-ridge", speedClassId: "redline", seed: "MIDNIGHT-NO-RETURN-PASS-REDLINE", feelTag: "final push" },
+  { id: "blackout-headlight-mile", name: "Headlight Mile", trackId: "blackout-run", speedClassId: "turbo", seed: "BLACKOUT-HEADLIGHT-MILE-TURBO", feelTag: "headlight read" },
+  { id: "blackout-reflector-gate", name: "Reflector Gate", trackId: "blackout-run", speedClassId: "turbo", seed: "BLACKOUT-REFLECTOR-GATE-TURBO", feelTag: "lane discipline" },
+  { id: "blackout-dark-lane-dash", name: "Dark Lane Dash", trackId: "blackout-run", speedClassId: "turbo", seed: "BLACKOUT-DARK-LANE-DASH-TURBO", feelTag: "clean speed" },
+  { id: "blackout-white-line-fever", name: "White Line Fever", trackId: "blackout-run", speedClassId: "turbo", seed: "BLACKOUT-WHITE-LINE-FEVER-TURBO", feelTag: "white line" },
+  { id: "blackout-blind-curve-cut", name: "Blind Curve Cut", trackId: "blackout-run", speedClassId: "overdrive", seed: "BLACKOUT-BLIND-CURVE-OVERDRIVE", feelTag: "precision" },
+  { id: "blackout-phantom-merge", name: "Phantom Merge", trackId: "blackout-run", speedClassId: "overdrive", seed: "BLACKOUT-PHANTOM-MERGE-OVERDRIVE", feelTag: "traffic shadow" },
+  { id: "blackout-low-beam-sprint", name: "Low Beam Sprint", trackId: "blackout-run", speedClassId: "overdrive", seed: "BLACKOUT-LOW-BEAM-SPRINT-OVERDRIVE", feelTag: "clean speed" },
+  { id: "blackout-lights-out-charge", name: "Lights Out Charge", trackId: "blackout-run", speedClassId: "redline", seed: "BLACKOUT-LIGHTS-OUT-REDLINE", feelTag: "final push" },
+  { id: "blackout-black-glass-run", name: "Black Glass Run", trackId: "blackout-run", speedClassId: "redline", seed: "BLACKOUT-BLACK-GLASS-REDLINE", feelTag: "lane discipline" },
+  { id: "blackout-no-moon-finale", name: "No Moon Finale", trackId: "blackout-run", speedClassId: "redline", seed: "BLACKOUT-NO-MOON-FINALE-REDLINE", feelTag: "final push" },
+  { id: "prism-pinkline-sprint", name: "Pinkline Sprint", trackId: "prism-highway", speedClassId: "turbo", seed: "PRISM-PINKLINE-SPRINT-TURBO", feelTag: "clean speed" },
+  { id: "prism-rainbow-ramp-rush", name: "Rainbow Ramp Rush", trackId: "prism-highway", speedClassId: "turbo", seed: "PRISM-RAINBOW-RAMP-TURBO", feelTag: "ramp route" },
+  { id: "prism-neon-ribbon-run", name: "Neon Ribbon Run", trackId: "prism-highway", speedClassId: "turbo", seed: "PRISM-NEON-RIBBON-TURBO", feelTag: "boost chain" },
+  { id: "prism-candy-sky-cut", name: "Candy Sky Cut", trackId: "prism-highway", speedClassId: "turbo", seed: "PRISM-CANDY-SKY-CUT-TURBO", feelTag: "lane discipline" },
+  { id: "prism-violet-boostway", name: "Violet Boostway", trackId: "prism-highway", speedClassId: "overdrive", seed: "PRISM-VIOLET-BOOSTWAY-OVERDRIVE", feelTag: "boost chain" },
+  { id: "prism-glowwave-merge", name: "Glowwave Merge", trackId: "prism-highway", speedClassId: "overdrive", seed: "PRISM-GLOWWAVE-MERGE-OVERDRIVE", feelTag: "traffic pressure" },
+  { id: "prism-starburst-switch", name: "Starburst Switch", trackId: "prism-highway", speedClassId: "overdrive", seed: "PRISM-STARBURST-SWITCH-OVERDRIVE", feelTag: "lane discipline" },
+  { id: "prism-hot-pink-redline", name: "Hot Pink Redline", trackId: "prism-highway", speedClassId: "redline", seed: "PRISM-HOT-PINK-REDLINE", feelTag: "final push" },
+  { id: "prism-spectrum-surge", name: "Spectrum Surge", trackId: "prism-highway", speedClassId: "redline", seed: "PRISM-SPECTRUM-SURGE-REDLINE", feelTag: "boost chain" },
+  { id: "prism-finale", name: "Prism Finale", trackId: "prism-highway", speedClassId: "redline", seed: "PRISM-FINALE-REDLINE", feelTag: "final push" }
 ];
 const BOOSTLINE_PROTOTYPE_ROUTE_DEFINITIONS = [
   {
@@ -15068,7 +15262,7 @@ class Renderer {
     }
     this.drawMusicHorizonAtmosphere(horizonY, musicIdentity, musicPulse, glowStrength);
 
-    this.drawHorizonSilhouettes(horizonY);
+    this.drawHorizonSilhouettes(horizonY, theme);
     if (theme.citySkyline) this.drawTrackCitySkyline(horizonY, theme);
 
     ctx.save();
@@ -15131,16 +15325,17 @@ class Renderer {
     ctx.restore();
   }
 
-  drawHorizonSilhouettes(horizonY) {
+  drawHorizonSilhouettes(horizonY, theme = {}) {
     const ctx = this.ctx;
     const w = this.width;
     ctx.save();
-    ctx.fillStyle = "rgba(11, 8, 24, 0.88)";
+    ctx.fillStyle = theme.mountainSilhouetteColor || "rgba(11, 8, 24, 0.88)";
     ctx.beginPath();
     ctx.moveTo(0, horizonY + 26);
     for (let i = 0; i <= 12; i += 1) {
       const x = (w / 12) * i;
-      const peak = horizonY - 34 - deterministicNoise(i, 2) * 52;
+      const peakLift = theme.mountainScenery ? 76 : 52;
+      const peak = horizonY - 34 - deterministicNoise(i, 2) * peakLift;
       ctx.lineTo(x, peak);
       ctx.lineTo(x + w / 24, horizonY + 18 - deterministicNoise(i, 3) * 16);
     }
@@ -15149,7 +15344,22 @@ class Renderer {
     ctx.closePath();
     ctx.fill();
 
-    ctx.fillStyle = "rgba(5, 7, 18, 0.72)";
+    if (theme.prismHorizon) {
+      ctx.globalAlpha = 0.36;
+      ctx.strokeStyle = theme.edgeAltColor || "#ff3fd1";
+      ctx.lineWidth = 2;
+      for (let i = 0; i < 4; i += 1) {
+        const y = horizonY - 18 + i * 16;
+        ctx.beginPath();
+        ctx.moveTo(0, y + Math.sin(i) * 5);
+        ctx.bezierCurveTo(w * 0.24, y - 18, w * 0.62, y + 18, w, y - 6);
+        ctx.stroke();
+        ctx.strokeStyle = i % 2 ? (theme.edgeColor || "#22f3ff") : (theme.edgeAltColor || "#ff3fd1");
+      }
+      ctx.globalAlpha = 1;
+    }
+
+    ctx.fillStyle = theme.farMountainSilhouetteColor || "rgba(5, 7, 18, 0.72)";
     const cityBase = horizonY + 34;
     for (let i = 0; i < 28; i += 1) {
       const buildingW = 12 + deterministicNoise(i, 8) * 22;
@@ -15157,9 +15367,10 @@ class Renderer {
       const height = 24 + deterministicNoise(i, 10) * 76;
       ctx.fillRect(x, cityBase - height, buildingW, height);
       if (deterministicNoise(i, 11) > 0.56) {
-        ctx.fillStyle = "rgba(255, 228, 94, 0.38)";
+        const lightAlpha = theme.blackoutScenery ? 0.16 : (theme.ridgeTownLights ? 0.5 : 0.38);
+        ctx.fillStyle = theme.townLightColor || `rgba(255, 228, 94, ${lightAlpha})`;
         ctx.fillRect(x + buildingW * 0.35, cityBase - height + 12, 3, 3);
-        ctx.fillStyle = "rgba(5, 7, 18, 0.72)";
+        ctx.fillStyle = theme.farMountainSilhouetteColor || "rgba(5, 7, 18, 0.72)";
       }
     }
     ctx.restore();
@@ -15359,7 +15570,13 @@ class Renderer {
       const warmth = clamp(this.getFinalStretchIntensity() + Math.max(0, visualIntensity - 1) * 0.42, 0, 1);
 
       if (activeRace) {
-        if (theme.urbanScenery) {
+        if (theme.blackoutScenery) {
+          this.drawBlackoutRoadsideReflector(x, y, scale * 0.9, side, theme, signRoll);
+        } else if (theme.mountainScenery) {
+          this.drawRidgeRoadsideMarker(x, y, scale * 0.9, side, theme, typeRoll, signRoll);
+        } else if (theme.prismScenery) {
+          this.drawPrismRoadsideMarker(x, y, scale * 0.86, side, theme, typeRoll);
+        } else if (theme.urbanScenery) {
           this.drawUrbanBarrierBlock(x, y, scale * 0.88, side, theme);
         } else if (typeRoll < 0.52) {
           this.drawPalmSilhouette(x, y, scale * 0.9, side);
@@ -15369,7 +15586,13 @@ class Renderer {
         continue;
       }
 
-      if (theme.urbanScenery) {
+      if (theme.blackoutScenery) {
+        this.drawBlackoutRoadsideReflector(x, y, scale, side, theme, signRoll);
+      } else if (theme.mountainScenery) {
+        this.drawRidgeRoadsideMarker(x, y, scale, side, theme, typeRoll, signRoll);
+      } else if (theme.prismScenery) {
+        this.drawPrismRoadsideMarker(x, y, scale, side, theme, typeRoll);
+      } else if (theme.urbanScenery) {
         if (typeRoll < 0.34) {
           this.drawRedlineChevronSign(x, y, scale, side, signRoll);
         } else if (typeRoll < 0.62) {
@@ -15548,6 +15771,99 @@ class Renderer {
     ctx.restore();
   }
 
+  drawRidgeRoadsideMarker(x, y, scale, side, theme = {}, typeRoll = 0, signRoll = 0) {
+    const ctx = this.ctx;
+    const color = theme.guardrailColor || "rgba(159, 184, 211, 0.7)";
+    ctx.save();
+    ctx.translate(x, y);
+    if (typeRoll < 0.48) {
+      const trunkH = 54 * scale;
+      ctx.fillStyle = "rgba(2, 6, 14, 0.88)";
+      ctx.fillRect(-2 * scale, -trunkH, 4 * scale, trunkH);
+      ctx.fillStyle = "rgba(4, 13, 22, 0.9)";
+      for (let i = 0; i < 3; i += 1) {
+        const branchY = -trunkH + i * 16 * scale;
+        ctx.beginPath();
+        ctx.moveTo(0, branchY - 16 * scale);
+        ctx.lineTo(side * 24 * scale, branchY + 4 * scale);
+        ctx.lineTo(side * -20 * scale, branchY + 7 * scale);
+        ctx.closePath();
+        ctx.fill();
+      }
+    } else {
+      const w = 86 * scale;
+      ctx.strokeStyle = color;
+      ctx.lineWidth = Math.max(1, 2 * scale);
+      ctx.globalAlpha = 0.58;
+      ctx.beginPath();
+      ctx.moveTo(-w * 0.5, -18 * scale);
+      ctx.lineTo(w * 0.5, -30 * scale);
+      ctx.moveTo(-w * 0.42, -6 * scale);
+      ctx.lineTo(w * 0.42, -18 * scale);
+      ctx.stroke();
+      if (signRoll > 0.62) {
+        ctx.globalAlpha = 0.88;
+        ctx.fillStyle = theme.reflectorColor || "#f3f7ff";
+        ctx.shadowBlur = 10 * scale;
+        ctx.shadowColor = ctx.fillStyle;
+        ctx.fillRect(side * 22 * scale, -28 * scale, 5 * scale, 12 * scale);
+      }
+    }
+    ctx.restore();
+  }
+
+  drawBlackoutRoadsideReflector(x, y, scale, side, theme = {}, roll = 0) {
+    const ctx = this.ctx;
+    const h = 46 * scale;
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.fillStyle = "rgba(0, 1, 4, 0.9)";
+    ctx.fillRect(-3 * scale, -h, 6 * scale, h);
+    const color = roll > 0.45 ? (theme.edgeAltColor || "#ffd36f") : (theme.reflectorColor || "#ffffff");
+    ctx.globalAlpha = 0.74;
+    ctx.shadowBlur = 12 * scale;
+    ctx.shadowColor = color;
+    ctx.fillStyle = color;
+    ctx.fillRect(-5 * scale, -h + 8 * scale, 10 * scale, 4 * scale);
+    if (roll > 0.68) {
+      ctx.globalAlpha = 0.28;
+      ctx.beginPath();
+      ctx.moveTo(0, -h + 10 * scale);
+      ctx.lineTo(side * 62 * scale, -h + 28 * scale);
+      ctx.lineTo(side * 12 * scale, -h + 38 * scale);
+      ctx.closePath();
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  drawPrismRoadsideMarker(x, y, scale, side, theme = {}, typeRoll = 0) {
+    const ctx = this.ctx;
+    const effectScale = this.getPerformanceEffectScale();
+    const colorA = typeRoll > 0.5 ? (theme.edgeAltColor || "#ff3fd1") : (theme.edgeColor || "#22f3ff");
+    const colorB = typeRoll > 0.5 ? (theme.reflectorColor || "#ffe45e") : (theme.laneSecondary || "#ff59d8");
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.globalCompositeOperation = "lighter";
+    ctx.globalAlpha = 0.56;
+    ctx.shadowBlur = 12 * scale * lerp(0.58, 1, effectScale);
+    ctx.shadowColor = colorA;
+    ctx.strokeStyle = colorA;
+    ctx.lineWidth = Math.max(1, 2 * scale);
+    const h = 44 * scale;
+    const w = 30 * scale;
+    ctx.beginPath();
+    ctx.moveTo(0, -h);
+    ctx.lineTo(side * w, -h * 0.18);
+    ctx.lineTo(side * -w * 0.45, -h * 0.34);
+    ctx.closePath();
+    ctx.stroke();
+    ctx.globalAlpha = 0.32;
+    ctx.fillStyle = colorB;
+    ctx.fill();
+    ctx.restore();
+  }
+
   drawLowDesertRock(x, y, scale, warmth) {
     const ctx = this.ctx;
     const w = 54 * scale;
@@ -15679,6 +15995,8 @@ class Renderer {
 
     const scrollSource = this.getVisualDistance() * this.getVisualMotionMultiplier();
     this.drawRoadSurfaceDetails(scrollSource, alpha);
+    if (theme.prismRibbons) this.drawPrismRoadRibbons(scrollSource, alpha, theme);
+    if (theme.headlightCone) this.drawBlackoutHeadlightCone(alpha, theme);
 
     ctx.shadowBlur = (14 * visualIntensity + speedFeel * 8) * lerp(0.68, 1, effectScale);
     ctx.shadowColor = theme.edgeColor || "#28f6ff";
@@ -15691,6 +16009,7 @@ class Renderer {
     ctx.lineTo(road.x + road.w, road.y + road.h);
     ctx.stroke();
     this.drawRoadEdgeDetails(scrollSource, alpha);
+    if (theme.ridgeGuardrail) this.drawRidgeGuardrailGlints(scrollSource, alpha, theme);
     this.drawMusicRoadAtmosphere(scrollSource, alpha);
     if (theme.tunnelPanels) this.drawTrackTunnelPanels(scrollSource, alpha, theme);
 
@@ -15764,6 +16083,106 @@ class Renderer {
         ctx.fillStyle = band;
         ctx.fillRect(road.x, y, road.w, bandHeight);
       }
+    }
+    ctx.restore();
+  }
+
+  drawBlackoutHeadlightCone(alpha = 1, theme = {}) {
+    const ctx = this.ctx;
+    const road = this.road;
+    const playerY = this.game.run ? this.getPlayerScreenY() + 18 : this.height * 0.88;
+    const centerX = road.x + road.w * 0.5;
+    const topY = road.y + road.h * 0.04;
+    const coneTopW = road.w * 0.68;
+    const coneBottomW = road.w * 0.34;
+    ctx.save();
+    ctx.globalCompositeOperation = "lighter";
+    const cone = ctx.createLinearGradient(0, topY, 0, playerY);
+    cone.addColorStop(0, "rgba(255, 255, 255, 0.02)");
+    cone.addColorStop(0.52, "rgba(255, 244, 205, 0.07)");
+    cone.addColorStop(1, "rgba(255, 244, 205, 0.16)");
+    ctx.fillStyle = cone;
+    ctx.beginPath();
+    ctx.moveTo(centerX - coneTopW * 0.5, topY);
+    ctx.lineTo(centerX + coneTopW * 0.5, topY);
+    ctx.lineTo(centerX + coneBottomW * 0.5, playerY);
+    ctx.lineTo(centerX - coneBottomW * 0.5, playerY);
+    ctx.closePath();
+    ctx.globalAlpha = alpha;
+    ctx.fill();
+
+    ctx.globalAlpha = alpha * 0.34;
+    ctx.strokeStyle = theme.lanePrimary || "#f4f5f7";
+    ctx.shadowBlur = 18;
+    ctx.shadowColor = theme.reflectorColor || "#ffffff";
+    ctx.lineWidth = 1.8;
+    ctx.beginPath();
+    ctx.moveTo(centerX - coneTopW * 0.5, topY);
+    ctx.lineTo(centerX - coneBottomW * 0.5, playerY);
+    ctx.moveTo(centerX + coneTopW * 0.5, topY);
+    ctx.lineTo(centerX + coneBottomW * 0.5, playerY);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  drawPrismRoadRibbons(scrollSource, alpha = 1, theme = {}) {
+    const ctx = this.ctx;
+    const road = this.road;
+    const speedFeel = this.getSpeedFeelIntensity();
+    const effectScale = this.getPerformanceEffectScale();
+    const palette = ["#ff3edb", "#22f3ff", "#7c4dff", "#ffe45e", "#44ff99"];
+    const spacing = 168 / Math.max(0.8, effectScale);
+    const scroll = (scrollSource * (0.42 + speedFeel * 0.18)) % spacing;
+    ctx.save();
+    ctx.globalCompositeOperation = "lighter";
+    ctx.globalAlpha = alpha * clamp(0.18 + speedFeel * 0.08, 0.18, 0.34) * lerp(0.68, 1, effectScale);
+    for (let lane = 0; lane < LANES; lane += 1) {
+      const x = road.x + lane * road.laneW;
+      const color = palette[lane % palette.length];
+      const laneFill = ctx.createLinearGradient(x, 0, x + road.laneW, 0);
+      laneFill.addColorStop(0, rgbaFromHex(color, 0));
+      laneFill.addColorStop(0.5, rgbaFromHex(color, 0.34));
+      laneFill.addColorStop(1, rgbaFromHex(color, 0));
+      ctx.fillStyle = laneFill;
+      ctx.fillRect(x + road.laneW * 0.18, road.y, road.laneW * 0.64, road.h);
+    }
+    ctx.globalAlpha = alpha * 0.28 * lerp(0.62, 1, effectScale);
+    ctx.lineWidth = 3;
+    for (let y = road.y - spacing + scroll; y < road.y + road.h + spacing; y += spacing) {
+      const color = palette[Math.abs(Math.floor(y / spacing)) % palette.length] || theme.edgeColor || "#22f3ff";
+      ctx.strokeStyle = color;
+      ctx.shadowBlur = 12 * lerp(0.58, 1, effectScale);
+      ctx.shadowColor = color;
+      ctx.beginPath();
+      ctx.moveTo(road.x + 18, y);
+      ctx.bezierCurveTo(road.x + road.w * 0.28, y + 18, road.x + road.w * 0.64, y - 20, road.x + road.w - 18, y + 8);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  drawRidgeGuardrailGlints(scrollSource, alpha = 1, theme = {}) {
+    const ctx = this.ctx;
+    const road = this.road;
+    const speedFeel = this.getSpeedFeelIntensity();
+    const spacing = 126;
+    const scroll = (scrollSource * (0.54 + speedFeel * 0.12)) % spacing;
+    ctx.save();
+    ctx.globalCompositeOperation = "lighter";
+    ctx.strokeStyle = theme.guardrailColor || "rgba(159, 184, 211, 0.7)";
+    ctx.lineWidth = 2;
+    ctx.shadowColor = theme.edgeColor || "#9fb8d3";
+    ctx.shadowBlur = 8;
+    ctx.globalAlpha = alpha * 0.42;
+    for (let y = road.y - spacing + scroll; y < road.y + road.h + spacing; y += spacing) {
+      const t = clamp((y - road.y) / Math.max(1, road.h), 0, 1);
+      const inset = lerp(28, 10, t);
+      ctx.beginPath();
+      ctx.moveTo(road.x - inset, y);
+      ctx.lineTo(road.x - inset - 48, y + 36);
+      ctx.moveTo(road.x + road.w + inset, y);
+      ctx.lineTo(road.x + road.w + inset + 48, y + 36);
+      ctx.stroke();
     }
     ctx.restore();
   }
@@ -16082,6 +16501,7 @@ class Renderer {
     const visual = this.getObstacleVisualSize(obstacle.type, scale, obstacle);
     if (visual.sprite) {
       drawTrafficSprite(ctx, x, y, { ...visual, type: obstacle.type });
+      this.drawReflectiveObstacleCue(ctx, x, y, visual.w, visual.h, scale, obstacle);
       if (obstacle.pursuitMarker || obstacle.pursuitRoadblock) {
         this.drawPursuitObstacleMarker(ctx, x, y, visual.w, visual.h, scale, obstacle);
       }
@@ -16122,9 +16542,38 @@ class Renderer {
     } else if (obstacle.type === "warning") {
       drawRoadSign(ctx, x, y, obstacle.warningType || "work", drawScale);
     }
+    this.drawReflectiveObstacleCue(ctx, x, y, visual.w, visual.h, scale, obstacle);
     if (obstacle.pursuitMarker || obstacle.pursuitRoadblock) {
       this.drawPursuitObstacleMarker(ctx, x, y, visual.w, visual.h, scale, obstacle);
     }
+  }
+
+  drawReflectiveObstacleCue(ctx, x, y, width, height, scale, obstacle = {}) {
+    const theme = this.getCurrentTrackVisualTheme();
+    if (!theme.reflectiveObstacleEdges) return;
+    if (!["slowCar", "fastCar", "truck", "barrier"].includes(obstacle.type)) return;
+    const pulse = 0.52 + Math.sin((this.game.run?.elapsed || 0) * 5 + x * 0.01) * 0.12;
+    const color = obstacle.type === "barrier" ? (theme.edgeAltColor || "#ffd36f") : (theme.reflectorColor || "#ffffff");
+    ctx.save();
+    ctx.globalCompositeOperation = "lighter";
+    ctx.globalAlpha = clamp(pulse, 0.35, 0.74);
+    ctx.strokeStyle = color;
+    ctx.shadowBlur = 9 * scale;
+    ctx.shadowColor = color;
+    ctx.lineWidth = Math.max(1.4, 2 * scale);
+    const yTop = y - height * 0.34;
+    const yMid = y - height * 0.08;
+    ctx.beginPath();
+    ctx.moveTo(x - width * 0.36, yTop);
+    ctx.lineTo(x - width * 0.14, yTop);
+    ctx.moveTo(x + width * 0.14, yTop);
+    ctx.lineTo(x + width * 0.36, yTop);
+    ctx.moveTo(x - width * 0.42, yMid);
+    ctx.lineTo(x - width * 0.28, yMid);
+    ctx.moveTo(x + width * 0.28, yMid);
+    ctx.lineTo(x + width * 0.42, yMid);
+    ctx.stroke();
+    ctx.restore();
   }
 
   drawGasCanApproachGuide(ctx, obstacle, x, y, width, height, scale) {
@@ -26788,7 +27237,7 @@ class NeonRoadRally {
           </div>
           <div class="field">
             <label for="roadSeedInput">Type a Seed</label>
-            <input id="roadSeedInput" type="text" maxlength="32" value="${escapeAttr(seed)}" autocomplete="off" spellcheck="false" inputmode="text">
+            <input id="roadSeedInput" type="text" maxlength="${ROAD_SEED_MAX_LENGTH}" value="${escapeAttr(seed)}" autocomplete="off" spellcheck="false" inputmode="text">
           </div>
           <input id="officialRouteInput" type="hidden" value="${escapeAttr(officialRoute?.id || "")}">
           <p class="hint">Same seed, track, speed class, and race type repeats the same road. Custom Road records are preserved outside the Official 10 boards.</p>
@@ -27308,7 +27757,7 @@ class NeonRoadRally {
             </div>
             <div class="field">
               <label for="partySeedInput">Type a Seed</label>
-              <input id="partySeedInput" type="text" maxlength="32" value="${escapeAttr(setup.sharedSeed)}" autocomplete="off" spellcheck="false" inputmode="text">
+              <input id="partySeedInput" type="text" maxlength="${ROAD_SEED_MAX_LENGTH}" value="${escapeAttr(setup.sharedSeed)}" autocomplete="off" spellcheck="false" inputmode="text">
             </div>
             <div class="row setup-action-row">
               <button class="small-button" data-action="partyRandomSeed">Random Seed</button>
