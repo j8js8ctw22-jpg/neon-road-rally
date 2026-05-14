@@ -25566,22 +25566,22 @@ class NeonRoadRally {
       ? `Badges ${badgeProgress.earnedCount}/${badgeProgress.totalCount} - Titles ${titleCount}/${TITLE_DEFINITIONS.length}`
       : "Add a local driver to save badges and scores";
     const soloAction = hasDriver ? "start" : "players";
-    const soloActionLabel = hasDriver ? "Start Solo Race" : "Add Driver & Start";
+    const soloActionLabel = hasDriver ? "Official Race" : "Create Driver";
     const soloActionHelp = hasDriver
-      ? "One driver. Choose race type, track, speed, and seed."
-      : "Create a local driver first, then choose race type, track, speed, and seed.";
+      ? "Main path: pick a track, choose an Official 10 route, and chase the board."
+      : "Add a local driver, then start the Official Race path.";
     const keyboardHint = hasDriver
-      ? "Enter starts Solo. A/D change lanes. Shift+A/D drift dash. Space boosts."
-      : "Enter opens Driver Garage. Add a driver, then start a solo race.";
-    const audioStatus = `${this.audio.masterMuted ? "Audio Muted" : "Audio On"} / Music ${this.audio.musicMuted ? "Muted" : "On"} / SFX ${this.audio.sfxMuted ? "Muted" : "On"}`;
+      ? "A/D change lanes. Shift+A/D drift dash. Space uses manual boost."
+      : "Add one local driver to save scores, badges, titles, and car style.";
+    const audioStatus = `${this.audio.masterMuted ? "Muted" : "On"} · Music ${this.audio.musicMuted ? "Off" : "On"} · SFX ${this.audio.sfxMuted ? "Off" : "On"}`;
     this.layer.classList.remove("is-empty");
     this.layer.innerHTML = `
       <section class="panel title-panel show-title-panel">
         <div class="title-block">
           <div class="eyebrow">Local Arcade Racer</div>
           <h1 class="game-title"><span>Neon</span><span>Road</span><span>Rally</span></h1>
-          <p class="subtitle title-tagline">Five lanes. One car. Beat your best time.</p>
-          <p class="subtitle">Classic and Fuel Run are the main races. Chase the Top 20, rerun exact seeds, and compare precise finish times.</p>
+          <p class="subtitle title-tagline">Five tracks. One clean line. Beat the board.</p>
+          <p class="subtitle">Run Official Race for the competitive route list, or use Custom Road / Practice when you want a seed lab.</p>
           <div class="title-status-grid">
             <div class="title-status-card ${player ? "title-driver-status" : ""}">
               <div>
@@ -25592,9 +25592,9 @@ class NeonRoadRally {
               ${player ? this.renderDriverMiniCanvas(player, "title-car-chip") : ""}
             </div>
             <div class="title-status-card">
-              <span>Next Solo Speed</span>
+              <span>Default Speed</span>
               <strong>${escapeHtml(selectedSpeedClass.label)}</strong>
-              <small>Score x${selectedSpeedClass.scoreMultiplier.toFixed(2)}</small>
+              <small>Used for Custom Road / Practice</small>
             </div>
             <div class="title-status-card">
               <span>Audio</span>
@@ -25611,21 +25611,21 @@ class NeonRoadRally {
               <span class="menu-section-label">Start Playing</span>
               <div class="title-primary-actions">
                 <button class="menu-button primary title-action-card" data-action="${escapeAttr(soloAction)}"><strong>${escapeHtml(soloActionLabel)}</strong><span>${escapeHtml(soloActionHelp)}</span></button>
-                <button class="menu-button title-action-card is-party" data-action="partyMode"><strong>Start Party Mode</strong><span>2-8 local drivers take turns on the same computer.</span></button>
+                <button class="menu-button title-action-card is-party" data-action="partyMode"><strong>Party Mode</strong><span>2-8 local drivers take turns on the same computer.</span></button>
               </div>
             </div>
             <div class="title-menu-section">
               <span class="menu-section-label">Drivers, Records, Help</span>
               <div class="title-secondary-actions">
-                <button class="menu-button" data-action="players"><strong>Driver Garage</strong><span>Switch drivers, rename profiles, badges, and car look.</span></button>
+                <button class="menu-button" data-action="players"><strong>Driver Garage</strong><span>Drivers, car look, badges, titles, and local progress.</span></button>
+                <button class="menu-button" data-action="leaderboard"><strong>Leaderboards</strong><span>Official Time Attack and Score Attack boards.</span></button>
                 <button class="menu-button" data-action="challengeMode"><strong>Challenges</strong><span>Fixed-seed goals for quick retries.</span></button>
-                <button class="menu-button" data-action="leaderboard"><strong>Leaderboards</strong><span>Score Attack for points. Time Attack for precise finish times.</span></button>
                 <button class="menu-button" data-action="howToPlay"><strong>How To Play</strong><span>Controls, race types, Party rules, and rewards.</span></button>
               </div>
             </div>
             <div class="title-menu-section">
               <span class="menu-section-label">Options</span>
-              <button class="menu-button is-quiet" data-action="settings"><strong>Settings</strong><span>Audio, default speed class, fullscreen, and Playtest Tools.</span></button>
+              <button class="menu-button is-quiet" data-action="settings"><strong>Settings</strong><span>Audio, fullscreen, default speed, and optional Playtest Tools.</span></button>
             </div>
           </div>
           <div class="title-utility-row">
@@ -25685,7 +25685,7 @@ class NeonRoadRally {
           <div>
             <span class="eyebrow">Game Settings</span>
             <h2>Settings</h2>
-            <p class="hint">Audio, default Solo speed class, fullscreen, and Playtest Tools live here.</p>
+            <p class="hint">Audio, fullscreen, and your default Practice speed live here. Optional local QA tools stay separate below.</p>
           </div>
           <div class="score-grid">
             <div class="score-card"><strong>Default Speed Class</strong><span>${escapeHtml(selectedSpeedClass.label)}</span></div>
@@ -25726,11 +25726,20 @@ class NeonRoadRally {
             <button class="small-button" data-action="toggleMasterAudio">Mute All: ${this.audio.masterMuted ? "On" : "Off"}</button>
             <button class="small-button" data-action="toggleMusic">Music: ${this.audio.musicMuted ? "Muted" : "On"}</button>
             <button class="small-button" data-action="toggleSfx">SFX: ${this.audio.sfxMuted ? "Muted" : "On"}</button>
+            <button class="small-button primary" data-action="title">Back to Title</button>
+          </div>
+          <div class="settings-quick-row">
             <button class="small-button" data-action="fullscreen">Fullscreen</button>
             <button class="small-button" data-action="howToPlay">How To Play</button>
-            <button class="small-button" data-action="showPlaytestReport">Playtest Tools</button>
+          </div>
+          <div class="settings-advanced-tools">
+            <div>
+              <span class="eyebrow">Optional Local Tools</span>
+              <strong>Playtest Tools</strong>
+              <small>Local run reports and debug-only inspection. Not needed for normal play.</small>
+            </div>
+            <button class="small-button" data-action="showPlaytestReport">Open Playtest Tools</button>
             ${this.debugMode ? `<button class="small-button" data-action="roadDirectorLab">Road Director Lab</button>` : ""}
-            <button class="small-button primary" data-action="title">Back to Title</button>
           </div>
           <p class="keyboard-hints">F toggles fullscreen while menus are open.</p>
           <p class="status-line">${escapeHtml(message)}</p>
@@ -27077,8 +27086,9 @@ class NeonRoadRally {
     )).join("");
   }
 
-  renderTrackSelect(name, selectedTrackId) {
+  renderTrackSelect(name, selectedTrackId, options = {}) {
     const selectedId = normalizeTrackId(selectedTrackId, DEFAULT_TRACK_ID);
+    const compact = options.compact === true;
     return `
       <div class="track-select-grid" role="radiogroup" aria-label="Track Select">
         ${TRACKS.map((track) => {
@@ -27087,15 +27097,17 @@ class NeonRoadRally {
           const fuelReady = trackSupportsRaceType(track, FUEL_RUN_RACE_TYPE_ID);
           const supportLabel = fuelReady ? "Classic + Fuel Run" : "Classic only";
           return `
-            <label class="track-option ${selected ? "selected" : ""}" data-track-card="${escapeAttr(track.id)}">
+            <label class="track-option ${compact ? "is-compact" : ""} ${selected ? "selected" : ""}" data-track-card="${escapeAttr(track.id)}">
               <input type="radio" name="${escapeAttr(name)}" value="${escapeAttr(track.id)}" ${selected ? "checked" : ""}>
               <span class="track-option-title">
                 <strong>${escapeHtml(track.name)}</strong>
                 <em>${escapeHtml(supportLabel)}</em>
               </span>
               <span>${escapeHtml(track.cardIdentity || track.description)}</span>
-              <small>Recommended: ${escapeHtml(modes)}</small>
-              <small>${escapeHtml(getTrackMusicStatus(track))}</small>
+              ${compact ? "" : `
+                <small>Recommended: ${escapeHtml(modes)}</small>
+                <small>${escapeHtml(getTrackMusicStatus(track))}</small>
+              `}
             </label>
           `;
         }).join("")}
@@ -27183,17 +27195,23 @@ class NeonRoadRally {
         <div class="form-stack">
           <div>
             <span class="eyebrow">Official Race Board</span>
-            <h2>Choose Tonight's Race</h2>
-            <p class="hint">Official competitive routes use Turbo, Overdrive, and Redline. Arcade and Pro live in Custom Road / Practice below.</p>
+            <h2>Set Up the Run</h2>
+            <p class="hint">Follow the arcade board from track to route, then start. Official routes use Turbo, Overdrive, and Redline; Arcade and Pro stay in Custom Road / Practice.</p>
+          </div>
+          <div class="setup-step-strip" aria-label="Race setup order">
+            <span><strong>1</strong>Track</span>
+            <span><strong>2</strong>Race Type</span>
+            <span><strong>3</strong>Route</span>
+            <span><strong>4</strong>Ready</span>
           </div>
           <div class="setup-section-heading">
             <span class="eyebrow">1 · Track</span>
-            <strong>Pick the official board.</strong>
+            <strong>Choose one of the five normal tracks.</strong>
           </div>
           ${this.renderTrackSelect("preRaceTrack", track.id)}
           <div class="setup-section-heading">
-            <span class="eyebrow">2 · ${escapeHtml(track.name)} Official 10</span>
-            <strong>${trackRoutes.length} named routes · Turbo / Overdrive / Redline only.</strong>
+            <span class="eyebrow">2 · Race Type</span>
+            <strong>Classic is pure racing. Fuel Run adds gas-can pressure.</strong>
           </div>
           <div class="field official-rules-field">
             <label class="setup-hidden-label" for="preRaceType">Race Type</label>
@@ -27202,9 +27220,13 @@ class NeonRoadRally {
             </select>
             ${this.renderOfficialRouteRaceTypeButtons(raceType.id, "preRace")}
           </div>
+          <div class="setup-section-heading">
+            <span class="eyebrow">3 · ${escapeHtml(track.name)} Official 10</span>
+            <strong>${trackRoutes.length} named routes grouped by competitive speed. Pick one route, then start.</strong>
+          </div>
           <div class="setup-sticky-action solo-setup-action" aria-label="Ready to race">
             <div>
-              <span class="eyebrow" id="soloSetupCompetitionLabel">${escapeHtml(competitionKind)}</span>
+              <span class="eyebrow" id="soloSetupCompetitionLabel">4 · ${escapeHtml(competitionKind)}</span>
               <strong id="soloSetupActionSummary">${escapeHtml(officialRoute ? getOfficialRouteDisplayName(officialRoute) : `${raceType.label} · ${track.name} · ${speedClass.label}`)}</strong>
               <small id="soloSetupActionSeed">${escapeHtml(officialRoute ? `${raceType.label} · ${speedClass.label} · ${getOfficialRouteDisplayFeelTag(officialRoute)}` : `${raceType.label} · ${speedClass.label} · Custom Road Seed ${seed}`)}</small>
             </div>
@@ -27217,12 +27239,13 @@ class NeonRoadRally {
             <div class="score-card"><strong>Route</strong><span id="preRaceRouteSummary">${escapeHtml(officialRoute ? getOfficialRouteDisplayName(officialRoute) : competitionKind)}</span></div>
             <div class="score-card"><strong>Rules</strong><span id="preRaceTypeSummary">${escapeHtml(raceType.label)}</span></div>
             <div class="score-card"><strong>Speed</strong><span id="preRaceModeSummary">${escapeHtml(speedClass.label)} · x${speedClass.scoreMultiplier.toFixed(2)}</span></div>
-            <div class="score-card"><strong>Seed</strong><span id="preRaceSeedSummary" class="is-compact">${escapeHtml(seed)}</span></div>
+            <div class="score-card"><strong id="preRaceSeedLabel">${officialRoute ? "Route Lock" : "Seed"}</strong><span id="preRaceSeedSummary" class="is-compact">${escapeHtml(officialRoute ? "Official route" : seed)}</span></div>
           </div>
           <div class="setup-section-heading">
             <span class="eyebrow">Custom Road / Practice</span>
-            <strong>Training speeds, manual seeds, and random roads stay here.</strong>
+            <strong>Secondary path for Arcade, Pro, manual seeds, and random roads.</strong>
           </div>
+          <div class="practice-setup-panel">
           <div class="field">
             <label for="preRaceSpeedClass">Practice Speed</label>
             <p class="hint mode-ladder-note">Arcade and Pro are practice speeds. Picking a speed or typing a seed switches Ready to Race into Custom Road.</p>
@@ -27248,6 +27271,7 @@ class NeonRoadRally {
             <button class="small-button" data-action="howToPlay">How To Play</button>
             <button class="small-button" data-action="title">Back to Title</button>
           </div>
+          </div>
           <p class="status-line">${escapeHtml(message)}</p>
         </div>
       </section>
@@ -27268,6 +27292,7 @@ class NeonRoadRally {
     const modeSummary = document.getElementById("preRaceModeSummary");
     const trackSummary = document.getElementById("preRaceTrackSummary");
     const seedSummary = document.getElementById("preRaceSeedSummary");
+    const seedLabel = document.getElementById("preRaceSeedLabel");
     const musicSummary = document.getElementById("preRaceMusicSummary");
     const soloSetupCompetitionLabel = document.getElementById("soloSetupCompetitionLabel");
     const soloSetupActionSummary = document.getElementById("soloSetupActionSummary");
@@ -27316,7 +27341,10 @@ class NeonRoadRally {
       this.syncModeLadderMetrics(track);
       display.textContent = normalized || "Random seed on start";
       if (seedSummary) {
-        seedSummary.textContent = normalized || "Random on start";
+        seedSummary.textContent = officialRoute ? "Official route" : (normalized || "Random on start");
+      }
+      if (seedLabel) {
+        seedLabel.textContent = officialRoute ? "Route Lock" : "Seed";
       }
       if (routeSummary) {
         routeSummary.textContent = officialRoute ? getOfficialRouteDisplayName(officialRoute) : competitionKind;
@@ -27342,7 +27370,7 @@ class NeonRoadRally {
         soloSetupActionSummary.textContent = officialRoute ? getOfficialRouteDisplayName(officialRoute) : `${raceType.label} · ${track.name} · ${speedClass.label}`;
       }
       if (soloSetupCompetitionLabel) {
-        soloSetupCompetitionLabel.textContent = competitionKind;
+        soloSetupCompetitionLabel.textContent = `4 · ${competitionKind}`;
       }
       if (soloSetupActionSeed) {
         soloSetupActionSeed.textContent = officialRoute
@@ -27709,7 +27737,7 @@ class NeonRoadRally {
             </div>
             <div class="field">
               <label>Track</label>
-              ${this.renderTrackSelect("partyTrack", track.id)}
+              ${this.renderTrackSelect("partyTrack", track.id, { compact: true })}
             </div>
             <div class="field">
               <label class="setup-hidden-label" for="partyRaceType">Race Type</label>
@@ -29307,6 +29335,8 @@ class NeonRoadRally {
           </div>
         </div>
 
+        ${this.renderGarageStats(player)}
+
         <div class="garage-layout">
           <section class="garage-section" id="garageRenameDriver">
             <div class="garage-section-heading">
@@ -29392,9 +29422,8 @@ class NeonRoadRally {
           <section class="garage-section is-wide" id="garageRewards">
             <div class="garage-section-heading">
               <span class="eyebrow">Records & Rewards</span>
-              <h3>Stats, Titles, Badges</h3>
+              <h3>Titles and Badges</h3>
             </div>
-            ${this.renderGarageStats(player)}
             ${this.renderPlayerTitlePanel(player)}
             ${this.renderPlayerBadgePanel(player)}
           </section>
@@ -29879,14 +29908,14 @@ class NeonRoadRally {
     const routes = getOfficialRoutesForTrack(trackId);
     return `
       <div class="official-route-grid compact-official-route-grid" aria-label="Official 10 routes">
-        ${routes.map((route) => {
+        ${routes.map((route, index) => {
           const stats = this.getOfficialRouteRecordSummary(route, raceTypeId);
           return `
-            <button class="official-route-card ${route.id === selectedId ? "is-selected" : ""}" type="button" data-action="leaderboard" data-view="${escapeAttr(view)}" data-official-route-id="${escapeAttr(route.id)}" data-race-type-id="${escapeAttr(raceTypeId)}">
+            <button class="official-route-card is-${escapeAttr(route.speedClassId)} ${route.id === selectedId ? "is-selected" : ""}" type="button" data-action="leaderboard" data-view="${escapeAttr(view)}" data-official-route-id="${escapeAttr(route.id)}" data-race-type-id="${escapeAttr(raceTypeId)}">
               <strong>${escapeHtml(getOfficialRouteDisplayName(route))}</strong>
               <span>${escapeHtml(route.speedClassLabel)} · ${escapeHtml(getOfficialRouteDisplayFeelTag(route))}</span>
               <small>${escapeHtml(view === LEADERBOARD_VIEW_TIME_ATTACK ? stats.leaderTimeText : stats.leaderScoreText)}</small>
-              <em>${escapeHtml(route.seed)}</em>
+              <em>Route ${String(index + 1).padStart(2, "0")}</em>
             </button>
           `;
         }).join("")}
@@ -29901,14 +29930,14 @@ class NeonRoadRally {
     const routes = getOfficialRoutesForTrack(safeTrackId);
     return `
       <div class="official-route-grid" aria-label="Official 10 routes">
-        ${routes.map((route) => {
+        ${routes.map((route, index) => {
           const stats = this.getOfficialRouteRecordSummary(route, safeRaceTypeId);
           return `
-          <button class="official-route-card ${route.id === selectedId ? "is-selected" : ""}" type="button" data-official-route-id="${escapeAttr(route.id)}">
+          <button class="official-route-card is-${escapeAttr(route.speedClassId)} ${route.id === selectedId ? "is-selected" : ""}" type="button" data-official-route-id="${escapeAttr(route.id)}">
             <strong>${escapeHtml(getOfficialRouteDisplayName(route))}</strong>
             <span>${escapeHtml(route.speedClassLabel)} · ${escapeHtml(getOfficialRouteDisplayFeelTag(route))}</span>
             <small>${escapeHtml(stats.pbText)}</small>
-            <em>${escapeHtml(route.seed)}</em>
+            <em>Route ${String(index + 1).padStart(2, "0")}</em>
           </button>
         `;
         }).join("")}
@@ -30159,7 +30188,7 @@ class NeonRoadRally {
           ` : ""}
           ${legacyTimeRows.length ? `
             <h2>Legacy Time Records</h2>
-            <p class="hint">These saved times are preserved but not ranked against the current pacing version.</p>
+            <p class="hint">Older saved times are preserved, but they are not ranked against the current rules.</p>
             <ol class="leaderboard-list">
               ${this.renderTimeAttackRows(legacyTimeRows, "No legacy records for this setup.")}
             </ol>
@@ -30259,7 +30288,7 @@ class NeonRoadRally {
             ? `Tank empty at ${progressPercent}% progress.`
             : (status === "busted"
               ? `Heat hit the limit at ${progressPercent}% progress.`
-              : `Crashed into ${crashReason} at ${progressPercent}% progress.`)));
+              : `Hit ${crashReason} at ${progressPercent}% progress. Replay the same route to practice that spot.`)));
     const boardMetricText = summary.scoreSaved ? leaderboardText : "Not saved";
     const restartLabel = summary.challengeMode ? "Retry Challenge" : (summary.partyMode ? "Replay This Turn" : "Race Again");
     const resultEyebrow = summary.challengeMode
@@ -30329,7 +30358,7 @@ class NeonRoadRally {
           <button class="small-button" data-action="title">Back to Title</button>
         </div>
         <details class="result-details-block">
-          <summary>Run Details, Badges, and Boards</summary>
+          <summary>Details, Badges, and Boards</summary>
           <h2>Score Breakdown</h2>
           ${this.renderScoreBreakdown(summary)}
           ${this.renderMedalChips(summary.medals)}

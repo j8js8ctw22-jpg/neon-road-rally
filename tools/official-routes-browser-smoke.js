@@ -209,7 +209,7 @@ async function assertTrackOfficial10(page, trackId, label) {
     assertIncludes(card.text, route.name);
     assertIncludes(card.text, route.speedClass);
     assertIncludes(card.text, route.feelTag);
-    assertIncludes(card.text, route.seed);
+    assert(!card.text.includes(route.seed), "Official route setup cards should hide raw route seeds", { route, card: card.text });
     assert(!/Arcade|Pro/i.test(`${route.name} ${route.speedClass}`), "Official cards should not use Arcade/Pro", { route });
   }
 

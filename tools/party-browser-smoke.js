@@ -221,7 +221,7 @@ async function run() {
 
   await page.getByRole("button", { name: /(Return|Back) to Title/i }).click();
   await page.waitForFunction(() => window.neonRoadRally?.screen === "title", null, { timeout: 5000 });
-  await clickText("Solo Race");
+  await clickText("Official Race|Solo Race");
   await page.waitForFunction(() => window.neonRoadRally?.screen === "preRace", null, { timeout: 5000 });
   await page.selectOption("#preRaceType", "classic");
   await page.selectOption("#preRaceType", "fuelRun");

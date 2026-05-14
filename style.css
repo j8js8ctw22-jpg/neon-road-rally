@@ -158,7 +158,7 @@ button {
 .setup-step-strip {
   display: grid;
   gap: 8px;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
 .setup-step-strip span {
@@ -306,6 +306,39 @@ button {
 .settings-panel {
   display: grid;
   gap: 12px;
+}
+
+.settings-quick-row {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.settings-advanced-tools {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  border: 1px solid rgba(184, 198, 217, 0.2);
+  border-radius: 8px;
+  padding: 12px;
+  background: rgba(3, 7, 18, 0.44);
+}
+
+.settings-advanced-tools strong,
+.settings-advanced-tools small {
+  display: block;
+}
+
+.settings-advanced-tools strong {
+  color: var(--text);
+  text-transform: uppercase;
+}
+
+.settings-advanced-tools small {
+  margin-top: 3px;
+  color: var(--muted);
+  line-height: 1.35;
 }
 
 .title-menu-section {
@@ -818,7 +851,7 @@ button {
 .official-route-grid {
   display: grid;
   gap: 10px;
-  grid-template-columns: repeat(auto-fit, minmax(205px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(184px, 1fr));
 }
 
 .compact-official-route-grid {
@@ -829,10 +862,10 @@ button {
   position: relative;
   display: grid;
   gap: 6px;
-  min-height: 118px;
+  min-height: 106px;
   border: 1px solid rgba(40, 246, 255, 0.34);
   border-radius: 7px;
-  padding: 12px;
+  padding: 11px 12px;
   background:
     linear-gradient(180deg, rgba(255, 228, 94, 0.08), rgba(40, 246, 255, 0.035)),
     rgba(8, 14, 34, 0.9);
@@ -849,6 +882,18 @@ button {
   width: 4px;
   background: linear-gradient(180deg, var(--yellow), var(--cyan));
   opacity: 0.72;
+}
+
+.official-route-card.is-turbo::before {
+  background: linear-gradient(180deg, var(--cyan), var(--green));
+}
+
+.official-route-card.is-overdrive::before {
+  background: linear-gradient(180deg, var(--yellow), var(--orange));
+}
+
+.official-route-card.is-redline::before {
+  background: linear-gradient(180deg, var(--magenta), var(--red));
 }
 
 .official-route-card strong,
@@ -882,12 +927,16 @@ button {
 
 .official-route-card em {
   align-self: end;
-  color: rgba(246, 251, 255, 0.58);
-  font-family: ui-monospace, "SFMono-Regular", Consolas, monospace;
-  font-size: 0.64rem;
+  width: fit-content;
+  border: 1px solid rgba(246, 251, 255, 0.18);
+  border-radius: 999px;
+  padding: 3px 7px;
+  color: rgba(246, 251, 255, 0.76);
+  font-size: 0.62rem;
   font-style: normal;
-  font-weight: 750;
+  font-weight: 900;
   letter-spacing: 0;
+  text-transform: uppercase;
   overflow-wrap: anywhere;
 }
 
@@ -921,6 +970,17 @@ button {
 
 .official-rules-field {
   margin-bottom: 4px;
+}
+
+.practice-setup-panel {
+  display: grid;
+  gap: 12px;
+  border: 1px solid rgba(184, 198, 217, 0.22);
+  border-radius: 8px;
+  padding: 12px;
+  background:
+    linear-gradient(180deg, rgba(184, 198, 217, 0.05), rgba(40, 246, 255, 0.035)),
+    rgba(3, 7, 18, 0.58);
 }
 
 .race-type-card {
@@ -1392,6 +1452,14 @@ button:disabled {
 .track-option small {
   color: var(--muted);
   line-height: 1.35;
+}
+
+.track-option.is-compact {
+  min-height: 104px;
+}
+
+.party-panel .track-select-grid {
+  grid-template-columns: repeat(auto-fit, minmax(158px, 1fr));
 }
 
 .hint,
@@ -3426,6 +3494,8 @@ button:disabled {
   .official-route-grid,
   .audio-grid,
   .audio-test-grid,
+  .settings-quick-row,
+  .settings-advanced-tools,
   .setup-sticky-action,
   .speed-class-grid,
   .setup-step-strip,
