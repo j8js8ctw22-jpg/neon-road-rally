@@ -110,6 +110,66 @@ const BADGE_DEFINITIONS = [
     icon: "CLN"
   },
   {
+    id: "first_drift_dash",
+    name: "First Drift Dash",
+    description: "Complete your first drift dash.",
+    category: "skill",
+    difficulty: "Easy",
+    hidden: false,
+    icon: "DRF",
+    drift: true
+  },
+  {
+    id: "clean_cut",
+    name: "Clean Cut",
+    description: "Finish with 5 drift dashes and no drift crash.",
+    category: "skill",
+    difficulty: "Hard",
+    hidden: false,
+    icon: "CUT",
+    drift: true
+  },
+  {
+    id: "big_drift_cut",
+    name: "Big Drift Cut",
+    description: "Cross 3 or more lanes in one drift dash.",
+    category: "skill",
+    difficulty: "Hard",
+    hidden: false,
+    icon: "3LN",
+    drift: true
+  },
+  {
+    id: "drift_boost_route",
+    name: "Drift Boost Route",
+    description: "Collect 3 boost pads in a run with 3 drift dashes.",
+    category: "skill",
+    difficulty: "Hard",
+    hidden: false,
+    icon: "DBR",
+    drift: true
+  },
+  {
+    id: "ramp_cut",
+    name: "Ramp Cut",
+    description: "Finish after drifting and clearing 2 ramp targets.",
+    category: "skill",
+    difficulty: "Hard",
+    hidden: false,
+    icon: "RC",
+    drift: true
+  },
+  {
+    id: "thread_the_needle",
+    name: "Thread the Needle",
+    description: "Earn 3 drift near misses without a drift crash.",
+    category: "skill",
+    difficulty: "Very Hard",
+    hidden: false,
+    icon: "NDL",
+    drift: true
+  },
+  {
     id: "near_miss_streak",
     name: "Near-Miss Streak",
     description: "Earn at least 5 near misses in one run.",
@@ -889,6 +949,78 @@ const BADGE_DEFINITIONS = [
     icon: "H10",
     progressStat: "totalHeatHeavyPursuitRuns",
     progressTarget: 10
+  },
+  {
+    id: "mastery_drift_dash_25",
+    name: "Drift Dash I",
+    description: "Complete 25 total drift dashes.",
+    category: "mastery",
+    difficulty: "Progress",
+    hidden: false,
+    icon: "DD1",
+    progressStat: "totalDriftDashesCompleted",
+    progressTarget: 25,
+    drift: true
+  },
+  {
+    id: "mastery_drift_dash_100",
+    name: "Drift Dash II",
+    description: "Complete 100 total drift dashes.",
+    category: "mastery",
+    difficulty: "Progress",
+    hidden: false,
+    icon: "DD2",
+    progressStat: "totalDriftDashesCompleted",
+    progressTarget: 100,
+    drift: true
+  },
+  {
+    id: "mastery_drift_dash_500",
+    name: "Drift Dash III",
+    description: "Complete 500 total drift dashes.",
+    category: "mastery",
+    difficulty: "Progress",
+    hidden: false,
+    icon: "DD3",
+    progressStat: "totalDriftDashesCompleted",
+    progressTarget: 500,
+    drift: true
+  },
+  {
+    id: "mastery_drift_lanes_50",
+    name: "Lane Cutter I",
+    description: "Cross 50 total lanes with drift dash.",
+    category: "mastery",
+    difficulty: "Progress",
+    hidden: false,
+    icon: "LC1",
+    progressStat: "totalDriftLanesCrossed",
+    progressTarget: 50,
+    drift: true
+  },
+  {
+    id: "mastery_drift_lanes_250",
+    name: "Lane Cutter II",
+    description: "Cross 250 total lanes with drift dash.",
+    category: "mastery",
+    difficulty: "Progress",
+    hidden: false,
+    icon: "LC2",
+    progressStat: "totalDriftLanesCrossed",
+    progressTarget: 250,
+    drift: true
+  },
+  {
+    id: "mastery_drift_lanes_1000",
+    name: "Lane Cutter III",
+    description: "Cross 1,000 total lanes with drift dash.",
+    category: "mastery",
+    difficulty: "Progress",
+    hidden: false,
+    icon: "LC3",
+    progressStat: "totalDriftLanesCrossed",
+    progressTarget: 1000,
+    drift: true
   }
 ];
 const BADGE_DEFINITION_BY_ID = Object.fromEntries(BADGE_DEFINITIONS.map((badge) => [badge.id, badge]));
@@ -3780,6 +3912,10 @@ function isVisibleBadgeDefinition(badge) {
   return Boolean(badge) && badge.hidden !== true && badge.deprecated !== true && badge.visible !== false;
 }
 
+function isDriftBadgeDefinition(badge) {
+  return Boolean(badge?.drift);
+}
+
 function getRampTargetGap(ramp) {
   const targetDistance = Number.isFinite(ramp?.solutionTargetDistance) ? ramp.solutionTargetDistance : null;
   if (!targetDistance || !Number.isFinite(ramp?.distance)) return ROAD_READABILITY_CONFIG.rampTargetMaxGap;
@@ -4851,6 +4987,8 @@ function createDefaultPlayerBadgeStats() {
     totalPursuitEscapes: 0,
     totalRoadblocksCleared: 0,
     totalHeatHeavyPursuitRuns: 0,
+    totalDriftDashesCompleted: 0,
+    totalDriftLanesCrossed: 0,
     partyWins: 0,
     bestOf3Wins: 0,
     partyAwardsWon: 0,
@@ -4892,6 +5030,8 @@ function normalizePlayerBadgeStats(value) {
     totalPursuitEscapes: normalizeNonNegativeInteger(source.totalPursuitEscapes, 0, 999999),
     totalRoadblocksCleared: normalizeNonNegativeInteger(source.totalRoadblocksCleared, 0, 999999),
     totalHeatHeavyPursuitRuns: normalizeNonNegativeInteger(source.totalHeatHeavyPursuitRuns, 0, 999999),
+    totalDriftDashesCompleted: normalizeNonNegativeInteger(source.totalDriftDashesCompleted, 0, 999999),
+    totalDriftLanesCrossed: normalizeNonNegativeInteger(source.totalDriftLanesCrossed, 0, 999999),
     partyWins: normalizeNonNegativeInteger(source.partyWins, 0, 999999),
     bestOf3Wins: normalizeNonNegativeInteger(source.bestOf3Wins, 0, 999999),
     partyAwardsWon: normalizeNonNegativeInteger(source.partyAwardsWon, 0, 999999),
@@ -6805,6 +6945,8 @@ class PlayerProfileManager {
     player.badgeStats.totalRuns += 1;
     player.badgeStats.totalNearMisses += normalizeNonNegativeInteger(summary.nearMisses, 0, 999);
     player.badgeStats.totalRampsUsed += normalizeNonNegativeInteger(summary.rampsUsed, 0, 999);
+    player.badgeStats.totalDriftDashesCompleted += normalizeNonNegativeInteger(summary.driftDashesCompleted, 0, 999);
+    player.badgeStats.totalDriftLanesCrossed += normalizeNonNegativeInteger(summary.driftLanesCrossed, 0, 999);
     if (finished) {
       player.badgeStats.totalFinishes += 1;
       if (isSpeedClassAtLeast(speedClass, "turbo")) player.badgeStats.totalTurboPlusFinishes += 1;
@@ -6906,8 +7048,13 @@ class PlayerProfileManager {
     const player = this.getPlayerById(summary.playerId);
     const badgeStats = normalizePlayerBadgeStats(player?.badgeStats);
     const speedClass = normalizeSpeedClassId(summary.speedClass, DEFAULT_SPEED_CLASS_ID);
+    const finished = normalizeRunStatus(summary.status) === "finished";
+    const driftDashes = normalizeNonNegativeInteger(summary.driftDashesCompleted, 0, 999);
+    const longestDriftDashLanes = normalizeNonNegativeNumber(summary.longestDriftDashLanes, 0, LANES);
+    const driftNearMisses = normalizeNonNegativeInteger(summary.driftNearMisses, 0, 999);
+    const crashesWhileDrifting = normalizeNonNegativeInteger(summary.crashesWhileDrifting, 0, 999);
 
-    if (summary.status === "finished") {
+    if (finished) {
       badgeIds.push("first_finish");
       if (summary.trackId === "sunset-highway") badgeIds.push("sunset_finisher");
       if (summary.trackId === "redline-run") badgeIds.push("redline_finisher");
@@ -6938,6 +7085,12 @@ class PlayerProfileManager {
     if ((summary.nearMisses || 0) >= 10) badgeIds.push("near_miss_10");
     if ((summary.rampsUsed || 0) >= 5) badgeIds.push("ramp_rider");
     if ((summary.rampTargetsCleared || 0) >= 5) badgeIds.push("jump_master");
+    if (driftDashes >= 1) badgeIds.push("first_drift_dash");
+    if (finished && driftDashes >= 5 && crashesWhileDrifting === 0) badgeIds.push("clean_cut");
+    if (longestDriftDashLanes >= 3) badgeIds.push("big_drift_cut");
+    if ((summary.boostPadsCollected || 0) >= 3 && driftDashes >= 3) badgeIds.push("drift_boost_route");
+    if (finished && driftDashes >= 1 && (summary.rampTargetsCleared || 0) >= 2) badgeIds.push("ramp_cut");
+    if (driftNearMisses >= 3 && crashesWhileDrifting === 0) badgeIds.push("thread_the_needle");
     if (summary.raceTypeId === FUEL_RUN_RACE_TYPE_ID && (summary.gasCansCollected || 0) >= 5) badgeIds.push("gas_gremlin");
     if (summary.raceTypeId === FUEL_RUN_RACE_TYPE_ID && (summary.fuelSavedByBoost || 0) >= 10) badgeIds.push("boost_saver");
     if (summary.partyMode && badgeStats.partyRuns >= 5) badgeIds.push("party_regular");
@@ -27771,12 +27924,19 @@ class NeonRoadRally {
       .concat((Array.isArray(titleChanges.claimed) ? titleChanges.claimed : []).map((title) => ({ ...title, state: "claimed" })))
       .concat((Array.isArray(titleChanges.defended) ? titleChanges.defended : []).map((title) => ({ ...title, state: "defended" })));
     const chips = [];
-    const badgePreview = masteryBadges.length
-      ? masteryBadges.slice(0, 1).concat(badges.filter((badge) => badge.category !== "mastery").slice(0, 1))
-      : badges.slice(0, 2);
+    const driftBadges = badges.filter(isDriftBadgeDefinition);
+    const badgePreview = [];
+    const addBadgePreview = (badge) => {
+      if (badge && !badgePreview.some((item) => item.id === badge.id) && badgePreview.length < 2) {
+        badgePreview.push(badge);
+      }
+    };
+    addBadgePreview(driftBadges[0]);
+    addBadgePreview(masteryBadges[0]);
+    badges.forEach(addBadgePreview);
     badgePreview.forEach((badge) => {
       chips.push({
-        label: badge.category === "mastery" ? "Mastery Progress" : "Badge Earned",
+        label: badge.category === "mastery" ? "Mastery Progress" : (isDriftBadgeDefinition(badge) ? "Drift Badge" : "Badge Earned"),
         value: badge.name,
         detail: getBadgeCategoryLabel(badge.category)
       });

@@ -404,6 +404,158 @@ vm.runInContext(`
   assert.strictEqual(rightBox.x, baseBox.x, "Right drift should preserve the non-drift-side edge");
   assert(rightBox.x + rightBox.w > baseBox.x + baseBox.w, "Right drift danger footprint should extend right");
 
+  function createBadgeHarnessPlayer(key, name = "DRIFT TESTER") {
+    localStorage.removeItem(key);
+    const profiles = new PlayerProfileManager(key);
+    const player = profiles.createPlayer(name);
+    return { profiles, player };
+  }
+
+  function makeBadgeSummary(player, overrides = {}) {
+    return {
+      playerId: player.id,
+      playerName: player.name,
+      scoreSaved: true,
+      status: "finished",
+      trackId: "sunset-highway",
+      raceTypeId: DEFAULT_RACE_TYPE_ID,
+      speedClass: "turbo",
+      slowdownHits: 0,
+      nearMisses: 0,
+      rampsUsed: 0,
+      rampTargetsCleared: 0,
+      boostPadsCollected: 0,
+      driftDashesCompleted: 0,
+      driftDashTime: 0,
+      maxDriftHold: 0,
+      driftLanesCrossed: 0,
+      longestDriftDashLanes: 0,
+      driftNearMisses: 0,
+      crashesWhileDrifting: 0,
+      manualBoostsUsed: 1,
+      averageSpeed: 2000,
+      ...overrides
+    };
+  }
+
+  function evaluateBadgesForSummary(profiles, summary) {
+    profiles.recordBadgeRunStats(summary);
+    return profiles.evaluateRunBadges(summary).map((badge) => badge.id);
+  }
+
+  {
+    localStorage.setItem("drift-badge-legacy-save", JSON.stringify({
+      version: 1,
+      currentPlayerId: "legacy-driver",
+      players: [{
+        id: "legacy-driver",
+        name: "LEGACY",
+        badgeStats: { totalRuns: 3, totalNearMisses: 4 },
+        badges: { earned: {} }
+      }],
+      leaderboard: []
+    }));
+    const profiles = new PlayerProfileManager("drift-badge-legacy-save");
+    const stats = normalizePlayerBadgeStats(profiles.getPlayerById("legacy-driver").badgeStats);
+    assert.strictEqual(stats.totalDriftDashesCompleted, 0, "Existing saves should load with safe drift dash counters");
+    assert.strictEqual(stats.totalDriftLanesCrossed, 0, "Existing saves should load with safe drift lane counters");
+  }
+
+  {
+    const { profiles, player } = createBadgeHarnessPlayer("drift-badge-first-use");
+    const summary = makeBadgeSummary(player, { driftDashesCompleted: 1, driftLanesCrossed: 1.1, longestDriftDashLanes: 1.1 });
+    const firstIds = evaluateBadgesForSummary(profiles, summary);
+    assert(firstIds.includes("first_drift_dash"), "First completed drift dash should unlock First Drift Dash");
+    const secondIds = evaluateBadgesForSummary(profiles, summary);
+    assert(!secondIds.includes("first_drift_dash"), "First Drift Dash should only unlock once");
+  }
+
+  {
+    const { profiles, player } = createBadgeHarnessPlayer("drift-badge-big-cut");
+    const ids = evaluateBadgesForSummary(profiles, makeBadgeSummary(player, {
+      driftDashesCompleted: 1,
+      driftLanesCrossed: 3.2,
+      longestDriftDashLanes: 3.05
+    }));
+    assert(ids.includes("big_drift_cut"), "3+ lanes in one drift dash should unlock Big Drift Cut");
+  }
+
+  {
+    const crashed = createBadgeHarnessPlayer("drift-badge-clean-crashed");
+    const crashedIds = evaluateBadgesForSummary(crashed.profiles, makeBadgeSummary(crashed.player, {
+      status: "crashed",
+      driftDashesCompleted: 5,
+      crashesWhileDrifting: 0
+    }));
+    assert(!crashedIds.includes("clean_cut"), "Clean Cut should require a finished run");
+
+    const driftCrash = createBadgeHarnessPlayer("drift-badge-clean-drift-crash");
+    const driftCrashIds = evaluateBadgesForSummary(driftCrash.profiles, makeBadgeSummary(driftCrash.player, {
+      driftDashesCompleted: 5,
+      crashesWhileDrifting: 1
+    }));
+    assert(!driftCrashIds.includes("clean_cut"), "Clean Cut should reject runs with drift crash telemetry");
+
+    const clean = createBadgeHarnessPlayer("drift-badge-clean-valid");
+    const cleanIds = evaluateBadgesForSummary(clean.profiles, makeBadgeSummary(clean.player, {
+      driftDashesCompleted: 5,
+      crashesWhileDrifting: 0
+    }));
+    assert(cleanIds.includes("clean_cut"), "Clean Cut should unlock for a finished 5-dash run with no drift crash");
+  }
+
+  {
+    const { profiles, player } = createBadgeHarnessPlayer("drift-badge-route-skill");
+    const ids = evaluateBadgesForSummary(profiles, makeBadgeSummary(player, {
+      driftDashesCompleted: 4,
+      boostPadsCollected: 3,
+      rampsUsed: 2,
+      rampTargetsCleared: 2,
+      driftNearMisses: 3,
+      crashesWhileDrifting: 0
+    }));
+    assert(ids.includes("drift_boost_route"), "3 boost pads with 3+ dashes should unlock Drift Boost Route");
+    assert(ids.includes("ramp_cut"), "Drift plus 2 cleared ramp targets on a finish should unlock Ramp Cut");
+    assert(ids.includes("thread_the_needle"), "3 drift near misses without drift crash should unlock Thread the Needle");
+  }
+
+  {
+    const { profiles, player } = createBadgeHarnessPlayer("drift-badge-lifetime");
+    evaluateBadgesForSummary(profiles, makeBadgeSummary(player, {
+      driftDashesCompleted: 12,
+      driftLanesCrossed: 20
+    }));
+    const secondIds = evaluateBadgesForSummary(profiles, makeBadgeSummary(player, {
+      driftDashesCompleted: 13,
+      driftLanesCrossed: 31
+    }));
+    const stats = normalizePlayerBadgeStats(profiles.getPlayerById(player.id).badgeStats);
+    assert.strictEqual(stats.totalDriftDashesCompleted, 25, "Lifetime drift dash completions should increment");
+    assert.strictEqual(stats.totalDriftLanesCrossed, 51, "Lifetime drift lane-cut progress should increment");
+    assert(secondIds.includes("mastery_drift_dash_25"), "25 lifetime drift dashes should unlock Drift Dash I");
+    assert(secondIds.includes("mastery_drift_lanes_50"), "50 lifetime drift lanes crossed should unlock Lane Cutter I");
+    const laneProgress = profiles.getBadgeViewModels(player).find((badge) => badge.id === "mastery_drift_lanes_250")?.progress;
+    assert(laneProgress && laneProgress.current === 51 && laneProgress.target === 250, "Locked lane mastery badge should expose Garage progress");
+  }
+
+  {
+    const rewardApp = Object.create(NeonRoadRally.prototype);
+    const rewardHtml = rewardApp.renderResultRewardStrip({
+      newlyEarnedBadges: [
+        "first_finish",
+        "clean_run",
+        "first_drift_dash",
+        "big_drift_cut",
+        "mastery_drift_dash_25"
+      ].map((id) => getBadgeDefinition(id)).filter(Boolean),
+      titleChanges: { claimed: [{ name: "Test Champion" }], defended: [] }
+    });
+    const chipCount = (rewardHtml.match(/result-reward-chip/g) || []).length;
+    assert(rewardHtml.includes("Drift Badge") && rewardHtml.includes("First Drift Dash"), "Result reward strip should prioritize compact drift badge chips");
+    assert(rewardHtml.includes("More Rewards"), "Result reward strip should summarize overflow rewards");
+    assert(chipCount <= 5, "Result reward strip should remain compact when many badges unlock");
+  }
+
   const palmCaptureA = app.captureRoadDirectorSequence({
     officialRouteId: "sunset-neon-palm-sprint",
     raceTypeId: DEFAULT_RACE_TYPE_ID,

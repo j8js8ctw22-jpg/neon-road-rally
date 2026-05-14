@@ -340,17 +340,22 @@ async function forceFinishWithDriftNote(page) {
     run.baseScore = 118000;
     run.score = 118000;
     run.manualBoosts = Math.max(0, run.manualBoosts || 0);
-    run.driftsStarted = Math.max(run.driftsStarted || 0, 2);
-    run.driftBoostsReleased = Math.max(run.driftBoostsReleased || 0, 2);
-    run.driftDashesCompleted = Math.max(run.driftDashesCompleted || 0, 2);
-    run.driftBoostTime = Math.max(run.driftBoostTime || 0, 1.1);
-    run.driftDashTime = Math.max(run.driftDashTime || 0, 1.2);
-    run.driftLanesCrossed = Math.max(run.driftLanesCrossed || 0, 2.2);
-    run.longestDriftDashLanes = Math.max(run.longestDriftDashLanes || 0, 2.1);
+    run.driftsStarted = Math.max(run.driftsStarted || 0, 5);
+    run.driftBoostsReleased = Math.max(run.driftBoostsReleased || 0, 5);
+    run.driftDashesCompleted = Math.max(run.driftDashesCompleted || 0, 5);
+    run.driftBoostTime = Math.max(run.driftBoostTime || 0, 2.6);
+    run.driftDashTime = Math.max(run.driftDashTime || 0, 3.2);
+    run.driftLanesCrossed = Math.max(run.driftLanesCrossed || 0, 7.2);
+    run.longestDriftDashLanes = Math.max(run.longestDriftDashLanes || 0, 3.1);
     run.longestDrift = Math.max(run.longestDrift || 0, 1.05);
     run.maxDriftCharge = Math.max(run.maxDriftCharge || 0, 1.05);
     run.maxDriftHold = Math.max(run.maxDriftHold || 0, 1.05);
     run.driftNearMisses = 0;
+    run.crashesWhileDrifting = 0;
+    run.boostPadsCollected = Math.max(run.boostPadsCollected || 0, 3);
+    run.boostPadsReachableSeen = Math.max(run.boostPadsReachableSeen || 0, 3);
+    run.rampsUsed = Math.max(run.rampsUsed || 0, 2);
+    run.rampTargetsCleared = Math.max(run.rampTargetsCleared || 0, 2);
     run.slowdownHits = 0;
     app.endRace("finished", "Drift Browser Smoke Finish");
   });
@@ -358,6 +363,9 @@ async function forceFinishWithDriftNote(page) {
   const text = await bodyText(page);
   assertIncludes(text, "Official Race Result");
   assertIncludes(text, "Big drift cut");
+  assertIncludes(text, "Drift Badge");
+  assertIncludes(text, "First Drift Dash");
+  assertIncludes(text, "More Rewards");
   const summary = await page.evaluate(() => {
     const result = window.neonRoadRally.lastSummary || {};
     return {
@@ -372,10 +380,13 @@ async function forceFinishWithDriftNote(page) {
       maxDriftHold: Number((result.maxDriftHold || 0).toFixed(3)),
       driftLanesCrossed: Number((result.driftLanesCrossed || 0).toFixed(3)),
       longestDriftDashLanes: Number((result.longestDriftDashLanes || 0).toFixed(3)),
-      raceTypeId: result.raceTypeId || ""
+      raceTypeId: result.raceTypeId || "",
+      newlyEarnedBadges: (result.newlyEarnedBadges || []).map((badge) => badge.id)
     };
   });
   assert(summary.driftResultNote === "Big drift cut", "Result summary should keep the drift dash note", { summary });
+  assert(summary.newlyEarnedBadges.includes("first_drift_dash"), "Drift badge should unlock during browser smoke", { summary });
+  assert(summary.newlyEarnedBadges.includes("big_drift_cut"), "Big Drift Cut badge should unlock during browser smoke", { summary });
   return summary;
 }
 
