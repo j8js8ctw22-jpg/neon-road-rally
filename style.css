@@ -2320,6 +2320,20 @@ button:disabled {
   margin-bottom: 7px;
 }
 
+.official-race-lock-panel {
+  border-color: rgba(255, 228, 94, 0.48);
+  background:
+    linear-gradient(135deg, rgba(255, 228, 94, 0.12), rgba(68, 255, 153, 0.06)),
+    rgba(5, 8, 20, 0.58);
+}
+
+.official-endurance-result-panel {
+  border-color: rgba(68, 255, 153, 0.42);
+  background:
+    linear-gradient(135deg, rgba(68, 255, 153, 0.11), rgba(255, 63, 209, 0.06)),
+    rgba(5, 8, 20, 0.58);
+}
+
 .result-improvement-list span {
   display: grid;
   gap: 3px;

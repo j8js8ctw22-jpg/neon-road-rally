@@ -5005,6 +5005,20 @@ function getOfficialEndurancePressureMultiplier(run) {
   return clamp(1 + (getOfficialEnduranceLapNumber(run) - 1) * 0.12, 1, 1.56);
 }
 
+function getOfficialEnduranceHudContextParts(run, progress = 0) {
+  if (!isOfficialEnduranceRun(run)) return null;
+  const officialTimeText = run.officialFinishTimeMs !== null && run.officialFinishTimeMs !== undefined
+    ? formatFinishTimeMs(run.officialFinishTimeMs)
+    : "LOCKED";
+  return [
+    `OFFICIAL ${officialTimeText} LOCKED`,
+    `LAP ${getOfficialEnduranceLapNumber(run)} ${Math.round(clamp(progress, 0, 1) * 100)}%`,
+    `SURVIVE ${formatTime(run.officialEnduranceSurvivalTime || 0)}`,
+    `BOOST ${Math.max(0, run.manualBoosts || 0)}/3`,
+    "ESC ENDS"
+  ];
+}
+
 function getCountdownLabel(timer) {
   if (timer <= 0) return "";
   if (timer <= ARCADE_FEEL.countdownGoSeconds) return "GO";
@@ -19103,12 +19117,8 @@ class Renderer {
     ctx.font = "700 11px Trebuchet MS, Verdana, sans-serif";
     const sectionLabel = String(run.currentSectionLabel || getTrackSection(run.track, progress).label || "").toUpperCase();
     const contextParts = enduranceRun
-      ? [`LAP ${getOfficialEnduranceLapNumber(run)}`, `${Math.round(progress * 100)}%`, "OFFICIAL TIME LOCKED"]
+      ? getOfficialEnduranceHudContextParts(run, progress)
       : [`${Math.round(progress * 100)}%`, sectionLabel];
-    if (enduranceRun && run.officialFinishTimeMs !== null && run.officialFinishTimeMs !== undefined) {
-      contextParts.push(formatFinishTimeMs(run.officialFinishTimeMs));
-      contextParts.push(`SURVIVE ${formatTime(run.officialEnduranceSurvivalTime || 0)}`);
-    }
     if (run.paceFeedbackText && run.comparableBestTimeMs !== null) {
       contextParts.push(`PB PACE ${String(run.paceFeedbackText).toUpperCase()}`);
     }
@@ -21149,6 +21159,10 @@ class NeonRoadRally {
       officialEndurancePostScoreStart: 0,
       officialEndurancePostScore: 0,
       officialEndurancePostBoostsUsedStart: 0,
+      officialEndurancePostNearMissesStart: 0,
+      officialEndurancePostDriftsStartedStart: 0,
+      officialEndurancePostDriftDashesStart: 0,
+      officialEndurancePostDriftBoostsStart: 0,
       officialEnduranceLapSeed: "",
       officialEnduranceLapSeedHash: 0,
       officialEnduranceLastLapNotice: "",
@@ -22542,14 +22556,18 @@ class NeonRoadRally {
     run.officialEndurancePostScoreStart = run.score;
     run.officialEndurancePostScore = 0;
     run.officialEndurancePostBoostsUsedStart = run.manualBoostsUsed || 0;
+    run.officialEndurancePostNearMissesStart = run.nearMisses || 0;
+    run.officialEndurancePostDriftsStartedStart = run.driftsStarted || 0;
+    run.officialEndurancePostDriftDashesStart = run.driftDashesCompleted || 0;
+    run.officialEndurancePostDriftBoostsStart = run.driftBoostsReleased || 0;
     run.officialEnduranceEndReason = "";
     run.officialRouteSeedLocked = false;
     run.routeSeedLocked = false;
     this.resetOfficialEnduranceLapState(run, 2, 0);
     run.finishFlashTimer = Math.max(run.finishFlashTimer || 0, ARCADE_FEEL.finishFlashSeconds);
     run.finishStripeTimer = Math.max(run.finishStripeTimer || 0, ARCADE_FEEL.finishStripeMs / 1000);
-    run.officialEnduranceLastLapNotice = "Lap 2 / Keep Going";
-    this.showRaceStateCallout("LAP 2 / KEEP GOING", "hot", 2.25, { replace: true });
+    run.officialEnduranceLastLapNotice = "Lap 2 / Bonus Survival";
+    this.showRaceStateCallout("LAP 2 / BONUS SURVIVAL", "hot", 1.8, { replace: true });
     this.addFloatingScoreText("LAP 2", {
       color: "#ffe45e",
       size: 24,
@@ -22590,8 +22608,8 @@ class NeonRoadRally {
     this.resetOfficialEnduranceLapState(run, nextLap, carryDistance);
     run.finishFlashTimer = Math.max(run.finishFlashTimer || 0, ARCADE_FEEL.finishFlashSeconds * 0.75);
     run.finishStripeTimer = Math.max(run.finishStripeTimer || 0, ARCADE_FEEL.finishStripeMs / 1000);
-    run.officialEnduranceLastLapNotice = `Lap ${nextLap} / Keep Going`;
-    this.showRaceStateCallout(`LAP ${nextLap} / KEEP GOING`, "hot", 1.8, { replace: true });
+    run.officialEnduranceLastLapNotice = `Lap ${nextLap} / Bonus Survival`;
+    this.showRaceStateCallout(`LAP ${nextLap} / BONUS SURVIVAL`, "hot", 1.55, { replace: true });
     this.addFloatingScoreText(`LAP ${nextLap}`, {
       color: "#ffe45e",
       size: 23,
@@ -22665,6 +22683,10 @@ class NeonRoadRally {
       totalDistance: finishDistance + postFinishDistance,
       postFinishScore,
       postFinishBoostsUsed: Math.max(0, (run?.manualBoostsUsed || 0) - (run?.officialEndurancePostBoostsUsedStart || 0)),
+      postFinishNearMisses: Math.max(0, (run?.nearMisses || 0) - (run?.officialEndurancePostNearMissesStart || 0)),
+      postFinishDriftsStarted: Math.max(0, (run?.driftsStarted || 0) - (run?.officialEndurancePostDriftsStartedStart || 0)),
+      postFinishDriftDashes: Math.max(0, (run?.driftDashesCompleted || 0) - (run?.officialEndurancePostDriftDashesStart || 0)),
+      postFinishDriftBoosts: Math.max(0, (run?.driftBoostsReleased || 0) - (run?.officialEndurancePostDriftBoostsStart || 0)),
       officialFinishTimeMs: officialSummary.finishTimeMs ?? run?.officialFinishTimeMs ?? null,
       officialFinishScore: officialSummary.finalScore ?? run?.officialFinishScore ?? 0
     };
@@ -30563,24 +30585,45 @@ class NeonRoadRally {
     renderOfficialEnduranceResultPanel(summary) {
       const result = summary?.officialEnduranceResult || null;
       if (!result) return "";
+      const officialSummary = summary.officialFinishSummary || summary;
       const officialTime = result.officialFinishTimeMs !== null && result.officialFinishTimeMs !== undefined
         ? formatFinishTimeMs(result.officialFinishTimeMs)
         : (summary.finishTimeMs !== null && summary.finishTimeMs !== undefined ? formatFinishTimeMs(summary.finishTimeMs) : "Locked");
+      const timeAttackText = this.getTimeAttackPlacementText(officialSummary);
+      const pbDeltaText = formatPersonalBestTimeDeltaText(officialSummary);
+      const scoreAttackText = this.getScoreAttackPlacementText(officialSummary);
+      const lapReached = Math.max(2, result.currentLap || result.lapsCompleted || 2);
+      const enduranceLapsText = result.enduranceLapsCompleted > 0
+        ? `${result.enduranceLapsCompleted} bonus lap${result.enduranceLapsCompleted === 1 ? "" : "s"} cleared`
+        : "Bonus chase started";
       const bestText = result.newBest
         ? `New best: ${formatTime(result.survivalTime)}`
         : `Best: ${formatTime(result.bestSurvivalTime || result.survivalTime)}`;
       const distanceText = `${Math.round(result.postFinishDistance || 0).toLocaleString()} post / ${Math.round(result.totalDistance || 0).toLocaleString()} total`;
+      const endingText = result.endedBy === "Escape" ? "Ended by player" : `Ended by ${result.endedBy || "the road"}`;
+      const boostText = `${Math.max(0, result.postFinishBoostsUsed || 0)} boost${Math.max(0, result.postFinishBoostsUsed || 0) === 1 ? "" : "s"} used`;
+      const driftText = `${Math.max(0, result.postFinishDriftDashes || 0)} drift dash${Math.max(0, result.postFinishDriftDashes || 0) === 1 ? "" : "es"}`;
       return `
-        <div class="result-improvement-panel official-endurance-result-panel">
-          <span class="eyebrow">Official Race Result + Endurance</span>
+        <div class="result-improvement-panel official-race-lock-panel">
+          <span class="eyebrow">Official Race Locked</span>
           <div class="result-improvement-list">
-            <span><strong>Official Time</strong><em>${escapeHtml(officialTime)}</em></span>
+            <span><strong>First Finish</strong><em>${escapeHtml(officialTime)}</em></span>
+            <span><strong>Time Attack</strong><em>${escapeHtml(timeAttackText)}</em></span>
+            <span><strong>PB Delta</strong><em>${escapeHtml(pbDeltaText)}</em></span>
             <span><strong>Official Score</strong><em>${formatScore(result.officialFinishScore || summary.finalScore || 0)}</em></span>
-            <span><strong>Laps Survived</strong><em>${Math.max(1, result.lapsCompleted || 1)} lap${Math.max(1, result.lapsCompleted || 1) === 1 ? "" : "s"}</em></span>
+            <span><strong>Score Attack</strong><em>${escapeHtml(scoreAttackText)}</em></span>
+          </div>
+        </div>
+        <div class="result-improvement-panel official-endurance-result-panel">
+          <span class="eyebrow">Bonus Survival</span>
+          <div class="result-improvement-list">
             <span><strong>Survival</strong><em>${escapeHtml(formatTime(result.survivalTime || 0))}</em></span>
-            <span><strong>Post-Finish Score</strong><em>${formatScore(result.postFinishScore || 0)}</em></span>
+            <span><strong>Stage Reached</strong><em>${escapeHtml(`Reached Lap ${lapReached} · ${enduranceLapsText}`)}</em></span>
+            <span><strong>Ended By</strong><em>${escapeHtml(endingText)}</em></span>
+            <span><strong>Bonus Score</strong><em>${formatScore(result.postFinishScore || 0)}</em></span>
+            <span><strong>Near Misses</strong><em>${Math.max(0, result.postFinishNearMisses || 0).toLocaleString()}</em></span>
+            <span><strong>Boosts / Drifts</strong><em>${escapeHtml(`${boostText} · ${driftText}`)}</em></span>
             <span><strong>Distance</strong><em>${escapeHtml(distanceText)}</em></span>
-            <span><strong>Ended By</strong><em>${escapeHtml(result.endedBy || result.endReason || "Endurance Ended")}</em></span>
             <span><strong>Session Best</strong><em>${escapeHtml(bestText)}</em></span>
           </div>
         </div>
@@ -32031,6 +32074,7 @@ class NeonRoadRally {
     }
     const boostlineRun = isBoostlineRaceType(summary.raceTypeId);
     const enduranceResult = summary.officialEnduranceResult || null;
+    const officialSummaryForBoards = enduranceResult && summary.officialFinishSummary ? summary.officialFinishSummary : summary;
     const leaderboard = summary.officialRouteId
       ? this.getOfficialScoreAttackRows(summary.officialRouteId, { raceTypeId: summary.raceTypeId })
       : this.profiles.data.leaderboard
@@ -32052,13 +32096,13 @@ class NeonRoadRally {
     const bestTimeText = summary.bestTimeMs !== null && summary.bestTimeMs !== undefined
       ? formatFinishTimeMs(summary.bestTimeMs)
       : "No saved best";
-    const paceDeltaText = formatPersonalBestTimeDeltaText(summary);
+    const paceDeltaText = formatPersonalBestTimeDeltaText(officialSummaryForBoards);
     const status = normalizeRunStatus(summary.status);
     const progressPercent = Math.round(clamp((summary.distance || 0) / Math.max(1, summary.trackDistance || 1), 0, 1) * 100);
     const resultHeadline = summary.challengeMode
       ? (summary.challengeResult?.completed ? "Challenge Complete" : "Challenge Failed")
       : (enduranceResult
-        ? "Official Time Locked"
+        ? "Official Race Locked"
         : status === "crashed"
         ? (boostlineRun ? "Boostline Run Over" : "Run Over")
         : summary.raceTypeId === PURSUIT_RACE_TYPE_ID
@@ -32068,7 +32112,7 @@ class NeonRoadRally {
       const outcomeDetail = summary.raceTypeId === PURSUIT_RACE_TYPE_ID
         ? this.getPursuitOutcomeDetail(summary, progressPercent, resultTimeText, crashReason)
         : (enduranceResult
-          ? `Official finish saved at ${resultTimeText}. Endurance ended by ${enduranceResult.endedBy.toLowerCase()} after ${formatTime(enduranceResult.survivalTime)}.`
+          ? `Official race result is set at ${resultTimeText}. Bonus survival ended by ${enduranceResult.endedBy === "Escape" ? "the player" : enduranceResult.endedBy.toLowerCase()} after ${formatTime(enduranceResult.survivalTime)}.`
           : status === "finished"
           ? `Finished in ${resultTimeText}.`
           : (status === "outOfFuel"
@@ -32082,7 +32126,7 @@ class NeonRoadRally {
       ? "Challenge Run Result"
       : (summary.partyMode
         ? "Party Run Result"
-        : (enduranceResult ? "Official Race + Endurance Result" : (boostlineRun ? "Boostline Prototype Result" : (summary.officialRouteId ? "Official Race Result" : "Custom Road Result"))));
+        : (enduranceResult ? "Official Race Locked + Bonus Survival" : (boostlineRun ? "Boostline Prototype Result" : (summary.officialRouteId ? "Official Race Result" : "Custom Road Result"))));
     const officialRouteDisplayName = getOfficialRouteEntryDisplayName(summary);
     const routeLine = summary.officialRouteId
       ? `${officialRouteDisplayName} · Official route`
@@ -32090,27 +32134,27 @@ class NeonRoadRally {
     const setupLine = `${summary.trackName} · ${summary.raceTypeLabel || getRaceTypeLabel(summary.raceTypeId)} · ${summary.speedClassLabel}`;
     const timeAttackLabel = enduranceResult ? "Official Time" : (status === "finished" ? (boostlineRun ? "Finish Time" : "Time Attack") : "Progress");
     const timeAttackValue = enduranceResult || status === "finished" ? resultTimeText : `${progressPercent}%`;
-    const timeAttackPlacement = this.getTimeAttackPlacementText(enduranceResult && summary.officialFinishSummary ? summary.officialFinishSummary : summary);
+    const timeAttackPlacement = this.getTimeAttackPlacementText(officialSummaryForBoards);
     const timeAttackDetail = enduranceResult || status === "finished"
       ? `PB Delta: ${paceDeltaText}`
       : "No finish time";
-    const scoreAttackPlacement = this.getScoreAttackPlacementText(summary);
+    const scoreAttackPlacement = this.getScoreAttackPlacementText(officialSummaryForBoards);
     const scoreAttackDetail = summary.scoreSaved
       ? (summary.newPersonalBest ? "New score PB" : "Score saved locally")
       : "Debug run not saved";
-    const secondaryMetricLabel = enduranceResult ? "Endurance" : (boostlineRun ? "Boost Chain" : "Score Attack");
+    const secondaryMetricLabel = enduranceResult ? "Bonus Survival" : (boostlineRun ? "Boost Chain" : "Score Attack");
     const secondaryMetricValue = enduranceResult
-      ? `${enduranceResult.lapsCompleted} lap${enduranceResult.lapsCompleted === 1 ? "" : "s"}`
+      ? formatTime(enduranceResult.survivalTime || 0)
       : boostlineRun
       ? `x${Math.max(0, summary.bestBoostPadChain || 0)}`
       : formatScore(summary.finalScore);
     const secondaryMetricPlacement = enduranceResult
-      ? `${formatTime(enduranceResult.survivalTime)} after finish`
+      ? `Reached Lap ${Math.max(2, enduranceResult.currentLap || enduranceResult.lapsCompleted || 2)}`
       : boostlineRun
       ? `${Math.max(0, summary.boostPadsCollected || 0)} / ${Math.max(summary.boostPadsReachableSeen || 0, summary.boostPadsCollected || 0)} boosts`
       : scoreAttackPlacement;
     const secondaryMetricDetail = enduranceResult
-      ? `${formatScore(enduranceResult.postFinishScore)} post-finish score · ${enduranceResult.endReason}`
+      ? `${formatScore(enduranceResult.postFinishScore)} bonus score · ${enduranceResult.endedBy === "Escape" ? "Ended by player" : `Ended by ${enduranceResult.endedBy}`}`
       : boostlineRun
       ? `${Math.max(0, summary.rampTargetsCleared || 0)} / ${Math.max(summary.rampsUsed || 0, summary.rampTargetsCleared || 0)} ramps · ${summary.boostlineResultNote || getBoostlineResultNote(summary)}`
       : scoreAttackDetail;
@@ -32138,7 +32182,7 @@ class NeonRoadRally {
             </div>
             <div class="result-secondary-metric">
               <span>${escapeHtml(secondaryMetricLabel)}</span>
-              <strong ${boostlineRun ? "" : `id="finalScoreValue" class="tally-score"`}>${escapeHtml(secondaryMetricValue)}</strong>
+              <strong ${boostlineRun || enduranceResult ? "" : `id="finalScoreValue" class="tally-score"`}>${escapeHtml(secondaryMetricValue)}</strong>
               <small><b>${escapeHtml(secondaryMetricPlacement)}</b><em>${escapeHtml(secondaryMetricDetail)}</em></small>
             </div>
           </div>
@@ -32149,8 +32193,9 @@ class NeonRoadRally {
         <div class="row score-action-row">
           <button class="small-button primary" data-action="restart">${escapeHtml(restartLabel)}</button>
           ${summary.partyMode ? "" : `<button class="small-button" data-action="preRace">Change Route</button>`}
-          <button class="small-button" data-action="leaderboard" data-view="${LEADERBOARD_VIEW_TIME_ATTACK}" data-track-id="${escapeAttr(summary.trackId)}" data-race-type-id="${escapeAttr(summary.raceTypeId)}" data-speed-class-id="${escapeAttr(summary.speedClass)}" data-official-route-id="${escapeAttr(summary.officialRouteId || "")}">View Leaderboard</button>
-          ${boostlineRun ? "" : `<button class="small-button" data-action="leaderboard" data-view="${LEADERBOARD_VIEW_SCORE_ATTACK}" data-track-id="${escapeAttr(summary.trackId)}" data-race-type-id="${escapeAttr(summary.raceTypeId)}" data-speed-class-id="${escapeAttr(summary.speedClass)}" data-official-route-id="${escapeAttr(summary.officialRouteId || "")}">Score Board</button>`}
+          <button class="small-button" data-action="leaderboard" data-view="${LEADERBOARD_VIEW_TIME_ATTACK}" data-track-id="${escapeAttr(summary.trackId)}" data-race-type-id="${escapeAttr(summary.raceTypeId)}" data-speed-class-id="${escapeAttr(summary.speedClass)}" data-official-route-id="${escapeAttr(summary.officialRouteId || "")}">Time Attack Board</button>
+          ${boostlineRun ? "" : `<button class="small-button" data-action="leaderboard" data-view="${LEADERBOARD_VIEW_SCORE_ATTACK}" data-track-id="${escapeAttr(summary.trackId)}" data-race-type-id="${escapeAttr(summary.raceTypeId)}" data-speed-class-id="${escapeAttr(summary.speedClass)}" data-official-route-id="${escapeAttr(summary.officialRouteId || "")}">Score Attack Board</button>`}
+          <button class="small-button" data-action="players">Driver Garage</button>
           <button class="small-button" data-action="title">Back to Title</button>
         </div>
         <details class="result-details-block">
@@ -32161,19 +32206,21 @@ class NeonRoadRally {
           ${this.renderTitleCallouts(summary) || this.renderNewBadgeCallouts(summary) || this.renderChallengeCallouts(summary) ? `<div class="score-callout-row">${this.renderTitleCallouts(summary)}${this.renderNewBadgeCallouts(summary)}${this.renderChallengeCallouts(summary)}</div>` : ""}
           ${this.renderBadgeEarnedPanel(summary)}
           ${enduranceResult ? `
-            <h2>Official Race Result</h2>
+            <h2>Official Race Locked</h2>
             <div class="score-grid score-info-grid is-secondary">
               <div class="score-card"><strong>First Finish Time</strong><span>${escapeHtml(resultTimeText)}</span></div>
               <div class="score-card"><strong>Official Score</strong><span>${formatScore(enduranceResult.officialFinishScore || summary.finalScore || 0)}</span></div>
               <div class="score-card"><strong>Time Attack</strong><span class="is-compact">${escapeHtml(timeAttackPlacement)} · ${escapeHtml(paceDeltaText)}</span></div>
-              <div class="score-card"><strong>Score Attack</strong><span class="is-compact">${escapeHtml(leaderboardText)}</span></div>
+              <div class="score-card"><strong>Score Attack</strong><span class="is-compact">${escapeHtml(scoreAttackPlacement)}</span></div>
             </div>
-            <h2>Endurance Result</h2>
+            <h2>Bonus Survival Details</h2>
             <div class="score-grid score-info-grid is-secondary">
-              <div class="score-card"><strong>Laps Survived</strong><span>${Math.max(1, enduranceResult.lapsCompleted || 1)} lap${Math.max(1, enduranceResult.lapsCompleted || 1) === 1 ? "" : "s"}</span></div>
+              <div class="score-card"><strong>Stage Reached</strong><span>Lap ${Math.max(2, enduranceResult.currentLap || enduranceResult.lapsCompleted || 2)}</span></div>
               <div class="score-card"><strong>Survival After Finish</strong><span>${escapeHtml(formatTime(enduranceResult.survivalTime || 0))}</span></div>
-              <div class="score-card"><strong>Ended By</strong><span>${escapeHtml(enduranceResult.endedBy || enduranceResult.endReason || "Endurance Ended")}${enduranceResult.endReason && enduranceResult.endReason !== enduranceResult.endedBy ? ` · ${escapeHtml(enduranceResult.endReason)}` : ""}</span></div>
-              <div class="score-card"><strong>Post-Finish Score</strong><span>${formatScore(enduranceResult.postFinishScore || 0)}</span></div>
+              <div class="score-card"><strong>Ended By</strong><span>${escapeHtml(enduranceResult.endedBy === "Escape" ? "Player ended run" : (enduranceResult.endReason || enduranceResult.endedBy || "Endurance Ended"))}</span></div>
+              <div class="score-card"><strong>Bonus Score</strong><span>${formatScore(enduranceResult.postFinishScore || 0)}</span></div>
+              <div class="score-card"><strong>Near Misses</strong><span>${Math.max(0, enduranceResult.postFinishNearMisses || 0).toLocaleString()}</span></div>
+              <div class="score-card"><strong>Boosts / Drifts</strong><span class="is-compact">${Math.max(0, enduranceResult.postFinishBoostsUsed || 0)} boosts · ${Math.max(0, enduranceResult.postFinishDriftDashes || 0)} drift dashes</span></div>
               <div class="score-card"><strong>Distance</strong><span class="is-compact">${Math.round(enduranceResult.postFinishDistance || 0).toLocaleString()} post-finish / ${Math.round(enduranceResult.totalDistance || 0).toLocaleString()} total</span></div>
               <div class="score-card"><strong>Session Best</strong><span class="is-compact">${escapeHtml(enduranceResult.newBest ? `New best ${formatTime(enduranceResult.survivalTime || 0)}` : `Best ${formatTime(enduranceResult.bestSurvivalTime || enduranceResult.survivalTime || 0)}`)}</span></div>
             </div>

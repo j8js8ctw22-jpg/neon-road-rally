@@ -209,6 +209,54 @@ async function main() {
         return { app, route };
       }
 
+      function stripHtml(html) {
+        return String(html || "")
+          .replace(/<script[\\s\\S]*?<\\/script>/gi, " ")
+          .replace(/<style[\\s\\S]*?<\\/style>/gi, " ")
+          .replace(/<[^>]*>/g, " ")
+          .replace(/&nbsp;/g, " ")
+          .replace(/&amp;/g, "&")
+          .replace(/&lt;/g, "<")
+          .replace(/&gt;/g, ">")
+          .replace(/\\s+/g, " ")
+          .trim();
+      }
+
+      function renderScoreCopy(app) {
+        app.showScoreScreen();
+        return stripHtml(app.layer.innerHTML);
+      }
+
+      function assertCopyIncludes(copy, expected, message) {
+        assert(
+          copy.includes(expected),
+          message + " missing " + JSON.stringify(expected) + " in " + JSON.stringify(copy.slice(0, 800))
+        );
+      }
+
+      function assertCopyExcludes(copy, unexpected, message) {
+        assert(
+          !copy.includes(unexpected),
+          message + " should not include " + JSON.stringify(unexpected) + " in " + JSON.stringify(copy.slice(0, 800))
+        );
+      }
+
+      function assertPlayerCopyClean(copy, message) {
+        const lowerCopy = String(copy || "").toLowerCase();
+        [
+          "locked snapshot",
+          "schema",
+          "routesignature",
+          "route signature",
+          "progress hash",
+          "signature hash",
+          "post-finish write",
+          "debug"
+        ].forEach((term) => {
+          assert(!lowerCopy.includes(term), message + " should avoid player-facing debug term " + term);
+        });
+      }
+
       function finishFirstLap(app) {
         const beforeLeaderboardCount = app.profiles.data.leaderboard.length;
         app.handleFinishLineCrossing();
@@ -234,11 +282,35 @@ async function main() {
         };
       }
 
+      const preFinishCrash = startOfficialClassicRun();
+      preFinishCrash.app.run.elapsed = 12.345;
+      preFinishCrash.app.run.distance = preFinishCrash.app.run.track.distanceToFinish * 0.36;
+      preFinishCrash.app.endRace("crashed", "Traffic");
+      assert.strictEqual(preFinishCrash.app.lastSummary.officialEnduranceResult, undefined, "Crash before first finish should not create an endurance result");
+      const preFinishCrashCopy = renderScoreCopy(preFinishCrash.app);
+      assertCopyIncludes(preFinishCrashCopy, "Official Race Result", "Pre-finish crash result");
+      assertCopyIncludes(preFinishCrashCopy, "Run Over", "Pre-finish crash result");
+      assertCopyExcludes(preFinishCrashCopy, "Official Race Locked", "Pre-finish crash result");
+      assertCopyExcludes(preFinishCrashCopy, "Bonus Survival", "Pre-finish crash result");
+      assertCopyExcludes(preFinishCrashCopy, "Endurance Result", "Pre-finish crash result");
+      assertPlayerCopyClean(preFinishCrashCopy, "Pre-finish crash result");
+
       const first = startOfficialClassicRun();
       const signatureBefore = first.app.getOfficialFullRouteSignature(first.route, DEFAULT_RACE_TYPE_ID).hash;
       const official = finishFirstLap(first.app);
+      const hudCopy = getOfficialEnduranceHudContextParts(first.app.run, 0.18).join(" ");
+      assertCopyIncludes(hudCopy, "OFFICIAL " + formatFinishTimeMs(official.officialFinishTimeMs) + " LOCKED", "Endurance HUD");
+      assertCopyIncludes(hudCopy, "LAP 2", "Endurance HUD");
+      assertCopyIncludes(hudCopy, "SURVIVE", "Endurance HUD");
+      assertCopyIncludes(hudCopy, "BOOST 3/3", "Endurance HUD");
+      assertCopyIncludes(hudCopy, "ESC ENDS", "Endurance HUD");
       first.app.run.elapsed += 8.25;
       first.app.run.score += 2400;
+      first.app.run.manualBoosts = 2;
+      first.app.run.manualBoostsUsed += 1;
+      first.app.run.nearMisses += 2;
+      first.app.run.driftDashesCompleted += 1;
+      first.app.run.driftBoostsReleased += 1;
       first.app.run.distance = 9000;
       first.app.updateOfficialEnduranceStats();
       assert.strictEqual(first.app.run.officialFinishTimeMs, official.officialFinishTimeMs, "Post-finish play should not mutate the official finish time");
@@ -249,6 +321,33 @@ async function main() {
       assert.strictEqual(first.app.lastSummary.finalScore, official.officialScore, "Escape result should still show first-lap official score");
       assert.strictEqual(first.app.lastSummary.officialEnduranceResult.endedBy, "Escape", "Escape should end the endurance portion");
       assert.strictEqual(first.app.lastSummary.officialEnduranceResult.officialFinishTimeMs, official.officialFinishTimeMs, "Endurance result should reference the locked official time");
+      assert.strictEqual(first.app.lastSummary.officialEnduranceResult.postFinishBoostsUsed, 1, "Escape endurance result should include post-finish boost usage");
+      assert.strictEqual(first.app.lastSummary.officialEnduranceResult.postFinishNearMisses, 2, "Escape endurance result should include post-finish near misses");
+      assert.strictEqual(first.app.lastSummary.officialEnduranceResult.postFinishDriftDashes, 1, "Escape endurance result should include post-finish drift dashes");
+      const escapeCopy = renderScoreCopy(first.app);
+      const escapeTimePlacement = first.app.getTimeAttackPlacementText(first.app.lastSummary.officialFinishSummary);
+      const escapeScorePlacement = first.app.getScoreAttackPlacementText(first.app.lastSummary.officialFinishSummary);
+      assertCopyIncludes(escapeCopy, "Official Race Locked", "Escape result");
+      assertCopyIncludes(escapeCopy, "Bonus Survival", "Escape result");
+      assertCopyIncludes(escapeCopy, "First Finish", "Escape result");
+      assertCopyIncludes(escapeCopy, formatFinishTimeMs(official.officialFinishTimeMs), "Escape result");
+      assertCopyIncludes(escapeCopy, formatScore(official.officialScore), "Escape result");
+      assertCopyIncludes(escapeCopy, "Time Attack", "Escape result");
+      assertCopyIncludes(escapeCopy, escapeTimePlacement, "Escape result");
+      assertCopyIncludes(escapeCopy, "PB Delta", "Escape result");
+      assertCopyIncludes(escapeCopy, "Score Attack", "Escape result");
+      assertCopyIncludes(escapeCopy, escapeScorePlacement, "Escape result");
+      assertCopyIncludes(escapeCopy, "Reached Lap 2", "Escape result");
+      assertCopyIncludes(escapeCopy, "Ended by player", "Escape result");
+      assertCopyIncludes(escapeCopy, "Bonus Score", "Escape result");
+      assertCopyIncludes(escapeCopy, "Near Misses", "Escape result");
+      assertCopyIncludes(escapeCopy, "Boosts / Drifts", "Escape result");
+      assertCopyIncludes(escapeCopy, "Race Again", "Escape result");
+      assertCopyIncludes(escapeCopy, "Change Route", "Escape result");
+      assertCopyIncludes(escapeCopy, "Time Attack Board", "Escape result");
+      assertCopyIncludes(escapeCopy, "Score Attack Board", "Escape result");
+      assertCopyIncludes(escapeCopy, "Driver Garage", "Escape result");
+      assertPlayerCopyClean(escapeCopy, "Escape result");
       const officialRows = first.app.getOfficialScoreAttackRows(first.route.id, { raceTypeId: DEFAULT_RACE_TYPE_ID });
       assert.strictEqual(officialRows.filter((row) => row.runId === official.officialRunId).length, 1, "Official score board should contain only the first-finish row for this run");
       const timeRows = first.app.getTimeAttackLeaderboardRows({
@@ -266,15 +365,26 @@ async function main() {
       crash.app.run.elapsed += 4.5;
       crash.app.run.distance = 12000;
       crash.app.run.score += 1500;
+      crash.app.run.nearMisses += 1;
       crash.app.updateOfficialEnduranceStats();
-      crash.app.endRace("crashed", "Debug Crash");
+      crash.app.endRace("crashed", "Barrier Crash");
       assert.strictEqual(crash.app.profiles.data.leaderboard.length, crashOfficial.leaderboardCount, "Crash after finish should not add a second leaderboard row");
       assert.strictEqual(crash.app.lastSummary.status, "crashed", "Crash should remain the final endurance end status");
       assert.strictEqual(crash.app.lastSummary.finishTimeMs, crashOfficial.officialFinishTimeMs, "Crash result should preserve the first-lap finish time");
       assert.strictEqual(crash.app.lastSummary.finalScore, crashOfficial.officialScore, "Crash result should preserve the first-lap official score");
       assert.strictEqual(crash.app.lastSummary.officialEnduranceResult.endedBy, "Crash", "Crash should be recorded as the endurance ending");
-      assert.strictEqual(crash.app.lastSummary.officialEnduranceResult.endReason, "Debug Crash", "Crash reason should be stored on endurance result");
+      assert.strictEqual(crash.app.lastSummary.officialEnduranceResult.endReason, "Barrier Crash", "Crash reason should be stored on endurance result");
       assert(crash.app.lastSummary.officialEnduranceResult.postFinishScore > 0, "Crash endurance result should track post-finish score separately");
+      assert.strictEqual(crash.app.lastSummary.officialEnduranceResult.postFinishNearMisses, 1, "Crash endurance result should include post-finish near misses");
+      const crashCopy = renderScoreCopy(crash.app);
+      assertCopyIncludes(crashCopy, "Official Race Locked", "Crash result");
+      assertCopyIncludes(crashCopy, "Bonus Survival", "Crash result");
+      assertCopyIncludes(crashCopy, formatFinishTimeMs(crashOfficial.officialFinishTimeMs), "Crash result");
+      assertCopyIncludes(crashCopy, formatScore(crashOfficial.officialScore), "Crash result");
+      assertCopyIncludes(crashCopy, "Ended by Crash", "Crash result");
+      assertCopyIncludes(crashCopy, "Barrier Crash", "Crash result");
+      assertCopyIncludes(crashCopy, "Reached Lap 2", "Crash result");
+      assertPlayerCopyClean(crashCopy, "Crash result");
 
       const boosts = startOfficialClassicRun();
       finishFirstLap(boosts.app);
