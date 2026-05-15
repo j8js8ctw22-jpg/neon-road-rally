@@ -22,7 +22,10 @@ const context = vm.createContext({
   },
   document: {
     activeElement: null,
-    body: { contains: () => false }
+    body: { contains: () => false },
+    getElementById: () => null,
+    querySelector: () => null,
+    querySelectorAll: () => []
   },
   navigator: {},
   performance: { now: () => 0 },
@@ -227,6 +230,11 @@ async function main() {
         return stripHtml(app.layer.innerHTML);
       }
 
+      function renderLeaderboardCopy(app, view, options = {}) {
+        app.showLeaderboard(view, options);
+        return stripHtml(app.layer.innerHTML);
+      }
+
       function assertCopyIncludes(copy, expected, message) {
         assert(
           copy.includes(expected),
@@ -246,6 +254,8 @@ async function main() {
         [
           "locked snapshot",
           "schema",
+          "migration",
+          "internal",
           "routesignature",
           "route signature",
           "progress hash",
@@ -259,6 +269,7 @@ async function main() {
 
       function finishFirstLap(app) {
         const beforeLeaderboardCount = app.profiles.data.leaderboard.length;
+        const beforeEnduranceLeaderboardCount = app.profiles.data.enduranceLeaderboard.length;
         app.handleFinishLineCrossing();
         app.renderer.run = app.run;
         assert.strictEqual(app.screen, "game", "Official Classic should remain in race after first finish");
@@ -269,6 +280,7 @@ async function main() {
         assert.strictEqual(app.run.officialEnduranceCompletedLaps, 1, "First finish should count as Lap 1 complete");
         assert.strictEqual(app.run.manualBoosts, 3, "Lap 2 should start with three fresh manual boosts");
         assert.strictEqual(app.profiles.data.leaderboard.length, beforeLeaderboardCount + 1, "First finish should record exactly one official score row");
+        assert.strictEqual(app.profiles.data.enduranceLeaderboard.length, beforeEnduranceLeaderboardCount, "First finish should not write endurance rows yet");
         assert.strictEqual(app.run.officialFinishTimeMs, 51234, "Official finish time should be captured from first finish");
         assert.strictEqual(app.run.officialFinishSummary.finishTimeMs, 51234, "Official finish snapshot should preserve first finish time");
         assert.strictEqual(app.lastSummary.finishTimeMs, 51234, "Last summary before endurance should be the normal official finish");
@@ -278,7 +290,8 @@ async function main() {
           officialFinishTimeMs: app.run.officialFinishTimeMs,
           officialScore: app.run.officialFinishScore,
           officialSummary: app.run.officialFinishSummary,
-          leaderboardCount: app.profiles.data.leaderboard.length
+          leaderboardCount: app.profiles.data.leaderboard.length,
+          enduranceLeaderboardCount: app.profiles.data.enduranceLeaderboard.length
         };
       }
 
@@ -287,12 +300,15 @@ async function main() {
       preFinishCrash.app.run.distance = preFinishCrash.app.run.track.distanceToFinish * 0.36;
       preFinishCrash.app.endRace("crashed", "Traffic");
       assert.strictEqual(preFinishCrash.app.lastSummary.officialEnduranceResult, undefined, "Crash before first finish should not create an endurance result");
+      assert.strictEqual(preFinishCrash.app.profiles.data.enduranceLeaderboard.length, 0, "Crash before first finish should not write an endurance leaderboard row");
       const preFinishCrashCopy = renderScoreCopy(preFinishCrash.app);
       assertCopyIncludes(preFinishCrashCopy, "Official Race Result", "Pre-finish crash result");
       assertCopyIncludes(preFinishCrashCopy, "Run Over", "Pre-finish crash result");
       assertCopyExcludes(preFinishCrashCopy, "Official Race Locked", "Pre-finish crash result");
       assertCopyExcludes(preFinishCrashCopy, "Bonus Survival", "Pre-finish crash result");
       assertCopyExcludes(preFinishCrashCopy, "Endurance Result", "Pre-finish crash result");
+      assertCopyExcludes(preFinishCrashCopy, "New Endurance Survival Rank", "Pre-finish crash result");
+      assertCopyExcludes(preFinishCrashCopy, "New Endurance Score Rank", "Pre-finish crash result");
       assertPlayerCopyClean(preFinishCrashCopy, "Pre-finish crash result");
 
       const first = startOfficialClassicRun();
@@ -317,6 +333,7 @@ async function main() {
       assert.strictEqual(first.app.run.officialFinishSummary.finalScore, official.officialScore, "Post-finish play should not mutate the official score snapshot");
       first.app.endOfficialEndurance("Driver Ended");
       assert.strictEqual(first.app.profiles.data.leaderboard.length, official.leaderboardCount, "Escape after finish should not create a second official score row");
+      assert.strictEqual(first.app.profiles.data.enduranceLeaderboard.length, official.enduranceLeaderboardCount + 1, "Escape after finish should write exactly one endurance row");
       assert.strictEqual(first.app.lastSummary.finishTimeMs, official.officialFinishTimeMs, "Escape result should still show first-lap official time");
       assert.strictEqual(first.app.lastSummary.finalScore, official.officialScore, "Escape result should still show first-lap official score");
       assert.strictEqual(first.app.lastSummary.officialEnduranceResult.endedBy, "Escape", "Escape should end the endurance portion");
@@ -324,6 +341,16 @@ async function main() {
       assert.strictEqual(first.app.lastSummary.officialEnduranceResult.postFinishBoostsUsed, 1, "Escape endurance result should include post-finish boost usage");
       assert.strictEqual(first.app.lastSummary.officialEnduranceResult.postFinishNearMisses, 2, "Escape endurance result should include post-finish near misses");
       assert.strictEqual(first.app.lastSummary.officialEnduranceResult.postFinishDriftDashes, 1, "Escape endurance result should include post-finish drift dashes");
+      assert.strictEqual(first.app.lastSummary.officialEnduranceResult.survivalRank, 1, "Escape endurance result should place on Survival board");
+      assert.strictEqual(first.app.lastSummary.officialEnduranceResult.scoreRank, 1, "Escape endurance result should place on Endurance Score board");
+      const escapeEnduranceRecord = first.app.profiles.data.enduranceLeaderboard[0];
+      assert.strictEqual(escapeEnduranceRecord.officialRouteId, first.route.id, "Endurance record should keep the official route");
+      assert.strictEqual(escapeEnduranceRecord.officialFinishTimeMs, official.officialFinishTimeMs, "Endurance record should keep the first finish time");
+      assert.strictEqual(escapeEnduranceRecord.officialFinishScore, official.officialScore, "Endurance record should keep the first-lap score");
+      assert.strictEqual(escapeEnduranceRecord.endedBy, "Escape", "Endurance record should store the player-ended reason");
+      assert.strictEqual(escapeEnduranceRecord.postFinishBoostsUsed, 1, "Endurance record should include post-finish boosts");
+      assert.strictEqual(escapeEnduranceRecord.postFinishNearMisses, 2, "Endurance record should include post-finish near misses");
+      assert.strictEqual(escapeEnduranceRecord.postFinishDriftDashes, 1, "Endurance record should include post-finish drift dashes");
       const escapeCopy = renderScoreCopy(first.app);
       const escapeTimePlacement = first.app.getTimeAttackPlacementText(first.app.lastSummary.officialFinishSummary);
       const escapeScorePlacement = first.app.getScoreAttackPlacementText(first.app.lastSummary.officialFinishSummary);
@@ -342,14 +369,19 @@ async function main() {
       assertCopyIncludes(escapeCopy, "Bonus Score", "Escape result");
       assertCopyIncludes(escapeCopy, "Near Misses", "Escape result");
       assertCopyIncludes(escapeCopy, "Boosts / Drifts", "Escape result");
+      assertCopyIncludes(escapeCopy, "New Endurance Survival Rank", "Escape result");
+      assertCopyIncludes(escapeCopy, "New Endurance Score Rank", "Escape result");
       assertCopyIncludes(escapeCopy, "Race Again", "Escape result");
       assertCopyIncludes(escapeCopy, "Change Route", "Escape result");
       assertCopyIncludes(escapeCopy, "Time Attack Board", "Escape result");
       assertCopyIncludes(escapeCopy, "Score Attack Board", "Escape result");
+      assertCopyIncludes(escapeCopy, "Endurance Survival Board", "Escape result");
+      assertCopyIncludes(escapeCopy, "Endurance Score Board", "Escape result");
       assertCopyIncludes(escapeCopy, "Driver Garage", "Escape result");
       assertPlayerCopyClean(escapeCopy, "Escape result");
       const officialRows = first.app.getOfficialScoreAttackRows(first.route.id, { raceTypeId: DEFAULT_RACE_TYPE_ID });
       assert.strictEqual(officialRows.filter((row) => row.runId === official.officialRunId).length, 1, "Official score board should contain only the first-finish row for this run");
+      assert.strictEqual(officialRows.find((row) => row.runId === official.officialRunId).score, official.officialScore, "Score Attack row should use the first-lap score only");
       const timeRows = first.app.getTimeAttackLeaderboardRows({
         trackId: first.route.trackId,
         raceTypeId: DEFAULT_RACE_TYPE_ID,
@@ -360,6 +392,30 @@ async function main() {
       const signatureAfter = first.app.getOfficialFullRouteSignature(first.route, DEFAULT_RACE_TYPE_ID).hash;
       assert.strictEqual(signatureAfter, signatureBefore, "Post-finish endurance should not change the first-lap full-route signature");
 
+      const survivalBoardCopy = renderLeaderboardCopy(first.app, LEADERBOARD_VIEW_ENDURANCE_SURVIVAL, { officialRouteId: first.route.id });
+      assertCopyIncludes(survivalBoardCopy, "Official Time Attack", "Endurance Survival leaderboard");
+      assertCopyIncludes(survivalBoardCopy, "Official Score Attack", "Endurance Survival leaderboard");
+      assertCopyIncludes(survivalBoardCopy, "Endurance Survival", "Endurance Survival leaderboard");
+      assertCopyIncludes(survivalBoardCopy, "Endurance Score", "Endurance Survival leaderboard");
+      assertCopyIncludes(survivalBoardCopy, "Endurance Survival Board", "Endurance Survival leaderboard");
+      assertCopyIncludes(survivalBoardCopy, getOfficialRouteDisplayName(first.route), "Endurance Survival leaderboard");
+      assertCopyIncludes(survivalBoardCopy, "Official Classic", "Endurance Survival leaderboard");
+      assertCopyIncludes(survivalBoardCopy, "First finish", "Endurance Survival leaderboard");
+      assertCopyIncludes(survivalBoardCopy, "Ended by player", "Endurance Survival leaderboard");
+      assertPlayerCopyClean(survivalBoardCopy, "Endurance Survival leaderboard");
+      const enduranceScoreBoardCopy = renderLeaderboardCopy(first.app, LEADERBOARD_VIEW_ENDURANCE_SCORE, { officialRouteId: first.route.id });
+      assertCopyIncludes(enduranceScoreBoardCopy, "Endurance Score Board", "Endurance Score leaderboard");
+      assertCopyIncludes(enduranceScoreBoardCopy, formatScore(first.app.lastSummary.officialEnduranceResult.postFinishScore), "Endurance Score leaderboard");
+      assertPlayerCopyClean(enduranceScoreBoardCopy, "Endurance Score leaderboard");
+      const timeBoardCopy = renderLeaderboardCopy(first.app, LEADERBOARD_VIEW_TIME_ATTACK, { officialRouteId: first.route.id });
+      assertCopyIncludes(timeBoardCopy, "Official Time Attack", "Time Attack leaderboard");
+      assertCopyIncludes(timeBoardCopy, formatFinishTimeMs(official.officialFinishTimeMs), "Time Attack leaderboard");
+      assertPlayerCopyClean(timeBoardCopy, "Time Attack leaderboard");
+      const scoreBoardCopy = renderLeaderboardCopy(first.app, LEADERBOARD_VIEW_SCORE_ATTACK, { officialRouteId: first.route.id });
+      assertCopyIncludes(scoreBoardCopy, "Official Score Attack", "Score Attack leaderboard");
+      assertCopyIncludes(scoreBoardCopy, formatScore(official.officialScore), "Score Attack leaderboard");
+      assertPlayerCopyClean(scoreBoardCopy, "Score Attack leaderboard");
+
       const crash = startOfficialClassicRun();
       const crashOfficial = finishFirstLap(crash.app);
       crash.app.run.elapsed += 4.5;
@@ -369,6 +425,7 @@ async function main() {
       crash.app.updateOfficialEnduranceStats();
       crash.app.endRace("crashed", "Barrier Crash");
       assert.strictEqual(crash.app.profiles.data.leaderboard.length, crashOfficial.leaderboardCount, "Crash after finish should not add a second leaderboard row");
+      assert.strictEqual(crash.app.profiles.data.enduranceLeaderboard.length, crashOfficial.enduranceLeaderboardCount + 1, "Crash after finish should write exactly one endurance row");
       assert.strictEqual(crash.app.lastSummary.status, "crashed", "Crash should remain the final endurance end status");
       assert.strictEqual(crash.app.lastSummary.finishTimeMs, crashOfficial.officialFinishTimeMs, "Crash result should preserve the first-lap finish time");
       assert.strictEqual(crash.app.lastSummary.finalScore, crashOfficial.officialScore, "Crash result should preserve the first-lap official score");
@@ -376,6 +433,9 @@ async function main() {
       assert.strictEqual(crash.app.lastSummary.officialEnduranceResult.endReason, "Barrier Crash", "Crash reason should be stored on endurance result");
       assert(crash.app.lastSummary.officialEnduranceResult.postFinishScore > 0, "Crash endurance result should track post-finish score separately");
       assert.strictEqual(crash.app.lastSummary.officialEnduranceResult.postFinishNearMisses, 1, "Crash endurance result should include post-finish near misses");
+      assert.strictEqual(crash.app.lastSummary.officialEnduranceResult.survivalRank, 1, "Crash endurance result should place on Survival board");
+      assert.strictEqual(crash.app.lastSummary.officialEnduranceResult.scoreRank, 1, "Crash endurance result should place on Endurance Score board");
+      assert.strictEqual(crash.app.profiles.data.enduranceLeaderboard[0].endedBy, "Crash", "Crash endurance row should store Crash as the board ending");
       const crashCopy = renderScoreCopy(crash.app);
       assertCopyIncludes(crashCopy, "Official Race Locked", "Crash result");
       assertCopyIncludes(crashCopy, "Bonus Survival", "Crash result");
@@ -384,6 +444,8 @@ async function main() {
       assertCopyIncludes(crashCopy, "Ended by Crash", "Crash result");
       assertCopyIncludes(crashCopy, "Barrier Crash", "Crash result");
       assertCopyIncludes(crashCopy, "Reached Lap 2", "Crash result");
+      assertCopyIncludes(crashCopy, "New Endurance Survival Rank", "Crash result");
+      assertCopyIncludes(crashCopy, "New Endurance Score Rank", "Crash result");
       assertPlayerCopyClean(crashCopy, "Crash result");
 
       const boosts = startOfficialClassicRun();
@@ -407,6 +469,13 @@ async function main() {
       });
       assert.strictEqual(fuelApp.run.raceTypeId, FUEL_RUN_RACE_TYPE_ID, "Fuel Run setup should remain Fuel Run");
       assert.strictEqual(fuelApp.canStartOfficialEnduranceAtFinish(fuelApp.run), false, "Fuel Run should not start Official Endurance");
+      fuelApp.run.countdownTimer = 0;
+      fuelApp.run.raceActive = true;
+      fuelApp.run.elapsed = 33;
+      fuelApp.run.distance = fuelApp.run.track.distanceToFinish;
+      fuelApp.endRace("finished", "Finished");
+      assert.strictEqual(fuelApp.profiles.data.enduranceLeaderboard.length, 0, "Fuel Run should not write endurance leaderboard rows");
+      assert.strictEqual(fuelApp.lastSummary.officialEnduranceResult, undefined, "Fuel Run should not create endurance results");
 
       const partyApp = makeApp();
       partyApp.startRace({
@@ -418,6 +487,138 @@ async function main() {
       });
       assert.strictEqual(partyApp.run.partyMode, true, "Party setup should remain Party");
       assert.strictEqual(partyApp.canStartOfficialEnduranceAtFinish(partyApp.run), false, "Party should not start Official Endurance");
+      partyApp.run.countdownTimer = 0;
+      partyApp.run.raceActive = true;
+      partyApp.run.elapsed = 21;
+      partyApp.run.distance = partyApp.run.track.distanceToFinish;
+      partyApp.endRace("finished", "Finished");
+      assert.strictEqual(partyApp.profiles.data.enduranceLeaderboard.length, 0, "Party should not write endurance leaderboard rows");
+      assert.strictEqual(partyApp.lastSummary.officialEnduranceResult, undefined, "Party should not create endurance results");
+
+      function recordSyntheticEndurance(app, route, data) {
+        return app.profiles.recordEnduranceResult({
+          recordId: data.recordId,
+          runId: data.runId || data.recordId,
+          playerName: data.playerName,
+          carName: "TEST CAR",
+          trackId: route.trackId,
+          trackName: getTrackById(route.trackId).name,
+          officialRouteId: route.id,
+          officialRouteName: route.name,
+          speedClass: route.speedClassId,
+          raceTypeId: DEFAULT_RACE_TYPE_ID,
+          officialSeed: route.seed,
+          seed: route.seed,
+          officialFinishTimeMs: data.officialFinishTimeMs,
+          officialFinishScore: data.officialFinishScore || 1000,
+          survivalTime: data.survivalTime,
+          currentLap: data.currentLap,
+          lapsCompleted: Math.max(1, data.currentLap - 1),
+          enduranceLapsCompleted: Math.max(0, data.currentLap - 2),
+          postFinishScore: data.postFinishScore,
+          endedBy: data.endedBy || "Crash",
+          endReason: data.endReason || "Barrier Crash",
+          date: data.date
+        });
+      }
+
+      const survivalRankingApp = makeApp();
+      [
+        ["A", 10, 2, 500, 50000],
+        ["B", 12, 2, 500, 50000],
+        ["C", 12, 3, 400, 50000],
+        ["D", 12, 3, 700, 52000],
+        ["E", 12, 3, 700, 49000]
+      ].forEach(([name, survivalTime, currentLap, postFinishScore, officialFinishTimeMs], index) => {
+        recordSyntheticEndurance(survivalRankingApp, first.route, {
+          recordId: "survival-" + name,
+          playerName: name,
+          survivalTime,
+          currentLap,
+          postFinishScore,
+          officialFinishTimeMs,
+          date: "2026-05-15T12:00:0" + index + ".000Z"
+        });
+      });
+      assert.deepStrictEqual(
+        survivalRankingApp.getOfficialEnduranceRows(first.route.id, LEADERBOARD_VIEW_ENDURANCE_SURVIVAL, { limit: 5 }).map((row) => row.playerName),
+        ["E", "D", "C", "B", "A"],
+        "Endurance Survival should rank by survival time, lap reached, bonus score, then official time"
+      );
+
+      const scoreRankingApp = makeApp();
+      [
+        ["A", 20, 2, 1000, 50000],
+        ["B", 10, 2, 1200, 50000],
+        ["C", 12, 2, 1200, 50000],
+        ["D", 12, 3, 1200, 53000],
+        ["E", 12, 3, 1200, 51000]
+      ].forEach(([name, survivalTime, currentLap, postFinishScore, officialFinishTimeMs], index) => {
+        recordSyntheticEndurance(scoreRankingApp, first.route, {
+          recordId: "score-" + name,
+          playerName: name,
+          survivalTime,
+          currentLap,
+          postFinishScore,
+          officialFinishTimeMs,
+          date: "2026-05-15T13:00:0" + index + ".000Z"
+        });
+      });
+      assert.deepStrictEqual(
+        scoreRankingApp.getOfficialEnduranceRows(first.route.id, LEADERBOARD_VIEW_ENDURANCE_SCORE, { limit: 5 }).map((row) => row.playerName),
+        ["E", "D", "C", "B", "A"],
+        "Endurance Score should rank by bonus score, survival time, lap reached, then official time"
+      );
+
+      const officialRankingApp = makeApp();
+      officialRankingApp.profiles.recordScore({
+        runId: "official-slower-high-score",
+        playerName: "SCORE LEADER",
+        carName: "TEST CAR",
+        trackId: first.route.trackId,
+        trackName: getTrackById(first.route.trackId).name,
+        speedClass: first.route.speedClassId,
+        raceMode: first.route.speedClassId,
+        raceType: DEFAULT_RACE_TYPE_ID,
+        pacingRulesVersion: getActivePacingRulesVersion(DEFAULT_RACE_TYPE_ID),
+        seed: first.route.seed,
+        officialRouteId: first.route.id,
+        score: 9000,
+        status: "finished",
+        finishTimeMs: 52000,
+        time: 52
+      });
+      officialRankingApp.profiles.recordScore({
+        runId: "official-faster-lower-score",
+        playerName: "TIME LEADER",
+        carName: "TEST CAR",
+        trackId: first.route.trackId,
+        trackName: getTrackById(first.route.trackId).name,
+        speedClass: first.route.speedClassId,
+        raceMode: first.route.speedClassId,
+        raceType: DEFAULT_RACE_TYPE_ID,
+        pacingRulesVersion: getActivePacingRulesVersion(DEFAULT_RACE_TYPE_ID),
+        seed: first.route.seed,
+        officialRouteId: first.route.id,
+        score: 7000,
+        status: "finished",
+        finishTimeMs: 49000,
+        time: 49
+      });
+      assert.strictEqual(
+        officialRankingApp.getOfficialScoreAttackRows(first.route.id, { raceTypeId: DEFAULT_RACE_TYPE_ID })[0].playerName,
+        "SCORE LEADER",
+        "Score Attack should still rank by first-lap official score"
+      );
+      assert.strictEqual(
+        officialRankingApp.getTimeAttackLeaderboardRows({
+          trackId: first.route.trackId,
+          raceTypeId: DEFAULT_RACE_TYPE_ID,
+          speedClassId: first.route.speedClassId
+        }, { legacy: false, limit: 5 }).filter((row) => row.officialRouteId === first.route.id)[0].playerName,
+        "TIME LEADER",
+        "Time Attack should still rank by first-finish time"
+      );
 
       const speedLap2 = getOfficialEnduranceSpeedMultiplier({
         officialEnduranceActive: true,
