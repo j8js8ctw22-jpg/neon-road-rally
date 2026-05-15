@@ -1237,6 +1237,51 @@ const LAUNCH_PACING_CONFIG = {
     rampWeightMultiplier: 0.38
   }
 };
+const OFFICIAL_OPENING_ACTIVITY_CONFIG = {
+  firstWindowSeconds: 10,
+  eligibleSpeedClassIds: ["turbo", "overdrive", "redline"],
+  minMeaningfulWavesFirst10BySpeedClass: {
+    turbo: 4,
+    overdrive: 4,
+    redline: 4
+  },
+  minRequiredLaneDecisionsFirst10BySpeedClass: {
+    turbo: 2,
+    overdrive: 2,
+    redline: 2
+  },
+  targetDecisionTimesBySpeedClass: {
+    turbo: [2.45, 4.85, 6.9, 7.75],
+    overdrive: [2.4, 4.75, 6.8, 7.75],
+    redline: [2.35, 4.75, 7.1, 8.0]
+  },
+  requiredLaneDecisionTimesBySpeedClass: {
+    turbo: [2.45, 7.0],
+    overdrive: [2.4, 6.9],
+    redline: [2.35, 7.1]
+  },
+  firstDecisionDeadlineSecondsBySpeedClass: {
+    turbo: 3.15,
+    overdrive: 2.75,
+    redline: 2.6
+  },
+  maxOpeningDeadScreenSecondsBySpeedClass: {
+    turbo: 2.5,
+    overdrive: 2.4,
+    redline: 2.35
+  },
+  maxOpeningNoInputSafeTimeBySpeedClass: {
+    turbo: 5.15,
+    overdrive: 5.05,
+    redline: 5
+  },
+  minWaveGapSecondsBySpeedClass: {
+    turbo: 1.3,
+    overdrive: 1.28,
+    redline: 1.35
+  },
+  correctionWindowPaddingSeconds: 0.35
+};
 const SPAWN_VISIBILITY_CONFIG = {
     revealBufferWorld: 1100,
     revealBufferSeconds: 0.65,
@@ -2900,48 +2945,51 @@ TRACKS.push(
     id: "blackout-run",
     name: "Blackout Run",
     description: "Nearly unlit precision racing where headlights, reflective paint, and sparse glints define the road.",
-    cardIdentity: "Dark, minimal precision road built around headlight cones, white/yellow lane paint, reflective edges, and clean silhouettes.",
+    cardIdentity: "Near-total darkness defined by reflective lane dashes, road studs, edge glints, and traffic lights cutting through black road.",
     recommendedModes: ["Classic", "Fuel Run", "Party Mode", "Turbo / Overdrive"],
     themeTags: ["dark", "headlights", "precision", "minimal"],
     visualTheme: {
       identity: "blackout-run",
-      skyTop: "#000103",
-      skyMid: "#02040a",
-      skyHorizon: "#070b12",
-      skyBottom: "#010205",
-      horizonGlow: "rgba(255, 244, 205, 0.06)",
+      skyTop: "#000000",
+      skyMid: "#000103",
+      skyHorizon: "#010308",
+      skyBottom: "#000102",
+      horizonGlow: "rgba(255, 244, 205, 0.035)",
       sunAlpha: 0,
-      roadOuter: "#010205",
-      roadInner: "#05070c",
-      roadShoulder: "#020307",
+      roadOuter: "#000000",
+      roadInner: "#010205",
+      roadCenter: "#000103",
+      roadShoulder: "#000102",
       edgeColor: "#f4f5f7",
       edgeAltColor: "#ffd36f",
       lanePrimary: "rgba(249, 250, 251, 0.96)",
       laneSecondary: "rgba(255, 211, 111, 0.86)",
       reflectorColor: "#ffffff",
-      speedStreakColor: "rgba(244, 245, 247, 0.24)",
+      speedStreakColor: "rgba(244, 245, 247, 0.18)",
       boostStreakColor: "rgba(125, 229, 255, 0.48)",
       finishLabel: "BLACKOUT",
       roadsidePrimaryLabel: "LOW",
       roadsideSecondaryLabels: ["BEAM", "LINE"],
-      sceneryDensity: 0.42,
-      roadDetailIntensity: 0.24,
-      speedStreakIntensity: 0.48,
+      sceneryDensity: 0.36,
+      roadDetailIntensity: 0.18,
+      speedStreakIntensity: 0.36,
+      blackoutRoad: true,
       blackoutScenery: true,
-      headlightCone: true,
+      blackoutObstacleSilhouettes: true,
+      lowBeamGlow: true,
       reflectiveObstacleEdges: true,
       sharpLaneMarkers: true,
       mountainSilhouetteColor: "rgba(0, 1, 4, 0.96)",
-      farMountainSilhouetteColor: "rgba(5, 7, 12, 0.88)",
-      guardrailColor: "rgba(244, 245, 247, 0.42)",
-      townLightColor: "rgba(255, 236, 176, 0.22)"
+      farMountainSilhouetteColor: "rgba(1, 2, 5, 0.9)",
+      guardrailColor: "rgba(244, 245, 247, 0.34)",
+      townLightColor: "rgba(255, 236, 176, 0.16)"
     }
   }),
   createNormalTrackVariant({
     id: "prism-highway",
     name: "Prism Highway",
     description: "A bright neon showpiece with magenta, cyan, violet, electric blue, and rainbow road ribbons.",
-    cardIdentity: "Colorful arcade showpiece with rainbow lane ribbons, pink/cyan glow, and fast surreal highway energy.",
+    cardIdentity: "Vivid rainbow road panels and prismatic lane ribbons with clean contrast for cars, pickups, boosts, and ramps.",
     recommendedModes: ["Classic", "Fuel Run", "Party Mode", "Turbo / Redline"],
     themeTags: ["rainbow", "neon", "arcade", "showpiece"],
     visualTheme: {
@@ -2952,9 +3000,10 @@ TRACKS.push(
       skyBottom: "#12092b",
       horizonGlow: "rgba(255, 58, 216, 0.34)",
       sunAlpha: 0.34,
-      roadOuter: "#150728",
-      roadInner: "#111d46",
-      roadShoulder: "#32105c",
+      roadOuter: "#4b0f58",
+      roadInner: "#1d4fa8",
+      roadCenter: "#1330a8",
+      roadShoulder: "#6e1a89",
       edgeColor: "#22f3ff",
       edgeAltColor: "#ff3edb",
       lanePrimary: "rgba(125, 244, 255, 0.9)",
@@ -2965,13 +3014,15 @@ TRACKS.push(
       finishLabel: "PRISM",
       roadsidePrimaryLabel: "PRISM",
       roadsideSecondaryLabels: ["GLOW", "FAST"],
-      sceneryDensity: 0.78,
-      roadDetailIntensity: 0.66,
-      speedStreakIntensity: 1.18,
+      sceneryDensity: 0.56,
+      roadDetailIntensity: 0.42,
+      speedStreakIntensity: 0.82,
       prismScenery: true,
-      prismRibbons: true,
+      prismRoadSurface: true,
+      prismRibbons: false,
       prismHorizon: true,
       sharpLaneMarkers: true,
+      prismLanePalette: ["#ff2d55", "#ff8a2a", "#ffe45e", "#44ff99", "#22f3ff", "#2f7dff", "#8b5cff", "#ff3edb"],
       skylineColor: "rgba(12, 8, 34, 0.7)",
       cityWindowColor: "rgba(34, 243, 255, 0.5)",
       guardrailColor: "rgba(255, 62, 219, 0.58)",
@@ -3090,6 +3141,10 @@ const ALL_OFFICIAL_ROUTES = OFFICIAL_ROUTES.concat(BOOSTLINE_PROTOTYPE_ROUTES);
 const DEFAULT_OFFICIAL_ROUTE_ID = "sunset-neon-palm-sprint";
 const OFFICIAL_ROUTE_ID_SET = new Set(ALL_OFFICIAL_ROUTES.map((route) => route.id));
 const OFFICIAL_ROUTE_SIGNATURE_VERSION = "official-route-spine-v3";
+const OFFICIAL_FULL_ROUTE_SIGNATURE_WAVE_LIMIT = 999;
+const OFFICIAL_FULL_ROUTE_SIGNATURE_DT = 0.36;
+const RUN_PROGRESS_SIGNATURE_SCOPE = "run-progress-last-40-waves";
+const OFFICIAL_FULL_ROUTE_SIGNATURE_SCOPE = "official-full-route";
 const OFFICIAL_ROUTE_DISPLAY_NAME_OVERRIDES = {
   "sunset-boostline-pier": "Pier Boost Sprint",
   "redline-switchyard-boostline": "Switchyard Charge"
@@ -3443,7 +3498,7 @@ const FUEL_RUN_CONFIG = {
 const FUEL_CAN_REACHABILITY_CONFIG = {
   approachSeconds: 1.08,
   approachMinDistance: 520,
-  approachMaxDistance: 880,
+  approachMaxDistance: 1800,
   collectClearBefore: 360,
   collectClearAfter: 170,
   sameLaneHardClearBefore: 520,
@@ -3452,7 +3507,7 @@ const FUEL_CAN_REACHABILITY_CONFIG = {
   nearbyClearAfter: 210,
   escapeLookaheadSeconds: 0.62,
   escapeLookaheadMinDistance: 360,
-  escapeLookaheadMaxDistance: 680,
+  escapeLookaheadMaxDistance: 2200,
   exitLaneClearBefore: 70,
   routeSampleStep: 120,
   routeTimingBufferSeconds: 0.16,
@@ -3461,6 +3516,26 @@ const FUEL_CAN_REACHABILITY_CONFIG = {
   highDensityAdjacentEscapeHardBlockers: 2,
   maxNearbyHardBlockers: 3,
   maxLaneNeighborhoodHardBlockers: 2
+};
+
+const OFFICIAL_FUEL_VIABILITY_CONFIG = {
+  minimumFinishReserveFuel: 8,
+  simulatedPickupEfficiency: 0.85,
+  midpointProgress: 0.5,
+  lateProgress: 0.72,
+  minPostMidpointOpportunities: 1,
+  minLateOpportunities: 1,
+  minTotalOpportunitiesBySpeedClass: {
+    turbo: 3,
+    overdrive: 4,
+    redline: 4
+  },
+  lateFuelThresholdPadding: 4,
+  recoveryRejectStreak: 1,
+  generalRecoveryRejectStreak: 3,
+  recoveryRevealBuffer: 180,
+  recoveryWindowClearAfter: 760,
+  maxNoFuelStretchPaddingSeconds: 4
 };
 
 const PURSUIT_CONFIG = {
@@ -3711,22 +3786,22 @@ const SPEED_TUNING = {
 };
 
 const DRIFT_TUNING = {
-  minChargeSeconds: 0.15,
-  maxChargeSeconds: 1.05,
-  minBoostDuration: 0.45,
-  maxBoostDuration: 0.9,
-  minBoostMultiplier: 1.06,
-  maxBoostMultiplier: 1.16,
-  releaseCooldownSeconds: 0.2,
+  minChargeSeconds: 0.12,
+  maxChargeSeconds: 0.55,
+  minBoostDuration: 0.3,
+  maxBoostDuration: 0.62,
+  minBoostMultiplier: 1.04,
+  maxBoostMultiplier: 1.1,
+  releaseCooldownSeconds: 0.18,
   leanLaneOffset: 0.08,
   dangerLaneReach: 0.48,
   releaseBurstSeconds: 0.32,
   skidSparkSeconds: 0.16,
   fullChargeCueSeconds: 0.24,
-  dashLanesPerSecond: 4.2,
-  fullBoostDashLanes: 2,
-  minBoostDashLanes: 0.14,
-  initialDashSeconds: 0.075,
+  dashLanesPerSecond: 9.2,
+  fullBoostDashLanes: 3,
+  minBoostDashLanes: 0.18,
+  initialDashSeconds: 0.09,
   settleMajorityThreshold: 0.51
 };
 
@@ -3787,6 +3862,39 @@ const TRACK_VISUALS = {
   scenerySpacing: 260,
   finalStretchStart: 0.78,
   bottomCarMargin: 12
+};
+
+const TRACK_RENDER_BUDGETS = {
+  default: {
+    backgroundGrid: true,
+    roadsideGlow: true,
+    roadGradient: true,
+    roadEdgeDetails: true,
+    blackoutNoiseStreaks: 18,
+    blackoutStudSpacing: 64,
+    blackoutDashSpacing: 106,
+    prismBandSpacing: 124
+  },
+  blackout: {
+    backgroundGrid: false,
+    roadsideGlow: false,
+    roadGradient: false,
+    roadEdgeDetails: false,
+    blackoutNoiseStreaks: 6,
+    blackoutStudSpacing: 92,
+    blackoutDashSpacing: 142,
+    prismBandSpacing: 124
+  },
+  prism: {
+    backgroundGrid: true,
+    roadsideGlow: false,
+    roadGradient: false,
+    roadEdgeDetails: true,
+    blackoutNoiseStreaks: 18,
+    blackoutStudSpacing: 64,
+    blackoutDashSpacing: 106,
+    prismBandSpacing: 188
+  }
 };
 
 const ROAD_DIRECTOR = {
@@ -5663,6 +5771,113 @@ function getFuelRunTuning(speedClassId) {
   };
 }
 
+function estimateTrackFinishSeconds(track = TRACKS[0], speedClassId = DEFAULT_SPEED_CLASS_ID) {
+  const safeTrack = track || TRACKS[0];
+  const distance = Math.max(1, safeTrack.distanceToFinish || TRACKS[0].distanceToFinish || 1);
+  const samples = 80;
+  let seconds = 0;
+  for (let index = 0; index < samples; index += 1) {
+    const progress = (index + 0.5) / samples;
+    const speed = Math.max(1, getTrackCruiseSpeed(safeTrack, progress, speedClassId));
+    seconds += (distance / samples) / speed;
+  }
+  return seconds;
+}
+
+function estimateTrackElapsedSecondsAtDistance(track = TRACKS[0], speedClassId = DEFAULT_SPEED_CLASS_ID, targetDistance = 0) {
+  const safeTrack = track || TRACKS[0];
+  const finishDistance = Math.max(1, safeTrack.distanceToFinish || TRACKS[0].distanceToFinish || 1);
+  const distance = clamp(Number(targetDistance) || 0, 0, finishDistance);
+  if (distance <= 0) return 0;
+  const samples = 96;
+  let seconds = 0;
+  for (let index = 0; index < samples; index += 1) {
+    const sampleDistance = distance * (index + 0.5) / samples;
+    const progress = clamp(sampleDistance / finishDistance, 0, 1);
+    const speed = Math.max(1, getTrackCruiseSpeed(safeTrack, progress, speedClassId));
+    seconds += (distance / samples) / speed;
+  }
+  return seconds;
+}
+
+function estimateTrackDistanceAtElapsedSeconds(track = TRACKS[0], speedClassId = DEFAULT_SPEED_CLASS_ID, targetSeconds = 0) {
+  const safeTrack = track || TRACKS[0];
+  const finishDistance = Math.max(1, safeTrack.distanceToFinish || TRACKS[0].distanceToFinish || 1);
+  const seconds = Math.max(0, Number(targetSeconds) || 0);
+  if (seconds <= 0) return 0;
+  let low = 0;
+  let high = finishDistance;
+  for (let index = 0; index < 26; index += 1) {
+    const mid = (low + high) / 2;
+    if (estimateTrackElapsedSecondsAtDistance(safeTrack, speedClassId, mid) < seconds) low = mid;
+    else high = mid;
+  }
+  return clamp((low + high) / 2, 0, finishDistance);
+}
+
+function isOfficialOpeningActivitySpeed(speedClassId = DEFAULT_SPEED_CLASS_ID) {
+  const id = normalizeSpeedClassId(speedClassId, DEFAULT_SPEED_CLASS_ID);
+  return OFFICIAL_OPENING_ACTIVITY_CONFIG.eligibleSpeedClassIds.includes(id);
+}
+
+function getOfficialOpeningActivityRules(route = null, speedClassId = DEFAULT_SPEED_CLASS_ID, track = TRACKS[0], raceTypeId = DEFAULT_RACE_TYPE_ID) {
+  const id = normalizeSpeedClassId(speedClassId, DEFAULT_SPEED_CLASS_ID);
+  const typeId = normalizeRaceTypeId(raceTypeId, DEFAULT_RACE_TYPE_ID);
+  if (!route || !isOfficialOpeningActivitySpeed(id)) return null;
+  if (!PLAYER_FACING_RACE_TYPE_IDS.includes(typeId)) return null;
+  if (!officialRouteSupportsRaceType(route, typeId)) return null;
+  const fuelRun = typeId === FUEL_RUN_RACE_TYPE_ID;
+  const targetDecisionTimes = (OFFICIAL_OPENING_ACTIVITY_CONFIG.targetDecisionTimesBySpeedClass[id] || []).slice();
+  const requiredLaneDecisionTimes = (OFFICIAL_OPENING_ACTIVITY_CONFIG.requiredLaneDecisionTimesBySpeedClass[id] || []).slice();
+  const firstWindowSeconds = OFFICIAL_OPENING_ACTIVITY_CONFIG.firstWindowSeconds;
+  return {
+    officialRouteId: route.id || "",
+    speedClassId: id,
+    raceTypeId: typeId,
+    firstWindowSeconds,
+    minMeaningfulWavesFirst10: OFFICIAL_OPENING_ACTIVITY_CONFIG.minMeaningfulWavesFirst10BySpeedClass[id] || 4,
+    minRequiredLaneDecisionsFirst10: fuelRun ? 1 : (OFFICIAL_OPENING_ACTIVITY_CONFIG.minRequiredLaneDecisionsFirst10BySpeedClass[id] || 2),
+    targetDecisionTimes,
+    requiredLaneDecisionTimes,
+    firstDecisionDeadlineSeconds: OFFICIAL_OPENING_ACTIVITY_CONFIG.firstDecisionDeadlineSecondsBySpeedClass[id] || 2.65,
+    maxOpeningDeadScreenSeconds: OFFICIAL_OPENING_ACTIVITY_CONFIG.maxOpeningDeadScreenSecondsBySpeedClass[id] || 2.5,
+    maxOpeningNoInputSafeTime: OFFICIAL_OPENING_ACTIVITY_CONFIG.maxOpeningNoInputSafeTimeBySpeedClass[id] || 5.15,
+    minWaveGapSeconds: OFFICIAL_OPENING_ACTIVITY_CONFIG.minWaveGapSecondsBySpeedClass[id] || 1.7,
+    estimatedFinishSeconds: estimateTrackFinishSeconds(track, id)
+  };
+}
+
+function getOfficialFuelViabilityRules(route = null, speedClassId = DEFAULT_SPEED_CLASS_ID, track = TRACKS[0]) {
+  const id = normalizeSpeedClassId(speedClassId, DEFAULT_SPEED_CLASS_ID);
+  const tuning = getFuelRunTuning(id);
+  const estimatedFinishSeconds = estimateTrackFinishSeconds(track, id);
+  const effectiveRestore = Math.max(1, tuning.gasCanRestoreAmount * OFFICIAL_FUEL_VIABILITY_CONFIG.simulatedPickupEfficiency);
+  const reserve = OFFICIAL_FUEL_VIABILITY_CONFIG.minimumFinishReserveFuel;
+  const requiredFuelBeyondTank = Math.max(0, estimatedFinishSeconds * tuning.fuelDrainPerSecond - tuning.fuelMax + reserve);
+  const budgetMinimum = Math.ceil(requiredFuelBeyondTank / effectiveRestore);
+  const speedMinimum = OFFICIAL_FUEL_VIABILITY_CONFIG.minTotalOpportunitiesBySpeedClass[id] || 3;
+  return {
+    officialRouteId: route?.id || "",
+    minTotalOpportunities: Math.max(speedMinimum, budgetMinimum),
+    minPostMidpointOpportunities: OFFICIAL_FUEL_VIABILITY_CONFIG.minPostMidpointOpportunities,
+    minLateOpportunities: OFFICIAL_FUEL_VIABILITY_CONFIG.minLateOpportunities,
+    midpointProgress: OFFICIAL_FUEL_VIABILITY_CONFIG.midpointProgress,
+    lateProgress: OFFICIAL_FUEL_VIABILITY_CONFIG.lateProgress,
+    lateFuelThreshold: Math.min(
+      tuning.fuelMax,
+      tuning.lowFuelThreshold + OFFICIAL_FUEL_VIABILITY_CONFIG.lateFuelThresholdPadding
+    ),
+    minimumFinishReserveFuel: reserve,
+    estimatedFinishSeconds,
+    estimatedFuelDrain: estimatedFinishSeconds * tuning.fuelDrainPerSecond,
+    cansNeededForFuelBudget: budgetMinimum,
+    maxNoFuelStretchSeconds: Math.max(
+      tuning.maxGasGapSeconds + OFFICIAL_FUEL_VIABILITY_CONFIG.maxNoFuelStretchPaddingSeconds,
+      tuning.targetGasGapSeconds + OFFICIAL_FUEL_VIABILITY_CONFIG.maxNoFuelStretchPaddingSeconds
+    )
+  };
+}
+
 function getPursuitTuning(speedClassId, track = TRACKS[0]) {
   const id = normalizeSpeedClassId(speedClassId, DEFAULT_SPEED_CLASS_ID);
   const redline = (track?.id || "") === "redline-run";
@@ -6212,6 +6427,14 @@ function normalizePlaytestRunSummary(entry) {
     routeSignatureVersion: sanitizeName(entry.routeSignatureVersion, "", 48),
     routeSignatureHash: sanitizeName(entry.routeSignatureHash, "", 24),
     routeSignatureWaveCount: normalizeNonNegativeInteger(entry.routeSignatureWaveCount, 0, 999),
+    runProgressSignatureVersion: sanitizeName(entry.runProgressSignatureVersion || entry.routeSignatureVersion, "", 48),
+    runProgressSignatureHash: sanitizeName(entry.runProgressSignatureHash || entry.routeSignatureHash, "", 24),
+    runProgressSignatureWaveCount: normalizeNonNegativeInteger(entry.runProgressSignatureWaveCount ?? entry.routeSignatureWaveCount, 0, 999),
+    runProgressSignatureScope: sanitizeName(entry.runProgressSignatureScope || RUN_PROGRESS_SIGNATURE_SCOPE, RUN_PROGRESS_SIGNATURE_SCOPE, 64),
+    officialFullRouteSignatureVersion: sanitizeName(entry.officialFullRouteSignatureVersion, "", 48),
+    officialFullRouteSignatureHash: sanitizeName(entry.officialFullRouteSignatureHash, "", 24),
+    officialFullRouteSignatureWaveCount: normalizeNonNegativeInteger(entry.officialFullRouteSignatureWaveCount, 0, 999),
+    officialFullRouteSignatureScope: sanitizeName(entry.officialFullRouteSignatureScope || OFFICIAL_FULL_ROUTE_SIGNATURE_SCOPE, OFFICIAL_FULL_ROUTE_SIGNATURE_SCOPE, 64),
     routeSeedLocked: Boolean(entry.routeSeedLocked || entry.officialRouteSeedLocked),
     pacingRulesVersion: normalizePacingRulesVersion(
       entry.pacingRulesVersion || entry.pacingVersion,
@@ -6342,9 +6565,17 @@ function normalizePlaytestRunSummary(entry) {
     deadScreenTime: normalizeNonNegativeNumber(entry.deadScreenTime, 0, 24 * 60 * 60),
     longestDeadScreenSeconds: normalizeNonNegativeNumber(entry.longestDeadScreenSeconds, 0, 24 * 60 * 60),
     timeSinceLastMeaningfulDecisionMax: normalizeNonNegativeNumber(entry.timeSinceLastMeaningfulDecisionMax, 0, 24 * 60 * 60),
+    firstMeaningfulDecisionTime: normalizeOptionalFiniteNumber(entry.firstMeaningfulDecisionTime, 0, 24 * 60 * 60),
+    firstRequiredLaneDecisionTime: normalizeOptionalFiniteNumber(entry.firstRequiredLaneDecisionTime, 0, 24 * 60 * 60),
+    openingDeadScreenTimeFirst10Seconds: normalizeNonNegativeNumber(entry.openingDeadScreenTimeFirst10Seconds, 0, 24 * 60 * 60),
+    longestOpeningDeadScreenSeconds: normalizeNonNegativeNumber(entry.longestOpeningDeadScreenSeconds, 0, 24 * 60 * 60),
+    openingMeaningfulWaveCountFirst10Seconds: normalizeNonNegativeInteger(entry.openingMeaningfulWaveCountFirst10Seconds, 0, 99999),
+    openingRequiredLaneDecisionCountFirst10Seconds: normalizeNonNegativeInteger(entry.openingRequiredLaneDecisionCountFirst10Seconds, 0, 99999),
+    openingNoInputSafeTime: normalizeNonNegativeNumber(entry.openingNoInputSafeTime, 0, 24 * 60 * 60),
     visibleMeaningfulMin: normalizeNonNegativeInteger(entry.visibleMeaningfulMin, 0, 999),
     visibleMeaningfulAverage: normalizeNonNegativeNumber(entry.visibleMeaningfulAverage, 0, 999),
     upcomingDecisionGapMax: normalizeNonNegativeNumber(entry.upcomingDecisionGapMax, 0, 24 * 60 * 60),
+    officialOpeningActivityCorrections: normalizeNonNegativeInteger(entry.officialOpeningActivityCorrections, 0, 99999),
     underActivityCorrections: normalizeNonNegativeInteger(entry.underActivityCorrections, 0, 99999),
     overActivityDelays: normalizeNonNegativeInteger(entry.overActivityDelays, 0, 99999),
     directorIntentCounts: normalizeCountMap(entry.directorIntentCounts),
@@ -6362,6 +6593,13 @@ function normalizePlaytestRunSummary(entry) {
     hardestPressureObserved: normalizeNonNegativeNumber(entry.hardestPressureObserved, 0, 999),
     gasCansSpawned: normalizeNonNegativeInteger(entry.gasCansSpawned, 0, 9999),
     gasCansCollected: normalizeNonNegativeInteger(entry.gasCansCollected || entry.fuelCollected, 0, 9999),
+    gasCansMissed: normalizeNonNegativeInteger(
+      Number.isFinite(Number(entry.gasCansMissed))
+        ? entry.gasCansMissed
+        : Math.max(0, (Number(entry.gasCansSpawned) || 0) - (Number(entry.gasCansCollected || entry.fuelCollected) || 0)),
+      0,
+      9999
+    ),
     gasCanSpawnRejected: normalizeNonNegativeInteger(entry.gasCanSpawnRejected, 0, 99999),
     gasCanSpawnRepositioned: normalizeNonNegativeInteger(entry.gasCanSpawnRepositioned, 0, 99999),
     gasCanReachabilityFailuresPrevented: normalizeNonNegativeInteger(entry.gasCanReachabilityFailuresPrevented, 0, 99999),
@@ -9239,6 +9477,8 @@ class RoadDirector {
     this.laneStillSeconds = 0;
     this.lastObservedLane = TRACK_DIRECTOR.centerLane;
     this.laneSafeSeconds = Array(LANES).fill(0);
+    this.openingDeadScreenSeconds = 0;
+    this.openingLastRequiredLaneDecisionTime = 0;
     this.forceRecoveryNext = false;
     this.lastFairnessPassed = true;
     this.nextWaveId = 1;
@@ -9283,6 +9523,14 @@ class RoadDirector {
       deadScreenTime: 0,
       longestDeadScreenSeconds: 0,
       timeSinceLastMeaningfulDecisionMax: 0,
+      firstMeaningfulDecisionTime: null,
+      firstRequiredLaneDecisionTime: null,
+      openingDeadScreenTimeFirst10Seconds: 0,
+      longestOpeningDeadScreenSeconds: 0,
+      openingMeaningfulWaveCountFirst10Seconds: 0,
+      openingRequiredLaneDecisionCountFirst10Seconds: 0,
+      openingNoInputSafeTime: 0,
+      officialOpeningActivityCorrections: 0,
       underActivityCorrections: 0,
       overActivityDelays: 0,
       boostLaneCounts: Array(LANES).fill(0),
@@ -9394,6 +9642,35 @@ class RoadDirector {
     return Math.max(0, distance - Math.max(0, lastDistance || 0)) / Math.max(1, cruiseSpeed || 1);
   }
 
+  getRouteElapsedSecondsAtDistance(track, speedClassId, distance, seedLocked = this.isSeedLocked(), run = this.manager.game.run || {}) {
+    if (seedLocked) {
+      return estimateTrackElapsedSecondsAtDistance(track || this.track || this.manager.track, speedClassId, distance);
+    }
+    return Math.max(0, Number.isFinite(run?.elapsed) ? run.elapsed : 0);
+  }
+
+  getOfficialOpeningActivityContext(run, track, speedClassId, raceTypeId, distance) {
+    const route = getOfficialRouteById(run?.officialRouteId || "");
+    const rules = getOfficialOpeningActivityRules(route, speedClassId, track, raceTypeId);
+    if (!rules) return null;
+    const routeElapsed = estimateTrackElapsedSecondsAtDistance(track, speedClassId, distance);
+    const meaningfulCount = this.stats.openingMeaningfulWaveCountFirst10Seconds
+      || this.stats.meaningfulWavesFirst10Seconds
+      || 0;
+    const requiredLaneDecisionCount = this.stats.openingRequiredLaneDecisionCountFirst10Seconds || 0;
+    return {
+      ...rules,
+      routeElapsed,
+      force: Boolean(run?.forceOfficialOpeningActivityWave),
+      reason: run?.forceOfficialOpeningActivityReason || "",
+      requireLaneDecision: Boolean(run?.forceOfficialOpeningActivityRequiresLaneDecision),
+      meaningfulCount,
+      requiredLaneDecisionCount,
+      needsMeaningfulWave: meaningfulCount < rules.minMeaningfulWavesFirst10,
+      needsRequiredLaneDecision: requiredLaneDecisionCount < rules.minRequiredLaneDecisionsFirst10
+    };
+  }
+
   update(dt) {
     const run = this.manager.game.run || {};
     const laneValue = Number.isFinite(run.renderLaneFloat)
@@ -9421,6 +9698,7 @@ class RoadDirector {
       ? this.manager.getRoadActivitySnapshot(run, this.manager.obstacles, run.distance || 0)
       : null;
     this.lastActivitySnapshot = activitySnapshot;
+    const openingTelemetryWindow = (run?.elapsed || 0) <= OFFICIAL_OPENING_ACTIVITY_CONFIG.firstWindowSeconds;
     if (this.hasActivePressureAhead()) {
       this.activeEmptySeconds = 0;
     } else {
@@ -9430,12 +9708,28 @@ class RoadDirector {
       this.deadScreenSeconds += dt;
       this.stats.deadScreenTime += dt;
       this.stats.longestDeadScreenSeconds = Math.max(this.stats.longestDeadScreenSeconds, this.deadScreenSeconds);
+      if (openingTelemetryWindow) {
+        this.openingDeadScreenSeconds += dt;
+        this.stats.openingDeadScreenTimeFirst10Seconds += dt;
+        this.stats.longestOpeningDeadScreenSeconds = Math.max(
+          this.stats.longestOpeningDeadScreenSeconds,
+          this.openingDeadScreenSeconds
+        );
+      }
       if (run && !run.ended) {
         run.deadScreenTime = (run.deadScreenTime || 0) + dt;
         run.longestDeadScreenSeconds = Math.max(run.longestDeadScreenSeconds || 0, this.deadScreenSeconds);
+        if (openingTelemetryWindow) {
+          run.openingDeadScreenTimeFirst10Seconds = (run.openingDeadScreenTimeFirst10Seconds || 0) + dt;
+          run.longestOpeningDeadScreenSeconds = Math.max(
+            run.longestOpeningDeadScreenSeconds || 0,
+            this.openingDeadScreenSeconds
+          );
+        }
       }
     } else {
       this.deadScreenSeconds = 0;
+      this.openingDeadScreenSeconds = 0;
     }
     if (activitySnapshot && run && !run.ended) {
       const visibleMeaningful = Math.max(0, activitySnapshot.visibleMeaningfulObjects || 0);
@@ -9541,6 +9835,7 @@ class RoadDirector {
     const activityBudget = this.manager.getActivityFloorBudget
       ? this.manager.getActivityFloorBudget(run, section)
       : {};
+    const officialOpeningActivity = this.getOfficialOpeningActivityContext(run, track, speedClassId, raceTypeId, distance);
 
     return {
       track,
@@ -9577,6 +9872,7 @@ class RoadDirector {
       cruiseSpeed,
       activity,
       activityBudget,
+      officialOpeningActivity,
       forcedDirectorIntent: run.forceRoadDirectorIntent || "",
       forcedDirectorIntentReason: run.forceRoadDirectorIntentReason || ""
     };
@@ -9600,6 +9896,10 @@ class RoadDirector {
     if (context.run) {
       context.run.forceRoadDirectorIntent = "";
       context.run.forceRoadDirectorIntentReason = "";
+      context.run.forceOfficialOpeningActivityWave = false;
+      context.run.forceOfficialOpeningActivityReason = "";
+      context.run.forceOfficialOpeningActivityRequiresLaneDecision = false;
+      context.run.forceOfficialOpeningActivityTargetKey = "";
     }
     return result;
   }
@@ -9636,6 +9936,10 @@ class RoadDirector {
     if (context.run) {
       context.run.forceRoadDirectorIntent = "";
       context.run.forceRoadDirectorIntentReason = "";
+      context.run.forceOfficialOpeningActivityWave = false;
+      context.run.forceOfficialOpeningActivityReason = "";
+      context.run.forceOfficialOpeningActivityRequiresLaneDecision = false;
+      context.run.forceOfficialOpeningActivityTargetKey = "";
     }
     return result;
   }
@@ -9740,6 +10044,9 @@ class RoadDirector {
       }
       if (context.fuelRun) {
         const fuel = context.fuel || {};
+        if (fuel.officialViability?.requiresGasRoute) {
+          return this.makeDirectorIntent("gasRoute", "official Fuel Run viability requires fair fuel");
+        }
         const gasDue = fuel.low || fuel.critical || (fuel.timeSinceLastGasCan || 0) >= (fuel.targetGasGapSeconds || 16);
         if (underActivity && gasDue) return this.makeDirectorIntent("gasRoute", "fuel route can carry activity");
         if (gasDue && this.random() < 0.76) return this.makeDirectorIntent("gasRoute", "fuel route due");
@@ -9896,6 +10203,9 @@ class RoadDirector {
       this.forceRecoveryNext = false;
       return "recoveryGap";
     }
+    if (context.officialOpeningActivity?.force) {
+      return this.chooseOfficialOpeningActivityWave(context);
+    }
     const officialRacecraftWave = this.consumeOfficialRacecraftWaveType(context);
     if (officialRacecraftWave) return officialRacecraftWave;
     if (context.activity?.underActivity && !context.activity?.overDensity) {
@@ -10023,6 +10333,29 @@ class RoadDirector {
     });
 
     return weightedChoice(entries, () => this.random());
+  }
+
+  chooseOfficialOpeningActivityWave(context) {
+    const requireLaneDecision = Boolean(context.officialOpeningActivity?.requireLaneDecision);
+    if (requireLaneDecision && this.isWaveAllowed("centerBlock", context)) return "centerBlock";
+    const weights = [
+      { value: "singleBlocker", weight: 1.45 },
+      { value: "doubleGate", weight: 1.35 },
+      { value: "offsetPair", weight: 1.05 },
+      { value: "boostTemptation", weight: 0.82 },
+      { value: "rampEscape", weight: context.track?.identity === "ramp" ? 0.42 : 0.18 }
+    ];
+    weights.forEach((item) => {
+      item.weight *= this.getSectionWaveWeight(item.value, context);
+      item.weight *= this.getTrackWaveWeight(item.value, context);
+      item.weight *= this.getVarietyWeight(item.value, context);
+      if (!this.isWaveAllowed(item.value, context)) item.weight = 0;
+      const expectedPressure = this.getExpectedWavePressure(item.value, context);
+      if (expectedPressure > context.pressureBudget + context.pressureBudgetAllowance) {
+        item.weight *= 0.5;
+      }
+    });
+    return weightedChoice(weights, () => this.random()) || "singleBlocker";
   }
 
   chooseActivityFloorWave(context) {
@@ -10234,12 +10567,15 @@ class RoadDirector {
     const minGap = fuel.minGasGapSeconds || 8;
     const targetGap = fuel.targetGasGapSeconds || 16;
     const maxGap = fuel.maxGasGapSeconds || 24;
+    const officialViability = fuel.officialViability || null;
     const pastOpeningGrace = context.progress > 0.06 || (context.run.elapsed || 0) >= FUEL_RUN_CONFIG.initialGasGraceSeconds;
     const low = Boolean(fuel.low);
     const critical = Boolean(fuel.critical);
     const overdue = pastOpeningGrace && timeSinceGas >= maxGap;
     const due = pastOpeningGrace && timeSinceGas >= targetGap;
-    const canSpawnFuel = pastOpeningGrace && timeSinceGas >= minGap && context.progress < 0.97;
+    const canSpawnFuel = pastOpeningGrace
+      && (timeSinceGas >= minGap || officialViability?.allowGapOverride)
+      && context.progress < 0.985;
     const familyStreakLength = this.lastWaveFamily ? this.sameWaveFamilyStreak + 1 : 0;
     const needsFuelFamilyBreak = (this.lastWaveFamily === "fuel-route" || this.lastWaveFamily === "fuel-pressure")
       && familyStreakLength >= 4;
@@ -10263,6 +10599,21 @@ class RoadDirector {
 
     if (needsFuelFamilyBreak && recoveryGapWeight > 0 && this.isWaveAllowed("recoveryGap", context)) {
       return "recoveryGap";
+    }
+    if (officialViability?.requiresGasRoute && canSpawnFuel) {
+      if (officialViability.needsLateOpportunity || critical) return "fuelLowRescue";
+      if (officialViability.needsPostMidpointOpportunity || low) return "fuelTrafficGate";
+      return weightedChoice([
+        { value: "fuelTrafficGate", weight: 2 },
+        { value: "fuelAfterPressure", weight: 1.4 },
+        { value: "fuelSideTemptation", weight: 1.2 },
+        { value: "fuelSplit", weight: context.progress > 0.3 ? 0.7 : 0.12 }
+      ].map(scoreFuelChoice), () => this.random()) || "fuelTrafficGate";
+    }
+    if (context.officialOpeningActivity?.force
+      && context.officialOpeningActivity.requireLaneDecision
+      && this.isWaveAllowed("centerBlock", context)) {
+      return "centerBlock";
     }
     if (critical && canSpawnFuel && (overdue || this.random() < 0.82)) {
       return "fuelLowRescue";
@@ -10294,6 +10645,17 @@ class RoadDirector {
         { value: "fuelSplit", weight: context.progress > 0.24 ? 0.48 : 0.08 },
         { value: "recoveryGap", weight: recoveryGapWeight * 0.48 }
       ].map(scoreFuelChoice), () => this.random()) || "fuelSideTemptation";
+    }
+
+    if (context.officialOpeningActivity?.force) {
+      if (context.officialOpeningActivity.requireLaneDecision && this.isWaveAllowed("centerBlock", context)) {
+        return "centerBlock";
+      }
+      return weightedChoice([
+        { value: "fuelTrafficPressure", weight: context.officialOpeningActivity.requireLaneDecision ? 2.4 : 1.7 },
+        { value: "fuelSupport", weight: 0.95 },
+        { value: "fuelTrafficGate", weight: canSpawnFuel ? 0.72 : 0 }
+      ].map(scoreFuelChoice), () => this.random()) || "fuelTrafficPressure";
     }
 
     const officialRacecraftWave = this.consumeOfficialRacecraftWaveType(context);
@@ -10407,7 +10769,8 @@ class RoadDirector {
       centerBlocked: false,
       fairnessPassed: true,
       hard: false,
-      fallbackUsed: false
+      fallbackUsed: false,
+      fuelRecoveryWindowEndDistance: 0
     };
   }
 
@@ -10568,6 +10931,13 @@ class RoadDirector {
     run.lastGasCanDistance = obstacle.distance;
     run.maxTimeBetweenGasCans = Math.max(run.maxTimeBetweenGasCans || 0, gap);
     if (Array.isArray(run.gasCanGapSamples)) run.gasCanGapSamples.push(gap);
+    if (Array.isArray(run.gasCanSpawnProgressSamples)) {
+      const finishDistance = Math.max(1, context.track?.distanceToFinish || run.track?.distanceToFinish || 1);
+      run.gasCanSpawnProgressSamples.push(Number(clamp(obstacle.distance / finishDistance, 0, 1).toFixed(4)));
+    }
+    if (Array.isArray(run.gasCanSpawnTimeSamples)) {
+      run.gasCanSpawnTimeSamples.push(Number(Math.max(0, run.elapsed || 0).toFixed(3)));
+    }
     if (run.gasCansSpawnedBySection && context.section?.id) {
       run.gasCansSpawnedBySection[context.section.id] = (run.gasCansSpawnedBySection[context.section.id] || 0) + 1;
     }
@@ -10575,12 +10945,19 @@ class RoadDirector {
       run.fuelOpportunitiesBySection[context.section.id] = (run.fuelOpportunitiesBySection[context.section.id] || 0) + 1;
     }
     run.timeSinceLastGasCan = 0;
+    run.gasCanConsecutivePlacementFailures = 0;
 
     if (run.simulateFuelPickups && isFuelRunRaceType(run.raceTypeId)) {
       const restore = Number.isFinite(run.gasCanRestoreAmount) ? run.gasCanRestoreAmount : getFuelRunTuning(run.speedClassId).gasCanRestoreAmount;
       run.fuel = clamp((run.fuel || 0) + restore * 0.85, 0, run.fuelMax || FUEL_RUN_CONFIG.fuelMax);
       run.simulatedFuelRestored = (run.simulatedFuelRestored || 0) + restore;
+      run.gasCansCollected = Math.max(0, (run.gasCansCollected || 0) + 1);
+      run.fuelCollected = Math.max(0, (run.fuelCollected || 0) + 1);
+      if (run.gasCansCollectedBySection && context.section?.id) {
+        run.gasCansCollectedBySection[context.section.id] = (run.gasCansCollectedBySection[context.section.id] || 0) + 1;
+      }
     }
+    run.gasCansMissed = Math.max(0, (run.gasCansSpawned || 0) - (run.gasCansCollected || 0));
   }
 
   recordIntendedRoute(result, lanes, routeType = "") {
@@ -10621,6 +10998,13 @@ class RoadDirector {
     const sectionStats = this.getSectionStats(stats, context.section);
     const waveGapSeconds = this.timeSinceWaveSeconds;
     const meaningfulGapSeconds = this.timeSinceMeaningfulWaveSeconds;
+    const routeElapsedSeconds = this.getRouteElapsedSecondsAtDistance(
+      context.track,
+      context.speedClassId,
+      context.distance,
+      context.seedLocked,
+      context.run
+    );
     stats.totalWaves += 1;
     if (context.band.id !== "opening") stats.nonOpeningWaves += 1;
     stats.blockedLaneSum += blockedCount;
@@ -10711,6 +11095,10 @@ class RoadDirector {
       sectionStats.meaningfulWaveCount += 1;
       sectionStats.meaningfulWaveGapCount += 1;
       sectionStats.meaningfulWaveGapSum += meaningfulGapSeconds;
+      if (stats.firstMeaningfulDecisionTime === null) {
+        stats.firstMeaningfulDecisionTime = routeElapsedSeconds;
+        if (context.run) context.run.firstMeaningfulDecisionTime = routeElapsedSeconds;
+      }
       this.timeSinceMeaningfulWaveSeconds = 0;
     } else {
       stats.supportWaveCount += 1;
@@ -10734,11 +11122,35 @@ class RoadDirector {
       sectionStats.longestRecoveryGapSeconds = Math.max(sectionStats.longestRecoveryGapSeconds || 0, this.timeSinceRecoveryWaveSeconds);
       this.timeSinceRecoveryWaveSeconds = 0;
     }
-    const inFirstWindow = (context.run?.elapsed || 0) <= LAUNCH_PACING_CONFIG.firstWindowSeconds;
+    const inFirstWindow = routeElapsedSeconds <= OFFICIAL_OPENING_ACTIVITY_CONFIG.firstWindowSeconds + 0.001;
     if (inFirstWindow) {
       stats.wavesFirst10Seconds += 1;
-      if (meaningfulWave) stats.meaningfulWavesFirst10Seconds += 1;
-      else stats.supportWavesFirst10Seconds += 1;
+      if (meaningfulWave) {
+        stats.meaningfulWavesFirst10Seconds += 1;
+        stats.openingMeaningfulWaveCountFirst10Seconds += 1;
+      } else {
+        stats.supportWavesFirst10Seconds += 1;
+      }
+      if (result.centerBlocked) {
+        stats.openingRequiredLaneDecisionCountFirst10Seconds += 1;
+        stats.openingNoInputSafeTime = Math.max(
+          stats.openingNoInputSafeTime || 0,
+          routeElapsedSeconds - (this.openingLastRequiredLaneDecisionTime || 0)
+        );
+        this.openingLastRequiredLaneDecisionTime = routeElapsedSeconds;
+      }
+      if (context.run) {
+        context.run.openingMeaningfulWaveCountFirst10Seconds = stats.openingMeaningfulWaveCountFirst10Seconds || 0;
+        context.run.openingRequiredLaneDecisionCountFirst10Seconds = stats.openingRequiredLaneDecisionCountFirst10Seconds || 0;
+        context.run.openingNoInputSafeTime = Math.max(
+          context.run.openingNoInputSafeTime || 0,
+          stats.openingNoInputSafeTime || 0
+        );
+      }
+    }
+    if (result.centerBlocked && stats.firstRequiredLaneDecisionTime === null) {
+      stats.firstRequiredLaneDecisionTime = routeElapsedSeconds;
+      if (context.run) context.run.firstRequiredLaneDecisionTime = routeElapsedSeconds;
     }
     if (context.section?.id === "launch") {
       stats.launchWaveCount += 1;
@@ -10858,7 +11270,7 @@ class RoadDirector {
         pressureBudgetPassed: this.currentWave.pressureBudgetPassed !== false,
         obstacles: this.currentWave.obstacles.map((obstacle) => ({ ...obstacle }))
       });
-      if (context.run.roadDirectorSequence.length > 40) {
+      if (!context.run.preserveFullRoadDirectorSequence && context.run.roadDirectorSequence.length > 40) {
         context.run.roadDirectorSequence.splice(0, context.run.roadDirectorSequence.length - 40);
       }
     }
@@ -11078,6 +11490,10 @@ class RoadDirector {
     const visibleSamples = stats.visibleMeaningfulSampleCount || 0;
     const rampSpawned = stats.rampLaneCounts.reduce((sum, count) => sum + count, 0);
     const rampUseRate = rampSpawned ? Math.min(1, Math.max(0, (run.rampsUsed || 0) / rampSpawned)) : 0;
+    const openingNoInputSafeTime = Math.max(
+      stats.openingNoInputSafeTime || 0,
+      OFFICIAL_OPENING_ACTIVITY_CONFIG.firstWindowSeconds - (this.openingLastRequiredLaneDecisionTime || 0)
+    );
     return {
       totalWaves: stats.totalWaves,
       nonOpeningWaves: stats.nonOpeningWaves,
@@ -11094,6 +11510,13 @@ class RoadDirector {
       wavesFirst10Seconds: stats.wavesFirst10Seconds,
       meaningfulWavesFirst10Seconds: stats.meaningfulWavesFirst10Seconds,
       supportWavesFirst10Seconds: stats.supportWavesFirst10Seconds,
+      firstMeaningfulDecisionTime: stats.firstMeaningfulDecisionTime,
+      firstRequiredLaneDecisionTime: stats.firstRequiredLaneDecisionTime,
+      openingDeadScreenTimeFirst10Seconds: stats.openingDeadScreenTimeFirst10Seconds || 0,
+      longestOpeningDeadScreenSeconds: Math.max(stats.longestOpeningDeadScreenSeconds || 0, this.openingDeadScreenSeconds || 0),
+      openingMeaningfulWaveCountFirst10Seconds: stats.openingMeaningfulWaveCountFirst10Seconds || stats.meaningfulWavesFirst10Seconds || 0,
+      openingRequiredLaneDecisionCountFirst10Seconds: stats.openingRequiredLaneDecisionCountFirst10Seconds || 0,
+      openingNoInputSafeTime,
       launchWaveCount: stats.launchWaveCount,
       launchMeaningfulWaveCount: stats.launchMeaningfulWaveCount,
       launchSupportWaveCount: stats.launchSupportWaveCount,
@@ -11159,6 +11582,7 @@ class RoadDirector {
       deadScreenTime: stats.deadScreenTime || 0,
       longestDeadScreenSeconds: Math.max(stats.longestDeadScreenSeconds || 0, this.deadScreenSeconds || 0),
       timeSinceLastMeaningfulDecisionMax: Math.max(stats.timeSinceLastMeaningfulDecisionMax || 0, this.timeSinceMeaningfulWaveSeconds || 0),
+      officialOpeningActivityCorrections: stats.officialOpeningActivityCorrections || run.officialOpeningActivityCorrections || 0,
       underActivityCorrections: stats.underActivityCorrections || run.underActivityCorrections || 0,
       overActivityDelays: stats.overActivityDelays || run.overActivityDelays || run.activeFieldBudgetDelays || 0,
       rampUseRate,
@@ -12135,8 +12559,84 @@ class RoadDirector {
         return spawned;
       }
     }
+    const recovered = this.trySpawnFuelRecoveryCan(ordered, distance, context, result, pattern);
+    if (recovered) return recovered;
     if (isFuelRunRaceType(run.raceTypeId) && ordered.length) {
       run.gasCanPlacementSkippedNoFairRoute = (run.gasCanPlacementSkippedNoFairRoute || 0) + 1;
+      run.gasCanConsecutivePlacementFailures = Math.max(0, (run.gasCanConsecutivePlacementFailures || 0) + 1);
+    }
+    return null;
+  }
+
+  shouldAttemptFuelRecoveryPlacement(context, run) {
+    if (!run || !isFuelRunRaceType(run.raceTypeId)) return false;
+    const officialFuelRun = Boolean(context.officialRouteId && context.officialRoute);
+    const nextFailureStreak = Math.max(0, (run.gasCanConsecutivePlacementFailures || 0) + 1);
+    if (officialFuelRun) {
+      return Boolean(context.fuel?.officialViability?.requiresGasRoute)
+        || nextFailureStreak >= OFFICIAL_FUEL_VIABILITY_CONFIG.recoveryRejectStreak;
+    }
+    return nextFailureStreak >= OFFICIAL_FUEL_VIABILITY_CONFIG.generalRecoveryRejectStreak;
+  }
+
+  getFuelRecoveryLaneOrder(preferredLanes, context) {
+    const preferred = (Array.isArray(preferredLanes) ? preferredLanes : [preferredLanes])
+      .map((lane) => Math.round(clamp(lane, 0, LANES - 1)))
+      .filter((lane, index, list) => Number.isFinite(lane) && list.indexOf(lane) === index);
+    const sideLanes = this.allLanes().filter((lane) => lane !== TRACK_DIRECTOR.centerLane);
+    const playerLane = Math.round(clamp(Number.isFinite(context.playerLane) ? context.playerLane : TRACK_DIRECTOR.centerLane, 0, LANES - 1));
+    return preferred
+      .concat(sideLanes)
+      .concat([playerLane, TRACK_DIRECTOR.centerLane])
+      .filter((lane, index, list) => Number.isFinite(lane) && lane >= 0 && lane < LANES && list.indexOf(lane) === index);
+  }
+
+  getFuelRecoveryDistanceOffsets(context) {
+    const speed = Math.max(1, context.cruiseSpeed || 1);
+    return [
+      0,
+      220,
+      440,
+      700,
+      Math.round(speed * 0.16),
+      Math.round(speed * 0.28),
+      Math.round(speed * 0.42)
+    ]
+      .map((offset) => Math.max(0, Math.round(offset / 20) * 20))
+      .filter((offset, index, list) => list.indexOf(offset) === index)
+      .sort((a, b) => a - b);
+  }
+
+  trySpawnFuelRecoveryCan(preferredLanes, distance, context, result, pattern = result.type) {
+    const run = context.run || this.manager.game.run || {};
+    if (!this.shouldAttemptFuelRecoveryPlacement(context, run)) return null;
+    const finishLimit = Math.max(0, (context.track?.distanceToFinish || this.manager.track?.distanceToFinish || 0) - 420);
+    const minDistance = Math.max(
+      distance,
+      (run.distance || 0) + VIEW_DISTANCE + OFFICIAL_FUEL_VIABILITY_CONFIG.recoveryRevealBuffer
+    );
+    const lanes = this.getFuelRecoveryLaneOrder(preferredLanes, context);
+    const offsets = this.getFuelRecoveryDistanceOffsets(context);
+    for (const offset of offsets) {
+      const candidateDistance = Math.max(minDistance, distance + offset);
+      if (finishLimit > 0 && candidateDistance >= finishLimit) continue;
+      for (const lane of lanes) {
+        run.gasCanPlacementAttempts = (run.gasCanPlacementAttempts || 0) + 1;
+        run.gasCanRecoveryPlacementAttempts = (run.gasCanRecoveryPlacementAttempts || 0) + 1;
+        const spawned = this.spawn("gasCan", lane, candidateDistance, result, {
+          allowLaneAdjust: false,
+          fuelRecoveryWindow: true
+        });
+        if (!spawned) continue;
+        run.gasCanSpawnRepositioned = (run.gasCanSpawnRepositioned || 0) + 1;
+        run.gasCanRecoveryPlacements = (run.gasCanRecoveryPlacements || 0) + 1;
+        result.fuelRecoveryWindowEndDistance = Math.max(
+          result.fuelRecoveryWindowEndDistance || 0,
+          spawned.distance + OFFICIAL_FUEL_VIABILITY_CONFIG.recoveryWindowClearAfter
+        );
+        this.recordFuelPlacement(spawned, context, result, `${pattern}Recovery`);
+        return spawned;
+      }
     }
     return null;
   }
@@ -12471,6 +12971,91 @@ class ObstacleManager {
     return true;
   }
 
+  applyOfficialOpeningActivityFloor(run, plan) {
+    const track = this.track || run?.track || TRACKS[0];
+    const route = getOfficialRouteById(run?.officialRouteId || "");
+    const speedClassId = this.getSpeedClassId();
+    const raceTypeId = this.getRaceTypeId();
+    const rules = getOfficialOpeningActivityRules(route, speedClassId, track, raceTypeId);
+    if (!run || !rules || !plan) return false;
+    const currentRouteElapsed = estimateTrackElapsedSecondsAtDistance(track, speedClassId, run.distance || 0);
+    if (currentRouteElapsed > rules.firstWindowSeconds + OFFICIAL_OPENING_ACTIVITY_CONFIG.correctionWindowPaddingSeconds) return false;
+    const stats = this.director?.stats || {};
+    const meaningfulCount = stats.openingMeaningfulWaveCountFirst10Seconds
+      || stats.meaningfulWavesFirst10Seconds
+      || 0;
+    const requiredLaneDecisionCount = stats.openingRequiredLaneDecisionCountFirst10Seconds || 0;
+    const targetCandidates = [];
+    if (meaningfulCount < rules.minMeaningfulWavesFirst10) {
+      const targetSeconds = rules.targetDecisionTimes[meaningfulCount]
+        ?? (rules.targetDecisionTimes[rules.targetDecisionTimes.length - 1] || rules.firstWindowSeconds);
+      targetCandidates.push({
+        key: `meaningful-${meaningfulCount}`,
+        seconds: targetSeconds,
+        requireLaneDecision: false,
+        reason: "official opening meaningful wave floor"
+      });
+    }
+    if (requiredLaneDecisionCount < rules.minRequiredLaneDecisionsFirst10) {
+      const targetSeconds = rules.requiredLaneDecisionTimes[requiredLaneDecisionCount]
+        ?? (rules.requiredLaneDecisionTimes[rules.requiredLaneDecisionTimes.length - 1] || rules.firstDecisionDeadlineSeconds);
+      targetCandidates.push({
+        key: `required-${requiredLaneDecisionCount}`,
+        seconds: targetSeconds,
+        requireLaneDecision: true,
+        reason: "official opening required lane decision floor"
+      });
+    }
+    if (!targetCandidates.length) return false;
+    targetCandidates.sort((a, b) => (a.seconds - b.seconds) || (Number(b.requireLaneDecision) - Number(a.requireLaneDecision)));
+    const target = targetCandidates[0];
+    if (!Number.isFinite(target.seconds) || target.seconds > rules.firstWindowSeconds + 0.25) return false;
+    const targetDistance = estimateTrackDistanceAtElapsedSeconds(track, speedClassId, target.seconds);
+    const targetProgress = clamp(targetDistance / Math.max(1, track.distanceToFinish || 1), 0, 1);
+    const targetSpeed = Math.max(1, getTrackCruiseSpeed(track, targetProgress, speedClassId));
+    const minimumGapDistance = Math.max(0, run.lastWaveSpawnDistance || 0) + targetSpeed * rules.minWaveGapSeconds;
+    const openingMinimumSpawnDistance = target.requireLaneDecision && requiredLaneDecisionCount === 0
+      ? plan.minimumSpawnDistance
+      : Math.min(
+        plan.minimumSpawnDistance,
+        (run.distance || 0) + VIEW_DISTANCE + Math.max(220, targetSpeed * 0.14)
+      );
+    const finishLimit = (track?.distanceToFinish || 0) - 650;
+    const targetReachable = targetDistance <= plan.spawnHorizon + 1;
+    const normalWaveDue = this.nextSpawnDistance <= plan.spawnHorizon + 1;
+    if (!targetReachable && !normalWaveDue) return false;
+    const candidateBaseDistance = targetReachable
+      ? Math.max(
+        openingMinimumSpawnDistance,
+        targetDistance,
+        minimumGapDistance
+      )
+      : this.nextSpawnDistance;
+    const candidateDistance = Math.min(
+      plan.spawnHorizon,
+      plan.launchSpawnLimit,
+      finishLimit - 1,
+      candidateBaseDistance
+    );
+    if (!Number.isFinite(candidateDistance) || candidateDistance >= finishLimit) return false;
+    const moved = this.nextSpawnDistance > candidateDistance + 1;
+    const targetKey = `${target.key}:${Math.round(candidateDistance)}`;
+    if (moved) this.nextSpawnDistance = candidateDistance;
+    run.forceOfficialOpeningActivityWave = true;
+    run.forceOfficialOpeningActivityRequiresLaneDecision = Boolean(target.requireLaneDecision);
+    run.forceOfficialOpeningActivityReason = target.reason;
+    run.forceOfficialOpeningActivityTargetKey = targetKey;
+    if (moved) {
+      run.officialOpeningActivityCorrections = (run.officialOpeningActivityCorrections || 0) + 1;
+      run.lastOfficialOpeningActivityCorrectionElapsed = currentRouteElapsed;
+      run.lastOfficialOpeningActivityCorrectionReason = target.reason;
+      if (this.director?.stats) {
+        this.director.stats.officialOpeningActivityCorrections = (this.director.stats.officialOpeningActivityCorrections || 0) + 1;
+      }
+    }
+    return true;
+  }
+
   configureBoostlineRouteScript(run = this.game.run, track = this.track) {
     this.boostlineRouteScript = null;
     this.boostlineNextEventIndex = 0;
@@ -12573,6 +13158,7 @@ class ObstacleManager {
     const activityRunDistance = routeSeedLocked ? this.getSafetyRunDistance(this.nextSpawnDistance) : (run.distance || 0);
     const activityObstacles = routeSeedLocked ? this.getSpawnValidationObstacles(this.nextSpawnDistance) : this.obstacles;
     const activity = this.getRoadActivitySnapshot(run, activityObstacles, activityRunDistance);
+    const officialOpeningCorrected = routeSeedLocked ? this.applyOfficialOpeningActivityFloor(run, plan) : false;
     const underActivityCorrected = routeSeedLocked ? false : this.applyUnderActivityCorrection(run, plan, activity);
 
     if (this.nextSpawnDistance <= plan.spawnHorizon + 1 && this.nextSpawnDistance < finishLimit) {
@@ -12588,7 +13174,11 @@ class ObstacleManager {
       run.lastWaveSpawnSection = plan.section?.id || "";
       run.lastSpawnVisibleAhead = VIEW_DISTANCE;
       run.lastSpawnRevealBuffer = plan.revealBuffer;
-      this.nextSpawnDistance += this.getNextScheduledWaveSpacing(wave, spawnDistance);
+      const nextScheduledDistance = this.nextSpawnDistance + this.getNextScheduledWaveSpacing(wave, spawnDistance);
+      this.nextSpawnDistance = Math.max(
+        nextScheduledDistance,
+        Number.isFinite(wave?.fuelRecoveryWindowEndDistance) ? wave.fuelRecoveryWindowEndDistance : 0
+      );
     }
 
     if (wavesSpawned >= plan.maxWavesPerFrame && this.nextSpawnDistance <= plan.spawnHorizon + 1 && this.nextSpawnDistance < finishLimit) {
@@ -12598,7 +13188,7 @@ class ObstacleManager {
     run.wavesSpawnedThisFrame = wavesSpawned;
     run.maxWavesSpawnedInSingleFrame = Math.max(run.maxWavesSpawnedInSingleFrame || 0, wavesSpawned);
     run.lastWaveDelayedForVisibleSafety = delayedForVisibility;
-    return { ...plan, wavesSpawned, delayedForVisibility, underActivityCorrected };
+    return { ...plan, wavesSpawned, delayedForVisibility, underActivityCorrected, officialOpeningCorrected };
   }
 
   maybePlayWarningSfx(obstacle, ahead) {
@@ -13323,6 +13913,44 @@ class ObstacleManager {
     const timeSinceLastGasCan = routeSeedLocked
       ? Math.max(0, distance - lastGasDistance) / cruiseSpeed
       : (Number.isFinite(run.timeSinceLastGasCan) ? run.timeSinceLastGasCan : 0);
+    const officialRoute = getOfficialRouteById(run.officialRouteId || "");
+    let officialViability = null;
+    if (officialRoute && isFuelRunRaceType(run.raceTypeId)) {
+      const rules = getOfficialFuelViabilityRules(officialRoute, this.getSpeedClassId(), track);
+      const progressSamples = Array.isArray(run.gasCanSpawnProgressSamples) ? run.gasCanSpawnProgressSamples : [];
+      const postMidpointOpportunities = progressSamples.filter((item) => item >= rules.midpointProgress).length;
+      const lateOpportunities = progressSamples.filter((item) => item >= rules.lateProgress).length;
+      const remainingSeconds = Math.max(0, (track.distanceToFinish || 0) - distance) / cruiseSpeed;
+      const drainPerSecond = Number.isFinite(run.fuelDrainPerSecond) ? run.fuelDrainPerSecond : tuning.fuelDrainPerSecond;
+      const projectedFuelAtFinish = fuel - remainingSeconds * drainPerSecond;
+      const belowLateThreshold = fuel <= rules.lateFuelThreshold || projectedFuelAtFinish <= rules.lateFuelThreshold;
+      const needsTotalOpportunity = progress >= 0.08
+        && progress < 0.985
+        && spawnedGas < rules.minTotalOpportunities;
+      const needsPostMidpointOpportunity = progress >= rules.midpointProgress
+        && progress < 0.985
+        && postMidpointOpportunities < rules.minPostMidpointOpportunities;
+      const needsLateOpportunity = progress >= rules.lateProgress
+        && progress < 0.985
+        && lateOpportunities < rules.minLateOpportunities
+        && belowLateThreshold;
+      officialViability = {
+        rules,
+        minTotalOpportunities: rules.minTotalOpportunities,
+        cansNeededForFuelBudget: rules.cansNeededForFuelBudget,
+        postMidpointOpportunities,
+        lateOpportunities,
+        projectedFuelAtFinish,
+        belowLateThreshold,
+        needsTotalOpportunity,
+        needsPostMidpointOpportunity,
+        needsLateOpportunity,
+        requiresGasRoute: needsTotalOpportunity || needsPostMidpointOpportunity || needsLateOpportunity,
+        allowGapOverride: needsLateOpportunity || (needsPostMidpointOpportunity && belowLateThreshold)
+      };
+      run.officialFuelViabilityMinGasCans = rules.minTotalOpportunities;
+      run.officialFuelViabilityCansNeeded = rules.cansNeededForFuelBudget;
+    }
     return {
       amount: fuel,
       max: Number.isFinite(run.fuelMax) ? run.fuelMax : tuning.fuelMax,
@@ -13336,7 +13964,8 @@ class ObstacleManager {
       critical: fuel <= tuning.criticalFuelThreshold,
       minGasGapSeconds: tuning.minGasGapSeconds,
       targetGasGapSeconds: tuning.targetGasGapSeconds,
-      maxGasGapSeconds: tuning.maxGasGapSeconds
+      maxGasGapSeconds: tuning.maxGasGapSeconds,
+      officialViability
     };
   }
 
@@ -14891,6 +15520,12 @@ class Renderer {
     return "SHIFT+A/D DRIFT DASH";
   }
 
+  getTrackRenderBudget(theme = this.getCurrentTrackVisualTheme()) {
+    if (theme?.blackoutRoad) return TRACK_RENDER_BUDGETS.blackout;
+    if (theme?.prismRoadSurface) return TRACK_RENDER_BUDGETS.prism;
+    return TRACK_RENDER_BUDGETS.default;
+  }
+
   resize() {
     const rect = this.canvas.getBoundingClientRect();
     const dpr = Math.max(1, Math.min(2, window.devicePixelRatio || 1));
@@ -15223,6 +15858,10 @@ class Renderer {
     const musicIdentity = this.getMusicIdentityAtmosphere();
     const musicPulse = this.getMusicPulse(musicIdentity);
     const musicGlow = musicIdentity ? musicIdentity.horizonGlow * (0.7 + musicPulse * 0.3) : 0;
+    if (theme.blackoutRoad) {
+      this.drawBlackoutBackground(theme);
+      return;
+    }
     const glowStrength = clamp(TRACK_VISUALS.horizonGlowStrength * clamp(visualIntensity + speedFeel * 0.16 + musicGlow, 0.78, 1.46), 0.45, 1.16) * lerp(0.82, 1, effectScale);
     const sky = ctx.createLinearGradient(0, 0, 0, h);
     sky.addColorStop(0, theme.skyTop || "#100c2b");
@@ -15265,24 +15904,59 @@ class Renderer {
     this.drawHorizonSilhouettes(horizonY, theme);
     if (theme.citySkyline) this.drawTrackCitySkyline(horizonY, theme);
 
-    ctx.save();
-    ctx.globalAlpha = (0.2 + speedFeel * 0.1) * lerp(0.72, 1, effectScale);
-    ctx.strokeStyle = "#28f6ff";
-    ctx.lineWidth = 1;
-    const gridY = horizonY + 12;
-    const horizontalStep = effectScale < 0.78 ? 52 : 34;
-    const radialStep = effectScale < 0.78 ? 102 : 68;
-    for (let y = gridY; y < h; y += horizontalStep) {
-      ctx.beginPath();
-      ctx.moveTo(0, y);
-      ctx.lineTo(w, y);
-      ctx.stroke();
+    const budget = this.getTrackRenderBudget(theme);
+    if (budget.backgroundGrid) {
+      ctx.save();
+      ctx.globalAlpha = (0.2 + speedFeel * 0.1) * lerp(0.72, 1, effectScale);
+      ctx.strokeStyle = "#28f6ff";
+      ctx.lineWidth = 1;
+      const gridY = horizonY + 12;
+      const horizontalStep = effectScale < 0.78 ? 52 : 34;
+      const radialStep = effectScale < 0.78 ? 102 : 68;
+      for (let y = gridY; y < h; y += horizontalStep) {
+        ctx.beginPath();
+        ctx.moveTo(0, y);
+        ctx.lineTo(w, y);
+        ctx.stroke();
+      }
+      for (let x = -w; x < w * 2; x += radialStep) {
+        ctx.beginPath();
+        ctx.moveTo(w * 0.5, gridY);
+        ctx.lineTo(x, h);
+        ctx.stroke();
+      }
+      ctx.restore();
     }
-    for (let x = -w; x < w * 2; x += radialStep) {
-      ctx.beginPath();
-      ctx.moveTo(w * 0.5, gridY);
-      ctx.lineTo(x, h);
-      ctx.stroke();
+  }
+
+  drawBlackoutBackground(theme = {}) {
+    const ctx = this.ctx;
+    const w = this.width;
+    const h = this.height;
+    const horizonY = Math.max(235, Math.min(h * 0.46, this.road.y + this.road.h * 0.42));
+    ctx.save();
+    ctx.fillStyle = theme.skyTop || "#000000";
+    ctx.fillRect(0, 0, w, h);
+    ctx.fillStyle = theme.mountainSilhouetteColor || "rgba(0, 1, 4, 0.96)";
+    ctx.beginPath();
+    ctx.moveTo(0, horizonY + 36);
+    for (let i = 0; i <= 10; i += 1) {
+      const x = (w / 10) * i;
+      const peak = horizonY - 18 - deterministicNoise(i, 151) * 64;
+      ctx.lineTo(x, peak);
+      ctx.lineTo(x + w / 20, horizonY + 24 - deterministicNoise(i, 152) * 12);
+    }
+    ctx.lineTo(w, h);
+    ctx.lineTo(0, h);
+    ctx.closePath();
+    ctx.fill();
+    ctx.globalAlpha = 0.16;
+    ctx.fillStyle = theme.townLightColor || "rgba(255, 236, 176, 0.16)";
+    for (let i = 0; i < 18; i += 1) {
+      if (deterministicNoise(i, 153) < 0.36) continue;
+      const x = deterministicNoise(i, 154) * w;
+      const y = horizonY + 8 + deterministicNoise(i, 155) * 58;
+      ctx.fillRect(x, y, 2, 2);
     }
     ctx.restore();
   }
@@ -15540,6 +16214,7 @@ class Renderer {
     const visualIntensity = this.getRaceVisualIntensity();
     const theme = this.getCurrentTrackVisualTheme();
     const effectScale = this.getPerformanceEffectScale();
+    const budget = this.getTrackRenderBudget(theme);
     const activeRace = this.game.screen === "game";
     const sceneryDensity = (TRACK_VISUALS.sceneryDensity || 1)
       * clampNumber(theme.sceneryDensity, 0.3, 1.4, 1)
@@ -15617,6 +16292,11 @@ class Renderer {
       } else {
         this.drawLowDesertRock(x, y, scale, warmth);
       }
+    }
+
+    if (!budget.roadsideGlow) {
+      ctx.restore();
+      return;
     }
 
     const parallaxScroll = (scrollSource * (0.12 + speedRatio * 0.07)) % 120;
@@ -15821,33 +16501,22 @@ class Renderer {
     ctx.fillRect(-3 * scale, -h, 6 * scale, h);
     const color = roll > 0.45 ? (theme.edgeAltColor || "#ffd36f") : (theme.reflectorColor || "#ffffff");
     ctx.globalAlpha = 0.74;
-    ctx.shadowBlur = 12 * scale;
-    ctx.shadowColor = color;
     ctx.fillStyle = color;
     ctx.fillRect(-5 * scale, -h + 8 * scale, 10 * scale, 4 * scale);
     if (roll > 0.68) {
-      ctx.globalAlpha = 0.28;
-      ctx.beginPath();
-      ctx.moveTo(0, -h + 10 * scale);
-      ctx.lineTo(side * 62 * scale, -h + 28 * scale);
-      ctx.lineTo(side * 12 * scale, -h + 38 * scale);
-      ctx.closePath();
-      ctx.fill();
+      ctx.globalAlpha = 0.42;
+      ctx.fillRect((side < 0 ? -28 : 10) * scale, -h + 14 * scale, 18 * scale, 2 * scale);
     }
     ctx.restore();
   }
 
   drawPrismRoadsideMarker(x, y, scale, side, theme = {}, typeRoll = 0) {
     const ctx = this.ctx;
-    const effectScale = this.getPerformanceEffectScale();
     const colorA = typeRoll > 0.5 ? (theme.edgeAltColor || "#ff3fd1") : (theme.edgeColor || "#22f3ff");
     const colorB = typeRoll > 0.5 ? (theme.reflectorColor || "#ffe45e") : (theme.laneSecondary || "#ff59d8");
     ctx.save();
     ctx.translate(x, y);
-    ctx.globalCompositeOperation = "lighter";
-    ctx.globalAlpha = 0.56;
-    ctx.shadowBlur = 12 * scale * lerp(0.58, 1, effectScale);
-    ctx.shadowColor = colorA;
+    ctx.globalAlpha = 0.42;
     ctx.strokeStyle = colorA;
     ctx.lineWidth = Math.max(1, 2 * scale);
     const h = 44 * scale;
@@ -15858,7 +16527,7 @@ class Renderer {
     ctx.lineTo(side * -w * 0.45, -h * 0.34);
     ctx.closePath();
     ctx.stroke();
-    ctx.globalAlpha = 0.32;
+    ctx.globalAlpha = 0.2;
     ctx.fillStyle = colorB;
     ctx.fill();
     ctx.restore();
@@ -15967,68 +16636,83 @@ class Renderer {
     const speedFeel = this.getSpeedFeelIntensity();
     const theme = this.getCurrentTrackVisualTheme();
     const effectScale = this.getPerformanceEffectScale();
+    const budget = this.getTrackRenderBudget(theme);
     ctx.save();
     ctx.globalAlpha = alpha;
-    const roadGradient = ctx.createLinearGradient(road.x, 0, road.x + road.w, 0);
-    roadGradient.addColorStop(0, theme.roadOuter || "#161722");
-    roadGradient.addColorStop(0.08, theme.roadInner || "#10111a");
-    roadGradient.addColorStop(0.5, "#0b0d16");
-    roadGradient.addColorStop(0.92, theme.roadInner || "#10111a");
-    roadGradient.addColorStop(1, theme.roadOuter || "#161722");
-    ctx.fillStyle = roadGradient;
+    if (budget.roadGradient) {
+      const roadGradient = ctx.createLinearGradient(road.x, 0, road.x + road.w, 0);
+      roadGradient.addColorStop(0, theme.roadOuter || "#161722");
+      roadGradient.addColorStop(0.08, theme.roadInner || "#10111a");
+      roadGradient.addColorStop(0.5, theme.roadCenter || "#0b0d16");
+      roadGradient.addColorStop(0.92, theme.roadInner || "#10111a");
+      roadGradient.addColorStop(1, theme.roadOuter || "#161722");
+      ctx.fillStyle = roadGradient;
+    } else {
+      ctx.fillStyle = theme.roadCenter || "#0b0d16";
+    }
     ctx.fillRect(road.x, road.y, road.w, road.h);
 
-    const shoulderWash = ctx.createLinearGradient(road.x, 0, road.x + road.w, 0);
-    shoulderWash.addColorStop(0, rgbaFromHex(theme.edgeColor || "#28f6ff", 0.12 + speedFeel * 0.04));
-    shoulderWash.addColorStop(0.18, "rgba(0, 0, 0, 0)");
-    shoulderWash.addColorStop(0.82, "rgba(0, 0, 0, 0)");
-    shoulderWash.addColorStop(1, rgbaFromHex(theme.edgeAltColor || "#ff3fd1", 0.12 + speedFeel * 0.04));
-    ctx.fillStyle = shoulderWash;
-    ctx.fillRect(road.x, road.y, road.w, road.h);
+    if (!theme.blackoutRoad) {
+      const shoulderWash = ctx.createLinearGradient(road.x, 0, road.x + road.w, 0);
+      shoulderWash.addColorStop(0, rgbaFromHex(theme.edgeColor || "#28f6ff", 0.12 + speedFeel * 0.04));
+      shoulderWash.addColorStop(0.18, "rgba(0, 0, 0, 0)");
+      shoulderWash.addColorStop(0.82, "rgba(0, 0, 0, 0)");
+      shoulderWash.addColorStop(1, rgbaFromHex(theme.edgeAltColor || "#ff3fd1", 0.12 + speedFeel * 0.04));
+      ctx.fillStyle = shoulderWash;
+      ctx.fillRect(road.x, road.y, road.w, road.h);
 
-    ctx.fillStyle = "rgba(255, 255, 255, 0.04)";
-    for (let i = 0; i < LANES; i += 1) {
-      if (i % 2 === 0) {
-        ctx.fillRect(road.x + i * road.laneW, road.y, road.laneW, road.h);
+      ctx.fillStyle = theme.prismRoadSurface ? "rgba(255, 255, 255, 0.025)" : "rgba(255, 255, 255, 0.04)";
+      for (let i = 0; i < LANES; i += 1) {
+        if (i % 2 === 0) {
+          ctx.fillRect(road.x + i * road.laneW, road.y, road.laneW, road.h);
+        }
       }
     }
 
     const scrollSource = this.getVisualDistance() * this.getVisualMotionMultiplier();
-    this.drawRoadSurfaceDetails(scrollSource, alpha);
+    if (theme.blackoutRoad) {
+      this.drawBlackoutRoadReflectors(scrollSource, alpha, theme);
+    } else if (theme.prismRoadSurface) {
+      this.drawPrismRoadSurface(scrollSource, alpha, theme);
+    } else {
+      this.drawRoadSurfaceDetails(scrollSource, alpha);
+    }
     if (theme.prismRibbons) this.drawPrismRoadRibbons(scrollSource, alpha, theme);
     if (theme.headlightCone) this.drawBlackoutHeadlightCone(alpha, theme);
 
-    ctx.shadowBlur = (14 * visualIntensity + speedFeel * 8) * lerp(0.68, 1, effectScale);
+    ctx.shadowBlur = theme.blackoutRoad ? 0 : (14 * visualIntensity + speedFeel * 8) * lerp(0.68, 1, effectScale);
     ctx.shadowColor = theme.edgeColor || "#28f6ff";
     ctx.strokeStyle = theme.edgeColor || "#28f6ff";
-    ctx.lineWidth = 4 + Math.max(0, visualIntensity - 1) * 1.5 + speedFeel * 0.9;
+    ctx.lineWidth = (theme.blackoutRoad ? 2.4 : 4) + Math.max(0, visualIntensity - 1) * 1.5 + speedFeel * 0.9;
     ctx.beginPath();
     ctx.moveTo(road.x, road.y);
     ctx.lineTo(road.x, road.y + road.h);
     ctx.moveTo(road.x + road.w, road.y);
     ctx.lineTo(road.x + road.w, road.y + road.h);
     ctx.stroke();
-    this.drawRoadEdgeDetails(scrollSource, alpha);
+    if (budget.roadEdgeDetails) this.drawRoadEdgeDetails(scrollSource, alpha);
     if (theme.ridgeGuardrail) this.drawRidgeGuardrailGlints(scrollSource, alpha, theme);
     this.drawMusicRoadAtmosphere(scrollSource, alpha);
     if (theme.tunnelPanels) this.drawTrackTunnelPanels(scrollSource, alpha, theme);
 
-    const dashHeight = 56 + speedFeel * 8;
-    const gap = Math.max(38, 46 - speedFeel * 7);
-    const scroll = (scrollSource * SPEED_TUNING.roadStripeScrollScale) % (dashHeight + gap);
-    const lanePulse = 0.94 + Math.sin(scrollSource * 0.018) * 0.06 * clamp((visualIntensity + speedFeel * 0.4 - 0.8) / 0.55, 0, 1);
-    ctx.globalAlpha = alpha * clamp((visualIntensity + speedFeel * 0.18) * lanePulse, 0.78, 1.32);
-    for (let lane = 1; lane < LANES; lane += 1) {
-      const x = road.x + lane * road.laneW;
-      ctx.shadowColor = lane % 2 ? (theme.laneSecondary || "#ff3fd1") : (theme.lanePrimary || "#ffe45e");
-      ctx.strokeStyle = lane % 2 ? (theme.laneSecondary || "#ff3fd1") : (theme.lanePrimary || "#ffe45e");
-      ctx.lineWidth = (theme.sharpLaneMarkers ? 3.8 : 3) + speedFeel * 0.45;
-      ctx.shadowBlur = (8 + speedFeel * 4) * lerp(0.56, 1, effectScale);
-      for (let y = road.y - dashHeight + scroll; y < road.y + road.h + dashHeight; y += dashHeight + gap) {
-        ctx.beginPath();
-        ctx.moveTo(x, y);
-        ctx.lineTo(x, y + dashHeight);
-        ctx.stroke();
+    if (!theme.blackoutRoad) {
+      const dashHeight = 56 + speedFeel * 8;
+      const gap = Math.max(38, 46 - speedFeel * 7);
+      const scroll = (scrollSource * SPEED_TUNING.roadStripeScrollScale) % (dashHeight + gap);
+      const lanePulse = 0.94 + Math.sin(scrollSource * 0.018) * 0.06 * clamp((visualIntensity + speedFeel * 0.4 - 0.8) / 0.55, 0, 1);
+      ctx.globalAlpha = alpha * clamp((visualIntensity + speedFeel * 0.18) * lanePulse, 0.78, 1.32);
+      for (let lane = 1; lane < LANES; lane += 1) {
+        const x = road.x + lane * road.laneW;
+        ctx.shadowColor = lane % 2 ? (theme.laneSecondary || "#ff3fd1") : (theme.lanePrimary || "#ffe45e");
+        ctx.strokeStyle = lane % 2 ? (theme.laneSecondary || "#ff3fd1") : (theme.lanePrimary || "#ffe45e");
+        ctx.lineWidth = (theme.sharpLaneMarkers ? 3.8 : 3) + speedFeel * 0.45;
+        ctx.shadowBlur = (8 + speedFeel * 4) * lerp(0.56, 1, effectScale);
+        for (let y = road.y - dashHeight + scroll; y < road.y + road.h + dashHeight; y += dashHeight + gap) {
+          ctx.beginPath();
+          ctx.moveTo(x, y);
+          ctx.lineTo(x, y + dashHeight);
+          ctx.stroke();
+        }
       }
     }
     ctx.globalAlpha = alpha;
@@ -16042,6 +16726,8 @@ class Renderer {
   drawMusicRoadAtmosphere(scrollSource, alpha = 1) {
     const identity = this.getMusicIdentityAtmosphere();
     if (!identity) return;
+    const theme = this.getCurrentTrackVisualTheme();
+    if (theme.blackoutRoad || theme.prismRoadSurface) return;
     const ctx = this.ctx;
     const road = this.road;
     const pulse = this.getMusicPulse(identity);
@@ -16084,6 +16770,138 @@ class Renderer {
         ctx.fillRect(road.x, y, road.w, bandHeight);
       }
     }
+    ctx.restore();
+  }
+
+  getPrismPalette(theme = {}) {
+    return Array.isArray(theme.prismLanePalette) && theme.prismLanePalette.length >= LANES
+      ? theme.prismLanePalette
+      : ["#ff2d55", "#ff8a2a", "#ffe45e", "#44ff99", "#22f3ff", "#2f7dff", "#8b5cff", "#ff3edb"];
+  }
+
+  drawPrismRoadSurface(scrollSource, alpha = 1, theme = {}) {
+    const ctx = this.ctx;
+    const road = this.road;
+    const speedFeel = this.getSpeedFeelIntensity();
+    const effectScale = this.getPerformanceEffectScale();
+    const budget = this.getTrackRenderBudget(theme);
+    const palette = this.getPrismPalette(theme);
+    const panelSpacing = budget.prismBandSpacing / Math.max(0.86, effectScale);
+    const panelScroll = (scrollSource * (0.32 + speedFeel * 0.1)) % panelSpacing;
+    ctx.save();
+    ctx.globalCompositeOperation = "source-over";
+    for (let lane = 0; lane < LANES; lane += 1) {
+      const x = road.x + lane * road.laneW;
+      const colorA = palette[(lane * 2) % palette.length];
+      const colorB = palette[(lane * 2 + 1) % palette.length];
+      ctx.globalAlpha = alpha * 0.86;
+      ctx.fillStyle = rgbaFromHex(colorA, 0.76);
+      ctx.fillRect(x + 1, road.y, road.laneW - 2, road.h);
+      ctx.globalAlpha = alpha * 0.34;
+      ctx.fillStyle = rgbaFromHex(colorB, 0.56);
+      ctx.fillRect(x + road.laneW * 0.08, road.y, road.laneW * 0.84, road.h);
+      ctx.globalAlpha = alpha * 0.18;
+      ctx.fillStyle = "rgba(255, 255, 255, 0.2)";
+      ctx.fillRect(x + road.laneW * 0.42, road.y, road.laneW * 0.16, road.h);
+    }
+
+    ctx.globalAlpha = alpha * 0.26 * lerp(0.74, 1, effectScale);
+    let bandIndex = 0;
+    for (let y = road.y - panelSpacing + panelScroll; y < road.y + road.h + panelSpacing; y += panelSpacing) {
+      const panelH = 10 + speedFeel * 2;
+      for (let lane = 0; lane < LANES; lane += 1) {
+        const x = road.x + lane * road.laneW;
+        ctx.fillStyle = rgbaFromHex(palette[(lane + bandIndex + 2) % palette.length], 0.52);
+        ctx.fillRect(x + 2, y, road.laneW - 4, panelH);
+      }
+      bandIndex += 1;
+    }
+
+    ctx.globalCompositeOperation = "source-over";
+    ctx.globalAlpha = alpha * 0.28;
+    ctx.strokeStyle = "rgba(0, 0, 0, 0.42)";
+    ctx.lineWidth = 2;
+    for (let lane = 1; lane < LANES; lane += 1) {
+      const x = road.x + lane * road.laneW;
+      ctx.beginPath();
+      ctx.moveTo(x, road.y);
+      ctx.lineTo(x, road.y + road.h);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  drawBlackoutRoadReflectors(scrollSource, alpha = 1, theme = {}) {
+    const ctx = this.ctx;
+    const road = this.road;
+    const speedFeel = this.getSpeedFeelIntensity();
+    const effectScale = this.getPerformanceEffectScale();
+    const budget = this.getTrackRenderBudget(theme);
+    const studSpacing = budget.blackoutStudSpacing / Math.max(0.9, effectScale);
+    const studScroll = (scrollSource * (0.56 + speedFeel * 0.12)) % studSpacing;
+    const dashSpacing = budget.blackoutDashSpacing / Math.max(0.92, effectScale);
+    const dashScroll = (scrollSource * (0.62 + speedFeel * 0.12)) % dashSpacing;
+    ctx.save();
+
+    ctx.globalAlpha = alpha * 0.22;
+    ctx.fillStyle = "rgba(246, 251, 255, 0.035)";
+    for (let i = 0; i < budget.blackoutNoiseStreaks; i += 1) {
+      const worldIndex = Math.floor(scrollSource * 0.04) + i * 29;
+      const x = road.x + 20 + deterministicNoise(worldIndex, 101) * (road.w - 40);
+      const y = road.y + deterministicNoise(worldIndex, 102) * road.h;
+      const h = lerp(10, 42, deterministicNoise(worldIndex, 103));
+      ctx.fillRect(x, y, 1, h);
+    }
+
+    ctx.globalCompositeOperation = "source-over";
+    for (let lane = 0; lane <= LANES; lane += 1) {
+      const x = road.x + lane * road.laneW;
+      const lineColor = lane === 0 || lane === LANES ? (theme.edgeAltColor || "#ffd36f") : (theme.reflectorColor || "#ffffff");
+      ctx.fillStyle = lineColor;
+      ctx.shadowBlur = 0;
+      ctx.globalAlpha = alpha * (lane === 0 || lane === LANES ? 0.62 : 0.42);
+      for (let y = road.y - studSpacing + studScroll; y < road.y + road.h + studSpacing; y += studSpacing) {
+        const depth = clamp((y - road.y) / Math.max(1, road.h), 0, 1);
+        const w = lerp(2, 5, depth);
+        const h = lerp(4, 12, depth);
+        ctx.fillRect(x - w * 0.5, y, w, h);
+      }
+    }
+
+    ctx.fillStyle = theme.edgeAltColor || "#ffd36f";
+    ctx.globalAlpha = alpha * 0.12;
+    ctx.fillRect(road.x - 10, road.y, 2, road.h);
+    ctx.fillRect(road.x + road.w + 8, road.y, 2, road.h);
+    ctx.globalAlpha = alpha * 0.64;
+    for (let y = road.y - studSpacing + studScroll; y < road.y + road.h + studSpacing; y += studSpacing) {
+      const depth = clamp((y - road.y) / Math.max(1, road.h), 0, 1);
+      const w = lerp(3, 6, depth);
+      const h = lerp(5, 14, depth);
+      ctx.fillRect(road.x - 12, y, w, h);
+      ctx.fillRect(road.x + road.w + 8, y, w, h);
+    }
+
+    ctx.globalAlpha = alpha * 0.44;
+    ctx.shadowBlur = 0;
+    ctx.strokeStyle = theme.lanePrimary || "#f4f5f7";
+    ctx.lineWidth = 1.8;
+    for (let lane = 1; lane < LANES; lane += 1) {
+      const x = road.x + lane * road.laneW;
+      for (let y = road.y - dashSpacing + dashScroll; y < road.y + road.h + dashSpacing; y += dashSpacing) {
+        ctx.beginPath();
+        ctx.moveTo(x, y);
+        ctx.lineTo(x, y + 22 + speedFeel * 5);
+        ctx.stroke();
+      }
+    }
+
+    if (theme.lowBeamGlow) {
+      const playerY = this.game.run ? this.getPlayerScreenY() + this.road.laneW * 0.1 : this.height * 0.88;
+      ctx.globalAlpha = alpha * 0.035;
+      ctx.fillStyle = "rgba(255, 244, 205, 0.5)";
+      ctx.fillRect(road.x + road.w * 0.38, Math.max(road.y, playerY - road.h * 0.32), road.w * 0.24, road.h * 0.32);
+    }
+
     ctx.restore();
   }
 
@@ -16130,32 +16948,32 @@ class Renderer {
     const road = this.road;
     const speedFeel = this.getSpeedFeelIntensity();
     const effectScale = this.getPerformanceEffectScale();
-    const palette = ["#ff3edb", "#22f3ff", "#7c4dff", "#ffe45e", "#44ff99"];
+    const palette = this.getPrismPalette(theme);
     const spacing = 168 / Math.max(0.8, effectScale);
     const scroll = (scrollSource * (0.42 + speedFeel * 0.18)) % spacing;
     ctx.save();
     ctx.globalCompositeOperation = "lighter";
-    ctx.globalAlpha = alpha * clamp(0.18 + speedFeel * 0.08, 0.18, 0.34) * lerp(0.68, 1, effectScale);
+    ctx.globalAlpha = alpha * clamp(0.12 + speedFeel * 0.04, 0.12, 0.22) * lerp(0.68, 1, effectScale);
     for (let lane = 0; lane < LANES; lane += 1) {
       const x = road.x + lane * road.laneW;
-      const color = palette[lane % palette.length];
+      const color = palette[(lane + 4) % palette.length];
       const laneFill = ctx.createLinearGradient(x, 0, x + road.laneW, 0);
       laneFill.addColorStop(0, rgbaFromHex(color, 0));
-      laneFill.addColorStop(0.5, rgbaFromHex(color, 0.34));
+      laneFill.addColorStop(0.5, rgbaFromHex(color, 0.4));
       laneFill.addColorStop(1, rgbaFromHex(color, 0));
       ctx.fillStyle = laneFill;
-      ctx.fillRect(x + road.laneW * 0.18, road.y, road.laneW * 0.64, road.h);
+      ctx.fillRect(x + road.laneW * 0.3, road.y, road.laneW * 0.4, road.h);
     }
-    ctx.globalAlpha = alpha * 0.28 * lerp(0.62, 1, effectScale);
-    ctx.lineWidth = 3;
+    ctx.globalAlpha = alpha * 0.16 * lerp(0.62, 1, effectScale);
+    ctx.lineWidth = 2;
     for (let y = road.y - spacing + scroll; y < road.y + road.h + spacing; y += spacing) {
       const color = palette[Math.abs(Math.floor(y / spacing)) % palette.length] || theme.edgeColor || "#22f3ff";
       ctx.strokeStyle = color;
-      ctx.shadowBlur = 12 * lerp(0.58, 1, effectScale);
+      ctx.shadowBlur = 8 * lerp(0.58, 1, effectScale);
       ctx.shadowColor = color;
       ctx.beginPath();
       ctx.moveTo(road.x + 18, y);
-      ctx.bezierCurveTo(road.x + road.w * 0.28, y + 18, road.x + road.w * 0.64, y - 20, road.x + road.w - 18, y + 8);
+      ctx.lineTo(road.x + road.w - 18, y + 6);
       ctx.stroke();
     }
     ctx.restore();
@@ -16192,10 +17010,28 @@ class Renderer {
     if (!run || this.game.screen !== "game") return;
     const ctx = this.ctx;
     const road = this.road;
+    const theme = this.getCurrentTrackVisualTheme();
     const laneX = road.x + run.targetLane * road.laneW;
     const playerY = this.getPlayerScreenY();
     const boostPunch = this.getBoostVisualPunch();
     const laneChanging = Math.abs(run.renderLaneFloat - run.targetLane) > 0.02;
+    if (theme.blackoutRoad) {
+      const glowAlpha = alpha * clamp(0.08 + boostPunch * 0.08 + (laneChanging ? 0.05 : 0), 0.05, 0.18);
+      ctx.save();
+      ctx.globalAlpha = glowAlpha;
+      ctx.fillStyle = "rgba(255, 244, 205, 0.42)";
+      ctx.fillRect(laneX + road.laneW * 0.32, Math.max(road.y, playerY - road.laneW * 1.2), road.laneW * 0.36, road.laneW * 1.1);
+      ctx.globalAlpha = glowAlpha * 1.8;
+      ctx.strokeStyle = getCarBoostTrailColor(run.player.car);
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(laneX + road.laneW * 0.36, playerY + road.laneW * 0.52);
+      ctx.lineTo(laneX + road.laneW * 0.5, playerY + road.laneW * 0.34);
+      ctx.lineTo(laneX + road.laneW * 0.64, playerY + road.laneW * 0.52);
+      ctx.stroke();
+      ctx.restore();
+      return;
+    }
     const glowAlpha = alpha * clamp(0.11 + boostPunch * 0.15 + (laneChanging ? 0.08 : 0), 0.08, 0.36);
     const y0 = clamp(playerY - road.laneW * 1.15, road.y, road.y + road.h);
     const y1 = clamp(playerY + road.laneW * 1.45, road.y, road.y + road.h);
@@ -16330,6 +17166,7 @@ class Renderer {
     const speedFeel = this.getSpeedFeelIntensity();
     const theme = this.getCurrentTrackVisualTheme();
     const effectScale = this.getPerformanceEffectScale();
+    const blackoutRoad = Boolean(theme.blackoutRoad);
     const lightSpacing = TRACK_VISUALS.edgeLightSpacing / Math.max(0.76, effectScale);
     const reflectorSpacing = TRACK_VISUALS.reflectorSpacing / Math.max(0.82, effectScale);
     const lightScroll = (scrollSource * (0.72 + speedRatio * 0.42 + speedFeel * 0.16) * clamp(visualIntensity, 0.92, 1.12)) % lightSpacing;
@@ -16337,10 +17174,11 @@ class Renderer {
 
     ctx.save();
     const shoulderGlow = ctx.createLinearGradient(road.x - 34, 0, road.x + road.w + 34, 0);
-    shoulderGlow.addColorStop(0, rgbaFromHex(theme.edgeColor || "#28f6ff", alpha * (0.18 + speedFeel * 0.08) * lerp(0.76, 1, effectScale)));
+    const glowAlpha = alpha * (blackoutRoad ? 0.055 + speedFeel * 0.018 : 0.18 + speedFeel * 0.08) * lerp(0.76, 1, effectScale);
+    shoulderGlow.addColorStop(0, rgbaFromHex(theme.edgeColor || "#28f6ff", glowAlpha));
     shoulderGlow.addColorStop(0.11, "rgba(0, 0, 0, 0)");
     shoulderGlow.addColorStop(0.89, "rgba(0, 0, 0, 0)");
-    shoulderGlow.addColorStop(1, rgbaFromHex(theme.edgeAltColor || "#ff3fd1", alpha * (0.18 + speedFeel * 0.08) * lerp(0.76, 1, effectScale)));
+    shoulderGlow.addColorStop(1, rgbaFromHex(theme.edgeAltColor || "#ff3fd1", glowAlpha));
     ctx.globalCompositeOperation = "lighter";
     ctx.fillStyle = shoulderGlow;
     ctx.fillRect(road.x - 34, road.y, road.w + 68, road.h);
@@ -16350,7 +17188,7 @@ class Renderer {
       const t = clamp((y - road.y) / Math.max(1, road.h), 0, 1);
       const size = lerp(3, 7, t);
       const color = Math.floor(y / lightSpacing) % 2 ? (theme.edgeAltColor || "#ff3fd1") : (theme.edgeColor || "#28f6ff");
-      ctx.shadowBlur = (12 * visualIntensity + speedFeel * 8) * lerp(0.68, 1, effectScale);
+      ctx.shadowBlur = blackoutRoad ? 0 : (12 * visualIntensity + speedFeel * 8) * lerp(0.68, 1, effectScale);
       ctx.shadowColor = color;
       ctx.fillStyle = color;
       ctx.fillRect(road.x - 14, y, size, size * 2.3);
@@ -16497,8 +17335,207 @@ class Renderer {
     ctx.restore();
   }
 
+  drawBlackoutObstacle(ctx, obstacle, x, y, visual, scale) {
+    if (!obstacle || !visual) return false;
+    if (obstacle.type === "slowCar" || obstacle.type === "fastCar" || obstacle.type === "truck") {
+      this.drawBlackoutVehicleSilhouette(ctx, x, y, visual.w, visual.h, scale, obstacle.type);
+      return true;
+    }
+    if (obstacle.type === "barrier") {
+      this.drawBlackoutBarrier(ctx, x, y, visual.w, visual.h, scale);
+      return true;
+    }
+    if (obstacle.type === "ramp") {
+      this.drawBlackoutRamp(ctx, x, y, visual.w, visual.h, scale, obstacle);
+      return true;
+    }
+    if (obstacle.type === "gasCan") {
+      this.drawBlackoutGasCan(ctx, x, y, visual.w, visual.h, scale, obstacle);
+      return true;
+    }
+    return false;
+  }
+
+  drawBlackoutVehicleSilhouette(ctx, x, y, width, height, scale, type) {
+    const isFast = type === "fastCar";
+    const isTruck = type === "truck";
+    const w = width;
+    const h = height;
+    ctx.save();
+    ctx.translate(x, y);
+    drawShadow(ctx, w * 0.92, h * 0.88);
+
+    ctx.globalCompositeOperation = "source-over";
+    ctx.fillStyle = "rgba(0, 1, 4, 0.98)";
+    ctx.strokeStyle = "rgba(246, 251, 255, 0.18)";
+    ctx.lineWidth = Math.max(1, 1.4 * scale);
+    ctx.beginPath();
+    if (isTruck) {
+      ctx.rect(-w * 0.44, -h * 0.47, w * 0.88, h * 0.9);
+    } else if (isFast) {
+      ctx.moveTo(0, -h * 0.5);
+      ctx.lineTo(w * 0.39, -h * 0.34);
+      ctx.lineTo(w * 0.43, h * 0.28);
+      ctx.lineTo(w * 0.31, h * 0.5);
+      ctx.lineTo(-w * 0.31, h * 0.5);
+      ctx.lineTo(-w * 0.43, h * 0.28);
+      ctx.lineTo(-w * 0.39, -h * 0.34);
+      ctx.closePath();
+    } else {
+      ctx.rect(-w * 0.42, -h * 0.49, w * 0.84, h * 0.98);
+    }
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.fillStyle = "rgba(246, 251, 255, 0.11)";
+    ctx.fillRect(-w * 0.26, -h * 0.3, w * 0.52, Math.max(2, h * 0.04));
+    ctx.fillRect(-w * 0.22, h * 0.15, w * 0.44, Math.max(2, h * 0.035));
+
+    ctx.globalCompositeOperation = "source-over";
+    ctx.fillStyle = "#fff2b0";
+    const headW = w * (isTruck ? 0.16 : 0.13);
+    const headH = h * 0.045;
+    ctx.fillRect(-w * 0.3, -h * 0.48, headW, headH);
+    ctx.fillRect(w * (0.3 - (isTruck ? 0.16 : 0.13)), -h * 0.48, headW, headH);
+
+    ctx.fillStyle = "#ff334c";
+    ctx.fillRect(-w * 0.32, h * 0.43, w * 0.13, h * 0.045);
+    ctx.fillRect(w * 0.19, h * 0.43, w * 0.13, h * 0.045);
+
+    ctx.strokeStyle = isTruck ? "#ffd36f" : (isFast ? "#ff334c" : "#f6fbff");
+    ctx.globalAlpha = 0.72;
+    ctx.lineWidth = Math.max(1.2, 1.8 * scale);
+    ctx.beginPath();
+    ctx.moveTo(-w * 0.38, -h * 0.18);
+    ctx.lineTo(-w * 0.2, -h * 0.2);
+    ctx.moveTo(w * 0.2, -h * 0.2);
+    ctx.lineTo(w * 0.38, -h * 0.18);
+    ctx.moveTo(-w * 0.38, h * 0.26);
+    ctx.lineTo(-w * 0.2, h * 0.29);
+    ctx.moveTo(w * 0.2, h * 0.29);
+    ctx.lineTo(w * 0.38, h * 0.26);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  drawBlackoutBarrier(ctx, x, y, width, height, scale) {
+    const w = width;
+    const h = height;
+    ctx.save();
+    ctx.translate(x, y);
+    drawShadow(ctx, w * 0.92, h * 0.64);
+    ctx.fillStyle = "rgba(1, 2, 6, 0.96)";
+    ctx.fillRect(-w * 0.48, -h * 0.3, w * 0.96, h * 0.48);
+    ctx.strokeStyle = "rgba(246, 251, 255, 0.24)";
+    ctx.lineWidth = Math.max(1, 1.6 * scale);
+    ctx.strokeRect(-w * 0.48, -h * 0.3, w * 0.96, h * 0.48);
+    ctx.globalCompositeOperation = "source-over";
+    for (let i = -2; i <= 2; i += 1) {
+      const sx = i * w * 0.18;
+      ctx.strokeStyle = i % 2 ? "#f6fbff" : "#ffd36f";
+      ctx.lineWidth = Math.max(2, 3 * scale);
+      ctx.beginPath();
+      ctx.moveTo(sx - w * 0.12, h * 0.14);
+      ctx.lineTo(sx + w * 0.08, -h * 0.26);
+      ctx.stroke();
+    }
+    ctx.fillStyle = "#ff334c";
+    ctx.fillRect(-w * 0.5, -h * 0.39, w * 0.14, h * 0.11);
+    ctx.fillRect(w * 0.36, -h * 0.39, w * 0.14, h * 0.11);
+    ctx.restore();
+  }
+
+  drawBlackoutRamp(ctx, x, y, width, height, scale, obstacle) {
+    const w = width;
+    const h = height;
+    const pulse = 0.5 + Math.sin((this.game.run?.elapsed || 0) * 7 + obstacle.distance * 0.01) * 0.5;
+    ctx.save();
+    ctx.translate(x, y);
+    drawShadow(ctx, w * 0.9, h * 0.48);
+    ctx.fillStyle = "rgba(1, 4, 7, 0.94)";
+    ctx.beginPath();
+    ctx.moveTo(-w * 0.5, h * 0.32);
+    ctx.lineTo(w * 0.5, h * 0.32);
+    ctx.lineTo(w * 0.28, -h * 0.34);
+    ctx.lineTo(-w * 0.5, h * 0.05);
+    ctx.closePath();
+    ctx.fill();
+    ctx.globalCompositeOperation = "source-over";
+    ctx.globalAlpha = 0.78;
+    ctx.strokeStyle = "#44ff99";
+    ctx.lineWidth = Math.max(2, 3 * scale);
+    ctx.stroke();
+    ctx.strokeStyle = "#f6fbff";
+    ctx.globalAlpha = 0.56;
+    ctx.beginPath();
+    ctx.moveTo(-w * 0.42, h * 0.12);
+    ctx.lineTo(w * 0.3, -h * 0.24);
+    ctx.moveTo(-w * 0.22, h * 0.26);
+    ctx.lineTo(w * 0.48, h * 0.26);
+    ctx.stroke();
+    ctx.fillStyle = "#ffe45e";
+    ctx.globalAlpha = 0.86;
+    ctx.beginPath();
+    ctx.moveTo(-w * 0.44, h * 0.24);
+    ctx.lineTo(-w * 0.16, h * 0.1);
+    ctx.lineTo(-w * 0.22, h * 0.23);
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+  }
+
+  drawBlackoutGasCan(ctx, x, y, width, height, scale, obstacle) {
+    const w = width;
+    const h = height;
+    const pulse = 0.5 + Math.sin((this.game.run?.elapsed || 0) * 8 + obstacle.distance * 0.012) * 0.5;
+    ctx.save();
+    ctx.translate(x, y);
+    drawShadow(ctx, w * 0.86, h * 0.72);
+    ctx.globalCompositeOperation = "source-over";
+    ctx.globalAlpha = 0.2 + pulse * 0.1;
+    ctx.strokeStyle = "#44ff99";
+    ctx.lineWidth = Math.max(2, 2.6 * scale);
+    ctx.beginPath();
+    ctx.ellipse(0, h * 0.12, w * 0.6, h * 0.46, 0, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.globalCompositeOperation = "source-over";
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = "rgba(3, 5, 9, 0.96)";
+    pixelPath(ctx, [
+      [-0.34, -0.42],
+      [0.18, -0.42],
+      [0.36, -0.24],
+      [0.36, 0.42],
+      [-0.34, 0.42],
+      [-0.42, 0.28],
+      [-0.42, -0.32]
+    ], w, h);
+    ctx.strokeStyle = "rgba(246, 251, 255, 0.48)";
+    ctx.lineWidth = Math.max(2, 2.8 * scale);
+    ctx.stroke();
+    ctx.globalCompositeOperation = "source-over";
+    ctx.fillStyle = "#ff334c";
+    ctx.fillRect(-w * 0.22, -h * 0.12, w * 0.44, h * 0.09);
+    ctx.fillStyle = "#44ff99";
+    ctx.fillRect(-w * 0.22, h * 0.02, w * 0.44, Math.max(2, h * 0.06));
+    ctx.fillStyle = "#ffe45e";
+    ctx.beginPath();
+    ctx.moveTo(0, -h * 0.02);
+    ctx.bezierCurveTo(w * 0.18, h * 0.12, w * 0.12, h * 0.3, 0, h * 0.3);
+    ctx.bezierCurveTo(-w * 0.12, h * 0.3, -w * 0.18, h * 0.12, 0, -h * 0.02);
+    ctx.fill();
+    ctx.restore();
+  }
+
   drawObstacle(ctx, obstacle, x, y, scale) {
     const visual = this.getObstacleVisualSize(obstacle.type, scale, obstacle);
+    const theme = this.getCurrentTrackVisualTheme();
+    if (theme.blackoutObstacleSilhouettes && this.drawBlackoutObstacle(ctx, obstacle, x, y, visual, scale)) {
+      if (obstacle.pursuitMarker || obstacle.pursuitRoadblock) {
+        this.drawPursuitObstacleMarker(ctx, x, y, visual.w, visual.h, scale, obstacle);
+      }
+      return;
+    }
     if (visual.sprite) {
       drawTrafficSprite(ctx, x, y, { ...visual, type: obstacle.type });
       this.drawReflectiveObstacleCue(ctx, x, y, visual.w, visual.h, scale, obstacle);
@@ -20012,6 +21049,7 @@ class NeonRoadRally {
     this.playtestReportCopyText = "";
     this.roadDirectorReportCopyText = "";
     this.roadRng = null;
+    this.officialFullRouteSignatureCache = new Map();
     this.randomFloat = () => this.nextRoadRandom();
     this.simulationStatus = null;
     this.simulationRunning = false;
@@ -20052,6 +21090,14 @@ class NeonRoadRally {
       routeSignatureVersion: "",
       routeSignatureHash: "",
       routeSignatureWaveCount: 0,
+      runProgressSignatureVersion: "",
+      runProgressSignatureHash: "",
+      runProgressSignatureWaveCount: 0,
+      runProgressSignatureScope: RUN_PROGRESS_SIGNATURE_SCOPE,
+      officialFullRouteSignatureVersion: "",
+      officialFullRouteSignatureHash: "",
+      officialFullRouteSignatureWaveCount: 0,
+      officialFullRouteSignatureScope: OFFICIAL_FULL_ROUTE_SIGNATURE_SCOPE,
       competitionKind: "Custom Road",
       fuelMax: 0,
       fuel: 0,
@@ -20071,8 +21117,11 @@ class NeonRoadRally {
       longestNoFuelStretchSeconds: 0,
       maxTimeBetweenGasCans: 0,
       gasCanGapSamples: [],
+      gasCanSpawnProgressSamples: [],
+      gasCanSpawnTimeSamples: [],
       gasCansSpawned: 0,
       gasCansCollected: 0,
+      gasCansMissed: 0,
       gasCanSpawnRejected: 0,
       gasCanSpawnRepositioned: 0,
       gasCanReachabilityFailuresPrevented: 0,
@@ -20081,6 +21130,11 @@ class NeonRoadRally {
       gasCanPlacementSkippedNoFairRoute: 0,
       gasCanRouteSafetyFailures: 0,
       gasCanNearestBlockerDistanceMin: null,
+      gasCanConsecutivePlacementFailures: 0,
+      gasCanRecoveryPlacementAttempts: 0,
+      gasCanRecoveryPlacements: 0,
+      officialFuelViabilityMinGasCans: 0,
+      officialFuelViabilityCansNeeded: 0,
       fuelCollected: 0,
       fuelSavedByBoost: 0,
       fuelDrainPausedTime: 0,
@@ -20361,10 +21415,24 @@ class NeonRoadRally {
       deadScreenTime: 0,
       longestDeadScreenSeconds: 0,
       timeSinceLastMeaningfulDecisionMax: 0,
+      firstMeaningfulDecisionTime: null,
+      firstRequiredLaneDecisionTime: null,
+      openingDeadScreenTimeFirst10Seconds: 0,
+      longestOpeningDeadScreenSeconds: 0,
+      openingMeaningfulWaveCountFirst10Seconds: 0,
+      openingRequiredLaneDecisionCountFirst10Seconds: 0,
+      openingNoInputSafeTime: 0,
       visibleMeaningfulMin: Infinity,
       visibleMeaningfulSampleSum: 0,
       visibleMeaningfulSampleCount: 0,
       upcomingDecisionGapMax: 0,
+      officialOpeningActivityCorrections: 0,
+      lastOfficialOpeningActivityCorrectionElapsed: -Infinity,
+      lastOfficialOpeningActivityCorrectionReason: "",
+      forceOfficialOpeningActivityWave: false,
+      forceOfficialOpeningActivityReason: "",
+      forceOfficialOpeningActivityRequiresLaneDecision: false,
+      forceOfficialOpeningActivityTargetKey: "",
       underActivityCorrections: 0,
       lastUnderActivityCorrectionElapsed: -Infinity,
       lastUnderActivityCorrectionReason: "",
@@ -20690,8 +21758,11 @@ class NeonRoadRally {
     run.longestNoFuelStretchSeconds = 0;
     run.maxTimeBetweenGasCans = 0;
     run.gasCanGapSamples = [];
+    run.gasCanSpawnProgressSamples = [];
+    run.gasCanSpawnTimeSamples = [];
     run.gasCansSpawned = 0;
     run.gasCansCollected = 0;
+    run.gasCansMissed = 0;
     run.gasCanSpawnRejected = 0;
     run.gasCanSpawnRepositioned = 0;
     run.gasCanReachabilityFailuresPrevented = 0;
@@ -20700,6 +21771,11 @@ class NeonRoadRally {
     run.gasCanPlacementSkippedNoFairRoute = 0;
     run.gasCanRouteSafetyFailures = 0;
     run.gasCanNearestBlockerDistanceMin = null;
+    run.gasCanConsecutivePlacementFailures = 0;
+    run.gasCanRecoveryPlacementAttempts = 0;
+    run.gasCanRecoveryPlacements = 0;
+    run.officialFuelViabilityMinGasCans = 0;
+    run.officialFuelViabilityCansNeeded = 0;
     run.fuelCollected = 0;
     run.fuelSavedByBoost = 0;
     run.fuelDrainPausedTime = 0;
@@ -21075,6 +22151,7 @@ class NeonRoadRally {
     run.fuel = clamp(run.fuel + restore, 0, run.fuelMax);
     run.gasCansCollected += 1;
     run.fuelCollected += 1;
+    run.gasCansMissed = Math.max(0, (run.gasCansSpawned || 0) - (run.gasCansCollected || 0));
     if (run.gasCansCollectedBySection) {
       const sectionId = obstacle.sectionId || run.currentSectionId || "";
       if (sectionId) run.gasCansCollectedBySection[sectionId] = (run.gasCansCollectedBySection[sectionId] || 0) + 1;
@@ -22344,6 +23421,14 @@ class NeonRoadRally {
       routeSignatureVersion: summary.routeSignatureVersion || run.routeSignatureVersion || "",
       routeSignatureHash: summary.routeSignatureHash || run.routeSignatureHash || "",
       routeSignatureWaveCount: summary.routeSignatureWaveCount || run.routeSignatureWaveCount || 0,
+      runProgressSignatureVersion: summary.runProgressSignatureVersion || run.runProgressSignatureVersion || summary.routeSignatureVersion || run.routeSignatureVersion || "",
+      runProgressSignatureHash: summary.runProgressSignatureHash || run.runProgressSignatureHash || summary.routeSignatureHash || run.routeSignatureHash || "",
+      runProgressSignatureWaveCount: summary.runProgressSignatureWaveCount || run.runProgressSignatureWaveCount || summary.routeSignatureWaveCount || run.routeSignatureWaveCount || 0,
+      runProgressSignatureScope: summary.runProgressSignatureScope || run.runProgressSignatureScope || (summary.routeSignatureHash || run.routeSignatureHash ? RUN_PROGRESS_SIGNATURE_SCOPE : ""),
+      officialFullRouteSignatureVersion: summary.officialFullRouteSignatureVersion || run.officialFullRouteSignatureVersion || "",
+      officialFullRouteSignatureHash: summary.officialFullRouteSignatureHash || run.officialFullRouteSignatureHash || "",
+      officialFullRouteSignatureWaveCount: summary.officialFullRouteSignatureWaveCount || run.officialFullRouteSignatureWaveCount || 0,
+      officialFullRouteSignatureScope: summary.officialFullRouteSignatureScope || run.officialFullRouteSignatureScope || (summary.officialFullRouteSignatureHash || run.officialFullRouteSignatureHash ? OFFICIAL_FULL_ROUTE_SIGNATURE_SCOPE : ""),
       routeSeedLocked: Boolean(summary.routeSeedLocked || run.routeSeedLocked || run.officialRouteSeedLocked),
       pacingRulesVersion: summary.pacingRulesVersion || run.pacingRulesVersion || getActivePacingRulesVersion(summary.raceTypeId),
       challengeId: summary.challengeMode ? summary.challengeId : "",
@@ -22459,9 +23544,17 @@ class NeonRoadRally {
       deadScreenTime: run.deadScreenTime || directorStats.deadScreenTime || 0,
       longestDeadScreenSeconds: run.longestDeadScreenSeconds || directorStats.longestDeadScreenSeconds || 0,
       timeSinceLastMeaningfulDecisionMax: run.timeSinceLastMeaningfulDecisionMax || directorStats.timeSinceLastMeaningfulDecisionMax || 0,
+      firstMeaningfulDecisionTime: run.firstMeaningfulDecisionTime ?? directorStats.firstMeaningfulDecisionTime ?? null,
+      firstRequiredLaneDecisionTime: run.firstRequiredLaneDecisionTime ?? directorStats.firstRequiredLaneDecisionTime ?? null,
+      openingDeadScreenTimeFirst10Seconds: run.openingDeadScreenTimeFirst10Seconds || directorStats.openingDeadScreenTimeFirst10Seconds || 0,
+      longestOpeningDeadScreenSeconds: run.longestOpeningDeadScreenSeconds || directorStats.longestOpeningDeadScreenSeconds || 0,
+      openingMeaningfulWaveCountFirst10Seconds: run.openingMeaningfulWaveCountFirst10Seconds || directorStats.openingMeaningfulWaveCountFirst10Seconds || directorStats.meaningfulWavesFirst10Seconds || 0,
+      openingRequiredLaneDecisionCountFirst10Seconds: run.openingRequiredLaneDecisionCountFirst10Seconds || directorStats.openingRequiredLaneDecisionCountFirst10Seconds || 0,
+      openingNoInputSafeTime: run.openingNoInputSafeTime || directorStats.openingNoInputSafeTime || 0,
       visibleMeaningfulMin,
       visibleMeaningfulAverage,
       upcomingDecisionGapMax: run.upcomingDecisionGapMax || directorStats.upcomingDecisionGapMax || 0,
+      officialOpeningActivityCorrections: run.officialOpeningActivityCorrections || directorStats.officialOpeningActivityCorrections || 0,
       underActivityCorrections: run.underActivityCorrections || directorStats.underActivityCorrections || 0,
       overActivityDelays: run.overActivityDelays || directorStats.overActivityDelays || 0,
       directorIntentCounts: normalizeCountMap(directorStats.directorIntentCounts || {}),
@@ -22479,6 +23572,7 @@ class NeonRoadRally {
       hardestPressureObserved: run.hardestPressureObserved || 0,
       gasCansSpawned: summary.gasCansSpawned,
       gasCansCollected: summary.gasCansCollected,
+      gasCansMissed: Math.max(0, (summary.gasCansSpawned || 0) - (summary.gasCansCollected || 0)),
       gasCanSpawnRejected: isFuelRunRaceType(summary.raceTypeId) ? (run.gasCanSpawnRejected || 0) : 0,
       gasCanSpawnRepositioned: isFuelRunRaceType(summary.raceTypeId) ? (run.gasCanSpawnRepositioned || 0) : 0,
       gasCanReachabilityFailuresPrevented: isFuelRunRaceType(summary.raceTypeId) ? (run.gasCanReachabilityFailuresPrevented || 0) : 0,
@@ -22634,7 +23728,7 @@ class NeonRoadRally {
       ? getOfficialRouteForRun(run.track.id, run.speedClassId, run.raceTypeId, run.roadSeed, run.officialRouteId)
       : null;
     const competitionKind = getCompetitionKindLabel(officialRoute);
-    const routeSignature = officialRoute
+    const runProgressSignature = officialRoute
       ? this.getRoadDirectorRouteSignature({
         seed: run.roadSeed,
         speedClassId: run.speedClassId,
@@ -22648,9 +23742,20 @@ class NeonRoadRally {
         sequence: run.roadDirectorSequence || []
       }, { officialRouteId: officialRoute.id })
       : null;
-    run.routeSignatureVersion = routeSignature?.version || "";
-    run.routeSignatureHash = routeSignature?.hash || "";
-    run.routeSignatureWaveCount = routeSignature?.waveCount || 0;
+    const officialFullRouteSignature = officialRoute
+      ? this.getOfficialFullRouteSignature(officialRoute, run.raceTypeId)
+      : null;
+    run.routeSignatureVersion = runProgressSignature?.version || "";
+    run.routeSignatureHash = runProgressSignature?.hash || "";
+    run.routeSignatureWaveCount = runProgressSignature?.waveCount || 0;
+    run.runProgressSignatureVersion = runProgressSignature?.version || "";
+    run.runProgressSignatureHash = runProgressSignature?.hash || "";
+    run.runProgressSignatureWaveCount = runProgressSignature?.waveCount || 0;
+    run.runProgressSignatureScope = runProgressSignature ? RUN_PROGRESS_SIGNATURE_SCOPE : "";
+    run.officialFullRouteSignatureVersion = officialFullRouteSignature?.version || "";
+    run.officialFullRouteSignatureHash = officialFullRouteSignature?.hash || "";
+    run.officialFullRouteSignatureWaveCount = officialFullRouteSignature?.waveCount || 0;
+    run.officialFullRouteSignatureScope = officialFullRouteSignature ? OFFICIAL_FULL_ROUTE_SIGNATURE_SCOPE : "";
     const previousOfficialScoreRecord = officialRoute ? this.getOfficialBestScoreRecord(player.id, officialRoute.id, run.raceTypeId) : null;
     const previousBestScore = officialRoute ? (previousOfficialScoreRecord?.score || 0) : (profilePlayer.bestScore || 0);
     const leaderboard = this.profiles.data.leaderboard || [];
@@ -22692,9 +23797,9 @@ class NeonRoadRally {
       officialRouteName: officialRoute?.name || "",
       officialSeed: officialRoute?.seed || "",
       competitionKind,
-      routeSignatureVersion: routeSignature?.version || "",
-      routeSignatureHash: routeSignature?.hash || "",
-      routeSignatureWaveCount: routeSignature?.waveCount || 0,
+      routeSignatureVersion: runProgressSignature?.version || "",
+      routeSignatureHash: runProgressSignature?.hash || "",
+      routeSignatureWaveCount: runProgressSignature?.waveCount || 0,
       routeSeedLocked: Boolean(run.routeSeedLocked || run.officialRouteSeedLocked),
       score: run.score,
       status,
@@ -22752,9 +23857,17 @@ class NeonRoadRally {
       officialRouteName: officialRoute?.name || "",
       officialSeed: officialRoute?.seed || "",
       competitionKind,
-      routeSignatureVersion: routeSignature?.version || "",
-      routeSignatureHash: routeSignature?.hash || "",
-      routeSignatureWaveCount: routeSignature?.waveCount || 0,
+      routeSignatureVersion: runProgressSignature?.version || "",
+      routeSignatureHash: runProgressSignature?.hash || "",
+      routeSignatureWaveCount: runProgressSignature?.waveCount || 0,
+      runProgressSignatureVersion: runProgressSignature?.version || "",
+      runProgressSignatureHash: runProgressSignature?.hash || "",
+      runProgressSignatureWaveCount: runProgressSignature?.waveCount || 0,
+      runProgressSignatureScope: runProgressSignature ? RUN_PROGRESS_SIGNATURE_SCOPE : "",
+      officialFullRouteSignatureVersion: officialFullRouteSignature?.version || "",
+      officialFullRouteSignatureHash: officialFullRouteSignature?.hash || "",
+      officialFullRouteSignatureWaveCount: officialFullRouteSignature?.waveCount || 0,
+      officialFullRouteSignatureScope: officialFullRouteSignature ? OFFICIAL_FULL_ROUTE_SIGNATURE_SCOPE : "",
       routeSeedLocked: Boolean(run.routeSeedLocked || run.officialRouteSeedLocked),
       boostlineRouteId: run.boostlineRouteId || "",
       boostlineRouteName: run.boostlineRouteName || "",
@@ -22856,6 +23969,7 @@ class NeonRoadRally {
       laneMoves: run.laneMoves || 0,
       gasCansSpawned: run.gasCansSpawned || 0,
       gasCansCollected: run.gasCansCollected || 0,
+      gasCansMissed: Math.max(0, (run.gasCansSpawned || 0) - (run.gasCansCollected || 0)),
       fuelCollected: run.gasCansCollected || 0,
       gasCanSpawnRejected: isFuelRunRaceType(run.raceTypeId) ? (run.gasCanSpawnRejected || 0) : 0,
       gasCanSpawnRepositioned: isFuelRunRaceType(run.raceTypeId) ? (run.gasCanSpawnRepositioned || 0) : 0,
@@ -23287,6 +24401,109 @@ class NeonRoadRally {
     simRun.pursuitHeatStatus = status === "Heat Rising" ? "Heat Rising" : "Heat Dropping";
   }
 
+  applyRoadDirectorSignatureSimulationInputStyle(simRun, styleId) {
+    if (!simRun || !styleId) return;
+    const style = String(styleId);
+    const finishDistance = simRun.track?.distanceToFinish || 1;
+    const progress = clamp((simRun.distance || 0) / finishDistance, 0, 1);
+    const elapsed = simRun.elapsed || 0;
+    const setLane = (lane) => {
+      const safeLane = clamp(Math.round(lane), 0, LANES - 1);
+      simRun.targetLane = safeLane;
+      simRun.renderLaneFloat = safeLane;
+    };
+    if (style === "frequent-drift") {
+      setLane(Math.floor((elapsed * 3.6) % LANES));
+      simRun.driftActive = true;
+      simRun.driftDirection = Math.floor(elapsed * 4) % 2 === 0 ? -1 : 1;
+      simRun.driftChargeSeconds = Math.min(DRIFT_TUNING.maxChargeSeconds, 0.12 + (elapsed % 0.28));
+    } else if (style === "boost-heavy") {
+      setLane(progress < 0.34 ? TRACK_DIRECTOR.centerLane : (progress < 0.68 ? LANES - 2 : 1));
+      simRun.boostTimer = 0.4;
+      simRun.boostPadsCollected = Math.max(simRun.boostPadsCollected || 0, Math.floor(progress * 8));
+      simRun.rampsUsed = Math.max(simRun.rampsUsed || 0, Math.floor(progress * 3));
+    } else if (style === "conservative-lane-changes") {
+      const laneStep = Math.floor(progress * 4);
+      setLane(clamp(TRACK_DIRECTOR.centerLane + (laneStep % 3) - 1, 0, LANES - 1));
+      simRun.driftActive = false;
+    } else if (style === "early-crash") {
+      setLane(Math.floor((elapsed * 2) % LANES));
+      simRun.crashCollisionType = progress > 0.14 ? "simulated early crash" : "";
+    } else if (style === "full-finish" || style === "no-drift") {
+      setLane(TRACK_DIRECTOR.centerLane);
+      simRun.driftActive = false;
+    }
+  }
+
+  createRoadDirectorSignatureRenderer() {
+    const renderer = {
+      width: 1280,
+      height: 720,
+      road: { x: 260, y: 0, w: 760, h: 720, laneW: 152 },
+      run: null,
+      aheadForY(y) {
+        return clamp((this.height - y) / this.height * VIEW_DISTANCE, 0, VIEW_DISTANCE);
+      },
+      yForDistanceAt(distance, runDistance) {
+        return this.height - clamp((distance - runDistance) / VIEW_DISTANCE, -0.2, 1.2) * this.height;
+      },
+      laneCenter(lane) {
+        return this.road.x + this.road.laneW * (lane + 0.5);
+      },
+      scaleForY(y) {
+        return 0.45 + clamp(y / this.height, 0, 1) * 0.65;
+      },
+      getObstacleVisualSize(type, scale = 1) {
+        const info = OBSTACLE_INFO[type] || { w: 70, h: 84 };
+        return { w: info.w * scale, h: info.h * scale, drawScale: scale };
+      },
+      getObstacleScreenPositionAt(obstacle, runDistance) {
+        const y = this.yForDistanceAt(obstacle.distance, runDistance);
+        const lane = Number.isFinite(obstacle.laneFloat) ? obstacle.laneFloat : obstacle.lane;
+        return { x: this.laneCenter(clamp(lane, 0, LANES - 1)), y, scale: this.scaleForY(y) };
+      },
+      getObstacleVisualRectAt(obstacle, runDistance) {
+        const info = OBSTACLE_INFO[obstacle.type];
+        if (!info || obstacle.type === "warning") return null;
+        const ahead = obstacle.distance - runDistance;
+        if (ahead < -70 || ahead > VIEW_DISTANCE + 160) return null;
+        const position = this.getObstacleScreenPositionAt(obstacle, runDistance);
+        const size = this.getObstacleVisualSize(obstacle.type, position.scale, obstacle);
+        return {
+          centerX: position.x,
+          centerY: position.y,
+          renderedX: position.x - size.w / 2,
+          renderedY: position.y - size.h / 2,
+          renderedWidth: size.w,
+          renderedHeight: size.h
+        };
+      },
+      getObstacleHitboxAt(obstacle, runDistance) {
+        const config = getHitboxConfig(obstacle.type);
+        const visual = this.getObstacleVisualRectAt(obstacle, runDistance);
+        if (!config || !visual) return null;
+        return rectFromCenter(
+          visual.centerX + config.offsetX * visual.renderedWidth,
+          visual.centerY + config.offsetY * visual.renderedHeight,
+          visual.renderedWidth * config.width,
+          visual.renderedHeight * config.height
+        );
+      },
+      getObstacleHitbox(obstacle) {
+        return this.getObstacleHitboxAt(obstacle, this.run?.distance || 0);
+      },
+      getPlayerHitbox() {
+        return rectFromCenter(
+          this.laneCenter(TRACK_DIRECTOR.centerLane),
+          this.height * PLAYER_START_Y_RATIO,
+          70,
+          100
+        );
+      }
+    };
+    return renderer;
+  }
+
   captureRoadDirectorSequence(options = {}) {
     const officialRoute = getOfficialRouteById(options.officialRouteId || options.routeId);
     const speedClassId = officialRoute
@@ -23307,6 +24524,8 @@ class NeonRoadRally {
     const seedSource = getRunRandomSeedSource(seed, track, speedClassId, raceTypeId);
     const rng = createSeededRandom(seedSource);
     const routeSeedLocked = Boolean(options.routeSeedLocked || options.officialRouteSeedLocked || officialRoute);
+    const preserveFullRoadDirectorSequence = Boolean(options.preserveFullRoadDirectorSequence || options.fullRouteSignature);
+    const simulatedInputStyle = sanitizeName(options.simulatedInputStyle, "", 64);
     const simRun = {
       track,
       speedClassId,
@@ -23324,6 +24543,7 @@ class NeonRoadRally {
       roadSeedHash: rng.seedHash,
       roadRngState: rng.getState(),
       roadDirectorSequence: [],
+      preserveFullRoadDirectorSequence,
       partySeedLocked: Boolean(options.partySeedLocked),
       distance: 0,
       elapsed: 0,
@@ -23334,9 +24554,13 @@ class NeonRoadRally {
     this.configureFuelForRun(simRun);
     this.configurePursuitForRun(simRun);
     simRun.simulateFuelPickups = true;
+    const simulationRenderer = preserveFullRoadDirectorSequence
+      ? this.createRoadDirectorSignatureRenderer()
+      : this.renderer;
+    if (simulationRenderer) simulationRenderer.run = simRun;
     const simGame = {
       run: simRun,
-      renderer: this.renderer,
+      renderer: simulationRenderer,
       randomFloat: () => {
         const value = rng();
         simRun.roadRngState = rng.getState();
@@ -23355,6 +24579,7 @@ class NeonRoadRally {
       simRun.currentSectionLabel = section.label;
       simRun.sectionProgress = getTrackSectionProgress(section, progress);
       simRun.currentSpeed = getTrackCruiseSpeed(track, progress, speedClassId);
+      this.applyRoadDirectorSignatureSimulationInputStyle(simRun, simulatedInputStyle);
       if (isFuelRunRaceType(raceTypeId)) {
         this.updateFuelRunSimulationState(simRun, dt);
       }
@@ -23383,6 +24608,28 @@ class NeonRoadRally {
       boostlineEventsSpawned: simRun.boostlineEventsSpawned || 0,
       boostlineVisibleSpawnViolations: simRun.boostlineVisibleSpawnViolations || 0,
       wavesSpawnedInsideVisibleCount: simRun.wavesSpawnedInsideVisibleCount || 0,
+      distance: simRun.distance,
+      elapsed: simRun.elapsed,
+      finishReached: simRun.distance >= track.distanceToFinish,
+      gasCansSpawned: simRun.gasCansSpawned || 0,
+      gasCansCollected: simRun.gasCansCollected || 0,
+      gasCansMissed: Math.max(0, (simRun.gasCansSpawned || 0) - (simRun.gasCansCollected || 0)),
+      gasCanSpawnProgressSamples: Array.isArray(simRun.gasCanSpawnProgressSamples) ? simRun.gasCanSpawnProgressSamples.slice() : [],
+      gasCanSpawnTimeSamples: Array.isArray(simRun.gasCanSpawnTimeSamples) ? simRun.gasCanSpawnTimeSamples.slice() : [],
+      gasCansSpawnedBySection: normalizeSectionCountMap(simRun.gasCansSpawnedBySection),
+      gasCansCollectedBySection: normalizeSectionCountMap(simRun.gasCansCollectedBySection),
+      fuelRemaining: Number.isFinite(simRun.fuel) ? simRun.fuel : 0,
+      simOutOfFuel: Boolean(simRun.simOutOfFuel),
+      maxTimeBetweenGasCans: simRun.maxTimeBetweenGasCans || 0,
+      longestNoFuelStretch: simRun.longestNoFuelStretchSeconds || 0,
+      gasCanPlacementAttempts: simRun.gasCanPlacementAttempts || 0,
+      gasCanPlacementRejectedUnsafe: simRun.gasCanPlacementRejectedUnsafe || 0,
+      gasCanPlacementSkippedNoFairRoute: simRun.gasCanPlacementSkippedNoFairRoute || 0,
+      gasCanRouteSafetyFailures: simRun.gasCanRouteSafetyFailures || 0,
+      gasCanRecoveryPlacementAttempts: simRun.gasCanRecoveryPlacementAttempts || 0,
+      gasCanRecoveryPlacements: simRun.gasCanRecoveryPlacements || 0,
+      officialFuelViabilityMinGasCans: simRun.officialFuelViabilityMinGasCans || 0,
+      officialFuelViabilityCansNeeded: simRun.officialFuelViabilityCansNeeded || 0,
       preventedUnsafeSpawns: manager.preventedUnsafeSpawns || 0,
       recentRoadDirectorRejections: Array.isArray(simRun.recentRoadDirectorRejections) ? simRun.recentRoadDirectorRejections.slice() : [],
       seedHash: rng.seedHash,
@@ -23444,6 +24691,47 @@ class NeonRoadRally {
       payload,
       serialized
     };
+  }
+
+  getOfficialFullRouteSignature(routeOrId, raceTypeId = DEFAULT_RACE_TYPE_ID) {
+    const officialRoute = typeof routeOrId === "string" ? getOfficialRouteById(routeOrId) : routeOrId;
+    if (!officialRoute) return null;
+    const requestedRaceTypeId = normalizeRaceTypeId(raceTypeId || officialRoute.raceTypeId, DEFAULT_RACE_TYPE_ID);
+    const safeRaceTypeId = officialRouteSupportsRaceType(officialRoute, requestedRaceTypeId)
+      ? requestedRaceTypeId
+      : (officialRoute.raceTypeId || DEFAULT_RACE_TYPE_ID);
+    if (!officialRouteSupportsRaceType(officialRoute, safeRaceTypeId)) return null;
+    if (!(this.officialFullRouteSignatureCache instanceof Map)) {
+      this.officialFullRouteSignatureCache = new Map();
+    }
+    const cacheKey = [
+      officialRoute.id,
+      safeRaceTypeId,
+      OFFICIAL_ROUTE_SIGNATURE_VERSION,
+      BOOSTLINE_ROUTE_SIGNATURE_VERSION,
+      OFFICIAL_FULL_ROUTE_SIGNATURE_DT,
+      OFFICIAL_FULL_ROUTE_SIGNATURE_WAVE_LIMIT
+    ].join("|");
+    if (!this.officialFullRouteSignatureCache.has(cacheKey)) {
+      const capture = this.captureRoadDirectorSequence({
+        officialRouteId: officialRoute.id,
+        raceTypeId: safeRaceTypeId,
+        waveLimit: OFFICIAL_FULL_ROUTE_SIGNATURE_WAVE_LIMIT,
+        dt: OFFICIAL_FULL_ROUTE_SIGNATURE_DT,
+        routeSeedLocked: true,
+        preserveFullRoadDirectorSequence: true,
+        fullRouteSignature: true
+      });
+      const signature = this.getRoadDirectorRouteSignature(capture, { officialRouteId: officialRoute.id });
+      this.officialFullRouteSignatureCache.set(cacheKey, {
+        ...signature,
+        scope: OFFICIAL_FULL_ROUTE_SIGNATURE_SCOPE,
+        finishReached: Boolean(capture.finishReached),
+        distance: capture.distance || 0,
+        elapsed: capture.elapsed || 0
+      });
+    }
+    return this.officialFullRouteSignatureCache.get(cacheKey);
   }
 
   getRoadDirectorSequenceFingerprint(sequence) {
@@ -23563,6 +24851,7 @@ class NeonRoadRally {
         }
         const firstHash = signatures[0]?.hash || "";
         const matching = signatures.every((signature) => signature.hash === firstHash);
+        const officialFullRouteSignature = this.getOfficialFullRouteSignature(route, raceTypeId);
         routeAudits.push({
           routeId: route.id,
           routeName: route.name,
@@ -23576,7 +24865,11 @@ class NeonRoadRally {
           signatureHash: firstHash,
           signatureHashes: signatures.map((signature) => signature.hash),
           waveCounts: signatures.map((signature) => signature.waveCount),
-          pass: matching
+          officialFullRouteSignatureVersion: officialFullRouteSignature?.version || "",
+          officialFullRouteSignatureHash: officialFullRouteSignature?.hash || "",
+          officialFullRouteSignatureWaveCount: officialFullRouteSignature?.waveCount || 0,
+          officialFullRouteSignatureScope: officialFullRouteSignature ? OFFICIAL_FULL_ROUTE_SIGNATURE_SCOPE : "",
+          pass: matching && Boolean(officialFullRouteSignature?.hash)
         });
       });
     });
@@ -23765,6 +25058,14 @@ class NeonRoadRally {
         deadScreenTime: 0,
         longestDeadScreenSeconds: 0,
         timeSinceLastMeaningfulDecisionMax: 0,
+        firstMeaningfulDecisionTime: null,
+        firstRequiredLaneDecisionTime: null,
+        openingDeadScreenTimeFirst10Seconds: 0,
+        longestOpeningDeadScreenSeconds: 0,
+        openingMeaningfulWaveCountFirst10Seconds: 0,
+        openingRequiredLaneDecisionCountFirst10Seconds: 0,
+        openingNoInputSafeTime: 0,
+        officialOpeningActivityCorrections: 0,
         underActivityCorrections: 0,
         overActivityDelays: 0,
         rampUseRateSum: 0,
@@ -24013,6 +25314,22 @@ class NeonRoadRally {
       target.deadScreenTime += stats.deadScreenTime || 0;
       target.longestDeadScreenSeconds = Math.max(target.longestDeadScreenSeconds, stats.longestDeadScreenSeconds || 0);
       target.timeSinceLastMeaningfulDecisionMax = Math.max(target.timeSinceLastMeaningfulDecisionMax, stats.timeSinceLastMeaningfulDecisionMax || 0);
+      if (Number.isFinite(stats.firstMeaningfulDecisionTime)) {
+        target.firstMeaningfulDecisionTime = target.firstMeaningfulDecisionTime === null
+          ? stats.firstMeaningfulDecisionTime
+          : Math.min(target.firstMeaningfulDecisionTime, stats.firstMeaningfulDecisionTime);
+      }
+      if (Number.isFinite(stats.firstRequiredLaneDecisionTime)) {
+        target.firstRequiredLaneDecisionTime = target.firstRequiredLaneDecisionTime === null
+          ? stats.firstRequiredLaneDecisionTime
+          : Math.min(target.firstRequiredLaneDecisionTime, stats.firstRequiredLaneDecisionTime);
+      }
+      target.openingDeadScreenTimeFirst10Seconds += stats.openingDeadScreenTimeFirst10Seconds || 0;
+      target.longestOpeningDeadScreenSeconds = Math.max(target.longestOpeningDeadScreenSeconds || 0, stats.longestOpeningDeadScreenSeconds || 0);
+      target.openingMeaningfulWaveCountFirst10Seconds += stats.openingMeaningfulWaveCountFirst10Seconds || stats.meaningfulWavesFirst10Seconds || 0;
+      target.openingRequiredLaneDecisionCountFirst10Seconds += stats.openingRequiredLaneDecisionCountFirst10Seconds || 0;
+      target.openingNoInputSafeTime = Math.max(target.openingNoInputSafeTime || 0, stats.openingNoInputSafeTime || 0);
+      target.officialOpeningActivityCorrections += stats.officialOpeningActivityCorrections || 0;
       target.underActivityCorrections += stats.underActivityCorrections || 0;
       target.overActivityDelays += stats.overActivityDelays || 0;
       if (Number.isFinite(stats.rampUseRate)) {
@@ -24087,6 +25404,14 @@ class NeonRoadRally {
         deadScreenTime: aggregate.deadScreenTime || 0,
         longestDeadScreenSeconds: aggregate.longestDeadScreenSeconds || 0,
         timeSinceLastMeaningfulDecisionMax: aggregate.timeSinceLastMeaningfulDecisionMax || 0,
+        firstMeaningfulDecisionTime: aggregate.firstMeaningfulDecisionTime,
+        firstRequiredLaneDecisionTime: aggregate.firstRequiredLaneDecisionTime,
+        openingDeadScreenTimeFirst10Seconds: aggregate.openingDeadScreenTimeFirst10Seconds || 0,
+        longestOpeningDeadScreenSeconds: aggregate.longestOpeningDeadScreenSeconds || 0,
+        openingMeaningfulWaveCountFirst10Seconds: aggregate.openingMeaningfulWaveCountFirst10Seconds || 0,
+        openingRequiredLaneDecisionCountFirst10Seconds: aggregate.openingRequiredLaneDecisionCountFirst10Seconds || 0,
+        openingNoInputSafeTime: aggregate.openingNoInputSafeTime || 0,
+        officialOpeningActivityCorrections: aggregate.officialOpeningActivityCorrections || 0,
         underActivityCorrections: aggregate.underActivityCorrections || 0,
         overActivityDelays: aggregate.overActivityDelays || 0,
         rampUseRate: aggregate.rampUseRateCount ? aggregate.rampUseRateSum / aggregate.rampUseRateCount : 0,
@@ -25867,8 +27192,16 @@ class NeonRoadRally {
     const paceFeedbackRuns = runs.filter((run) => (Number(run.paceFeedbackSampleCount) || 0) > 0 || (Number(run.paceFeedbackActiveTime) || 0) > 0);
     const frameTelemetryRuns = runs.filter((run) => (Number(run.frameSampleCount) || 0) > 0);
     const officialRouteRuns = runs.filter((run) => Boolean(run.officialRouteId));
-    const routeSignatureRows = this.countPlaytestRuns(
-      officialRouteRuns.filter((run) => run.routeSignatureHash),
+    const officialFullRouteSignatureRows = this.countPlaytestRuns(
+      officialRouteRuns.filter((run) => run.officialFullRouteSignatureHash),
+      (run) => `${getOfficialRouteEntryDisplayName(run, run.officialRouteId)} ${run.officialFullRouteSignatureHash}`
+    );
+    const runProgressSignatureRows = this.countPlaytestRuns(
+      officialRouteRuns.filter((run) => run.runProgressSignatureHash || run.routeSignatureHash),
+      (run) => `${getOfficialRouteEntryDisplayName(run, run.officialRouteId)} ${run.runProgressSignatureHash || run.routeSignatureHash}`
+    );
+    const legacyRouteSignatureRows = this.countPlaytestRuns(
+      officialRouteRuns.filter((run) => run.routeSignatureHash && !run.runProgressSignatureHash && !run.officialFullRouteSignatureHash),
       (run) => `${getOfficialRouteEntryDisplayName(run, run.officialRouteId)} ${run.routeSignatureHash}`
     );
     const fuelRuns = runs.filter((run) => run.raceTypeId === FUEL_RUN_RACE_TYPE_ID);
@@ -25972,7 +27305,10 @@ class NeonRoadRally {
           : 1,
         officialRouteRunCount: officialRouteRuns.length,
         routeSeedLockedRunCount: officialRouteRuns.filter((run) => run.routeSeedLocked).length,
-        routeSignatureRows,
+        officialFullRouteSignatureRows,
+        runProgressSignatureRows,
+        legacyRouteSignatureRows,
+        routeSignatureRows: runProgressSignatureRows,
       averageCenterLaneTime: this.averagePlaytestField(runs, "centerLaneTime"),
       totalNewBadges: runs.reduce((sum, run) => sum + (Array.isArray(run.newlyEarnedBadges) ? run.newlyEarnedBadges.length : 0), 0),
       totalMasteryBadgeUnlocks: masteryBadgeIds.length,
@@ -26001,9 +27337,23 @@ class NeonRoadRally {
       totalDeadScreenTime: runs.reduce((sum, run) => sum + (Number(run.deadScreenTime) || 0), 0),
       longestDeadScreenSeconds: runs.reduce((max, run) => Math.max(max, Number(run.longestDeadScreenSeconds) || 0), 0),
       maxTimeSinceLastMeaningfulDecision: runs.reduce((max, run) => Math.max(max, Number(run.timeSinceLastMeaningfulDecisionMax) || 0), 0),
+      firstMeaningfulDecisionTimeMin: runs.reduce((min, run) => {
+        const value = Number(run.firstMeaningfulDecisionTime);
+        return Number.isFinite(value) ? Math.min(min, value) : min;
+      }, Infinity),
+      firstRequiredLaneDecisionTimeMin: runs.reduce((min, run) => {
+        const value = Number(run.firstRequiredLaneDecisionTime);
+        return Number.isFinite(value) ? Math.min(min, value) : min;
+      }, Infinity),
+      totalOpeningDeadScreenTimeFirst10Seconds: runs.reduce((sum, run) => sum + (Number(run.openingDeadScreenTimeFirst10Seconds) || 0), 0),
+      longestOpeningDeadScreenSeconds: runs.reduce((max, run) => Math.max(max, Number(run.longestOpeningDeadScreenSeconds) || 0), 0),
+      averageOpeningMeaningfulWaveCountFirst10Seconds: this.averagePlaytestField(runs, "openingMeaningfulWaveCountFirst10Seconds"),
+      averageOpeningRequiredLaneDecisionCountFirst10Seconds: this.averagePlaytestField(runs, "openingRequiredLaneDecisionCountFirst10Seconds"),
+      openingNoInputSafeTimeMax: runs.reduce((max, run) => Math.max(max, Number(run.openingNoInputSafeTime) || 0), 0),
       visibleMeaningfulMin: runs.length ? runs.reduce((min, run) => Math.min(min, Number(run.visibleMeaningfulMin) || 0), Infinity) : 0,
       averageVisibleMeaningful: this.averagePlaytestField(runs, "visibleMeaningfulAverage"),
       upcomingDecisionGapMax: runs.reduce((max, run) => Math.max(max, Number(run.upcomingDecisionGapMax) || 0), 0),
+        totalOfficialOpeningActivityCorrections: runs.reduce((sum, run) => sum + (Number(run.officialOpeningActivityCorrections) || 0), 0),
         totalUnderActivityCorrections: runs.reduce((sum, run) => sum + (Number(run.underActivityCorrections) || 0), 0),
         totalOverActivityDelays: runs.reduce((sum, run) => sum + (Number(run.overActivityDelays) || 0), 0),
         directorIntentRows: this.countPlaytestMapRows(runs, "directorIntentCounts"),
@@ -26018,6 +27368,7 @@ class NeonRoadRally {
         runs: fuelRuns.length,
         averageGasCansCollected: this.averagePlaytestField(fuelRuns, "gasCansCollected"),
         averageGasCansSpawned: this.averagePlaytestField(fuelRuns, "gasCansSpawned"),
+        totalGasCansMissed: fuelRuns.reduce((sum, run) => sum + (Number(run.gasCansMissed) || Math.max(0, (Number(run.gasCansSpawned) || 0) - (Number(run.gasCansCollected) || 0))), 0),
         averageFuelRemainingOnFinishes: this.averagePlaytestField(fuelFinishes, "fuelRemaining"),
         averageFuelSavedByBoost: this.averagePlaytestField(fuelRuns, "fuelSavedByBoost"),
         totalFuelSavedByBoost,
@@ -26034,7 +27385,12 @@ class NeonRoadRally {
         averageLowestFuelReached: this.averagePlaytestField(fuelRuns, "lowestFuelReached"),
         averageLowFuelTime: this.averagePlaytestField(fuelRuns, "lowFuelTime"),
         averageCriticalFuelTime: this.averagePlaytestField(fuelRuns, "criticalFuelTime"),
-        outOfFuelCount: fuelRuns.filter((run) => run.outOfFuelOccurred).length
+        outOfFuelCount: fuelRuns.filter((run) => run.outOfFuelOccurred).length,
+        allCansCollectedOutOfFuelCount: fuelRuns.filter((run) => (
+          run.outOfFuelOccurred
+          && Math.max(0, (Number(run.gasCansSpawned) || 0) - (Number(run.gasCansCollected) || 0)) === 0
+          && (Number(run.gasCanPlacementSkippedNoFairRoute) || 0) > 0
+        )).length
       },
       pursuitSummary: {
         runs: pursuitRuns.length,
@@ -26162,6 +27518,9 @@ class NeonRoadRally {
           minRenderEffectScale: roundStatNumber(aggregate.minRenderEffectScale, 2),
           officialRouteRuns: aggregate.officialRouteRunCount,
           routeSeedLockedRuns: aggregate.routeSeedLockedRunCount,
+          officialFullRouteSignatures: aggregate.officialFullRouteSignatureRows.length,
+          runProgressSignatures: aggregate.runProgressSignatureRows.length,
+          legacyRunProgressSignatures: aggregate.legacyRouteSignatureRows.length,
           averageCenterLaneTimeSeconds: Number(aggregate.averageCenterLaneTime.toFixed(2)),
         totalNewBadges: aggregate.totalNewBadges,
         totalMasteryBadgeUnlocks: aggregate.totalMasteryBadgeUnlocks,
@@ -26204,7 +27563,10 @@ class NeonRoadRally {
           .map(([sectionId, seconds]) => [sectionId, roundStatNumber(seconds, 2)])),
         roadDirectorIntentVariety: aggregate.directorIntentRows,
         roadDirectorFamilyVariety: aggregate.waveFamilyRows,
-        officialRouteSignatures: aggregate.routeSignatureRows,
+        officialFullRouteSignatures: aggregate.officialFullRouteSignatureRows,
+        runProgressSignatures: aggregate.runProgressSignatureRows,
+        legacyRunProgressSignatures: aggregate.legacyRouteSignatureRows,
+        signatureFieldNote: "routeSignatureHash is legacy run-progress history; officialFullRouteSignatureHash is the full player-independent route.",
         completionByTrack: aggregate.trackRows,
       completionByRaceMode: aggregate.modeRows,
       completionByRaceType: aggregate.typeRows,
@@ -26860,7 +28222,8 @@ class NeonRoadRally {
             <div class="score-card"><strong>Effect Scale Min</strong><span>${this.formatPlaytestDecimal(aggregate.minPerformanceEffectScale, 2)}</span></div>
             <div class="score-card"><strong>Render Scale Min</strong><span>${this.formatPlaytestDecimal(aggregate.minRenderEffectScale, 2)}</span></div>
             <div class="score-card"><strong>Official Route Runs</strong><span>${aggregate.routeSeedLockedRunCount}/${aggregate.officialRouteRunCount} seed locked</span></div>
-            <div class="score-card"><strong>Route Signatures</strong><span>${aggregate.routeSignatureRows.length}</span></div>
+            <div class="score-card"><strong>Full Route Signatures</strong><span>${aggregate.officialFullRouteSignatureRows.length}</span></div>
+            <div class="score-card"><strong>Run Progress Signatures</strong><span>${aggregate.runProgressSignatureRows.length}</span></div>
           <div class="score-card"><strong>Avg Center-Lane Time</strong><span>${formatTime(aggregate.averageCenterLaneTime)}</span></div>
           <div class="score-card"><strong>New Badges</strong><span>${aggregate.totalNewBadges}</span></div>
           <div class="score-card"><strong>Mastery Unlocks</strong><span>${aggregate.totalMasteryBadgeUnlocks}</span></div>
@@ -26945,6 +28308,7 @@ class NeonRoadRally {
         </div>
         <div class="score-grid playtest-detail-grid">
             <div class="score-card"><strong>Fuel Runs</strong><span class="is-compact">${aggregate.fuelSummary.runs} runs · ${this.formatPlaytestDecimal(aggregate.fuelSummary.averageGasCansSpawned)} gas spawned · attempts ${aggregate.fuelSummary.gasCanPlacementAttempts} · unsafe ${aggregate.fuelSummary.gasCanPlacementRejectedUnsafe} · skipped ${aggregate.fuelSummary.gasCanPlacementSkippedNoFairRoute} · nearest blocker ${aggregate.fuelSummary.gasCanNearestBlockerDistanceMin === null ? "n/a" : `${Math.round(aggregate.fuelSummary.gasCanNearestBlockerDistanceMin)}`}</span></div>
+            <div class="score-card"><strong>Fuel Missed / Starved</strong><span class="is-compact">${aggregate.fuelSummary.totalGasCansMissed} missed · ${aggregate.fuelSummary.allCansCollectedOutOfFuelCount} all-cans-collected out-of-fuel warnings</span></div>
             <div class="score-card"><strong>Pacing Summary</strong><span class="is-compact">${finishStats.count} finishes · section avg ${this.formatPlaytestDecimal(aggregate.averageSectionDuration, 1)}s · pace feedback avg ${this.formatPlaytestDecimal(aggregate.averagePaceFeedbackActiveTime, 1)}s · PB delta samples ${aggregate.personalBestTimeDeltaStats.count}</span></div>
             <div class="score-card"><strong>Director Variety</strong><span class="is-compact">intents ${escapeHtml(directorIntentText)} · families ${escapeHtml(waveFamilyText)}</span></div>
               <div class="score-card"><strong>Experimental Pursuit Summary</strong><span class="is-compact">${aggregate.pursuitSummary.escaped} escaped · ${aggregate.pursuitSummary.busted} busted · heat critical ${formatTime(aggregate.pursuitSummary.averageHeatCriticalTime)} avg · rising ${formatTime(aggregate.pursuitSummary.averageHeatRisingTime)} · dropping ${formatTime(aggregate.pursuitSummary.averageHeatDroppingTime)} · roadblocks ${aggregate.pursuitSummary.roadblocksCleared}/${aggregate.pursuitSummary.roadblocksSpawned} · bonuses ${formatScore(aggregate.pursuitSummary.totalPursuitBonuses)}</span></div>
@@ -28923,6 +30287,13 @@ class NeonRoadRally {
         }
       } else if (status === "outOfFuel") {
         add("Out of fuel", "Grab gas cans earlier or rerun the same seed to plan the route.");
+        const gasMissed = Math.max(0, (summary.gasCansSpawned || 0) - (summary.gasCansCollected || 0));
+        if (summary.raceTypeId === FUEL_RUN_RACE_TYPE_ID
+          && gasMissed === 0
+          && (summary.gasCansSpawned || 0) > 0
+          && (summary.gasCanPlacementSkippedNoFairRoute || 0) > 0) {
+          add("Fuel route warning", "All visible gas was collected, but too few fair fuel routes appeared.");
+        }
         if (missedBoosts > 0) add("Missed reachable boosts", "Boost route also had reachable pads left behind.");
       } else {
         const crashLabel = progress >= 0.72 ? "Late crash" : (progress <= 0.35 ? "Early crash" : "Crash ended run");

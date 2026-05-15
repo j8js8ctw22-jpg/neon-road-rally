@@ -328,6 +328,110 @@ async function main() {
         routeReadabilityFailures: officialRacecraftSafety.routeReadabilityFailures
       }
     }));
+
+    function getOpeningRouteSeconds(track, speedClassId, distance) {
+      return estimateTrackElapsedSecondsAtDistance(track, speedClassId, distance);
+    }
+
+    function isOpeningMeaningfulWave(wave) {
+      return (wave.blockedLanes || []).length > 0
+        || (wave.boostLanes || []).length > 0
+        || (wave.rampLanes || []).length > 0
+        || (wave.gasCanLanes || []).length > 0;
+    }
+
+    function summarizeOfficialOpeningRoute(route, raceTypeId) {
+      const track = createRaceTrackForSpeedClass(getTrackById(route.trackId), route.speedClassId, raceTypeId);
+      const rules = getOfficialOpeningActivityRules(route, route.speedClassId, track, raceTypeId);
+      if (!rules) return null;
+      const capture = app.captureRoadDirectorSequence({
+        officialRouteId: route.id,
+        raceTypeId,
+        waveLimit: 14,
+        dt: 0.36,
+        routeSeedLocked: true
+      });
+      const openingWaves = (capture.sequence || [])
+        .map((wave) => ({
+          ...wave,
+          routeElapsed: getOpeningRouteSeconds(track, route.speedClassId, wave.distance || 0)
+        }))
+        .filter((wave) => wave.routeElapsed <= rules.firstWindowSeconds + 0.001);
+      const meaningfulWaves = openingWaves.filter(isOpeningMeaningfulWave);
+      const requiredLaneDecisionWaves = openingWaves.filter((wave) => (wave.blockedLanes || []).includes(TRACK_DIRECTOR.centerLane));
+      const firstMeaningfulDecisionTime = meaningfulWaves.length ? meaningfulWaves[0].routeElapsed : null;
+      const firstRequiredLaneDecisionTime = requiredLaneDecisionWaves.length ? requiredLaneDecisionWaves[0].routeElapsed : null;
+      const requiredTimes = requiredLaneDecisionWaves.map((wave) => wave.routeElapsed);
+      const noInputDecisionTimes = raceTypeId === FUEL_RUN_RACE_TYPE_ID
+        ? meaningfulWaves.map((wave) => wave.routeElapsed)
+        : requiredTimes;
+      let openingNoInputSafeTime = noInputDecisionTimes.length ? noInputDecisionTimes[0] : rules.firstWindowSeconds;
+      for (let index = 1; index < noInputDecisionTimes.length; index += 1) {
+        openingNoInputSafeTime = Math.max(openingNoInputSafeTime, noInputDecisionTimes[index] - noInputDecisionTimes[index - 1]);
+      }
+      if (noInputDecisionTimes.length) {
+        openingNoInputSafeTime = Math.max(openingNoInputSafeTime, rules.firstWindowSeconds - noInputDecisionTimes[noInputDecisionTimes.length - 1]);
+      }
+      return {
+        routeId: route.id,
+        routeName: route.name,
+        raceTypeId,
+        speedClassId: route.speedClassId,
+        openingMeaningfulWaveCountFirst10Seconds: meaningfulWaves.length,
+        openingRequiredLaneDecisionCountFirst10Seconds: requiredLaneDecisionWaves.length,
+        firstMeaningfulDecisionTime,
+        firstRequiredLaneDecisionTime,
+        openingNoInputSafeTime,
+        fairnessFailures: (capture.sequence || []).filter((wave) => wave.fairnessPassed === false).length,
+        openingWaveTypes: openingWaves.map((wave) => wave.type),
+        pass: meaningfulWaves.length >= rules.minMeaningfulWavesFirst10
+          && requiredLaneDecisionWaves.length >= rules.minRequiredLaneDecisionsFirst10
+          && Number.isFinite(firstMeaningfulDecisionTime)
+          && firstMeaningfulDecisionTime <= rules.firstDecisionDeadlineSeconds + 0.16
+          && Number.isFinite(firstRequiredLaneDecisionTime)
+          && firstRequiredLaneDecisionTime <= rules.firstDecisionDeadlineSeconds + 0.16
+          && openingNoInputSafeTime <= rules.maxOpeningNoInputSafeTime + 0.3
+          && (capture.sequence || []).every((wave) => wave.fairnessPassed !== false)
+      };
+    }
+
+    const officialOpeningRows = [];
+    for (const route of OFFICIAL_ROUTES) {
+      for (const raceTypeId of [DEFAULT_RACE_TYPE_ID, FUEL_RUN_RACE_TYPE_ID]) {
+        const row = summarizeOfficialOpeningRoute(route, raceTypeId);
+        if (row) officialOpeningRows.push(row);
+      }
+    }
+    const spectrumOpeningRows = officialOpeningRows.filter((row) => row.routeId === "prism-spectrum-surge");
+    const officialOpeningFailures = officialOpeningRows.filter((row) => !row.pass);
+    assert.strictEqual(officialOpeningFailures.length, 0, "Official Turbo/Overdrive/Redline routes should meet the opening activity floor: " + JSON.stringify(officialOpeningFailures.slice(0, 5)));
+    assert(
+      spectrumOpeningRows.some((row) => row.raceTypeId === DEFAULT_RACE_TYPE_ID
+        && row.openingMeaningfulWaveCountFirst10Seconds >= 4
+        && row.openingRequiredLaneDecisionCountFirst10Seconds >= 2
+        && row.firstRequiredLaneDecisionTime <= 2.7),
+      "Prism Highway / Spectrum Surge / Redline / Classic should have immediate no-sit opening activity"
+    );
+    const spectrumOpeningSafety = await app.runSpawnSafetySimulationCore({
+      runs: 1,
+      officialRouteId: "prism-spectrum-surge",
+      raceTypeId: DEFAULT_RACE_TYPE_ID,
+      dt: 0.36
+    });
+    assert.strictEqual(spectrumOpeningSafety.visibleSpawnViolations, 0, "Spectrum Surge opening floor should avoid visible spawn violations");
+    assert.strictEqual(spectrumOpeningSafety.invalidWalls, 0, "Spectrum Surge opening floor should avoid impossible walls");
+    assert.strictEqual(spectrumOpeningSafety.hardBlockerWalls, 0, "Spectrum Surge opening floor should avoid hard-blocker walls");
+    assert.strictEqual(spectrumOpeningSafety.routeReadabilityFailures, 0, "Spectrum Surge opening floor should keep readable routes");
+    console.log("OFFICIAL_OPENING_ACTIVITY_SAMPLE " + JSON.stringify({
+      checkedRoutes: officialOpeningRows.length,
+      spectrumSurge: spectrumOpeningRows,
+      spectrumSafety: {
+        visibleSpawnViolations: spectrumOpeningSafety.visibleSpawnViolations,
+        invalidWalls: spectrumOpeningSafety.invalidWalls,
+        hardBlockerWalls: spectrumOpeningSafety.hardBlockerWalls,
+        routeReadabilityFailures: spectrumOpeningSafety.routeReadabilityFailures
+      }
+    }));
     const fuelTrack = createRaceTrackForSpeedClass(getTrackById("sunset-highway"), "arcade", FUEL_RUN_RACE_TYPE_ID);
     const fuelRegressionRun = {
       track: fuelTrack,
@@ -502,6 +606,15 @@ async function main() {
         deadScreenMax: roundMetric(summary.longestDeadScreenSeconds),
         meaningfulGapMax: roundMetric(director.longestMeaningfulWaveGapSeconds),
         decisionGapMax: roundMetric(summary.upcomingDecisionGapMax),
+        opening: {
+          firstMeaningfulDecision: roundMetric(director.firstMeaningfulDecisionTime),
+          firstRequiredLaneDecision: roundMetric(director.firstRequiredLaneDecisionTime),
+          meaningfulWavesFirst10: director.openingMeaningfulWaveCountFirst10Seconds || director.meaningfulWavesFirst10Seconds || 0,
+          requiredLaneDecisionsFirst10: director.openingRequiredLaneDecisionCountFirst10Seconds || 0,
+          noInputSafeMax: roundMetric(director.openingNoInputSafeTime),
+          deadScreenFirst10: roundMetric(director.openingDeadScreenTimeFirst10Seconds),
+          deadScreenStreakMax: roundMetric(director.longestOpeningDeadScreenSeconds)
+        },
         hardBlockerDensity: {
           maxHardBlocked: summary.maxHardBlocked,
           fourLaneSamplePercent: roundMetric(summary.hardBlockerFourLaneSamplePercent, 4),
@@ -561,6 +674,9 @@ async function main() {
           speedClassId,
           {
             deadScreenMax: roundMetric(item.director?.longestDeadScreenSeconds),
+            firstRequiredLaneDecision: roundMetric(item.director?.firstRequiredLaneDecisionTime),
+            openingMeaningfulFirst10: item.director?.openingMeaningfulWaveCountFirst10Seconds || item.director?.meaningfulWavesFirst10Seconds || 0,
+            openingNoInputSafeMax: roundMetric(item.director?.openingNoInputSafeTime),
             meaningfulGapMax: roundMetric(item.director?.longestMeaningfulWaveGapSeconds),
             decisionGapMax: roundMetric(item.director?.upcomingDecisionGapMax),
             maxFamilyStreak: item.director?.maxWaveFamilyStreak || 0,
