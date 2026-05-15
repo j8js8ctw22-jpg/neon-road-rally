@@ -255,7 +255,9 @@ async function finishCurrentRace(page, score, time, feedback = {}) {
       renderEffectScaleMin: Number((run.renderEffectScaleMin || 1).toFixed(2)),
       officialRouteId: run.officialRouteId || "",
       routeSeedLocked: Boolean(run.routeSeedLocked || run.officialRouteSeedLocked),
-      routeSignatureHash: run.routeSignatureHash || ""
+      routeSignatureHash: run.routeSignatureHash || "",
+      runProgressSignatureHash: run.runProgressSignatureHash || run.routeSignatureHash || "",
+      officialFullRouteSignatureHash: run.officialFullRouteSignatureHash || ""
     };
   });
   assert(telemetry.frameSampleCount > 0, "Frame telemetry should collect samples on race screen", { telemetry });
@@ -543,13 +545,19 @@ async function run() {
         .map((run) => ({
           route: run.officialRouteName || run.officialRouteId,
           signatureHash: run.routeSignatureHash || "",
+          runProgressSignatureHash: run.runProgressSignatureHash || run.routeSignatureHash || "",
+          officialFullRouteSignatureHash: run.officialFullRouteSignatureHash || "",
           routeSeedLocked: Boolean(run.routeSeedLocked),
           averageFps: Number((run.averageFps || 0).toFixed(1)),
           worstFrameMs: Number((run.worstFrameMs || 0).toFixed(1)),
           renderEffectScaleMin: Number((run.renderEffectScaleMin || 1).toFixed(2))
         }));
     });
-    assert(playtestRouteTelemetry.some((run) => run.route === "Neon Palm Sprint" && run.signatureHash && run.routeSeedLocked), "Playtest Report should include official route signature and seed-lock telemetry", { playtestRouteTelemetry });
+    assert(
+      playtestRouteTelemetry.some((run) => run.route === "Neon Palm Sprint" && run.officialFullRouteSignatureHash && run.runProgressSignatureHash && run.routeSeedLocked),
+      "Playtest Report should distinguish full official route signatures from run-progress signatures",
+      { playtestRouteTelemetry }
+    );
 
     assert(consoleIssues.length === 0, "Console warnings/errors found", { consoleIssues });
     console.log("OFFICIAL_ROUTES_BROWSER_SMOKE_OK");

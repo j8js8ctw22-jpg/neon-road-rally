@@ -200,6 +200,112 @@ async function installVisualSmokeHelpers(page) {
       };
     }
 
+    function hueFamily(sample) {
+      const max = Math.max(sample.r, sample.g, sample.b);
+      const min = Math.min(sample.r, sample.g, sample.b);
+      const chroma = max - min;
+      if (sample.luma < 18 || chroma < 28) return "";
+      let hue = 0;
+      if (max === sample.r) hue = ((sample.g - sample.b) / chroma) % 6;
+      else if (max === sample.g) hue = (sample.b - sample.r) / chroma + 2;
+      else hue = (sample.r - sample.g) / chroma + 4;
+      hue = (hue * 60 + 360) % 360;
+      if (hue < 18 || hue >= 342) return "red";
+      if (hue < 42) return "orange";
+      if (hue < 72) return "yellow";
+      if (hue < 150) return "green";
+      if (hue < 205) return "cyan";
+      if (hue < 255) return "blue";
+      if (hue < 292) return "violet";
+      return "magenta";
+    }
+
+    function summarizeSamples(samples) {
+      const count = Math.max(1, samples.length);
+      const lumas = samples.map((sample) => sample.luma);
+      const chromas = samples.map((sample) => sample.chroma);
+      const families = Array.from(new Set(samples.map(hueFamily).filter(Boolean))).sort();
+      return {
+        count: samples.length,
+        averageLuma: Number((lumas.reduce((sum, value) => sum + value, 0) / count).toFixed(2)),
+        maxLuma: Number(Math.max(...lumas, 0).toFixed(2)),
+        averageChroma: Number((chromas.reduce((sum, value) => sum + value, 0) / count).toFixed(2)),
+        maxChroma: Math.max(...chromas, 0),
+        brightPixelRatio: Number((samples.filter((sample) => sample.luma >= 64).length / count).toFixed(3)),
+        colorCoverage: Number((samples.filter((sample) => sample.chroma >= 42 && sample.luma >= 24).length / count).toFixed(3)),
+        hueFamilies: families
+      };
+    }
+
+    function regionSamples(ctx, canvas, rect, step = 14) {
+      const samples = [];
+      const startX = Math.max(0, rect.x);
+      const endX = Math.min(app().renderer.width, rect.x + rect.w);
+      const startY = Math.max(0, rect.y);
+      const endY = Math.min(app().renderer.height, rect.y + rect.h);
+      for (let y = startY; y <= endY; y += step) {
+        for (let x = startX; x <= endX; x += step) {
+          samples.push(pixelAt(ctx, canvas, x, y));
+        }
+      }
+      return samples;
+    }
+
+    function regionStats(ctx, canvas, rect, step = 14) {
+      return summarizeSamples(regionSamples(ctx, canvas, rect, step));
+    }
+
+    function canvasIdentitySample() {
+      const game = app();
+      game.renderer.render();
+      const canvas = game.canvas;
+      const ctx = canvas.getContext("2d");
+      const road = game.renderer.road;
+      const roadCore = regionStats(ctx, canvas, {
+        x: road.x + road.w * 0.12,
+        y: road.y + road.h * 0.18,
+        w: road.w * 0.76,
+        h: road.h * 0.5
+      }, 18);
+      const centerWash = regionStats(ctx, canvas, {
+        x: road.x + road.w * 0.28,
+        y: road.y + road.h * 0.36,
+        w: road.w * 0.44,
+        h: road.h * 0.3
+      }, 16);
+      const sideWashSamples = regionSamples(ctx, canvas, {
+        x: road.x + road.w * 0.04,
+        y: road.y + road.h * 0.36,
+        w: road.w * 0.18,
+        h: road.h * 0.3
+      }, 16).concat(regionSamples(ctx, canvas, {
+        x: road.x + road.w * 0.78,
+        y: road.y + road.h * 0.36,
+        w: road.w * 0.18,
+        h: road.h * 0.3
+      }, 16));
+      const sideWash = summarizeSamples(sideWashSamples);
+      const backgroundSamples = regionSamples(ctx, canvas, {
+        x: 0,
+        y: road.y + road.h * 0.08,
+        w: Math.max(1, road.x - 22),
+        h: road.h * 0.48
+      }, 20).concat(regionSamples(ctx, canvas, {
+        x: road.x + road.w + 22,
+        y: road.y + road.h * 0.08,
+        w: Math.max(1, game.renderer.width - road.x - road.w - 22),
+        h: road.h * 0.48
+      }, 20));
+      const background = summarizeSamples(backgroundSamples);
+      return {
+        roadCore,
+        centerWash,
+        sideWash,
+        background,
+        centerToSideLumaDelta: Number((centerWash.averageLuma - sideWash.averageLuma).toFixed(2))
+      };
+    }
+
     function canvasReadabilitySample() {
       const game = app();
       game.renderer.render();
@@ -230,6 +336,36 @@ async function installVisualSmokeHelpers(page) {
         edgeSamples,
         roadSamples
       };
+    }
+
+    function objectPixelStats(types = []) {
+      const game = app();
+      game.renderer.render();
+      const canvas = game.canvas;
+      const ctx = canvas.getContext("2d");
+      const run = game.run;
+      if (!run) return [];
+      return game.obstacles.obstacles
+        .filter((obstacle) => types.includes(obstacle.type) && !obstacle.hit && !obstacle.remove)
+        .map((obstacle) => {
+          const rect = game.renderer.getObstacleVisualRectAt(obstacle, run.distance);
+          if (!rect) return null;
+          const isTrafficBody = ["slowCar", "fastCar", "truck"].includes(obstacle.type);
+          const insetX = rect.renderedWidth * (isTrafficBody ? 0.06 : 0.12);
+          const insetY = rect.renderedHeight * (isTrafficBody ? 0.02 : 0.12);
+          return {
+            type: obstacle.type,
+            lane: Math.round(Number.isFinite(obstacle.laneFloat) ? obstacle.laneFloat : obstacle.lane),
+            ahead: Math.round(obstacle.distance - run.distance),
+            stats: regionStats(ctx, canvas, {
+              x: rect.renderedX + insetX,
+              y: rect.renderedY + insetY,
+              w: Math.max(1, rect.renderedWidth - insetX * 2),
+              h: Math.max(1, rect.renderedHeight - insetY * 2)
+            }, Math.max(4, Math.round(Math.min(rect.renderedWidth, rect.renderedHeight) / 8)))
+          };
+        })
+        .filter(Boolean);
     }
 
     function visibleObjects() {
@@ -394,6 +530,77 @@ async function installVisualSmokeHelpers(page) {
         raceTypeId: "fuelRun",
         includeFuelAndBarrier: true
       });
+    }
+
+    function addFullObjectReadabilitySet() {
+      const ahead = Math.max(300, playerAhead() * 0.42);
+      makeObstacle("slowCar", 2, ahead);
+      makeObstacle("fastCar", 0, ahead + 170);
+      makeObstacle("truck", 4, ahead + 340);
+      makeObstacle("barrier", 1, ahead + 500, {
+        waveType: "visualSmokeIdentity",
+        waveLabel: "Visual smoke identity barrier"
+      });
+      makeObstacle("boostPad", 3, ahead + 660, {
+        waveType: "visualSmokeIdentity",
+        waveLabel: "Visual smoke identity boost"
+      });
+      makeObstacle("gasCan", 2, ahead + 820, {
+        waveType: "visualSmokeIdentity",
+        waveLabel: "Visual smoke identity fuel"
+      });
+      makeObstacle("ramp", 4, ahead + 980, {
+        waveType: "visualSmokeIdentity",
+        waveLabel: "Visual smoke identity ramp"
+      });
+    }
+
+    function testBlackoutIdentity(speedClassId = "turbo") {
+      primeRun({
+        raceTypeId: "fuelRun",
+        speedClassId,
+        trackId: "blackout-run",
+        seed: `VISUAL-BLACKOUT-IDENTITY-${speedClassId.toUpperCase()}`
+      });
+      const roadOnly = {
+        snapshot: snapshot(`blackout-road-only-${speedClassId}`),
+        readability: canvasReadabilitySample(),
+        identity: canvasIdentitySample()
+      };
+      addFullObjectReadabilitySet();
+      return {
+        trackId: "blackout-run",
+        speedClassId,
+        roadOnly,
+        objects: snapshot(`blackout-objects-${speedClassId}`),
+        readability: canvasReadabilitySample(),
+        identity: canvasIdentitySample(),
+        objectStats: objectPixelStats(["slowCar", "fastCar", "truck", "barrier", "boostPad", "gasCan", "ramp"])
+      };
+    }
+
+    function testPrismIdentity(speedClassId = "turbo") {
+      primeRun({
+        raceTypeId: "fuelRun",
+        speedClassId,
+        trackId: "prism-highway",
+        seed: `VISUAL-PRISM-IDENTITY-${speedClassId.toUpperCase()}`
+      });
+      const roadOnly = {
+        snapshot: snapshot(`prism-road-only-${speedClassId}`),
+        readability: canvasReadabilitySample(),
+        identity: canvasIdentitySample()
+      };
+      addFullObjectReadabilitySet();
+      return {
+        trackId: "prism-highway",
+        speedClassId,
+        roadOnly,
+        objects: snapshot(`prism-objects-${speedClassId}`),
+        readability: canvasReadabilitySample(),
+        identity: canvasIdentitySample(),
+        objectStats: objectPixelStats(["slowCar", "fastCar", "truck", "barrier", "boostPad", "gasCan", "ramp"])
+      };
     }
 
     function testClassicBoost() {
@@ -658,6 +865,8 @@ async function installVisualSmokeHelpers(page) {
       testPartyFuel,
       testTrackTheme,
       testBlackoutSpeedReadability,
+      testBlackoutIdentity,
+      testPrismIdentity,
       menuScreens
     };
   });
@@ -865,6 +1074,104 @@ async function run() {
         edgeMaxLuma: item.readability.edgeMaxLuma,
         maxChroma: item.readability.maxChroma
       }
+    }));
+
+    const blackoutIdentity = await page.evaluate(() => (
+      ["turbo", "overdrive", "redline"].map((speedClassId) => window.__nrrVisualSmoke.testBlackoutIdentity(speedClassId))
+    ));
+    for (const identityResult of blackoutIdentity) {
+      const { roadOnly, objects, objectStats, speedClassId } = identityResult;
+      assert(roadOnly.snapshot.screen === "game" && roadOnly.snapshot.trackId === "blackout-run", `Blackout Run ${speedClassId} identity smoke did not start correctly`, roadOnly.snapshot);
+      assert(
+        roadOnly.identity.roadCore.averageLuma <= 24,
+        `Blackout Run ${speedClassId} road should stay genuinely blacked out`,
+        roadOnly.identity
+      );
+      assert(
+        roadOnly.identity.background.averageLuma <= 14,
+        `Blackout Run ${speedClassId} background should stay near black`,
+        roadOnly.identity
+      );
+      assert(
+        roadOnly.identity.centerWash.brightPixelRatio <= 0.14 && roadOnly.identity.centerToSideLumaDelta <= 12,
+        `Blackout Run ${speedClassId} should not be dominated by a large bright headlight trapezoid`,
+        roadOnly.identity
+      );
+      ["slowCar", "fastCar", "truck", "barrier", "boostPad", "gasCan", "ramp"].forEach((type) => {
+        assert(objects.visibleTypes.includes(type), `Blackout Run ${speedClassId} should keep ${type} visible through reflective reads`, objects);
+      });
+      ["slowCar", "fastCar", "truck"].forEach((type) => {
+        const vehicle = objectStats.find((item) => item.type === type);
+        assert(vehicle, `Blackout Run ${speedClassId} should report ${type} pixel stats`, objectStats);
+        assert(
+          vehicle.stats.averageLuma <= 52 && vehicle.stats.maxLuma >= 70 && vehicle.stats.brightPixelRatio <= 0.36,
+          `Blackout Run ${speedClassId} ${type} should read as a dark silhouette with light/glint cues`,
+          vehicle
+        );
+      });
+      ["barrier", "boostPad", "gasCan", "ramp"].forEach((type) => {
+        const object = objectStats.find((item) => item.type === type);
+        assert(object, `Blackout Run ${speedClassId} should report ${type} pixel stats`, objectStats);
+        assert(
+          object.stats.maxLuma > roadOnly.identity.roadCore.averageLuma + 28,
+          `Blackout Run ${speedClassId} ${type} should remain identifiable in the dark`,
+          object
+        );
+      });
+    }
+    report.observed.blackoutIdentity = blackoutIdentity.map((item) => ({
+      speedClassId: item.speedClassId,
+      visibleTypes: item.objects.visibleTypes,
+      roadCore: item.roadOnly.identity.roadCore,
+      background: item.roadOnly.identity.background,
+      centerWash: item.roadOnly.identity.centerWash,
+      centerToSideLumaDelta: item.roadOnly.identity.centerToSideLumaDelta,
+      objectStats: item.objectStats.map((object) => ({
+        type: object.type,
+        averageLuma: object.stats.averageLuma,
+        maxLuma: object.stats.maxLuma,
+        brightPixelRatio: object.stats.brightPixelRatio
+      }))
+    }));
+
+    const prismIdentity = await page.evaluate(() => (
+      ["turbo", "overdrive", "redline"].map((speedClassId) => window.__nrrVisualSmoke.testPrismIdentity(speedClassId))
+    ));
+    for (const identityResult of prismIdentity) {
+      const { roadOnly, objects, objectStats, speedClassId } = identityResult;
+      assert(roadOnly.snapshot.screen === "game" && roadOnly.snapshot.trackId === "prism-highway", `Prism Highway ${speedClassId} identity smoke did not start correctly`, roadOnly.snapshot);
+      assert(
+        roadOnly.identity.roadCore.hueFamilies.length >= 6,
+        `Prism Highway ${speedClassId} should show multiple rainbow hue families on the road itself`,
+        roadOnly.identity.roadCore
+      );
+      assert(
+        roadOnly.identity.roadCore.colorCoverage >= 0.46 && roadOnly.identity.roadCore.averageChroma >= 54,
+        `Prism Highway ${speedClassId} road surface should carry the rainbow identity, not just decorative lines`,
+        roadOnly.identity.roadCore
+      );
+      ["slowCar", "fastCar", "truck", "barrier", "boostPad", "gasCan", "ramp"].forEach((type) => {
+        assert(objects.visibleTypes.includes(type), `Prism Highway ${speedClassId} should keep ${type} visible over rainbow pavement`, objects);
+      });
+      objectStats.forEach((object) => {
+        assert(
+          object.stats.maxLuma > roadOnly.identity.roadCore.averageLuma + 8 || object.stats.averageChroma > roadOnly.identity.roadCore.averageChroma + 8,
+          `Prism Highway ${speedClassId} ${object.type} should stand out from the colorful road`,
+          object
+        );
+      });
+    }
+    report.observed.prismIdentity = prismIdentity.map((item) => ({
+      speedClassId: item.speedClassId,
+      visibleTypes: item.objects.visibleTypes,
+      roadCore: item.roadOnly.identity.roadCore,
+      objectStats: item.objectStats.map((object) => ({
+        type: object.type,
+        averageLuma: object.stats.averageLuma,
+        maxLuma: object.stats.maxLuma,
+        averageChroma: object.stats.averageChroma,
+        maxChroma: object.stats.maxChroma
+      }))
     }));
 
     const pursuit = await page.evaluate(() => window.__nrrVisualSmoke.testPursuitRoadblockAndEscaped());

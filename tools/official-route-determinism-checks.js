@@ -183,6 +183,53 @@ vm.runInContext(`
     signatures: assertFrameCadenceStable(routeId, DEFAULT_RACE_TYPE_ID, getOfficialRouteDisplayName(routeId) + " Classic")
   }));
 
+  const headlightMileScenarios = [
+    { id: "no-drift", style: "no-drift", waveLimit: 36, dt: 0.36 },
+    { id: "frequent-drift", style: "frequent-drift", waveLimit: 36, dt: 0.31 },
+    { id: "early-crash", style: "early-crash", waveLimit: 8, dt: 0.36 },
+    { id: "full-finish", style: "full-finish", waveLimit: OFFICIAL_FULL_ROUTE_SIGNATURE_WAVE_LIMIT, dt: OFFICIAL_FULL_ROUTE_SIGNATURE_DT, preserveFull: true },
+    { id: "boost-heavy", style: "boost-heavy", waveLimit: 36, dt: 0.42 },
+    { id: "conservative-lane-changes", style: "conservative-lane-changes", waveLimit: 36, dt: 0.28 }
+  ];
+  const headlightMileRouteId = "blackout-headlight-mile";
+  const headlightMileFullSignature = app.getOfficialFullRouteSignature(headlightMileRouteId, DEFAULT_RACE_TYPE_ID);
+  assert(headlightMileFullSignature?.hash, "Headlight Mile should produce a full official route signature");
+  const headlightMileIntegrityRows = headlightMileScenarios.map((scenario) => {
+    const capture = app.captureRoadDirectorSequence({
+      officialRouteId: headlightMileRouteId,
+      raceTypeId: DEFAULT_RACE_TYPE_ID,
+      waveLimit: scenario.waveLimit,
+      dt: scenario.dt,
+      simulatedInputStyle: scenario.style,
+      routeSeedLocked: true,
+      preserveFullRoadDirectorSequence: Boolean(scenario.preserveFull),
+      fullRouteSignature: Boolean(scenario.preserveFull)
+    });
+    const runProgressSignature = app.getRoadDirectorRouteSignature(capture, { officialRouteId: headlightMileRouteId });
+    const officialFullRouteSignature = app.getOfficialFullRouteSignature(headlightMileRouteId, DEFAULT_RACE_TYPE_ID);
+    return {
+      scenarioId: scenario.id,
+      simulatedInputStyle: scenario.style,
+      dt: scenario.dt,
+      captureFinishReached: Boolean(capture.finishReached),
+      runProgressSignatureHash: runProgressSignature.hash,
+      runProgressSignatureWaveCount: runProgressSignature.waveCount,
+      officialFullRouteSignatureHash: officialFullRouteSignature.hash,
+      officialFullRouteSignatureWaveCount: officialFullRouteSignature.waveCount,
+      officialFullRouteSignatureScope: officialFullRouteSignature.scope
+    };
+  });
+  const headlightMileFullHashes = new Set(headlightMileIntegrityRows.map((row) => row.officialFullRouteSignatureHash));
+  assert.strictEqual(headlightMileFullHashes.size, 1, "Headlight Mile full route signature should not change across simulated input styles");
+  assert(headlightMileIntegrityRows.every((row) => row.officialFullRouteSignatureHash === headlightMileFullSignature.hash), "Scenario full signatures should match the cached Headlight Mile signature");
+  assert(headlightMileIntegrityRows.every((row) => row.officialFullRouteSignatureScope === OFFICIAL_FULL_ROUTE_SIGNATURE_SCOPE), "Full signatures should be labeled with the full-route scope");
+  const earlyCrashRow = headlightMileIntegrityRows.find((row) => row.scenarioId === "early-crash");
+  assert(earlyCrashRow.runProgressSignatureWaveCount < headlightMileFullSignature.waveCount, "Early crash progress signature should be partial");
+  assert.notStrictEqual(earlyCrashRow.runProgressSignatureHash, headlightMileFullSignature.hash, "Early crash progress signature should not masquerade as the full route signature");
+  const fullFinishRow = headlightMileIntegrityRows.find((row) => row.scenarioId === "full-finish");
+  assert.strictEqual(fullFinishRow.captureFinishReached, true, "Full-finish capture should reach the route finish");
+  assert.strictEqual(fullFinishRow.runProgressSignatureHash, headlightMileFullSignature.hash, "Full-finish progress capture should match the official full route signature when it captures the whole route");
+
   const palmManualClassic = getOfficialRouteForRun("sunset-highway", "turbo", DEFAULT_RACE_TYPE_ID, "SUNSET-PALM-SPRINT-TURBO", "");
   const palmManualFuel = getOfficialRouteForRun("sunset-highway", "turbo", FUEL_RUN_RACE_TYPE_ID, "SUNSET-PALM-SPRINT-TURBO", "");
   const midnightManualClassic = getOfficialRouteForRun("midnight-ridge", "turbo", DEFAULT_RACE_TYPE_ID, "MIDNIGHT-RIDGE-LANTERN-TURBO", "");
@@ -232,10 +279,13 @@ vm.runInContext(`
       raceTypeId: row.raceTypeId,
       seed: row.seed,
       signatureHash: row.signatureHash,
+      officialFullRouteSignatureHash: row.officialFullRouteSignatureHash,
+      officialFullRouteSignatureWaveCount: row.officialFullRouteSignatureWaveCount,
       waveCount: row.waveCounts[0],
       repeats: row.repeats
     })),
     frameCadenceAudits,
+    headlightMileSignatureIntegrity: headlightMileIntegrityRows,
     manualOfficialSeed: {
       seed: "SUNSET-PALM-SPRINT-TURBO",
       normalizedRouteId: palmManualClassic.id

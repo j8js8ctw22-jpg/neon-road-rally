@@ -181,10 +181,10 @@ async function exerciseDrift(page, directionKey, expectedDirection, options = {}
     return run.driftActive === true && run.driftDirection === direction && (run.driftChargeSeconds || 0) > 0.08;
   }, expectedDirection, { timeout: 5000 });
   if (holdMs > 0) await page.waitForTimeout(holdMs);
-  if (holdMs >= 800) {
+  if (holdMs >= 520) {
     await page.waitForFunction(() => {
       const run = window.neonRoadRally?.run || {};
-      return Boolean(run.driftFullChargeReady) || (run.driftChargeSeconds || 0) >= 1.045;
+      return Boolean(run.driftFullChargeReady) || (run.driftChargeSeconds || 0) >= 0.545;
     }, null, { timeout: 1500 });
   }
   const active = await page.evaluate(() => {
@@ -220,7 +220,7 @@ async function exerciseDrift(page, directionKey, expectedDirection, options = {}
   } else {
     assert(active.renderLaneFloat > before.renderLaneFloat, "Right drift dash should move the car right immediately", { before, active });
   }
-  if (holdMs >= 800) {
+  if (holdMs >= 520) {
     assert(active.fullChargeReady, "Max-hold drift dash should mark the cue as ready", { active });
     assert(active.fullChargeCueActive, "Max-hold drift dash should expose a visual cue state", { active });
   }
@@ -308,6 +308,65 @@ async function exerciseRepeatedQuickDriftDashes(page) {
   return { first, second, cooldownWaitMs: 240 };
 }
 
+async function exerciseBoostPadChaseWithDrift(page) {
+  await startCustomRun(page, {
+    trackId: "sunset-highway",
+    speedClassId: "arcade",
+    raceTypeId: "classic",
+    seed: "DRIFT-BOOST-PAD-CHASE"
+  });
+  const setup = await page.evaluate(() => {
+    const app = window.neonRoadRally;
+    const run = app.run;
+    run.targetLane = 1;
+    run.renderLaneFloat = 1;
+    run.playerLaneFloat = 1;
+    run.laneChangeStartLane = 1;
+    run.laneChangeTargetLane = 1;
+    run.laneChangeDistance = 0.001;
+    run.laneChangeElapsed = 0;
+    run.laneChangeProgress = 1;
+    const playerY = app.renderer.getPlayerScreenY();
+    const ahead = app.renderer.aheadForY(playerY);
+    app.obstacles.obstacles = [{
+      id: "drift-boost-pad-chase",
+      type: "boostPad",
+      lane: 3,
+      distance: run.distance + ahead,
+      variant: ""
+    }];
+    return {
+      targetLane: run.targetLane,
+      renderLaneFloat: run.renderLaneFloat,
+      boostPadLane: app.obstacles.obstacles[0].lane,
+      boostPadAhead: Number(ahead.toFixed(2))
+    };
+  });
+  await page.keyboard.down("Shift");
+  await page.keyboard.down("d");
+  await page.waitForTimeout(180);
+  await page.keyboard.up("d");
+  await page.keyboard.up("Shift");
+  await page.waitForFunction(() => {
+    const run = window.neonRoadRally?.run || {};
+    return (run.boostPadsCollected || 0) > 0 || (run.padBoostTimer || 0) > 0;
+  }, null, { timeout: 5000 });
+  const result = await page.evaluate(() => {
+    const run = window.neonRoadRally.run;
+    return {
+      boostPadsCollected: run.boostPadsCollected || 0,
+      padBoostTimer: Number((run.padBoostTimer || 0).toFixed(3)),
+      driftDashesCompleted: run.driftDashesCompleted || 0,
+      longestDriftDashLanes: Number((run.longestDriftDashLanes || 0).toFixed(3)),
+      targetLane: run.targetLane,
+      renderLaneFloat: Number((run.renderLaneFloat || 0).toFixed(3))
+    };
+  });
+  assert(result.boostPadsCollected >= 1 || result.padBoostTimer > 0, "Drift dash should be able to chase and collect a reachable boost pad", { setup, result });
+  assert(result.driftDashesCompleted >= 1, "Boost pad chase should complete through a drift dash", { setup, result });
+  return { setup, result };
+}
+
 async function assertLaneAndSpaceBoostStillWork(page) {
   const beforeLane = await page.evaluate(() => window.neonRoadRally.run.targetLane);
   await page.keyboard.press("d");
@@ -323,10 +382,74 @@ async function assertLaneAndSpaceBoostStillWork(page) {
   await page.waitForFunction(() => (window.neonRoadRally?.run?.boostTimer || 0) > 0, null, { timeout: 5000 });
   const boostResult = await page.evaluate(() => ({
     boostTimer: Number((window.neonRoadRally.run.boostTimer || 0).toFixed(3)),
-    manualBoostsUsed: window.neonRoadRally.run.manualBoostsUsed || 0
+    manualBoostsUsed: window.neonRoadRally.run.manualBoostsUsed || 0,
+    manualBoostMultiplier: SPEED_TUNING.manualBoostMultiplier,
+    driftMaxBoostMultiplier: DRIFT_TUNING.maxBoostMultiplier
   }));
   assert(boostResult.manualBoostsUsed >= 1 && boostResult.boostTimer > 0, "Space boost should still work", { boostResult });
+  assert(boostResult.manualBoostMultiplier > boostResult.driftMaxBoostMultiplier, "Space boost should remain stronger than drift release boost", { boostResult });
   return { laneResult, boostResult };
+}
+
+async function exerciseDriftCrashRisk(page) {
+  await startCustomRun(page, {
+    trackId: "sunset-highway",
+    speedClassId: "arcade",
+    raceTypeId: "classic",
+    seed: "DRIFT-CRASH-RISK"
+  });
+  const setup = await page.evaluate(() => {
+    const app = window.neonRoadRally;
+    const run = app.run;
+    run.targetLane = 1;
+    run.renderLaneFloat = 1;
+    run.playerLaneFloat = 1;
+    run.laneChangeStartLane = 1;
+    run.laneChangeTargetLane = 1;
+    run.laneChangeDistance = 0.001;
+    run.laneChangeElapsed = 0;
+    run.laneChangeProgress = 1;
+    const playerY = app.renderer.getPlayerScreenY();
+    const ahead = app.renderer.aheadForY(playerY);
+    app.obstacles.obstacles = [{
+      id: "drift-crash-risk-slow-car",
+      type: "slowCar",
+      lane: 2,
+      distance: run.distance + ahead,
+      variant: ""
+    }];
+    return {
+      targetLane: run.targetLane,
+      renderLaneFloat: run.renderLaneFloat,
+      obstacleLane: app.obstacles.obstacles[0].lane,
+      obstacleAhead: Number(ahead.toFixed(2))
+    };
+  });
+  await page.keyboard.down("Shift");
+  await page.keyboard.down("d");
+  try {
+    await page.waitForFunction(() => {
+      const app = window.neonRoadRally;
+      return app?.run?.ended === true || app?.screen === "score";
+    }, null, { timeout: 5000 });
+  } finally {
+    await page.keyboard.up("d").catch(() => {});
+    await page.keyboard.up("Shift").catch(() => {});
+  }
+  const result = await page.evaluate(() => {
+    const summary = window.neonRoadRally.lastSummary || {};
+    const run = window.neonRoadRally.run || {};
+    return {
+      status: summary.status || run.status || "",
+      crashReason: summary.crashReason || run.crashReason || "",
+      crashesWhileDrifting: summary.crashesWhileDrifting || run.crashesWhileDrifting || 0,
+      driftDashesCompleted: summary.driftDashesCompleted || run.driftDashesCompleted || 0,
+      screen: window.neonRoadRally.screen
+    };
+  });
+  assert(result.status === "crashed", "Drift danger footprint should still catch adjacent traffic during a dash", { setup, result });
+  assert(result.crashesWhileDrifting >= 1, "Crash-risk smoke should register the crash as a drift dash crash", { setup, result });
+  return { setup, result };
 }
 
 async function forceFinishWithDriftNote(page) {
@@ -347,9 +470,9 @@ async function forceFinishWithDriftNote(page) {
     run.driftDashTime = Math.max(run.driftDashTime || 0, 3.2);
     run.driftLanesCrossed = Math.max(run.driftLanesCrossed || 0, 7.2);
     run.longestDriftDashLanes = Math.max(run.longestDriftDashLanes || 0, 3.1);
-    run.longestDrift = Math.max(run.longestDrift || 0, 1.05);
-    run.maxDriftCharge = Math.max(run.maxDriftCharge || 0, 1.05);
-    run.maxDriftHold = Math.max(run.maxDriftHold || 0, 1.05);
+    run.longestDrift = Math.max(run.longestDrift || 0, 0.55);
+    run.maxDriftCharge = Math.max(run.maxDriftCharge || 0, 0.55);
+    run.maxDriftHold = Math.max(run.maxDriftHold || 0, 0.55);
     run.driftNearMisses = 0;
     run.crashesWhileDrifting = 0;
     run.boostPadsCollected = Math.max(run.boostPadsCollected || 0, 3);
@@ -489,10 +612,10 @@ async function main() {
       raceTypeId: "classic",
       seed: "DRIFT-ARCADE-FULL"
     });
-    const arcadeFullDrift = await exerciseDrift(page, "d", 1, { holdMs: 950, releaseMode: "shift" });
+    const arcadeFullDrift = await exerciseDrift(page, "d", 1, { holdMs: 620, releaseMode: "shift" });
     assert(arcadeFullDrift.release.driftBoostMultiplier > arcadeShortDrift.release.driftBoostMultiplier, "Arcade long drift dash should release a stronger boost than short drift dash", { arcadeShortDrift, arcadeFullDrift });
     assert(arcadeFullDrift.release.driftBoostTimer > arcadeShortDrift.release.driftBoostTimer, "Arcade long drift dash should release a longer boost than short drift dash", { arcadeShortDrift, arcadeFullDrift });
-    assert(arcadeFullDrift.release.fullRelease, "Arcade long drift dash should mark the release as a max dash", { arcadeFullDrift });
+    assert(arcadeFullDrift.release.maxDriftCharge >= 0.54, "Arcade long drift dash should reach the max-hold charge", { arcadeFullDrift });
 
     await startOfficialRun(page, {
       routeId: "sunset-neon-palm-sprint",
@@ -510,7 +633,7 @@ async function main() {
       raceTypeId: "classic",
       seed: "SUNSET-PALM-SPRINT-TURBO"
     });
-    const turboFullDrift = await exerciseDrift(page, "ArrowRight", 1, { holdMs: 950, releaseMode: "direction" });
+    const turboFullDrift = await exerciseDrift(page, "ArrowRight", 1, { holdMs: 620, releaseMode: "direction" });
     assert(turboFullDrift.release.driftBoostMultiplier > turboShortDrift.release.driftBoostMultiplier, "Turbo long drift dash should release a stronger boost than short drift dash", { turboShortDrift, turboFullDrift });
     assert(turboFullDrift.release.driftBoostTimer > turboShortDrift.release.driftBoostTimer, "Turbo long drift dash should release a longer boost than short drift dash", { turboShortDrift, turboFullDrift });
     const finishSummary = await forceFinishWithDriftNote(page);
@@ -523,6 +646,8 @@ async function main() {
     });
     const crashSummary = await forceCrashWithDriftDashNote(page);
     const repeatedQuickDrifts = await exerciseRepeatedQuickDriftDashes(page);
+    const boostPadChase = await exerciseBoostPadChaseWithDrift(page);
+    const driftCrashRisk = await exerciseDriftCrashRisk(page);
 
     await startOfficialRun(page, {
       routeId: "redline-switchyard-boostline",
@@ -545,6 +670,8 @@ async function main() {
       turboShortDrift,
       turboFullDrift,
       repeatedQuickDrifts,
+      boostPadChase,
+      driftCrashRisk,
       fuelDrift,
       finishSummary,
       crashSummary,

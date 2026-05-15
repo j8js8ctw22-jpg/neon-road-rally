@@ -36,6 +36,31 @@ const BASE_URL = process.env.NRR_SMOKE_URL || "http://127.0.0.1:8085/";
 const ROUTE_TIMEOUT_MS = Number(process.env.NRR_PERF_ROUTE_TIMEOUT_MS || 120000);
 const POST_ROUTE_CLEANUP_MS = 900;
 const INCLUDE_SEQUENCE = process.env.NRR_PERF_INCLUDE_SEQUENCE === "1";
+const DEFAULT_PERF_ROUTE_IDS = [
+  "sunset-neon-palm-sprint",
+  "sunset-last-light-gauntlet",
+  "blackout-headlight-mile",
+  "blackout-blind-curve-cut",
+  "blackout-lights-out-charge",
+  "prism-pinkline-sprint",
+  "prism-violet-boostway",
+  "prism-hot-pink-redline"
+].join(",");
+
+const TRACK_PERFORMANCE_THRESHOLDS = {
+  "blackout-run": {
+    minAverageFps: 58,
+    maxSlowFramePercent: 3,
+    maxWorstFrameMs: 95,
+    maxRecentAverageFrameMs: 24
+  },
+  "prism-highway": {
+    minAverageFps: 58,
+    maxSlowFramePercent: 3,
+    maxWorstFrameMs: 95,
+    maxRecentAverageFrameMs: 24
+  }
+};
 
 const ROUTES = {
   "sunset-neon-palm-sprint": {
@@ -53,6 +78,54 @@ const ROUTES = {
     speedClassId: "redline",
     raceTypeId: "classic",
     seed: "SUNSET-LAST-LIGHT-REDLINE"
+  },
+  "blackout-headlight-mile": {
+    routeId: "blackout-headlight-mile",
+    routeName: "Headlight Mile",
+    trackId: "blackout-run",
+    speedClassId: "turbo",
+    raceTypeId: "classic",
+    seed: "BLACKOUT-HEADLIGHT-MILE-TURBO"
+  },
+  "blackout-blind-curve-cut": {
+    routeId: "blackout-blind-curve-cut",
+    routeName: "Blind Curve Cut",
+    trackId: "blackout-run",
+    speedClassId: "overdrive",
+    raceTypeId: "classic",
+    seed: "BLACKOUT-BLIND-CURVE-OVERDRIVE"
+  },
+  "blackout-lights-out-charge": {
+    routeId: "blackout-lights-out-charge",
+    routeName: "Lights Out Charge",
+    trackId: "blackout-run",
+    speedClassId: "redline",
+    raceTypeId: "classic",
+    seed: "BLACKOUT-LIGHTS-OUT-REDLINE"
+  },
+  "prism-pinkline-sprint": {
+    routeId: "prism-pinkline-sprint",
+    routeName: "Pinkline Sprint",
+    trackId: "prism-highway",
+    speedClassId: "turbo",
+    raceTypeId: "classic",
+    seed: "PRISM-PINKLINE-SPRINT-TURBO"
+  },
+  "prism-violet-boostway": {
+    routeId: "prism-violet-boostway",
+    routeName: "Violet Boostway",
+    trackId: "prism-highway",
+    speedClassId: "overdrive",
+    raceTypeId: "classic",
+    seed: "PRISM-VIOLET-BOOSTWAY-OVERDRIVE"
+  },
+  "prism-hot-pink-redline": {
+    routeId: "prism-hot-pink-redline",
+    routeName: "Hot Pink Redline",
+    trackId: "prism-highway",
+    speedClassId: "redline",
+    raceTypeId: "classic",
+    seed: "PRISM-HOT-PINK-REDLINE"
   },
   "boostline-neon-palm": {
     routeId: "boostline-neon-palm",
@@ -73,7 +146,7 @@ const ROUTES = {
 };
 
 function getRouteList() {
-  const ids = String(process.env.NRR_PERF_ROUTE_IDS || "sunset-neon-palm-sprint,sunset-last-light-gauntlet")
+  const ids = String(process.env.NRR_PERF_ROUTE_IDS || DEFAULT_PERF_ROUTE_IDS)
     .split(",")
     .map((id) => id.trim())
     .filter(Boolean);
@@ -125,7 +198,9 @@ async function runRoute(page, route) {
         performanceEffectScale: Number((run.performanceEffectScale || 1).toFixed(2)),
         renderEffectScaleMin: Number((run.renderEffectScaleMin || 1).toFixed(2)),
         routeSeedLocked: Boolean(run.routeSeedLocked || run.officialRouteSeedLocked),
-        routeSignatureHash: run.routeSignatureHash || ""
+        routeSignatureHash: run.routeSignatureHash || "",
+        runProgressSignatureHash: run.runProgressSignatureHash || run.routeSignatureHash || "",
+        officialFullRouteSignatureHash: run.officialFullRouteSignatureHash || ""
       };
     });
     throw new Error(`Timed out waiting for ${route.routeName} to finish: ${error.message} ${JSON.stringify(diagnostic)}`);
@@ -171,8 +246,10 @@ async function runRoute(page, route) {
     const result = {
       routeId: routeConfig.routeId,
       routeName: routeConfig.routeName,
+      trackId: routeConfig.trackId,
       raceTypeId: routeConfig.raceTypeId,
       speedClassId: routeConfig.speedClassId,
+      seed: routeConfig.seed,
       status: summary.status || run.status || "",
       finishTimeMs: summary.finishTimeMs ?? null,
       frameSampleCount: run.frameSampleCount || 0,
@@ -188,7 +265,11 @@ async function runRoute(page, route) {
       routeContentHash: hashString(routeContentKey),
       routeCoarseHash: hashString(routeCoarseKey),
       routeSignatureHash: run.routeSignatureHash || "",
-      routeSignatureWaveCount: run.routeSignatureWaveCount || 0
+      routeSignatureWaveCount: run.routeSignatureWaveCount || 0,
+      runProgressSignatureHash: run.runProgressSignatureHash || run.routeSignatureHash || "",
+      runProgressSignatureWaveCount: run.runProgressSignatureWaveCount || run.routeSignatureWaveCount || 0,
+      officialFullRouteSignatureHash: run.officialFullRouteSignatureHash || "",
+      officialFullRouteSignatureWaveCount: run.officialFullRouteSignatureWaveCount || 0
     };
     if (routeConfig.includeSequence) {
       result.sequence = (run.roadDirectorSequence || []).map((wave) => ({
@@ -210,6 +291,29 @@ async function runRoute(page, route) {
   }, { ...route, includeSequence: INCLUDE_SEQUENCE });
   await page.waitForTimeout(POST_ROUTE_CLEANUP_MS);
   return result;
+}
+
+function assertPerformanceResults(results) {
+  const failures = [];
+  for (const result of results) {
+    const threshold = TRACK_PERFORMANCE_THRESHOLDS[result.trackId];
+    if (!threshold) continue;
+    if (result.averageFps < threshold.minAverageFps) {
+      failures.push(`${result.routeId} averageFps ${result.averageFps} < ${threshold.minAverageFps}`);
+    }
+    if (result.slowFramePercent > threshold.maxSlowFramePercent) {
+      failures.push(`${result.routeId} slowFramePercent ${result.slowFramePercent} > ${threshold.maxSlowFramePercent}`);
+    }
+    if (result.worstFrameMs > threshold.maxWorstFrameMs) {
+      failures.push(`${result.routeId} worstFrameMs ${result.worstFrameMs} > ${threshold.maxWorstFrameMs}`);
+    }
+    if (result.recentAverageFrameMs > threshold.maxRecentAverageFrameMs) {
+      failures.push(`${result.routeId} recentAverageFrameMs ${result.recentAverageFrameMs} > ${threshold.maxRecentAverageFrameMs}`);
+    }
+  }
+  if (failures.length) {
+    throw new Error(`Performance thresholds failed: ${failures.join(" | ")}`);
+  }
 }
 
 async function main() {
@@ -236,11 +340,12 @@ async function main() {
     for (const route of getRouteList()) {
       results.push(await runRoute(page, route));
     }
+    assertPerformanceResults(results);
     if (consoleIssues.length) {
       throw new Error(`Console warnings/errors found: ${consoleIssues.join(" | ")}`);
     }
     console.log("LIVE_RUN_PERFORMANCE_SAMPLE_OK");
-    console.log(JSON.stringify({ results, consoleIssues }, null, 2));
+    console.log(JSON.stringify({ results, consoleIssues, thresholds: TRACK_PERFORMANCE_THRESHOLDS }, null, 2));
   } finally {
     await browser.close();
   }
