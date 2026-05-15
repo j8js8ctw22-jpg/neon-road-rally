@@ -178,7 +178,18 @@ async function runRoute(page, route) {
   }, route);
 
   try {
-    await page.waitForFunction(() => window.neonRoadRally?.run?.ended === true, null, { timeout: ROUTE_TIMEOUT_MS });
+    await page.waitForFunction(() => {
+      const app = window.neonRoadRally;
+      const run = app?.run;
+      return Boolean(run?.ended || (run?.officialEnduranceActive && run?.officialFinishLocked && app?.lastSummary?.status === "finished"));
+    }, null, { timeout: ROUTE_TIMEOUT_MS });
+    await page.evaluate(() => {
+      const app = window.neonRoadRally;
+      if (app?.canEndOfficialEndurance?.()) {
+        app.endOfficialEndurance("Performance Sample Ended");
+      }
+    });
+    await page.waitForFunction(() => window.neonRoadRally?.run?.ended === true, null, { timeout: 5000 });
   } catch (error) {
     const diagnostic = await page.evaluate(() => {
       const app = window.neonRoadRally;
@@ -197,6 +208,10 @@ async function runRoute(page, route) {
         worstFrameMs: Number((run.frameTimeMaxMs || 0).toFixed(2)),
         performanceEffectScale: Number((run.performanceEffectScale || 1).toFixed(2)),
         renderEffectScaleMin: Number((run.renderEffectScaleMin || 1).toFixed(2)),
+        officialFinishLocked: Boolean(run.officialFinishLocked),
+        officialEnduranceActive: Boolean(run.officialEnduranceActive),
+        officialEnduranceLap: run.officialEnduranceLap || 1,
+        officialFinishTimeMs: run.officialFinishTimeMs ?? null,
         routeSeedLocked: Boolean(run.routeSeedLocked || run.officialRouteSeedLocked),
         routeSignatureHash: run.routeSignatureHash || "",
         runProgressSignatureHash: run.runProgressSignatureHash || run.routeSignatureHash || "",
@@ -210,6 +225,7 @@ async function runRoute(page, route) {
     const app = window.neonRoadRally;
     const run = app.run || {};
     const summary = app.lastSummary || {};
+    const officialSummary = summary.officialFinishSummary || summary;
     const sequence = run.roadDirectorSequence || [];
     const hashString = (value) => {
       let hash = 2166136261;
@@ -250,8 +266,10 @@ async function runRoute(page, route) {
       raceTypeId: routeConfig.raceTypeId,
       speedClassId: routeConfig.speedClassId,
       seed: routeConfig.seed,
-      status: summary.status || run.status || "",
-      finishTimeMs: summary.finishTimeMs ?? null,
+      status: officialSummary.status || summary.status || run.status || "",
+      finishTimeMs: officialSummary.finishTimeMs ?? summary.finishTimeMs ?? null,
+      officialEnduranceEnded: Boolean(summary.officialEnduranceResult),
+      officialEnduranceEndReason: summary.officialEnduranceResult?.endReason || "",
       frameSampleCount: run.frameSampleCount || 0,
       averageFrameMs: Number((run.averageFrameMs || 0).toFixed(2)),
       averageFps: Number((run.averageFps || 0).toFixed(1)),
@@ -261,15 +279,15 @@ async function runRoute(page, route) {
       slowFramePercent: Number((run.slowFramePercent || 0).toFixed(2)),
       performanceEffectScale: Number((run.performanceEffectScale || 1).toFixed(2)),
       renderEffectScaleMin: Number((run.renderEffectScaleMin || 1).toFixed(2)),
-      routeSeedLocked: Boolean(run.routeSeedLocked || run.officialRouteSeedLocked),
+      routeSeedLocked: Boolean(officialSummary.routeSeedLocked || run.routeSeedLocked || run.officialRouteSeedLocked),
       routeContentHash: hashString(routeContentKey),
       routeCoarseHash: hashString(routeCoarseKey),
-      routeSignatureHash: run.routeSignatureHash || "",
-      routeSignatureWaveCount: run.routeSignatureWaveCount || 0,
-      runProgressSignatureHash: run.runProgressSignatureHash || run.routeSignatureHash || "",
-      runProgressSignatureWaveCount: run.runProgressSignatureWaveCount || run.routeSignatureWaveCount || 0,
-      officialFullRouteSignatureHash: run.officialFullRouteSignatureHash || "",
-      officialFullRouteSignatureWaveCount: run.officialFullRouteSignatureWaveCount || 0
+      routeSignatureHash: officialSummary.routeSignatureHash || run.routeSignatureHash || "",
+      routeSignatureWaveCount: officialSummary.routeSignatureWaveCount || run.routeSignatureWaveCount || 0,
+      runProgressSignatureHash: officialSummary.runProgressSignatureHash || run.runProgressSignatureHash || run.routeSignatureHash || "",
+      runProgressSignatureWaveCount: officialSummary.runProgressSignatureWaveCount || run.runProgressSignatureWaveCount || run.routeSignatureWaveCount || 0,
+      officialFullRouteSignatureHash: officialSummary.officialFullRouteSignatureHash || run.officialFullRouteSignatureHash || "",
+      officialFullRouteSignatureWaveCount: officialSummary.officialFullRouteSignatureWaveCount || run.officialFullRouteSignatureWaveCount || 0
     };
     if (routeConfig.includeSequence) {
       result.sequence = (run.roadDirectorSequence || []).map((wave) => ({
