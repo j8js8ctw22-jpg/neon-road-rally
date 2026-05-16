@@ -1746,6 +1746,96 @@ button:disabled {
   align-items: center;
 }
 
+.leaderboard-chase-panel {
+  gap: 14px;
+}
+
+.chase-board-tabs {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+}
+
+.chase-board-card,
+.chase-filter-card {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 7px;
+  padding: 10px 12px;
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text);
+  text-align: left;
+}
+
+.chase-board-card {
+  cursor: pointer;
+}
+
+.chase-board-card:hover,
+.chase-board-card:focus-visible {
+  border-color: rgba(40, 246, 255, 0.62);
+  background: rgba(40, 246, 255, 0.08);
+}
+
+.chase-board-card.is-selected {
+  border-color: var(--yellow);
+  background:
+    linear-gradient(180deg, rgba(255, 228, 94, 0.12), rgba(40, 246, 255, 0.06)),
+    rgba(8, 14, 34, 0.94);
+  box-shadow: 0 0 14px rgba(255, 228, 94, 0.16);
+}
+
+.chase-board-card span,
+.chase-filter-card span,
+.leaderboard-chase-summary span {
+  color: var(--muted);
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.chase-board-card strong,
+.chase-filter-card strong,
+.leaderboard-chase-summary strong {
+  color: #fff;
+  font-size: 0.94rem;
+  line-height: 1.2;
+}
+
+.chase-board-card small,
+.chase-filter-card small,
+.leaderboard-chase-summary small {
+  color: var(--muted);
+  line-height: 1.35;
+}
+
+.chase-filter-grid,
+.leaderboard-chase-summary {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+}
+
+.leaderboard-chase-summary {
+  border: 1px solid rgba(40, 246, 255, 0.22);
+  border-radius: 7px;
+  padding: 12px;
+  background: rgba(40, 246, 255, 0.055);
+}
+
+.leaderboard-chase-summary > div {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.leaderboard-extra-details {
+  margin-top: 4px;
+}
+
 .leaderboard-rank {
   color: var(--yellow);
   font-weight: 700;
@@ -1754,6 +1844,37 @@ button:disabled {
 .leaderboard-score {
   color: var(--green);
   font-weight: 700;
+}
+
+.leaderboard-driver {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.leaderboard-primary-value {
+  display: grid;
+  gap: 2px;
+  justify-items: end;
+  min-width: 112px;
+  text-align: right;
+}
+
+.leaderboard-primary-value small {
+  color: var(--muted);
+  font-size: 0.66rem;
+  text-transform: uppercase;
+}
+
+.leaderboard-primary-value strong {
+  color: var(--green);
+  font-size: 1.08rem;
+}
+
+.leaderboard-item.is-current-driver {
+  border-color: var(--yellow);
+  background: rgba(255, 228, 94, 0.075);
+  box-shadow: 0 0 12px rgba(255, 228, 94, 0.14);
 }
 
 .leaderboard-item.is-winner {
@@ -3547,6 +3668,12 @@ button:disabled {
 
   .leaderboard-score {
     grid-column: 2;
+  }
+
+  .leaderboard-primary-value {
+    justify-items: start;
+    min-width: 0;
+    text-align: left;
   }
 
   .title-car-chip {

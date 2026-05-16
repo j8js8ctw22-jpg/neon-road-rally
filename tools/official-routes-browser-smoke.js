@@ -431,38 +431,45 @@ async function runManualOfficialSeedScenario(page) {
 }
 
 async function assertLeaderboards(page) {
-  await clickAction(page, "leaderboard", '[data-view="scoreAttack"]');
+  await page.evaluate(() => window.neonRoadRally?.showLeaderboard("scoreAttack", {
+    officialRouteId: "sunset-neon-palm-sprint",
+    raceTypeId: "classic"
+  }));
   await page.waitForFunction(() => window.neonRoadRally?.screen === "leaderboard", null, { timeout: 5000 });
   let text = await bodyText(page);
   assertIncludes(text, "Score Attack");
-  assertIncludes(text, "Official 10");
+  assertIncludes(text, "Chase Boards");
+  assertIncludes(text, "Route Chase Hub");
+  assertIncludes(text, "Official Routes");
   assertIncludes(text, "Official Score Attack");
+  assertIncludes(text, "Your Best");
   assertIncludes(text, "Neon Palm Sprint");
-  assertIncludes(text, "Custom Road Scores");
-  assertIncludes(text, "Practice, manual seed, and Challenge records preserved below Official 10");
-  assertIncludes(text, "CUSTOM-OFFICIAL-SMOKE");
   const lowerScoreText = text.toLowerCase();
   assert(
-    lowerScoreText.indexOf("official score attack") >= 0
-      && lowerScoreText.indexOf("custom road scores") > lowerScoreText.indexOf("official score attack"),
-    "Custom Road scores should appear below Official Score Attack"
+    lowerScoreText.indexOf("official score attack") >= 0,
+    "Official Score Attack should be the primary leaderboard"
   );
-  const customScoreSection = lowerScoreText.slice(lowerScoreText.indexOf("custom road scores"));
-  assert(!customScoreSection.includes("sunset-palm-sprint-turbo"), "Official seed should not appear in Custom Road Scores");
+  assert(!lowerScoreText.includes("sunset-palm-sprint-turbo"), "Main Score Attack board should hide raw official seeds");
+  await page.locator(".leaderboard-extra-details summary").click();
+  text = await bodyText(page);
+  assertIncludes(text, "Practice Scores");
+  assertIncludes(text, "Practice and Challenge records stay outside Official Score Attack.");
 
   await clickAction(page, "setLeaderboardView", '[data-view="timeAttack"]');
   await page.waitForFunction(() => window.neonRoadRally?.leaderboardView === "timeAttack", null, { timeout: 5000 });
   text = await bodyText(page);
   assertIncludes(text, "Time Attack");
   assertIncludes(text, "Official Time Attack");
+  assertIncludes(text, "Finish Time");
   assertIncludes(text, "Neon Palm Sprint");
   assertIncludes(text, "42.123s");
   assertIncludes(text, "41.987s");
-  assertIncludes(text, "Custom Road Times");
-  assertIncludes(text, "48.321s");
   const lowerTimeText = text.toLowerCase();
-  const customTimeSection = lowerTimeText.slice(lowerTimeText.indexOf("custom road times"));
-  assert(!customTimeSection.includes("sunset-palm-sprint-turbo"), "Official seed should not appear in Custom Road Times");
+  assert(!lowerTimeText.includes("sunset-palm-sprint-turbo"), "Main Time Attack board should hide raw official seeds");
+  await page.locator(".leaderboard-extra-details summary").click();
+  text = await bodyText(page);
+  assertIncludes(text, "Practice Times");
+  assertIncludes(text, "48.321s");
 }
 
 async function assertNewTrackLeaderboards(page) {
@@ -470,7 +477,7 @@ async function assertNewTrackLeaderboards(page) {
   await page.waitForFunction(() => window.neonRoadRally?.screen === "leaderboard", null, { timeout: 5000 });
   let text = await bodyText(page);
   assertIncludes(text, "Time Attack");
-  assertIncludes(text, "Midnight Ridge Official 10");
+  assertIncludes(text, "Midnight Ridge Official Routes");
   assertIncludes(text, "Ridge Lantern Sprint");
 
   await page.selectOption("#leaderboardTrack", "blackout-run");
@@ -482,14 +489,14 @@ async function assertNewTrackLeaderboards(page) {
     { timeout: 5000 }
   );
   text = await bodyText(page);
-  assertIncludes(text, "Blackout Run Official 10");
+  assertIncludes(text, "Blackout Run Official Routes");
   assertIncludes(text, "Headlight Mile");
 
   await page.evaluate(() => window.neonRoadRally?.showLeaderboard("scoreAttack", { officialRouteId: "prism-pinkline-sprint" }));
   await page.waitForFunction(() => window.neonRoadRally?.leaderboardView === "scoreAttack", null, { timeout: 5000 });
   text = await bodyText(page);
   assertIncludes(text, "Score Attack");
-  assertIncludes(text, "Prism Highway Official 10");
+  assertIncludes(text, "Prism Highway Official Routes");
   assertIncludes(text, "Pinkline Sprint");
   assertIncludes(text, "Official Score Attack");
 }

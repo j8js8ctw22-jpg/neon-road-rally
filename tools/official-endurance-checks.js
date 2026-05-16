@@ -258,9 +258,17 @@ async function main() {
           "internal",
           "routesignature",
           "route signature",
+          "signature",
+          "hash",
           "progress hash",
           "signature hash",
           "post-finish write",
+          "write",
+          "route seed",
+          "snapshot",
+          "telemetry",
+          "version",
+          "scope",
           "debug"
         ].forEach((term) => {
           assert(!lowerCopy.includes(term), message + " should avoid player-facing debug term " + term);
@@ -373,10 +381,9 @@ async function main() {
       assertCopyIncludes(escapeCopy, "New Endurance Score Rank", "Escape result");
       assertCopyIncludes(escapeCopy, "Race Again", "Escape result");
       assertCopyIncludes(escapeCopy, "Change Route", "Escape result");
-      assertCopyIncludes(escapeCopy, "Time Attack Board", "Escape result");
-      assertCopyIncludes(escapeCopy, "Score Attack Board", "Escape result");
-      assertCopyIncludes(escapeCopy, "Endurance Survival Board", "Escape result");
-      assertCopyIncludes(escapeCopy, "Endurance Score Board", "Escape result");
+      assertCopyIncludes(escapeCopy, "View Route Boards", "Escape result");
+      assertCopyExcludes(escapeCopy, "Endurance Survival Board", "Escape result");
+      assertCopyExcludes(escapeCopy, "Endurance Score Board", "Escape result");
       assertCopyIncludes(escapeCopy, "Driver Garage", "Escape result");
       assertPlayerCopyClean(escapeCopy, "Escape result");
       const officialRows = first.app.getOfficialScoreAttackRows(first.route.id, { raceTypeId: DEFAULT_RACE_TYPE_ID });
@@ -393,26 +400,43 @@ async function main() {
       assert.strictEqual(signatureAfter, signatureBefore, "Post-finish endurance should not change the first-lap full-route signature");
 
       const survivalBoardCopy = renderLeaderboardCopy(first.app, LEADERBOARD_VIEW_ENDURANCE_SURVIVAL, { officialRouteId: first.route.id });
+      assertCopyIncludes(survivalBoardCopy, "Chase Boards", "Endurance Survival leaderboard");
+      assertCopyIncludes(survivalBoardCopy, "Route Chase Hub", "Endurance Survival leaderboard");
       assertCopyIncludes(survivalBoardCopy, "Official Time Attack", "Endurance Survival leaderboard");
       assertCopyIncludes(survivalBoardCopy, "Official Score Attack", "Endurance Survival leaderboard");
       assertCopyIncludes(survivalBoardCopy, "Endurance Survival", "Endurance Survival leaderboard");
       assertCopyIncludes(survivalBoardCopy, "Endurance Score", "Endurance Survival leaderboard");
-      assertCopyIncludes(survivalBoardCopy, "Endurance Survival Board", "Endurance Survival leaderboard");
+      assertCopyIncludes(survivalBoardCopy, "Longest post-finish survival", "Endurance Survival leaderboard");
+      assertCopyIncludes(survivalBoardCopy, "Track", "Endurance Survival leaderboard");
+      assertCopyIncludes(survivalBoardCopy, "Route", "Endurance Survival leaderboard");
+      assertCopyIncludes(survivalBoardCopy, "Speed Class", "Endurance Survival leaderboard");
+      assertCopyIncludes(survivalBoardCopy, "Board Type", "Endurance Survival leaderboard");
+      assertCopyIncludes(survivalBoardCopy, "Your Best", "Endurance Survival leaderboard");
+      assertCopyIncludes(survivalBoardCopy, "Board Leader", "Endurance Survival leaderboard");
+      assertCopyIncludes(survivalBoardCopy, "Survival Time", "Endurance Survival leaderboard");
       assertCopyIncludes(survivalBoardCopy, getOfficialRouteDisplayName(first.route), "Endurance Survival leaderboard");
       assertCopyIncludes(survivalBoardCopy, "Official Classic", "Endurance Survival leaderboard");
-      assertCopyIncludes(survivalBoardCopy, "First finish", "Endurance Survival leaderboard");
+      assertCopyIncludes(survivalBoardCopy, "Lap 2", "Endurance Survival leaderboard");
       assertCopyIncludes(survivalBoardCopy, "Ended by player", "Endurance Survival leaderboard");
+      assertCopyIncludes(survivalBoardCopy, "Your run", "Endurance Survival leaderboard");
       assertPlayerCopyClean(survivalBoardCopy, "Endurance Survival leaderboard");
       const enduranceScoreBoardCopy = renderLeaderboardCopy(first.app, LEADERBOARD_VIEW_ENDURANCE_SCORE, { officialRouteId: first.route.id });
-      assertCopyIncludes(enduranceScoreBoardCopy, "Endurance Score Board", "Endurance Score leaderboard");
+      assertCopyIncludes(enduranceScoreBoardCopy, "Best post-finish bonus score", "Endurance Score leaderboard");
+      assertCopyIncludes(enduranceScoreBoardCopy, "Bonus Score", "Endurance Score leaderboard");
       assertCopyIncludes(enduranceScoreBoardCopy, formatScore(first.app.lastSummary.officialEnduranceResult.postFinishScore), "Endurance Score leaderboard");
       assertPlayerCopyClean(enduranceScoreBoardCopy, "Endurance Score leaderboard");
       const timeBoardCopy = renderLeaderboardCopy(first.app, LEADERBOARD_VIEW_TIME_ATTACK, { officialRouteId: first.route.id });
       assertCopyIncludes(timeBoardCopy, "Official Time Attack", "Time Attack leaderboard");
+      assertCopyIncludes(timeBoardCopy, "Fastest official finish", "Time Attack leaderboard");
+      assertCopyIncludes(timeBoardCopy, "Your Best", "Time Attack leaderboard");
+      assertCopyIncludes(timeBoardCopy, "Finish Time", "Time Attack leaderboard");
       assertCopyIncludes(timeBoardCopy, formatFinishTimeMs(official.officialFinishTimeMs), "Time Attack leaderboard");
       assertPlayerCopyClean(timeBoardCopy, "Time Attack leaderboard");
       const scoreBoardCopy = renderLeaderboardCopy(first.app, LEADERBOARD_VIEW_SCORE_ATTACK, { officialRouteId: first.route.id });
       assertCopyIncludes(scoreBoardCopy, "Official Score Attack", "Score Attack leaderboard");
+      assertCopyIncludes(scoreBoardCopy, "Highest official score", "Score Attack leaderboard");
+      assertCopyIncludes(scoreBoardCopy, "Your Best", "Score Attack leaderboard");
+      assertCopyIncludes(scoreBoardCopy, "Official Score", "Score Attack leaderboard");
       assertCopyIncludes(scoreBoardCopy, formatScore(official.officialScore), "Score Attack leaderboard");
       assertPlayerCopyClean(scoreBoardCopy, "Score Attack leaderboard");
 

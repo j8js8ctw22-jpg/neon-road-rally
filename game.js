@@ -31919,20 +31919,67 @@ class NeonRoadRally {
 
   renderLeaderboardTabs(view) {
     const activeView = this.normalizeLeaderboardView(view);
+    const cards = [
+      {
+        view: LEADERBOARD_VIEW_TIME_ATTACK,
+        title: "Official Time Attack",
+        label: "Fastest official finish",
+        detail: "First finish only"
+      },
+      {
+        view: LEADERBOARD_VIEW_SCORE_ATTACK,
+        title: "Official Score Attack",
+        label: "Highest official score",
+        detail: "First-lap score only"
+      },
+      {
+        view: LEADERBOARD_VIEW_ENDURANCE_SURVIVAL,
+        title: "Endurance Survival",
+        label: "Longest post-finish survival",
+        detail: "Bonus Survival chase"
+      },
+      {
+        view: LEADERBOARD_VIEW_ENDURANCE_SCORE,
+        title: "Endurance Score",
+        label: "Best post-finish bonus score",
+        detail: "Bonus scoring chase"
+      }
+    ];
     return `
-      <div class="row playtest-filter-row">
-        <button class="small-button ${activeView === LEADERBOARD_VIEW_TIME_ATTACK ? "primary" : ""}" data-action="setLeaderboardView" data-view="${LEADERBOARD_VIEW_TIME_ATTACK}">Official Time Attack</button>
-        <button class="small-button ${activeView === LEADERBOARD_VIEW_SCORE_ATTACK ? "primary" : ""}" data-action="setLeaderboardView" data-view="${LEADERBOARD_VIEW_SCORE_ATTACK}">Official Score Attack</button>
-        <button class="small-button ${activeView === LEADERBOARD_VIEW_ENDURANCE_SURVIVAL ? "primary" : ""}" data-action="setLeaderboardView" data-view="${LEADERBOARD_VIEW_ENDURANCE_SURVIVAL}">Endurance Survival</button>
-        <button class="small-button ${activeView === LEADERBOARD_VIEW_ENDURANCE_SCORE ? "primary" : ""}" data-action="setLeaderboardView" data-view="${LEADERBOARD_VIEW_ENDURANCE_SCORE}">Endurance Score</button>
-      </div>
-      <div class="score-grid mode-context-grid">
-        <div class="score-card"><strong>Official Time Attack</strong><span class="is-compact">Fastest first finish wins. Bonus Survival never changes this board.</span></div>
-        <div class="score-card"><strong>Official Score Attack</strong><span class="is-compact">Highest first-lap official score wins. Bonus Survival score is separate.</span></div>
-        <div class="score-card"><strong>Endurance Survival</strong><span class="is-compact">Longest Bonus Survival after the official finish wins.</span></div>
-        <div class="score-card"><strong>Endurance Score</strong><span class="is-compact">Highest post-finish bonus score wins after the official finish.</span></div>
+      <div class="chase-board-tabs" aria-label="Board type">
+        ${cards.map((card) => `
+          <button class="chase-board-card ${activeView === card.view ? "is-selected" : ""}" data-action="setLeaderboardView" data-view="${escapeAttr(card.view)}">
+            <span>${escapeHtml(card.title)}</span>
+            <strong>${escapeHtml(card.label)}</strong>
+            <small>${escapeHtml(card.detail)}</small>
+          </button>
+        `).join("")}
       </div>
     `;
+  }
+
+  getLeaderboardTitle(view) {
+    const activeView = this.normalizeLeaderboardView(view);
+    if (activeView === LEADERBOARD_VIEW_TIME_ATTACK) return "Official Time Attack";
+    if (activeView === LEADERBOARD_VIEW_ENDURANCE_SURVIVAL) return "Endurance Survival";
+    if (activeView === LEADERBOARD_VIEW_ENDURANCE_SCORE) return "Endurance Score";
+    return "Official Score Attack";
+  }
+
+  getLeaderboardPrimaryLabel(view) {
+    const activeView = this.normalizeLeaderboardView(view);
+    if (activeView === LEADERBOARD_VIEW_TIME_ATTACK) return "Finish Time";
+    if (activeView === LEADERBOARD_VIEW_ENDURANCE_SURVIVAL) return "Survival Time";
+    if (activeView === LEADERBOARD_VIEW_ENDURANCE_SCORE) return "Bonus Score";
+    return "Official Score";
+  }
+
+  getLeaderboardDescription(view) {
+    const activeView = this.normalizeLeaderboardView(view);
+    if (activeView === LEADERBOARD_VIEW_TIME_ATTACK) return "Fastest first finish wins. Bonus Survival never changes this board.";
+    if (activeView === LEADERBOARD_VIEW_ENDURANCE_SURVIVAL) return "Longest Bonus Survival after the official finish wins. Ties use lap reached, bonus score, then official finish time.";
+    if (activeView === LEADERBOARD_VIEW_ENDURANCE_SCORE) return "Highest post-finish bonus score wins. Ties use survival time, lap reached, then official finish time.";
+    return "Highest first-lap official score wins. Bonus Survival score is separate.";
   }
 
   getOfficialRouteRecordSummary(route, raceTypeId = DEFAULT_RACE_TYPE_ID) {
@@ -31962,6 +32009,145 @@ class NeonRoadRally {
     };
   }
 
+  getLeaderboardYourBest(route, view = this.leaderboardView, raceTypeId = DEFAULT_RACE_TYPE_ID) {
+    const player = this.profiles.getCurrentPlayer();
+    const activeView = this.normalizeLeaderboardView(view);
+    const emptyDetail = this.isEnduranceLeaderboardView(activeView)
+      ? "Finish once, then keep the Bonus Survival going."
+      : "Finish this official route to join the board.";
+    if (!route || !player) {
+      return {
+        label: "Your Best",
+        value: "No run yet",
+        detail: emptyDetail,
+        rank: ""
+      };
+    }
+    const safeRaceTypeId = this.isEnduranceLeaderboardView(activeView)
+      ? DEFAULT_RACE_TYPE_ID
+      : normalizeRaceTypeId(raceTypeId, DEFAULT_RACE_TYPE_ID);
+    if (activeView === LEADERBOARD_VIEW_TIME_ATTACK) {
+      const rows = this.getTimeAttackLeaderboardRows({
+        trackId: route.trackId,
+        raceTypeId: safeRaceTypeId,
+        speedClassId: route.speedClassId
+      }, { legacy: false, limit: LEADERBOARD_STORAGE_MAX_ENTRIES })
+        .filter((entry) => entry.officialRouteId === route.id);
+      const record = rows.find((entry) => entry.playerId === player.id) || null;
+      const rank = record ? rows.findIndex((entry) => entry === record) + 1 : 0;
+      return {
+        label: "Your Best",
+        value: record ? formatFinishTimeMs(record.finishTimeMs) : "No run yet",
+        detail: record ? `${rank ? `Rank #${rank} · ` : ""}Score ${formatScore(record.score || 0)}` : emptyDetail,
+        rank: rank ? `#${rank}` : ""
+      };
+    }
+    if (activeView === LEADERBOARD_VIEW_SCORE_ATTACK) {
+      const rows = this.getOfficialScoreAttackRows(route.id, { raceTypeId: safeRaceTypeId, limit: LEADERBOARD_STORAGE_MAX_ENTRIES });
+      const record = rows.find((entry) => entry.playerId === player.id) || null;
+      const rank = record ? rows.findIndex((entry) => entry === record) + 1 : 0;
+      return {
+        label: "Your Best",
+        value: record ? formatScore(record.score || 0) : "No run yet",
+        detail: record ? `${rank ? `Rank #${rank} · ` : ""}Finish ${formatFinishTimeMs(record.finishTimeMs)}` : emptyDetail,
+        rank: rank ? `#${rank}` : ""
+      };
+    }
+    const rows = this.getOfficialEnduranceRows(route.id, activeView, { limit: LEADERBOARD_STORAGE_MAX_ENTRIES });
+    const record = rows.find((entry) => entry.playerId === player.id) || null;
+    const rank = record ? rows.findIndex((entry) => entry === record) + 1 : 0;
+    const lapText = record ? `Lap ${Math.max(2, record.currentLap || record.lapReached || 2)}` : "";
+    const endText = record ? (record.endedBy === "Escape" ? "Ended by player" : `Ended by ${record.endedBy || "Crash"}`) : "";
+    return {
+      label: "Your Best",
+      value: record
+        ? (activeView === LEADERBOARD_VIEW_ENDURANCE_SCORE ? formatScore(record.postFinishScore || 0) : formatTime(record.survivalTime || 0))
+        : "No run yet",
+      detail: record ? `${rank ? `Rank #${rank} · ` : ""}${lapText} · ${endText}` : emptyDetail,
+      rank: rank ? `#${rank}` : ""
+    };
+  }
+
+  getLeaderboardLeader(route, view = this.leaderboardView, raceTypeId = DEFAULT_RACE_TYPE_ID) {
+    const activeView = this.normalizeLeaderboardView(view);
+    if (!route) return { value: "No leader yet", detail: "Pick a route to see the chase." };
+    if (activeView === LEADERBOARD_VIEW_TIME_ATTACK) {
+      const rows = this.getTimeAttackLeaderboardRows({
+        trackId: route.trackId,
+        raceTypeId: normalizeRaceTypeId(raceTypeId, DEFAULT_RACE_TYPE_ID),
+        speedClassId: route.speedClassId
+      }, { legacy: false, limit: LEADERBOARD_STORAGE_MAX_ENTRIES })
+        .filter((entry) => entry.officialRouteId === route.id);
+      const leader = rows[0] || null;
+      return leader
+        ? { value: formatFinishTimeMs(leader.finishTimeMs), detail: `${leader.playerName} · Score ${formatScore(leader.score || 0)}` }
+        : { value: "No leader yet", detail: "Set the first finish time." };
+    }
+    if (activeView === LEADERBOARD_VIEW_SCORE_ATTACK) {
+      const leader = this.getOfficialScoreAttackRows(route.id, {
+        raceTypeId: normalizeRaceTypeId(raceTypeId, DEFAULT_RACE_TYPE_ID),
+        limit: 1
+      })[0] || null;
+      return leader
+        ? { value: formatScore(leader.score || 0), detail: `${leader.playerName} · Finish ${formatFinishTimeMs(leader.finishTimeMs)}` }
+        : { value: "No leader yet", detail: "Set the first official score." };
+    }
+    const leader = this.getOfficialEnduranceRows(route.id, activeView, { limit: 1 })[0] || null;
+    const scorePrimary = activeView === LEADERBOARD_VIEW_ENDURANCE_SCORE;
+    return leader
+      ? {
+        value: scorePrimary ? formatScore(leader.postFinishScore || 0) : formatTime(leader.survivalTime || 0),
+        detail: `${leader.playerName} · Lap ${Math.max(2, leader.currentLap || leader.lapReached || 2)}`
+      }
+      : { value: "No leader yet", detail: "Finish once, then survive the chase." };
+  }
+
+  renderLeaderboardFilterSummary(filter, view = this.leaderboardView) {
+    const route = filter.officialRoute || getOfficialRouteById(filter.officialRouteId);
+    const activeView = this.normalizeLeaderboardView(view);
+    const raceTypeText = this.isEnduranceLeaderboardView(activeView)
+      ? "Official Classic"
+      : `${getRaceTypeLabel(filter.raceTypeId)} first finish`;
+    return `
+      <div class="chase-filter-grid">
+        <div class="field">
+          <label for="leaderboardTrack">Track</label>
+          <select id="leaderboardTrack">
+            ${TRACKS.map((item) => `<option value="${escapeAttr(item.id)}" ${item.id === filter.trackId ? "selected" : ""}>${escapeHtml(item.name)}</option>`).join("")}
+          </select>
+        </div>
+        <div class="chase-filter-card"><span>Route</span><strong>${escapeHtml(route ? getOfficialRouteDisplayName(route) : "Official Route")}</strong></div>
+        <div class="chase-filter-card"><span>Speed Class</span><strong>${escapeHtml(route?.speedClassLabel || getSpeedClassLabel(filter.speedClassId))}</strong></div>
+        <div class="chase-filter-card"><span>Board Type</span><strong>${escapeHtml(this.getLeaderboardTitle(activeView))}</strong><small>${escapeHtml(raceTypeText)}</small></div>
+      </div>
+    `;
+  }
+
+  renderLeaderboardYourBestPanel(route, view = this.leaderboardView, raceTypeId = DEFAULT_RACE_TYPE_ID) {
+    const activeView = this.normalizeLeaderboardView(view);
+    const yourBest = this.getLeaderboardYourBest(route, activeView, raceTypeId);
+    const leader = this.getLeaderboardLeader(route, activeView, raceTypeId);
+    return `
+      <div class="leaderboard-chase-summary">
+        <div>
+          <span>${escapeHtml(yourBest.label)}</span>
+          <strong>${escapeHtml(yourBest.value)}</strong>
+          <small>${escapeHtml(yourBest.detail)}</small>
+        </div>
+        <div>
+          <span>Board Leader</span>
+          <strong>${escapeHtml(leader.value)}</strong>
+          <small>${escapeHtml(leader.detail)}</small>
+        </div>
+        <div>
+          <span>Next Chase</span>
+          <strong>${escapeHtml(this.getLeaderboardPrimaryLabel(activeView))}</strong>
+          <small>${escapeHtml(this.getLeaderboardDescription(activeView))}</small>
+        </div>
+      </div>
+    `;
+  }
+
   renderOfficialRouteRaceTypeButtons(selectedRaceTypeId = DEFAULT_RACE_TYPE_ID, groupName = "preRace") {
     const selectedId = normalizeRaceTypeId(selectedRaceTypeId, DEFAULT_RACE_TYPE_ID);
     return `
@@ -31984,7 +32170,7 @@ class NeonRoadRally {
     const raceTypeId = normalizeRaceTypeId(options.raceTypeId || this.leaderboardRaceTypeId || DEFAULT_RACE_TYPE_ID, DEFAULT_RACE_TYPE_ID);
     const routes = getOfficialRoutesForTrack(trackId);
     return `
-      <div class="official-route-grid compact-official-route-grid" aria-label="Official 10 routes">
+      <div class="official-route-grid compact-official-route-grid" aria-label="Official routes">
         ${routes.map((route, index) => {
           const stats = this.getOfficialRouteRecordSummary(route, raceTypeId);
           const routeStatText = view === LEADERBOARD_VIEW_TIME_ATTACK
@@ -32048,17 +32234,21 @@ class NeonRoadRally {
   }
 
   renderScoreAttackRows(entries, recentEntry = null) {
+    const currentPlayerId = this.profiles.getCurrentPlayer()?.id || "";
     return entries.length ? entries.map((entry, index) => {
       const recent = entry === recentEntry || (recentEntry?.runId && entry.runId && recentEntry.runId === entry.runId);
-      const seedMeta = entry.officialRouteId ? "" : ` · Seed ${escapeHtml(formatRoadSeed(entry.seed))}`;
+      const current = currentPlayerId && entry.playerId === currentPlayerId;
+      const setupMeta = entry.officialRouteId
+        ? `Official Race: ${escapeHtml(getOfficialRouteEntryDisplayName(entry))}`
+        : "Practice Run";
       return `
-      <li class="leaderboard-item ${recent ? "is-recent" : ""}">
+      <li class="leaderboard-item ${recent ? "is-recent" : ""} ${current ? "is-current-driver" : ""}">
         <span class="leaderboard-rank">#${index + 1}</span>
-        <span>
+        <span class="leaderboard-driver">
           <strong>${escapeHtml(entry.playerName)}</strong>
-          <span class="meta">${entry.officialRouteId ? `Official Race: ${escapeHtml(getOfficialRouteEntryDisplayName(entry))} · ` : "Custom Road · "}${entry.challengeId ? `Challenge: ${escapeHtml(entry.challengeName || entry.challengeId)} · ` : ""}${entry.partyMode ? `Party ${escapeHtml(getPartyRoundTypeLabel(entry.partyRoundType))} R${entry.partyRoundIndex || 1} · ` : ""}${escapeHtml(entry.carName)} · ${escapeHtml(entry.trackName)} · ${escapeHtml(getRaceTypeLabel(entry.raceType))} · ${escapeHtml(getSpeedClassLabel(entry.raceMode || entry.speedClass))}${seedMeta} · ${escapeHtml(getRunOutcomeLabel(entry))} · ${formatRunElapsedTime(entry)}${formatPacingRulesLabel(entry) ? ` · ${escapeHtml(formatPacingRulesLabel(entry))}` : ""}${entry.raceType === FUEL_RUN_RACE_TYPE_ID ? ` · Fuel ${Math.max(0, entry.fuelRemaining || 0)}` : ""}${entry.raceType === PURSUIT_RACE_TYPE_ID ? ` · Heat ${Math.round(entry.heatAtEnd || 0)} · Roadblocks ${Math.max(0, entry.roadblocksCleared || 0)}` : ""}${formatShortDate(entry.date) ? ` · ${escapeHtml(formatShortDate(entry.date))}` : ""}</span>
+          <span class="meta">${setupMeta}${entry.challengeId ? ` · Challenge: ${escapeHtml(entry.challengeName || entry.challengeId)}` : ""}${entry.partyMode ? ` · Party ${escapeHtml(getPartyRoundTypeLabel(entry.partyRoundType))} R${entry.partyRoundIndex || 1}` : ""} · ${escapeHtml(entry.carName)} · ${escapeHtml(entry.trackName)} · ${escapeHtml(getRaceTypeLabel(entry.raceType))} · ${escapeHtml(getSpeedClassLabel(entry.raceMode || entry.speedClass))} · ${escapeHtml(getRunOutcomeLabel(entry))} · ${formatRunElapsedTime(entry)}${entry.raceType === FUEL_RUN_RACE_TYPE_ID ? ` · Fuel ${Math.max(0, entry.fuelRemaining || 0)}` : ""}${entry.raceType === PURSUIT_RACE_TYPE_ID ? ` · Heat ${Math.round(entry.heatAtEnd || 0)} · Roadblocks ${Math.max(0, entry.roadblocksCleared || 0)}` : ""}${formatShortDate(entry.date) ? ` · ${escapeHtml(formatShortDate(entry.date))}` : ""}${current ? " · Your run" : ""}</span>
         </span>
-        <span class="leaderboard-score">${formatScore(entry.score)}</span>
+        <span class="leaderboard-score leaderboard-primary-value"><small>Official Score</small><strong>${formatScore(entry.score)}</strong></span>
       </li>
     `;
     }).join("") : `<li class="leaderboard-item"><span class="meta">No scores saved yet.</span></li>`;
@@ -32067,10 +32257,12 @@ class NeonRoadRally {
   renderEnduranceRows(entries, view = LEADERBOARD_VIEW_ENDURANCE_SURVIVAL) {
     const activeView = this.normalizeLeaderboardView(view);
     const scorePrimary = activeView === LEADERBOARD_VIEW_ENDURANCE_SCORE;
+    const currentPlayerId = this.profiles.getCurrentPlayer()?.id || "";
     const emptyText = scorePrimary
       ? "No Endurance Score records saved for this Official Classic route."
       : "No Endurance Survival records saved for this Official Classic route.";
     return entries.length ? entries.map((entry, index) => {
+      const current = currentPlayerId && entry.playerId === currentPlayerId;
       const endingText = entry.endedBy === "Escape" ? "Ended by player" : `Ended by ${entry.endedBy || "Crash"}`;
       const lapText = `Lap ${Math.max(2, entry.currentLap || entry.lapReached || 2)}`;
       const primaryValue = scorePrimary ? formatScore(entry.postFinishScore || 0) : formatTime(entry.survivalTime || 0);
@@ -32078,13 +32270,13 @@ class NeonRoadRally {
         ? `${formatTime(entry.survivalTime || 0)} survival`
         : `${formatScore(entry.postFinishScore || 0)} bonus score`;
       return `
-        <li class="leaderboard-item">
+        <li class="leaderboard-item ${current ? "is-current-driver" : ""}">
           <span class="leaderboard-rank">#${index + 1}</span>
-          <span>
+          <span class="leaderboard-driver">
             <strong>${escapeHtml(entry.playerName)}</strong>
-            <span class="meta">Official Race: ${escapeHtml(getOfficialRouteEntryDisplayName(entry))} · ${escapeHtml(entry.trackName)} · ${escapeHtml(entry.speedClassLabel || getSpeedClassLabel(entry.speedClass))} · ${lapText} · ${secondaryStat} · First finish ${escapeHtml(formatFinishTimeMs(entry.officialFinishTimeMs))} · ${escapeHtml(endingText)}${formatShortDate(entry.date) ? ` · ${escapeHtml(formatShortDate(entry.date))}` : ""}</span>
+            <span class="meta">Official Race: ${escapeHtml(getOfficialRouteEntryDisplayName(entry))} · ${escapeHtml(entry.speedClassLabel || getSpeedClassLabel(entry.speedClass))} · ${lapText} · ${secondaryStat} · ${escapeHtml(endingText)}${formatShortDate(entry.date) ? ` · ${escapeHtml(formatShortDate(entry.date))}` : ""}${current ? " · Your run" : ""}</span>
           </span>
-          <span class="leaderboard-score">${escapeHtml(primaryValue)}</span>
+          <span class="leaderboard-score leaderboard-primary-value"><small>${scorePrimary ? "Bonus Score" : "Survival Time"}</small><strong>${escapeHtml(primaryValue)}</strong></span>
         </li>
       `;
     }).join("") : `<li class="leaderboard-item"><span class="meta">${escapeHtml(emptyText)}</span></li>`;
@@ -32167,16 +32359,20 @@ class NeonRoadRally {
   }
 
   renderTimeAttackRows(rows, emptyText) {
+    const currentPlayerId = this.profiles.getCurrentPlayer()?.id || "";
     return rows.length ? rows.map((entry, index) => {
-      const seedMeta = entry.officialRouteId ? "" : ` · Seed ${escapeHtml(formatRoadSeed(entry.seed))}`;
+      const current = currentPlayerId && entry.playerId === currentPlayerId;
+      const setupMeta = entry.officialRouteId
+        ? `Official Race: ${escapeHtml(getOfficialRouteEntryDisplayName(entry))}`
+        : "Practice Run";
       return `
-        <li class="leaderboard-item">
+        <li class="leaderboard-item ${current ? "is-current-driver" : ""}">
           <span class="leaderboard-rank">#${index + 1}</span>
-          <span>
+          <span class="leaderboard-driver">
             <strong>${escapeHtml(entry.playerName)}</strong>
-            <span class="meta">${entry.officialRouteId ? `Official Race: ${escapeHtml(getOfficialRouteEntryDisplayName(entry))} · ` : "Custom Road · "}${escapeHtml(entry.carName || "CAR")} · ${escapeHtml(entry.trackName)} · ${escapeHtml(getRaceTypeLabel(entry.raceType))} · ${escapeHtml(getSpeedClassLabel(entry.raceMode || entry.speedClass))}${seedMeta} · Score ${formatScore(entry.score)}${formatPacingRulesLabel(entry) ? ` · ${escapeHtml(formatPacingRulesLabel(entry))}` : ""}${formatShortDate(entry.date) ? ` · ${escapeHtml(formatShortDate(entry.date))}` : ""}</span>
+            <span class="meta">${setupMeta} · ${escapeHtml(entry.carName || "CAR")} · ${escapeHtml(entry.trackName)} · ${escapeHtml(getRaceTypeLabel(entry.raceType))} · ${escapeHtml(getSpeedClassLabel(entry.raceMode || entry.speedClass))} · Score ${formatScore(entry.score)}${formatShortDate(entry.date) ? ` · ${escapeHtml(formatShortDate(entry.date))}` : ""}${current ? " · Your run" : ""}</span>
           </span>
-          <span class="leaderboard-score">${formatFinishTimeMs(entry.finishTimeMs)}</span>
+          <span class="leaderboard-score leaderboard-primary-value"><small>Finish Time</small><strong>${formatFinishTimeMs(entry.finishTimeMs)}</strong></span>
         </li>
       `;
     }).join("") : `<li class="leaderboard-item"><span class="meta">${escapeHtml(emptyText)}</span></li>`;
@@ -32225,12 +32421,18 @@ class NeonRoadRally {
     `;
   }
 
-  bindLeaderboardControls() {
+  bindLeaderboardControls(activeView = this.leaderboardView) {
     const sync = () => {
       const track = getTrackById(document.getElementById("leaderboardTrack")?.value || this.leaderboardTrackId);
       const raceTypeId = normalizeRaceTypeId(document.getElementById("leaderboardRaceType")?.value || this.leaderboardRaceTypeId, DEFAULT_RACE_TYPE_ID);
       const speedClassId = normalizeSpeedClassId(document.getElementById("leaderboardSpeedClass")?.value || this.leaderboardSpeedClassId, DEFAULT_SPEED_CLASS_ID);
-      this.showLeaderboard(LEADERBOARD_VIEW_TIME_ATTACK, { trackId: track.id, raceTypeId, speedClassId });
+      const route = getDefaultOfficialRouteForTrack(track.id);
+      this.showLeaderboard(activeView, {
+        trackId: track.id,
+        officialRouteId: route?.id || "",
+        raceTypeId: this.isEnduranceLeaderboardView(activeView) ? DEFAULT_RACE_TYPE_ID : raceTypeId,
+        speedClassId: route?.speedClassId || speedClassId
+      });
     };
     ["leaderboardTrack", "leaderboardRaceType", "leaderboardSpeedClass"].forEach((id) => {
       const element = document.getElementById(id);
@@ -32302,75 +32504,47 @@ class NeonRoadRally {
     const setupLabel = officialRoute && officialRouteSupportsRaceType(officialRoute, boardFilter.raceTypeId)
       ? `${getOfficialRouteDisplayName(officialRoute)} · Official route`
       : `${boardFilter.track.name} · ${getRaceTypeLabel(boardFilter.raceTypeId)} · ${getSpeedClassLabel(boardFilter.speedClassId)}`;
-    const leaderboardTitle = activeView === LEADERBOARD_VIEW_TIME_ATTACK
-      ? "Official Time Attack"
-      : (activeView === LEADERBOARD_VIEW_ENDURANCE_SURVIVAL
-        ? "Endurance Survival"
-        : (activeView === LEADERBOARD_VIEW_ENDURANCE_SCORE ? "Endurance Score" : "Official Score Attack"));
-    const enduranceBoardDescription = activeView === LEADERBOARD_VIEW_ENDURANCE_SCORE
-      ? "Endurance Score Board: highest post-finish bonus score wins. Ties use survival time, lap reached, then the first finish time."
-      : "Endurance Survival Board: longest Bonus Survival after the first finish wins. Ties use lap reached, bonus score, then the first finish time.";
-    this.layer.classList.remove("is-empty");
-    this.layer.innerHTML = `
-      <section class="panel compact">
-        <span class="eyebrow">Local Leaderboards</span>
-        <h2>${escapeHtml(leaderboardTitle)}</h2>
-        ${this.renderLeaderboardTabs(activeView)}
-        <div class="leaderboard-section-heading">
-          <span class="eyebrow">${escapeHtml(boardFilter.track.name)} Official 10</span>
-          <strong>Official first-finish boards and Bonus Survival boards stay separate</strong>
-        </div>
-        ${enduranceView ? "" : this.renderOfficialRouteRaceTypeButtons(boardFilter.raceTypeId, "leaderboard")}
-        ${this.renderOfficialRoutePicker(officialRoute?.id || DEFAULT_OFFICIAL_ROUTE_ID, activeView, { trackId: boardFilter.trackId, raceTypeId: boardFilter.raceTypeId })}
-        ${activeView === LEADERBOARD_VIEW_TIME_ATTACK ? `
-          <p class="hint">Time Attack Board: ${escapeHtml(setupLabel)}. ${officialRoute ? "Finished Official Race runs rank here by precise time under the current rules." : "Finished runs rank here by precise time for this filter."}</p>
-          ${this.renderTimeAttackControls(boardFilter)}
-          <div class="leaderboard-section-heading">
-            <span class="eyebrow">${officialRoute ? "Official Time Attack" : "Time Attack"}</span>
-            <strong>${escapeHtml(officialRoute ? getOfficialRouteDisplayName(officialRoute) : setupLabel)}</strong>
-          </div>
-          <ol class="leaderboard-list">
-            ${this.renderTimeAttackRows(officialTimeRows, officialRoute ? "No Official Race finishes saved for this route." : "No Time Attack finishes saved for this setup.")}
-          </ol>
+    const leaderboardTitle = this.getLeaderboardTitle(activeView);
+    const leaderboardDescription = this.getLeaderboardDescription(activeView);
+    const officialRouteName = officialRoute ? getOfficialRouteDisplayName(officialRoute) : setupLabel;
+    const mainRows = activeView === LEADERBOARD_VIEW_TIME_ATTACK
+      ? this.renderTimeAttackRows(officialTimeRows, officialRoute ? "No official finishes saved for this route." : "No Time Attack finishes saved for this setup.")
+      : (enduranceView
+        ? this.renderEnduranceRows(enduranceRows, activeView)
+        : this.renderScoreAttackRows(officialScoreEntries));
+    const timeExtras = activeView === LEADERBOARD_VIEW_TIME_ATTACK && (customTimeRows.length || legacyTimeRows.length)
+      ? `
+        <details class="result-details-block leaderboard-extra-details">
+          <summary>Other Saved Times</summary>
           ${customTimeRows.length ? `
             <div class="leaderboard-section-heading">
-              <span class="eyebrow">Custom Road Times</span>
-              <strong>Practice/manual seeds preserved outside Official 10 ranking</strong>
+              <span class="eyebrow">Practice Times</span>
+              <strong>Practice records stay outside Official Time Attack.</strong>
             </div>
             <ol class="leaderboard-list">
-              ${this.renderTimeAttackRows(customTimeRows, "No custom times saved for this setup.")}
+              ${this.renderTimeAttackRows(customTimeRows, "No practice times saved for this setup.")}
             </ol>
           ` : ""}
           ${legacyTimeRows.length ? `
-            <h2>Legacy Time Records</h2>
-            <p class="hint">Older saved times are preserved, but they are not ranked against the current rules.</p>
+            <div class="leaderboard-section-heading">
+              <span class="eyebrow">Past Time Records</span>
+              <strong>Older saved times stay separate from today's Official Time Attack.</strong>
+            </div>
             <ol class="leaderboard-list">
-              ${this.renderTimeAttackRows(legacyTimeRows, "No legacy records for this setup.")}
+              ${this.renderTimeAttackRows(legacyTimeRows, "No past records for this setup.")}
             </ol>
           ` : ""}
-        ` : enduranceView ? `
-          <p class="hint">${escapeHtml(enduranceBoardDescription)} Official Time Attack and Official Score Attack keep the first-finish result.</p>
-          ${this.renderEnduranceLeaderboardControls(boardFilter)}
-          <div class="leaderboard-section-heading">
-            <span class="eyebrow">${escapeHtml(leaderboardTitle)}</span>
-            <strong>${escapeHtml(officialRoute ? getOfficialRouteDisplayName(officialRoute) : "Official Classic")}</strong>
-          </div>
-          <ol class="leaderboard-list">
-            ${this.renderEnduranceRows(enduranceRows, activeView)}
-          </ol>
-        ` : `
-          <p class="hint">Score Attack Board: highest score wins on the selected Official Route and race rules. Practice records stay outside Official boards.</p>
-          <div class="leaderboard-section-heading">
-            <span class="eyebrow">Official Score Attack</span>
-            <strong>${escapeHtml(officialRoute ? getOfficialRouteDisplayName(officialRoute) : "Official Race")}</strong>
-          </div>
-          <ol class="leaderboard-list">
-            ${this.renderScoreAttackRows(officialScoreEntries)}
-          </ol>
+        </details>
+      `
+      : "";
+    const scoreExtras = activeView === LEADERBOARD_VIEW_SCORE_ATTACK && (customScoreEntries.length || partyScoreEntries.length)
+      ? `
+        <details class="result-details-block leaderboard-extra-details">
+          <summary>Other Local Boards</summary>
           ${customScoreEntries.length ? `
             <div class="leaderboard-section-heading">
-              <span class="eyebrow">Custom Road Scores</span>
-              <strong>Practice, manual seed, and Challenge records preserved below Official 10</strong>
+              <span class="eyebrow">Practice Scores</span>
+              <strong>Practice and Challenge records stay outside Official Score Attack.</strong>
             </div>
             <ol class="leaderboard-list">
               ${this.renderScoreAttackRows(customScoreEntries)}
@@ -32379,14 +32553,41 @@ class NeonRoadRally {
           ${partyScoreEntries.length ? `
             <div class="leaderboard-section-heading">
               <span class="eyebrow">Party Results</span>
-              <strong>Pass-the-keyboard runs saved from Party Mode</strong>
+              <strong>Pass-the-keyboard runs saved from Party Mode.</strong>
             </div>
             <ol class="leaderboard-list">
               ${this.renderScoreAttackRows(partyScoreEntries)}
             </ol>
           ` : ""}
           ${this.renderLocalTitleBoard()}
-        `}
+        </details>
+      `
+      : "";
+    this.layer.classList.remove("is-empty");
+    this.layer.innerHTML = `
+      <section class="panel compact leaderboard-chase-panel">
+        <span class="eyebrow">Chase Boards</span>
+        <h2>Route Chase Hub</h2>
+        <p class="hint">Pick a board, pick an official route, then chase the next spot.</p>
+        ${this.renderLeaderboardTabs(activeView)}
+        ${this.renderLeaderboardFilterSummary(boardFilter, activeView)}
+        <div class="leaderboard-section-heading">
+          <span class="eyebrow">${escapeHtml(boardFilter.track.name)} Official Routes</span>
+          <strong>First-finish official boards and Bonus Survival boards stay separate.</strong>
+        </div>
+        ${enduranceView ? "" : this.renderOfficialRouteRaceTypeButtons(boardFilter.raceTypeId, "leaderboard")}
+        ${this.renderOfficialRoutePicker(officialRoute?.id || DEFAULT_OFFICIAL_ROUTE_ID, activeView, { trackId: boardFilter.trackId, raceTypeId: boardFilter.raceTypeId })}
+        ${this.renderLeaderboardYourBestPanel(officialRoute, activeView, boardFilter.raceTypeId)}
+        <p class="hint">${escapeHtml(leaderboardDescription)}</p>
+        <div class="leaderboard-section-heading">
+          <span class="eyebrow">${escapeHtml(leaderboardTitle)}</span>
+          <strong>${escapeHtml(officialRouteName)}</strong>
+        </div>
+        <ol class="leaderboard-list">
+          ${mainRows}
+        </ol>
+        ${timeExtras}
+        ${scoreExtras}
         <div class="row" style="margin-top:16px">
           <button class="small-button" data-action="title">Back</button>
           <button class="danger-button" data-action="resetData">Reset Local Data</button>
@@ -32404,8 +32605,7 @@ class NeonRoadRally {
         });
       });
     });
-    if (activeView === LEADERBOARD_VIEW_TIME_ATTACK) this.bindLeaderboardControls();
-    if (enduranceView) this.bindEnduranceLeaderboardControls(activeView);
+    this.bindLeaderboardControls(activeView);
   }
 
   showScoreScreen() {
@@ -32501,6 +32701,9 @@ class NeonRoadRally {
       : boostlineRun
       ? `${Math.max(0, summary.rampTargetsCleared || 0)} / ${Math.max(summary.rampsUsed || 0, summary.rampTargetsCleared || 0)} ramps · ${summary.boostlineResultNote || getBoostlineResultNote(summary)}`
       : scoreAttackDetail;
+    const resultBoardView = enduranceResult ? LEADERBOARD_VIEW_ENDURANCE_SURVIVAL : LEADERBOARD_VIEW_TIME_ATTACK;
+    const resultBoardRaceTypeId = enduranceResult ? DEFAULT_RACE_TYPE_ID : summary.raceTypeId;
+    const showResultBoardAction = !summary.partyMode && !isExperimentalRaceType(summary.raceTypeId);
     const rewardStrip = this.renderResultRewardStrip(summary);
     const improvementNotes = this.renderResultImprovementNotes(summary);
     const resultDetailPanel = enduranceResult
@@ -32536,10 +32739,7 @@ class NeonRoadRally {
         <div class="row score-action-row">
           <button class="small-button primary" data-action="restart">${escapeHtml(restartLabel)}</button>
           ${summary.partyMode ? "" : `<button class="small-button" data-action="preRace">Change Route</button>`}
-	          <button class="small-button" data-action="leaderboard" data-view="${LEADERBOARD_VIEW_TIME_ATTACK}" data-track-id="${escapeAttr(summary.trackId)}" data-race-type-id="${escapeAttr(summary.raceTypeId)}" data-speed-class-id="${escapeAttr(summary.speedClass)}" data-official-route-id="${escapeAttr(summary.officialRouteId || "")}">Time Attack Board</button>
-	          ${boostlineRun ? "" : `<button class="small-button" data-action="leaderboard" data-view="${LEADERBOARD_VIEW_SCORE_ATTACK}" data-track-id="${escapeAttr(summary.trackId)}" data-race-type-id="${escapeAttr(summary.raceTypeId)}" data-speed-class-id="${escapeAttr(summary.speedClass)}" data-official-route-id="${escapeAttr(summary.officialRouteId || "")}">Score Attack Board</button>`}
-	          ${enduranceResult ? `<button class="small-button" data-action="leaderboard" data-view="${LEADERBOARD_VIEW_ENDURANCE_SURVIVAL}" data-track-id="${escapeAttr(summary.trackId)}" data-race-type-id="${DEFAULT_RACE_TYPE_ID}" data-speed-class-id="${escapeAttr(summary.speedClass)}" data-official-route-id="${escapeAttr(summary.officialRouteId || "")}">Endurance Survival Board</button>` : ""}
-	          ${enduranceResult ? `<button class="small-button" data-action="leaderboard" data-view="${LEADERBOARD_VIEW_ENDURANCE_SCORE}" data-track-id="${escapeAttr(summary.trackId)}" data-race-type-id="${DEFAULT_RACE_TYPE_ID}" data-speed-class-id="${escapeAttr(summary.speedClass)}" data-official-route-id="${escapeAttr(summary.officialRouteId || "")}">Endurance Score Board</button>` : ""}
+	          ${showResultBoardAction ? `<button class="small-button" data-action="leaderboard" data-view="${escapeAttr(resultBoardView)}" data-track-id="${escapeAttr(summary.trackId)}" data-race-type-id="${escapeAttr(resultBoardRaceTypeId)}" data-speed-class-id="${escapeAttr(summary.speedClass)}" data-official-route-id="${escapeAttr(summary.officialRouteId || "")}">View Route Boards</button>` : ""}
 	          <button class="small-button" data-action="players">Driver Garage</button>
           <button class="small-button" data-action="title">Back to Title</button>
         </div>
@@ -32697,7 +32897,14 @@ class NeonRoadRally {
             officialRouteId: button.dataset.officialRouteId
           });
         }
-        else if (action === "setLeaderboardView") this.showLeaderboard(button.dataset.view || LEADERBOARD_VIEW_SCORE_ATTACK);
+        else if (action === "setLeaderboardView") {
+          this.showLeaderboard(button.dataset.view || LEADERBOARD_VIEW_SCORE_ATTACK, {
+            trackId: this.leaderboardTrackId,
+            raceTypeId: this.leaderboardRaceTypeId,
+            speedClassId: this.leaderboardSpeedClassId,
+            officialRouteId: this.leaderboardOfficialRouteId
+          });
+        }
         else if (action === "settings") this.showSettingsScreen();
         else if (action === "showPlaytestReport") {
           this.playtestReportFilter = normalizePlaytestReportFilter(button.dataset.filter || this.playtestReportFilter);
