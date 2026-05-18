@@ -78,6 +78,25 @@ async function run() {
     await page.getByText(new RegExp(text, "i")).filter({ visible: true }).first().waitFor({ timeout: 5000 });
   }
 
+  function assertNoNormalUiDebugTerms(text, label) {
+    const lower = String(text || "").toLowerCase();
+    [
+      "schema",
+      "migration",
+      "signature",
+      "hash",
+      "write",
+      "route seed",
+      "snapshot",
+      "internal",
+      "telemetry",
+      "version",
+      "scope"
+    ].forEach((term) => {
+      if (lower.includes(term)) throw new Error(`${label} should not expose ${term}: ${String(text).slice(0, 1000)}`);
+    });
+  }
+
   async function setPartyOption(selector, value, expectedText) {
     await page.selectOption(selector, value);
     if (expectedText) await expectText(expectedText);
@@ -161,6 +180,37 @@ async function run() {
     app.showPartySetupScreen();
   });
   await expectText("3/8");
+  const partySetupUi = await page.evaluate(() => {
+    const text = document.body.innerText || "";
+    const steps = Array.from(document.querySelectorAll(".party-flow-strip span")).map((node) => node.textContent.replace(/\s+/g, " ").trim());
+    const summary = document.querySelector(".party-summary-compact")?.getBoundingClientRect();
+    const start = document.querySelector(".party-start-action")?.getBoundingClientRect();
+    const trackHeights = Array.from(document.querySelectorAll("[data-track-card]")).map((node) => node.getBoundingClientRect().height);
+    return {
+      text,
+      steps,
+      summaryHeight: summary?.height || 0,
+      startTop: start?.top || 9999,
+      trackHeights,
+      driverRows: document.querySelectorAll(".party-driver-row").length,
+      giantDriverCards: document.querySelectorAll(".driver-card.is-party-card").length
+    };
+  });
+  if (JSON.stringify(partySetupUi.steps) !== JSON.stringify(["1Drivers", "2Race", "3Start"])) {
+    throw new Error(`Party setup should expose Drivers -> Race -> Start steps: ${JSON.stringify(partySetupUi.steps)}`);
+  }
+  if (partySetupUi.summaryHeight > 90) throw new Error(`Party summary should stay compact: ${partySetupUi.summaryHeight}`);
+  if (partySetupUi.startTop > 360) throw new Error(`Start Party Round should remain high in the setup flow: ${partySetupUi.startTop}`);
+  if (!partySetupUi.trackHeights.every((height) => height <= 90)) {
+    throw new Error(`Party track choices should be compact: ${JSON.stringify(partySetupUi.trackHeights)}`);
+  }
+  if (partySetupUi.driverRows !== 3 || partySetupUi.giantDriverCards !== 0) {
+    throw new Error(`Party drivers should use compact rows: ${JSON.stringify({ driverRows: partySetupUi.driverRows, giantDriverCards: partySetupUi.giantDriverCards })}`);
+  }
+  if (/Pursuit|Boostline|Endurance/i.test(partySetupUi.text)) {
+    throw new Error(`Party setup should not expose unsupported race families: ${partySetupUi.text.slice(0, 1000)}`);
+  }
+  assertNoNormalUiDebugTerms(partySetupUi.text, "Party setup");
   await assertPartyTrackSelection();
   await setPartyOption("#partyRaceType", "classic", "Classic Race");
   await setPartyOption("#partyStartingOrder", "rosterOrder", "Roster Order");

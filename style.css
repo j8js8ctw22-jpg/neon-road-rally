@@ -161,6 +161,10 @@ button {
   grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
+.setup-step-strip.party-flow-strip {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
 .setup-step-strip span {
   display: flex;
   gap: 7px;
@@ -226,6 +230,14 @@ button {
 
 .setup-sticky-action .primary {
   min-width: 148px;
+}
+
+.setup-action-buttons {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  align-items: center;
+  flex-wrap: wrap;
 }
 
 .setup-hidden-label,
@@ -777,7 +789,7 @@ button {
 }
 
 .mode-ladder-card {
-  min-height: 96px;
+  min-height: 58px;
   border: 1px solid rgba(40, 246, 255, 0.34);
   border-radius: 7px;
   padding: 8px;
@@ -813,6 +825,16 @@ button {
   font-size: 0.66rem;
   font-weight: 750;
   line-height: 1.2;
+}
+
+.race-type-pill-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.race-type-pill {
+  min-width: 126px;
 }
 
 .mode-ladder-card em {
@@ -962,6 +984,86 @@ button {
   opacity: 1;
 }
 
+.official-route-list {
+  display: grid;
+  gap: 6px;
+  grid-template-columns: repeat(2, minmax(280px, 1fr));
+}
+
+.official-route-row {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: 34px minmax(120px, 1fr) minmax(76px, 0.32fr) minmax(88px, 0.36fr) minmax(94px, 0.48fr);
+  align-items: center;
+  min-height: 42px;
+  border: 1px solid rgba(40, 246, 255, 0.28);
+  border-radius: 6px;
+  padding: 7px 9px;
+  background: rgba(8, 14, 34, 0.82);
+  color: var(--text);
+  cursor: pointer;
+  text-align: left;
+}
+
+.official-route-row:hover,
+.official-route-row:focus-visible {
+  outline: none;
+  border-color: var(--yellow);
+  box-shadow: 0 0 12px rgba(255, 228, 94, 0.14);
+}
+
+.official-route-row.is-selected {
+  border-color: var(--green);
+  background:
+    linear-gradient(90deg, rgba(68, 255, 153, 0.14), rgba(40, 246, 255, 0.05)),
+    rgba(8, 18, 28, 0.9);
+}
+
+.official-route-number {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border: 1px solid rgba(255, 228, 94, 0.3);
+  border-radius: 999px;
+  color: var(--yellow);
+  font-size: 0.68rem;
+  font-weight: 900;
+}
+
+.official-route-row strong {
+  color: #fff;
+  font-size: 0.82rem;
+  line-height: 1.1;
+  text-transform: uppercase;
+  overflow-wrap: anywhere;
+}
+
+.official-route-speed,
+.official-route-row em,
+.official-route-row small {
+  min-width: 0;
+  font-size: 0.68rem;
+  font-weight: 850;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+  text-transform: uppercase;
+}
+
+.official-route-speed {
+  color: var(--cyan);
+}
+
+.official-route-row em {
+  color: var(--muted);
+  font-style: normal;
+}
+
+.official-route-row small {
+  color: var(--green);
+  text-align: right;
+}
+
 .official-rules-toggle {
   display: flex;
   flex-wrap: wrap;
@@ -981,6 +1083,36 @@ button {
   background:
     linear-gradient(180deg, rgba(184, 198, 217, 0.05), rgba(40, 246, 255, 0.035)),
     rgba(3, 7, 18, 0.58);
+}
+
+.practice-collapsible {
+  padding: 0;
+  overflow: hidden;
+}
+
+.practice-collapsible > summary {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  align-items: center;
+  min-height: 42px;
+  padding: 10px 12px;
+  color: var(--text);
+  cursor: pointer;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.practice-collapsible > summary small {
+  color: var(--muted);
+  font-size: 0.68rem;
+}
+
+.practice-setup-body {
+  display: grid;
+  gap: 12px;
+  border-top: 1px solid rgba(184, 198, 217, 0.16);
+  padding: 12px;
 }
 
 .race-type-card {
@@ -1260,6 +1392,36 @@ button:disabled {
   margin: 14px 0 18px;
 }
 
+.party-summary-compact {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 10px 0;
+}
+
+.party-summary-compact span {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  min-height: 34px;
+  border: 1px solid rgba(40, 246, 255, 0.22);
+  border-radius: 999px;
+  padding: 6px 10px;
+  background: rgba(5, 8, 20, 0.58);
+}
+
+.party-summary-compact strong {
+  color: var(--muted);
+  font-size: 0.66rem;
+  text-transform: uppercase;
+}
+
+.party-summary-compact b {
+  color: #fff;
+  font-size: 0.78rem;
+  text-transform: uppercase;
+}
+
 .party-player-list,
 .party-order-list,
 .party-standings-list {
@@ -1395,8 +1557,8 @@ button:disabled {
 
 .track-select-grid {
   display: grid;
-  gap: 10px;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
 }
 
 .track-option {
@@ -1455,7 +1617,107 @@ button:disabled {
 }
 
 .track-option.is-compact {
-  min-height: 104px;
+  min-height: 54px;
+  gap: 5px;
+  padding: 8px 9px;
+}
+
+.track-option.is-compact .track-option-title strong {
+  font-size: 0.86rem;
+}
+
+.track-option.is-compact small {
+  font-size: 0.66rem;
+  line-height: 1.2;
+}
+
+.party-setup-compressed {
+  gap: 14px;
+  grid-template-columns: minmax(300px, 0.92fr) minmax(340px, 1.08fr);
+}
+
+.party-driver-tools {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: end;
+}
+
+.party-driver-list {
+  display: grid;
+  gap: 6px;
+  max-height: 42vh;
+  overflow: auto;
+  padding-right: 2px;
+}
+
+.party-driver-row {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: 64px minmax(0, 1fr) auto auto;
+  align-items: center;
+  border: 1px solid rgba(40, 246, 255, 0.24);
+  border-radius: 7px;
+  padding: 7px 8px;
+  background: rgba(7, 12, 30, 0.7);
+}
+
+.party-driver-row.is-selected {
+  border-color: var(--yellow);
+  background: rgba(255, 228, 94, 0.07);
+}
+
+.party-row-preview {
+  min-height: 42px;
+}
+
+.party-driver-row strong,
+.party-driver-row span {
+  display: block;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.party-driver-row strong {
+  color: var(--text);
+  font-size: 0.88rem;
+  text-transform: uppercase;
+}
+
+.party-driver-row span {
+  color: var(--muted);
+  font-size: 0.7rem;
+  line-height: 1.25;
+}
+
+.party-mini-details {
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.party-mini-details > summary {
+  padding: 9px 10px;
+  cursor: pointer;
+  color: var(--yellow);
+  font-size: 0.76rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.party-order-compact {
+  max-height: 230px;
+  padding: 0 10px 10px;
+}
+
+.party-rules-grid {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.party-seed-display {
+  margin-top: -2px;
 }
 
 .party-panel .track-select-grid {
@@ -1752,8 +2014,8 @@ button:disabled {
 
 .chase-board-tabs {
   display: grid;
-  gap: 10px;
-  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 8px;
+  grid-template-columns: repeat(auto-fit, minmax(126px, 1fr));
 }
 
 .chase-board-card,
@@ -1771,6 +2033,19 @@ button:disabled {
 
 .chase-board-card {
   cursor: pointer;
+}
+
+.chase-board-pill {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 38px;
+  padding: 8px 10px;
+  text-align: center;
+}
+
+.chase-board-card.chase-board-pill strong {
+  font-size: 0.82rem;
 }
 
 .chase-board-card:hover,
@@ -1819,10 +2094,15 @@ button:disabled {
   grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
 }
 
+.chase-filter-grid.is-compact {
+  gap: 8px;
+  grid-template-columns: minmax(170px, 0.9fr) minmax(170px, 1.1fr) minmax(130px, 0.72fr);
+}
+
 .leaderboard-chase-summary {
   border: 1px solid rgba(40, 246, 255, 0.22);
   border-radius: 7px;
-  padding: 12px;
+  padding: 8px 10px;
   background: rgba(40, 246, 255, 0.055);
 }
 
@@ -3616,6 +3896,9 @@ button:disabled {
   .party-summary-strip,
   .party-setup-grid,
   .party-setup-hero,
+  .party-setup-compressed,
+  .party-rules-grid,
+  .party-driver-tools,
   .playtest-report-header,
   .playtest-report-columns,
   .score-hero,
@@ -3627,6 +3910,8 @@ button:disabled {
   .score-grid,
   .track-select-grid,
   .official-route-grid,
+  .official-route-list,
+  .chase-filter-grid.is-compact,
   .audio-grid,
   .audio-test-grid,
   .settings-quick-row,
@@ -3636,6 +3921,24 @@ button:disabled {
   .setup-step-strip,
   .mode-ladder {
     grid-template-columns: 1fr;
+  }
+
+  .official-route-row {
+    grid-template-columns: 32px minmax(0, 1fr) auto;
+  }
+
+  .official-route-row em,
+  .official-route-row small {
+    grid-column: 2 / -1;
+    text-align: left;
+  }
+
+  .party-driver-row {
+    grid-template-columns: 56px minmax(0, 1fr);
+  }
+
+  .party-driver-row .small-button {
+    grid-column: span 1;
   }
 
   .game-title {
@@ -3728,6 +4031,14 @@ button:disabled {
 
   .setup-sticky-action .primary {
     width: 100%;
+  }
+
+  .setup-action-buttons {
+    width: 100%;
+  }
+
+  .setup-action-buttons .small-button {
+    flex: 1 1 120px;
   }
 
   .title-action-card,

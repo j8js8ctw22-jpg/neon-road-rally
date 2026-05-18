@@ -138,6 +138,25 @@ function assertIncludes(text, expected, label = expected) {
   );
 }
 
+function assertNoNormalUiDebugTerms(text, label) {
+  const lower = String(text || "").toLowerCase();
+  [
+    "schema",
+    "migration",
+    "signature",
+    "hash",
+    "write",
+    "route seed",
+    "snapshot",
+    "internal",
+    "telemetry",
+    "version",
+    "scope"
+  ].forEach((term) => {
+    assert(!lower.includes(term), `${label} should not expose ${term}`, { snippet: String(text).slice(0, 1000) });
+  });
+}
+
 async function clickAction(page, action, extraSelector = "") {
   const locator = page.locator(`[data-action="${action}"]${extraSelector}`);
   const count = await locator.count();
@@ -191,21 +210,38 @@ async function assertTrackOfficial10(page, trackId, label) {
   await selectTrack(page, trackId);
   const routes = TRACK_ROUTES[trackId];
   const text = await bodyText(page);
-  assertIncludes(text, `${label} Official 10`);
-  assertIncludes(text, "Custom Road / Practice");
+  assertIncludes(text, `${label} Routes`);
+  assertIncludes(text, "Practice / Custom Seed");
+  assertNoNormalUiDebugTerms(text, `${label} setup`);
   assert(!text.includes("Pursuit"), "Pursuit should not appear in normal setup", { snippet: text.slice(0, 1200) });
   assert(!text.includes("Boostline Prototype"), "Boostline prototype should not appear in normal setup", { snippet: text.slice(0, 1200) });
 
-  const cards = await page.$$eval(".official-route-grid [data-official-route-id]", (nodes) => (
+  const practiceOpen = await page.$eval(".practice-collapsible", (node) => node.open);
+  assert(!practiceOpen, "Practice / Custom Seed should be collapsed by default");
+
+  const trackLayout = await page.$$eval("[data-track-card]", (nodes) => nodes.map((node) => node.getBoundingClientRect().height));
+  assert(trackLayout.every((height) => height <= 90), "Track choices should be compact tiles", { trackLayout });
+
+  const routeLayout = await page.$eval(".official-route-list", (node) => {
+    const rect = node.getBoundingClientRect();
+    const style = window.getComputedStyle(node);
+    return { height: rect.height, columns: style.gridTemplateColumns.split(" ").filter(Boolean).length };
+  });
+  assert(routeLayout.height <= 360, "Official route list should avoid a huge-card layout", { routeLayout });
+  assert(routeLayout.columns === 1 || routeLayout.columns === 2, "Official route list should use one or two dense columns", { routeLayout });
+
+  const cards = await page.$$eval(".official-route-list [data-official-route-id]", (nodes) => (
     nodes.map((node) => ({
       id: node.dataset.officialRouteId,
-      text: node.textContent || ""
+      text: node.textContent || "",
+      height: node.getBoundingClientRect().height
     }))
   ));
-  assert(cards.length === 10, `Expected 10 official route cards for ${trackId}`, { cards });
+  assert(cards.length === 10, `Expected 10 official route rows for ${trackId}`, { cards });
+  assert(cards.every((card) => card.height <= 68), `Official route rows should stay compact for ${trackId}`, { cards });
   for (const route of routes) {
     const card = cards.find((item) => item.id === route.id);
-    assert(card, `Missing official route card: ${route.id}`, { cards });
+    assert(card, `Missing official route row: ${route.id}`, { cards });
     assertIncludes(card.text, route.name);
     assertIncludes(card.text, route.speedClass);
     assertIncludes(card.text, route.feelTag);
@@ -307,10 +343,13 @@ async function runOfficialScenario(page, scenario, options = {}) {
   assertIncludes(text, "Official Race Result");
   assertIncludes(text, route.name);
   assert(!text.includes(route.seed), "Official result first view should not expose raw route seed", { routeId: route.id });
+  assertNoNormalUiDebugTerms(text, `${route.name} result`);
   assertIncludes(text, `${scenario.time.toFixed(3)}s`);
   assertIncludes(text, "PB Delta");
   assertIncludes(text, "Top 20");
   if (scenario.expectFeedback) assertIncludes(text, scenario.expectFeedback);
+  const routeBoardActionCount = await page.locator('[data-action="leaderboard"]').filter({ hasText: "View Route Boards" }).count();
+  assert(routeBoardActionCount === 1, "Result should expose one View Route Boards action", { routeBoardActionCount });
   await page.locator(".result-details-block summary").click();
   const detailSeed = await page.locator(".seed-copy").inputValue();
   assert(detailSeed === route.seed, "Official route seed should remain available in result details", { routeId: route.id, detailSeed });
@@ -329,7 +368,6 @@ async function assertOfficialTimeBoard(page) {
   await page.waitForFunction(() => window.neonRoadRally?.screen === "leaderboard", null, { timeout: 5000 });
   const text = await bodyText(page);
   assertIncludes(text, "Time Attack");
-  assertIncludes(text, "Official Time Attack");
   assertIncludes(text, "Switchyard Charge");
   assertIncludes(text, "35.789s");
   assertIncludes(text, "Fuel Run");
@@ -346,11 +384,23 @@ async function selectPracticeSpeed(page, speedClassId) {
   );
 }
 
+async function expandPracticeSetup(page) {
+  const details = page.locator(".practice-collapsible");
+  const count = await details.count();
+  assert(count === 1, "Practice / Custom Seed section should exist", { count });
+  const open = await details.evaluate((node) => node.open);
+  if (!open) {
+    await page.locator(".practice-collapsible summary").click();
+    await page.waitForFunction(() => document.querySelector(".practice-collapsible")?.open, null, { timeout: 5000 });
+  }
+}
+
 async function runCustomScenario(page, options = {}) {
   const trackId = options.trackId || "sunset-highway";
   const seed = options.seed || "CUSTOM-OFFICIAL-SMOKE";
   await selectTrack(page, trackId);
   await setRaceType(page, "classic");
+  await expandPracticeSetup(page);
   await clickAction(page, "randomSeed");
   await page.waitForFunction(() => window.neonRoadRally?.screen === "preRace", null, { timeout: 5000 });
 
@@ -397,6 +447,7 @@ async function runManualOfficialSeedScenario(page) {
   const route = routeById("sunset-neon-palm-sprint");
   await selectTrack(page, "sunset-highway");
   await setRaceType(page, "classic");
+  await expandPracticeSetup(page);
   await clickAction(page, "randomSeed");
   await page.waitForFunction(() => window.neonRoadRally?.screen === "preRace", null, { timeout: 5000 });
   await selectPracticeSpeed(page, "turbo");
@@ -439,31 +490,39 @@ async function assertLeaderboards(page) {
   let text = await bodyText(page);
   assertIncludes(text, "Score Attack");
   assertIncludes(text, "Chase Boards");
-  assertIncludes(text, "Route Chase Hub");
-  assertIncludes(text, "Official Routes");
-  assertIncludes(text, "Official Score Attack");
+  assertIncludes(text, "Route Boards");
   assertIncludes(text, "Your Best");
   assertIncludes(text, "Neon Palm Sprint");
+  assertIncludes(text, "Time Attack");
+  assertIncludes(text, "Survival");
+  assertIncludes(text, "Bonus Score");
+  assertNoNormalUiDebugTerms(text, "Score Attack board");
+  const boardTabs = await page.$$eval(".chase-board-tabs .chase-board-card", (nodes) => nodes.map((node) => node.textContent.trim()));
+  assert(JSON.stringify(boardTabs) === JSON.stringify(["Time Attack", "Score Attack", "Survival", "Bonus Score"]), "Chase board tabs should be compact labels", { boardTabs });
+  const firstLeaderboardRowTop = await page.$eval(".leaderboard-list .leaderboard-item", (node) => node.getBoundingClientRect().top);
+  assert(firstLeaderboardRowTop < 760, "Leaderboard rows should start above the fold", { firstLeaderboardRowTop });
+  const yourBestHeight = await page.$eval(".leaderboard-chase-summary", (node) => node.getBoundingClientRect().height);
+  assert(yourBestHeight <= 120, "Your Best summary should stay compact", { yourBestHeight });
+  const scoreRowText = await page.locator(".leaderboard-list .leaderboard-item").first().innerText();
+  assert(!/Official Race/i.test(scoreRowText), "Leaderboard row should not repeat Official Race", { scoreRowText });
+  assert(!/Sunset Highway|Classic|Turbo/i.test(scoreRowText), "Filtered leaderboard row should not repeat selected track/rules/speed", { scoreRowText });
   const lowerScoreText = text.toLowerCase();
-  assert(
-    lowerScoreText.indexOf("official score attack") >= 0,
-    "Official Score Attack should be the primary leaderboard"
-  );
   assert(!lowerScoreText.includes("sunset-palm-sprint-turbo"), "Main Score Attack board should hide raw official seeds");
   await page.locator(".leaderboard-extra-details summary").click();
   text = await bodyText(page);
   assertIncludes(text, "Practice Scores");
-  assertIncludes(text, "Practice and Challenge records stay outside Official Score Attack.");
 
   await clickAction(page, "setLeaderboardView", '[data-view="timeAttack"]');
   await page.waitForFunction(() => window.neonRoadRally?.leaderboardView === "timeAttack", null, { timeout: 5000 });
   text = await bodyText(page);
   assertIncludes(text, "Time Attack");
-  assertIncludes(text, "Official Time Attack");
-  assertIncludes(text, "Finish Time");
+  assertIncludes(text, "Time");
   assertIncludes(text, "Neon Palm Sprint");
   assertIncludes(text, "42.123s");
   assertIncludes(text, "41.987s");
+  assertNoNormalUiDebugTerms(text, "Time Attack board");
+  const timeRowText = await page.locator(".leaderboard-list .leaderboard-item").first().innerText();
+  assert(!/Official Race/i.test(timeRowText), "Time Attack row should not repeat Official Race", { timeRowText });
   const lowerTimeText = text.toLowerCase();
   assert(!lowerTimeText.includes("sunset-palm-sprint-turbo"), "Main Time Attack board should hide raw official seeds");
   await page.locator(".leaderboard-extra-details summary").click();
@@ -477,7 +536,7 @@ async function assertNewTrackLeaderboards(page) {
   await page.waitForFunction(() => window.neonRoadRally?.screen === "leaderboard", null, { timeout: 5000 });
   let text = await bodyText(page);
   assertIncludes(text, "Time Attack");
-  assertIncludes(text, "Midnight Ridge Official Routes");
+  assertIncludes(text, "Midnight Ridge");
   assertIncludes(text, "Ridge Lantern Sprint");
 
   await page.selectOption("#leaderboardTrack", "blackout-run");
@@ -489,16 +548,15 @@ async function assertNewTrackLeaderboards(page) {
     { timeout: 5000 }
   );
   text = await bodyText(page);
-  assertIncludes(text, "Blackout Run Official Routes");
+  assertIncludes(text, "Blackout Run");
   assertIncludes(text, "Headlight Mile");
 
   await page.evaluate(() => window.neonRoadRally?.showLeaderboard("scoreAttack", { officialRouteId: "prism-pinkline-sprint" }));
   await page.waitForFunction(() => window.neonRoadRally?.leaderboardView === "scoreAttack", null, { timeout: 5000 });
   text = await bodyText(page);
   assertIncludes(text, "Score Attack");
-  assertIncludes(text, "Prism Highway Official Routes");
+  assertIncludes(text, "Prism Highway");
   assertIncludes(text, "Pinkline Sprint");
-  assertIncludes(text, "Official Score Attack");
 }
 
 async function run() {
