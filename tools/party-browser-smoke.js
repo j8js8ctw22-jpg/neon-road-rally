@@ -99,7 +99,15 @@ async function run() {
 
   async function setPartyOption(selector, value, expectedText) {
     await page.selectOption(selector, value);
+    const selectedValue = await page.locator(selector).inputValue();
+    if (selectedValue !== value) throw new Error(`${selector} expected ${value}, saw ${selectedValue}`);
     if (expectedText) await expectText(expectedText);
+  }
+
+  async function openPartyOptions() {
+    const options = page.locator(".party-options-panel").first();
+    const isOpen = await options.evaluate((node) => node.open);
+    if (!isOpen) await options.locator("summary").click();
   }
 
   async function assertPartyTrackSelection() {
@@ -182,40 +190,109 @@ async function run() {
   await expectText("3/8");
   const partySetupUi = await page.evaluate(() => {
     const text = document.body.innerText || "";
-    const steps = Array.from(document.querySelectorAll(".party-flow-strip span")).map((node) => node.textContent.replace(/\s+/g, " ").trim());
-    const summary = document.querySelector(".party-summary-compact")?.getBoundingClientRect();
     const start = document.querySelector(".party-start-action")?.getBoundingClientRect();
+    const startSummary = document.querySelector("#partySetupActionSummary")?.textContent.replace(/\s+/g, " ").trim() || "";
     const trackHeights = Array.from(document.querySelectorAll("[data-track-card]")).map((node) => node.getBoundingClientRect().height);
+    const driverHeights = Array.from(document.querySelectorAll(".party-driver-row")).map((node) => node.getBoundingClientRect().height);
+    const speedHeights = Array.from(document.querySelectorAll(".mode-ladder.is-compact .mode-ladder-card")).map((node) => node.getBoundingClientRect().height);
+    const raceTypeLabels = Array.from(document.querySelectorAll('[data-race-type-choice="party"]')).map((node) => node.textContent.replace(/\s+/g, " ").trim());
+    const sectionLabels = Array.from(document.querySelectorAll(".party-setup-section .setup-section-heading .eyebrow")).map((node) => node.textContent.replace(/\s+/g, " ").trim());
     return {
       text,
-      steps,
-      summaryHeight: summary?.height || 0,
+      sectionLabels,
+      oldSummaryCount: document.querySelectorAll(".party-summary-compact").length,
+      oldStepCount: document.querySelectorAll(".party-flow-strip").length,
+      startActionCount: document.querySelectorAll(".party-start-action").length,
+      startSummary,
       startTop: start?.top || 9999,
       trackHeights,
+      driverHeights,
+      speedHeights,
+      raceTypeLabels,
       driverRows: document.querySelectorAll(".party-driver-row").length,
-      giantDriverCards: document.querySelectorAll(".driver-card.is-party-card").length
+      giantDriverCards: document.querySelectorAll(".driver-card.is-party-card").length,
+      manageOpen: document.querySelector(".party-manage-details")?.open ?? true,
+      optionsOpen: document.querySelector(".party-options-panel")?.open ?? true,
+      visibleManagementCopy: /Rename|Remove|Up|Down/.test(text),
+      hiddenOptionsCopyVisible: /Round|Seed Text|Roster Order|Random Once|Random Every Round/.test(text)
     };
   });
-  if (JSON.stringify(partySetupUi.steps) !== JSON.stringify(["1Drivers", "2Race", "3Start"])) {
-    throw new Error(`Party setup should expose Drivers -> Race -> Start steps: ${JSON.stringify(partySetupUi.steps)}`);
+  if (JSON.stringify(partySetupUi.sectionLabels) !== JSON.stringify(["Drivers", "Shared Race"])) {
+    throw new Error(`Party setup should expose Drivers and Shared Race sections: ${JSON.stringify(partySetupUi.sectionLabels)}`);
   }
-  if (partySetupUi.summaryHeight > 90) throw new Error(`Party summary should stay compact: ${partySetupUi.summaryHeight}`);
+  if (partySetupUi.oldSummaryCount || partySetupUi.oldStepCount || partySetupUi.startActionCount !== 1) {
+    throw new Error(`Party setup should keep one compact start summary: ${JSON.stringify({
+      oldSummaryCount: partySetupUi.oldSummaryCount,
+      oldStepCount: partySetupUi.oldStepCount,
+      startActionCount: partySetupUi.startActionCount
+    })}`);
+  }
   if (partySetupUi.startTop > 360) throw new Error(`Start Party Round should remain high in the setup flow: ${partySetupUi.startTop}`);
-  if (!partySetupUi.trackHeights.every((height) => height <= 90)) {
+  if (!/3 drivers · Classic · .* · /.test(partySetupUi.startSummary)) {
+    throw new Error(`Start summary should use selected settings once: ${partySetupUi.startSummary}`);
+  }
+  if (!partySetupUi.trackHeights.every((height) => height <= 70)) {
     throw new Error(`Party track choices should be compact: ${JSON.stringify(partySetupUi.trackHeights)}`);
+  }
+  if (!partySetupUi.driverHeights.every((height) => height <= 62)) {
+    throw new Error(`Party driver rows should stay compact: ${JSON.stringify(partySetupUi.driverHeights)}`);
+  }
+  if (!partySetupUi.speedHeights.every((height) => height <= 52)) {
+    throw new Error(`Party speed choices should stay compact: ${JSON.stringify(partySetupUi.speedHeights)}`);
+  }
+  if (JSON.stringify(partySetupUi.raceTypeLabels) !== JSON.stringify(["Classic", "Fuel Run"])) {
+    throw new Error(`Party race type should be a two-option toggle: ${JSON.stringify(partySetupUi.raceTypeLabels)}`);
   }
   if (partySetupUi.driverRows !== 3 || partySetupUi.giantDriverCards !== 0) {
     throw new Error(`Party drivers should use compact rows: ${JSON.stringify({ driverRows: partySetupUi.driverRows, giantDriverCards: partySetupUi.giantDriverCards })}`);
+  }
+  if (partySetupUi.manageOpen || partySetupUi.optionsOpen || partySetupUi.visibleManagementCopy || partySetupUi.hiddenOptionsCopyVisible) {
+    throw new Error(`Party management/options should stay collapsed by default: ${JSON.stringify({
+      manageOpen: partySetupUi.manageOpen,
+      optionsOpen: partySetupUi.optionsOpen,
+      visibleManagementCopy: partySetupUi.visibleManagementCopy,
+      hiddenOptionsCopyVisible: partySetupUi.hiddenOptionsCopyVisible
+    })}`);
   }
   if (/Pursuit|Boostline|Endurance/i.test(partySetupUi.text)) {
     throw new Error(`Party setup should not expose unsupported race families: ${partySetupUi.text.slice(0, 1000)}`);
   }
   assertNoNormalUiDebugTerms(partySetupUi.text, "Party setup");
   await assertPartyTrackSelection();
-  await setPartyOption("#partyRaceType", "classic", "Classic Race");
-  await setPartyOption("#partyStartingOrder", "rosterOrder", "Roster Order");
-  await setPartyOption("#partyStartingOrder", "randomOnce", "Random Once");
-  await setPartyOption("#partyStartingOrder", "randomEveryRound", "Random Every Round");
+  await page.locator('[data-race-type-choice="party"][data-value="fuelRun"]').click();
+  await expectText("Fuel Run");
+  await page.locator('.mode-ladder-card[data-id="redline"]').click();
+  await expectText("Redline");
+  await page.locator('[data-race-type-choice="party"][data-value="classic"]').click();
+  await expectText("Classic");
+  await page.locator('.mode-ladder-card[data-id="turbo"]').click();
+  await expectText("Turbo");
+  await page.evaluate(() => {
+    const app = window.neonRoadRally;
+    while (app.profiles.data.players.length < 8) {
+      app.profiles.createPlayer(`Driver ${app.profiles.data.players.length + 1}`);
+    }
+    const setup = app.getPartySetup();
+    setup.selectedPlayerIds = app.profiles.data.players.slice(0, 8).map((player) => player.id);
+    app.showPartySetupScreen();
+  });
+  await expectText("8/8");
+  const maxPartySummary = await page.textContent("#partySetupActionSummary");
+  if (!/8 drivers/.test(maxPartySummary || "")) {
+    throw new Error(`Party setup should support 8 selected drivers: ${maxPartySummary}`);
+  }
+  await page.evaluate(() => {
+    const app = window.neonRoadRally;
+    const setup = app.getPartySetup();
+    setup.selectedPlayerIds = app.profiles.data.players.slice(0, 3).map((player) => player.id);
+    app.showPartySetupScreen();
+  });
+  await expectText("3/8");
+  await setPartyOption("#partyRaceType", "classic", "Classic");
+  await openPartyOptions();
+  await setPartyOption("#partyStartingOrder", "rosterOrder");
+  await setPartyOption("#partyStartingOrder", "randomOnce");
+  await setPartyOption("#partyStartingOrder", "randomEveryRound");
   await page.selectOption("#partyRoundType", "bestOf3");
   await page.getByRole("button", { name: /Start Party Round/i }).first().click();
   await page.waitForFunction(() => window.neonRoadRally?.screen === "partyTurn", null, { timeout: 5000 });
@@ -249,7 +326,8 @@ async function run() {
 
   await page.getByRole("button", { name: /Change (Players\/Mode|Setup)/i }).click();
   await page.waitForFunction(() => window.neonRoadRally?.screen === "partySetup", null, { timeout: 5000 });
-  await page.selectOption("#partyRaceType", "fuelRun");
+  await page.locator('[data-race-type-choice="party"][data-value="fuelRun"]').click();
+  await openPartyOptions();
   await page.selectOption("#partyRoundType", "oneRunEach");
   await page.selectOption("#partyStartingOrder", "randomOnce");
   await page.getByRole("button", { name: /Start Party Round/i }).first().click();

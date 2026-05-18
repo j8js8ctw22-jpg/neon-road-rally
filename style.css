@@ -788,6 +788,11 @@ button {
   margin: 0 0 8px;
 }
 
+.mode-ladder.is-compact {
+  grid-template-columns: repeat(5, minmax(76px, 1fr));
+  gap: 6px;
+}
+
 .mode-ladder-card {
   min-height: 58px;
   border: 1px solid rgba(40, 246, 255, 0.34);
@@ -797,6 +802,14 @@ button {
   color: var(--text);
   cursor: pointer;
   text-align: left;
+}
+
+.mode-ladder-card.is-compact {
+  display: grid;
+  place-items: center;
+  min-height: 38px;
+  padding: 7px 8px;
+  text-align: center;
 }
 
 .mode-ladder-card span,
@@ -817,6 +830,15 @@ button {
   color: var(--text);
   font-size: 0.76rem;
   text-transform: uppercase;
+}
+
+.mode-ladder-card.is-compact span {
+  display: none;
+}
+
+.mode-ladder-card.is-compact strong {
+  margin: 0;
+  font-size: 0.72rem;
 }
 
 .mode-ladder-card small {
@@ -1636,29 +1658,65 @@ button:disabled {
   grid-template-columns: minmax(300px, 0.92fr) minmax(340px, 1.08fr);
 }
 
+.party-setup-simple {
+  gap: 12px;
+}
+
+.party-setup-title-row {
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+  align-items: start;
+}
+
+.party-title-actions {
+  justify-content: flex-end;
+}
+
+.party-setup-main {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: minmax(300px, 0.95fr) minmax(340px, 1.05fr);
+}
+
+.party-setup-section {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+}
+
+.party-race-row {
+  display: grid;
+  gap: 10px;
+}
+
+.party-field-compact {
+  gap: 5px;
+}
+
 .party-driver-tools {
   display: grid;
   gap: 8px;
-  grid-template-columns: minmax(0, 1fr) auto auto;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: end;
 }
 
 .party-driver-list {
   display: grid;
-  gap: 6px;
-  max-height: 42vh;
+  gap: 5px;
+  max-height: 38vh;
   overflow: auto;
   padding-right: 2px;
 }
 
 .party-driver-row {
   display: grid;
-  gap: 8px;
-  grid-template-columns: 64px minmax(0, 1fr) auto auto;
+  gap: 7px;
+  grid-template-columns: 54px minmax(0, 1fr) auto;
   align-items: center;
   border: 1px solid rgba(40, 246, 255, 0.24);
   border-radius: 7px;
-  padding: 7px 8px;
+  padding: 6px 7px;
   background: rgba(7, 12, 30, 0.7);
 }
 
@@ -1667,8 +1725,11 @@ button:disabled {
   background: rgba(255, 228, 94, 0.07);
 }
 
-.party-row-preview {
-  min-height: 42px;
+.mini-car-preview.party-row-preview {
+  display: block;
+  width: 54px;
+  height: 34px;
+  min-height: 0;
 }
 
 .party-driver-row strong,
@@ -1680,14 +1741,23 @@ button:disabled {
 
 .party-driver-row strong {
   color: var(--text);
-  font-size: 0.88rem;
+  font-size: 0.82rem;
   text-transform: uppercase;
 }
 
 .party-driver-row span {
   color: var(--muted);
-  font-size: 0.7rem;
+  font-size: 0.66rem;
   line-height: 1.25;
+}
+
+.party-driver-toggle {
+  min-width: 48px;
+}
+
+.party-driver-toggle.is-on {
+  border-color: rgba(255, 228, 94, 0.45);
+  color: var(--yellow);
 }
 
 .party-mini-details {
@@ -1710,10 +1780,15 @@ button:disabled {
   padding: 0 10px 10px;
 }
 
+.party-options-panel {
+  margin-top: 2px;
+}
+
 .party-rules-grid {
   display: grid;
   gap: 8px;
   grid-template-columns: repeat(2, minmax(0, 1fr));
+  padding: 0 10px 10px;
 }
 
 .party-seed-display {
@@ -3897,6 +3972,8 @@ button:disabled {
   .party-setup-grid,
   .party-setup-hero,
   .party-setup-compressed,
+  .party-setup-main,
+  .party-race-row,
   .party-rules-grid,
   .party-driver-tools,
   .playtest-report-header,
@@ -3921,6 +3998,23 @@ button:disabled {
   .setup-step-strip,
   .mode-ladder {
     grid-template-columns: 1fr;
+  }
+
+  .party-setup-title-row {
+    flex-direction: column;
+  }
+
+  .party-title-actions {
+    justify-content: stretch;
+    width: 100%;
+  }
+
+  .party-title-actions .small-button {
+    flex: 1 1 120px;
+  }
+
+  .mode-ladder.is-compact {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .official-route-row {
