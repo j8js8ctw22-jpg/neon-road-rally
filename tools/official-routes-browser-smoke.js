@@ -105,8 +105,19 @@ const NORMAL_TRACKS = [
   { id: "prism-highway", name: "Prism Highway" }
 ];
 
+const SPEED_LABELS = {
+  arcade: "Arcade",
+  pro: "Pro",
+  turbo: "Turbo",
+  overdrive: "Overdrive",
+  redline: "Redline"
+};
+
+const SPEED_IDS_BY_LABEL = Object.fromEntries(Object.entries(SPEED_LABELS).map(([id, label]) => [label, id]));
+
 const OFFICIAL_SCENARIOS = [
   { routeId: "sunset-neon-palm-sprint", trackId: "sunset-highway", raceType: "classic", score: 112300, time: 42.123, feedback: { boostPadsCollected: 3, bestBoostPadChain: 2, rampsUsed: 1, rampTargetsCleared: 0 }, expectFeedback: "Strong boost route" },
+  { routeId: "sunset-orange-sky-switchback", trackId: "sunset-highway", raceType: "classic", score: 118900, time: 40.777 },
   { routeId: "sunset-glass-city-climb", trackId: "sunset-highway", raceType: "classic", score: 132400, time: 39.654, feedback: { boostPadsCollected: 1, bestBoostPadChain: 0, rampsUsed: 2, rampTargetsCleared: 2 }, expectFeedback: "Strong ramp route" },
   { routeId: "sunset-last-light-gauntlet", trackId: "sunset-highway", raceType: "classic", score: 284500, time: 28.456 },
   { routeId: "midnight-ridge-lantern-sprint", trackId: "midnight-ridge", raceType: "classic", score: 126400, time: 43.219 },
@@ -208,6 +219,85 @@ async function setRaceType(page, raceType) {
   );
 }
 
+async function assertOfficialSetupLayoutIntegrity(page, label) {
+  const metrics = await page.evaluate(() => {
+    const viewportWidth = document.documentElement.clientWidth;
+    const pageScrollWidth = document.documentElement.scrollWidth;
+    const panel = document.querySelector(".pre-race-panel");
+    const routeList = document.querySelector(".official-route-list");
+    const longNames = ["Orange Sky Switchback", "Last Light Gauntlet", "Heatwave Express"];
+    const rows = Array.from(document.querySelectorAll(".official-route-list [data-official-route-id]")).map((row) => {
+      const rowRect = row.getBoundingClientRect();
+      const children = Array.from(row.children).map((child) => {
+        const rect = child.getBoundingClientRect();
+        return {
+          className: child.className || child.tagName,
+          text: child.textContent.replace(/\s+/g, " ").trim(),
+          left: rect.left,
+          right: rect.right,
+          top: rect.top,
+          bottom: rect.bottom,
+          width: rect.width,
+          height: rect.height,
+          scrollWidth: child.scrollWidth,
+          clientWidth: child.clientWidth
+        };
+      });
+      const overlaps = [];
+      for (let index = 0; index < children.length; index += 1) {
+        for (let next = index + 1; next < children.length; next += 1) {
+          const a = children[index];
+          const b = children[next];
+          const intersects = a.left < b.right - 1
+            && b.left < a.right - 1
+            && a.top < b.bottom - 1
+            && b.top < a.bottom - 1;
+          if (intersects) overlaps.push([a.text, b.text]);
+        }
+      }
+      const outside = children.filter((child) => (
+        child.left < rowRect.left - 1
+        || child.right > rowRect.right + 1
+        || child.top < rowRect.top - 1
+        || child.bottom > rowRect.bottom + 1
+        || child.scrollWidth > child.clientWidth + 1
+      ));
+      const pb = row.querySelector("small")?.getBoundingClientRect();
+      const title = row.querySelector("strong")?.textContent?.replace(/\s+/g, " ").trim() || "";
+      return {
+        id: row.dataset.officialRouteId,
+        text: row.textContent.replace(/\s+/g, " ").trim(),
+        width: rowRect.width,
+        height: rowRect.height,
+        outside,
+        overlaps,
+        title,
+        pbInside: !pb || (pb.left >= rowRect.left - 1 && pb.right <= rowRect.right + 1)
+      };
+    });
+    return {
+      viewportWidth,
+      pageScrollWidth,
+      panelOverflow: panel ? panel.scrollWidth - panel.clientWidth : 0,
+      routeListOverflow: routeList ? routeList.scrollWidth - routeList.clientWidth : 0,
+      rows,
+      longNameRows: rows.filter((row) => longNames.some((name) => row.title.includes(name)))
+    };
+  });
+  assert(metrics.pageScrollWidth <= metrics.viewportWidth + 1, `${label} should not require horizontal page scrolling`, { metrics });
+  assert(metrics.panelOverflow <= 1, `${label} panel should not overflow horizontally`, { metrics });
+  assert(metrics.routeListOverflow <= 1, `${label} route list should not overflow horizontally`, { metrics });
+  const outsideRows = metrics.rows.filter((row) => row.outside.length);
+  assert(outsideRows.length === 0, `${label} route row text should stay inside each row`, { outsideRows });
+  const overlappingRows = metrics.rows.filter((row) => row.overlaps.length);
+  assert(overlappingRows.length === 0, `${label} route row text should not overlap`, { overlappingRows });
+  const pbOutsideRows = metrics.rows.filter((row) => !row.pbInside);
+  assert(pbOutsideRows.length === 0, `${label} PB text should stay inside route rows`, { pbOutsideRows });
+  if (metrics.rows.some((row) => ["Orange Sky Switchback", "Last Light Gauntlet", "Heatwave Express"].includes(row.title))) {
+    assert(metrics.longNameRows.length >= 3, `${label} should keep long Sunset route names readable`, { longNameRows: metrics.longNameRows });
+  }
+}
+
 async function assertTrackOfficial10(page, trackId, label) {
   await selectTrack(page, trackId);
   const routes = TRACK_ROUTES[trackId];
@@ -250,6 +340,7 @@ async function assertTrackOfficial10(page, trackId, label) {
 
   const trackLayout = await page.$$eval("[data-track-card]", (nodes) => nodes.map((node) => node.getBoundingClientRect().height));
   assert(trackLayout.every((height) => height <= 90), "Track choices should be compact tiles", { trackLayout });
+  await assertOfficialSetupLayoutIntegrity(page, `${label} setup`);
 
   const routeLayout = await page.$eval(".official-route-list", (node) => {
     const rect = node.getBoundingClientRect();
@@ -261,7 +352,7 @@ async function assertTrackOfficial10(page, trackId, label) {
       rowTops: Array.from(new Set(rows.map((row) => Math.round(row.top))))
     };
   });
-  assert(routeLayout.height <= 300, "Official route list should avoid a huge-card layout", { routeLayout });
+  assert(routeLayout.height <= 420, "Official route list should avoid a huge-card layout", { routeLayout });
   assert(routeLayout.columns === 2 && routeLayout.rowTops.length === 5, "Official route list should use a dense two-column, five-row board on desktop", { routeLayout });
 
   const cards = await page.$$eval(".official-route-list [data-official-route-id]", (nodes) => (
@@ -272,7 +363,7 @@ async function assertTrackOfficial10(page, trackId, label) {
     }))
   ));
   assert(cards.length === 10, `Expected 10 official route rows for ${trackId}`, { cards });
-  assert(cards.every((card) => card.height <= 68), `Official route rows should stay compact for ${trackId}`, { cards });
+  assert(cards.every((card) => card.height <= 92), `Official route rows should stay compact for ${trackId}`, { cards });
   for (const route of routes) {
     const card = cards.find((item) => item.id === route.id);
     assert(card, `Missing official route row: ${route.id}`, { cards });
@@ -311,6 +402,79 @@ async function selectOfficialRoute(page, routeId) {
   })));
   assert(selectedState.filter((item) => item.selected).length === 1, "One official route should be visibly selected", { selectedState });
   assert(selectedState.some((item) => item.id === routeId && item.selected), "Selected route should match the clicked route", { selectedState, routeId });
+}
+
+async function returnToPreRace(page) {
+  await page.evaluate(() => window.neonRoadRally?.showPreRaceScreen());
+  await page.waitForFunction(() => window.neonRoadRally?.screen === "preRace", null, { timeout: 5000 });
+}
+
+async function assertOfficialLaunchState(page, routeId) {
+  const route = routeById(routeId);
+  await selectTrack(page, "sunset-highway");
+  await setRaceType(page, "classic");
+  await selectOfficialRoute(page, routeId);
+  const readyText = await page.locator(".solo-setup-action").innerText();
+  assertIncludes(readyText, "Official Race");
+  assertIncludes(readyText, route.name);
+  assertIncludes(readyText, route.speedClass);
+  assert(!readyText.includes(route.seed), "Official Start Race summary should hide raw route seeds", { readyText, routeId });
+  await clickAction(page, "startSeededRace");
+  await page.waitForFunction(() => window.neonRoadRally?.screen === "game", null, { timeout: 5000 });
+  const runState = await page.evaluate(() => {
+    const run = window.neonRoadRally?.run || {};
+    return {
+      officialRouteId: run.officialRouteId || "",
+      speedClassId: run.speedClassId || "",
+      raceTypeId: run.raceTypeId || "",
+      competitionKind: run.competitionKind || "",
+      routeSeedLocked: Boolean(run.routeSeedLocked || run.officialRouteSeedLocked),
+      seed: run.roadSeed || run.seed || ""
+    };
+  });
+  assert(runState.officialRouteId === routeId, `Official route ${routeId} should launch as Official Race`, { runState, route });
+  assert(runState.speedClassId === SPEED_IDS_BY_LABEL[route.speedClass], "Official launch should use the route locked speed", { runState, route });
+  assert(runState.competitionKind === "Official Race", "Official route launch should use Official Race context", { runState, route });
+  assert(runState.routeSeedLocked, "Official route launch should seed-lock the route", { runState, route });
+  await returnToPreRace(page);
+}
+
+async function assertPracticeOverridesOfficialLaunch(page, routeId, speedClassId) {
+  const route = routeById(routeId);
+  await selectTrack(page, "sunset-highway");
+  await setRaceType(page, "classic");
+  await selectOfficialRoute(page, routeId);
+  await expandPracticeSetup(page);
+  await selectPracticeSpeed(page, speedClassId);
+  const readyText = await page.locator(".solo-setup-action").innerText();
+  assertIncludes(readyText, "Custom Road");
+  assertIncludes(readyText, SPEED_LABELS[speedClassId] || speedClassId);
+  assertIncludes(readyText, route.seed);
+  assert(!readyText.includes(route.name), "Practice summary should not keep the selected Official route name", { readyText, route });
+  await clickAction(page, "startSeededRace");
+  await page.waitForFunction(() => window.neonRoadRally?.screen === "game", null, { timeout: 5000 });
+  const runState = await page.evaluate(() => {
+    const run = window.neonRoadRally?.run || {};
+    return {
+      officialRouteId: run.officialRouteId || "",
+      speedClassId: run.speedClassId || "",
+      raceTypeId: run.raceTypeId || "",
+      competitionKind: run.competitionKind || "",
+      routeSeedLocked: Boolean(run.routeSeedLocked || run.officialRouteSeedLocked),
+      seed: run.roadSeed || run.seed || ""
+    };
+  });
+  assert(runState.officialRouteId === "", "Practice launch should not keep the selected Official route id", { runState, route });
+  assert(runState.competitionKind === "Custom Road", "Practice launch should use Custom Road context", { runState, route });
+  assert(runState.speedClassId === speedClassId, "Practice launch should use the selected custom speed", { runState, speedClassId });
+  assert(runState.seed === route.seed, "Practice launch should use the current custom seed input", { runState, route });
+  assert(!runState.routeSeedLocked, "Practice launch should not seed-lock an Official route", { runState, route });
+  await returnToPreRace(page);
+  await selectOfficialRoute(page, routeId);
+  const officialReadyText = await page.locator(".solo-setup-action").innerText();
+  assertIncludes(officialReadyText, "Official Race");
+  assertIncludes(officialReadyText, route.name);
+  assert(!officialReadyText.includes("Custom Road"), "Selecting an Official route should switch back from Practice context", { officialReadyText, route });
 }
 
 async function finishCurrentRace(page, score, time, feedback = {}) {
@@ -418,10 +582,18 @@ async function assertOfficialTimeBoard(page) {
 }
 
 async function selectPracticeSpeed(page, speedClassId) {
-  await page.selectOption("#preRaceSpeedClass", speedClassId);
+  await expandPracticeSetup(page);
+  const button = page.locator(`.practice-setup-body [data-action="setModePickerSpeed"][data-id="${speedClassId}"]`);
+  const count = await button.count();
+  assert(count === 1, `Expected one Practice speed button for ${speedClassId}`, { count });
+  await button.click();
   await page.waitForFunction(
-    (id) => document.querySelector("#preRaceSpeedClass")?.value === id,
-    speedClassId,
+    ({ id, label }) => (
+      document.querySelector("#preRaceSpeedClass")?.value === id
+      && document.querySelector("#soloSetupCompetitionLabel")?.textContent?.includes("Custom Road")
+      && document.querySelector("#soloSetupActionSummary")?.textContent?.includes(label)
+    ),
+    { id: speedClassId, label: SPEED_LABELS[speedClassId] || speedClassId },
     { timeout: 5000 }
   );
 }
@@ -452,12 +624,12 @@ async function runCustomScenario(page, options = {}) {
 
   await selectPracticeSpeed(page, "arcade");
   let readyText = await page.locator(".solo-setup-action").innerText();
-  assertIncludes(readyText, "Practice / Custom Seed");
+  assertIncludes(readyText, "Custom Road");
   assertIncludes(readyText, "Arcade");
 
   await selectPracticeSpeed(page, "pro");
   readyText = await page.locator(".solo-setup-action").innerText();
-  assertIncludes(readyText, "Practice / Custom Seed");
+  assertIncludes(readyText, "Custom Road");
   assertIncludes(readyText, "Pro");
 
   await selectPracticeSpeed(page, "turbo");
@@ -469,9 +641,9 @@ async function runCustomScenario(page, options = {}) {
     { timeout: 5000 }
   );
   readyText = await page.locator(".solo-setup-action").innerText();
-  assertIncludes(readyText, "Practice / Custom Seed");
+  assertIncludes(readyText, "Custom Road");
   assertIncludes(readyText, "Turbo");
-  assert(!readyText.includes(seed), "Practice start summary should not expose raw seeds", { readyText, seed });
+  assertIncludes(readyText, seed);
   await clickAction(page, "startSeededRace");
   const telemetry = await finishCurrentRace(page, 98100, 48.321);
   const text = await bodyText(page);
@@ -484,44 +656,6 @@ async function runCustomScenario(page, options = {}) {
     await page.waitForFunction(() => window.neonRoadRally?.screen === "preRace", null, { timeout: 5000 });
   }
   return { routeId: "custom-road", telemetry };
-}
-
-async function runManualOfficialSeedScenario(page) {
-  const route = routeById("sunset-neon-palm-sprint");
-  await selectTrack(page, "sunset-highway");
-  await setRaceType(page, "classic");
-  await expandPracticeSetup(page);
-  await clickAction(page, "randomSeed");
-  await page.waitForFunction(() => window.neonRoadRally?.screen === "preRace", null, { timeout: 5000 });
-  await selectPracticeSpeed(page, "turbo");
-  const input = page.locator("#roadSeedInput");
-  await input.fill(route.seed);
-  await page.waitForFunction(
-    ({ seed, routeId, name }) => (
-      document.querySelector("#roadSeedInput")?.value === seed
-      && document.querySelector("#officialRouteInput")?.value === routeId
-      && document.querySelector("#soloSetupCompetitionLabel")?.textContent?.includes("Official Race")
-      && document.querySelector("#soloSetupActionSummary")?.textContent?.includes(name)
-    ),
-    { seed: route.seed, routeId: route.id, name: route.name },
-    { timeout: 5000 }
-  );
-  const readyText = await page.locator(".solo-setup-action").innerText();
-  assertIncludes(readyText, "Official Race");
-  assertIncludes(readyText, route.name);
-  await clickAction(page, "startSeededRace");
-  const telemetry = await finishCurrentRace(page, 118800, 41.987);
-  const text = await bodyText(page);
-  assertIncludes(text, "Official Race Result");
-  assertIncludes(text, route.name);
-  assert(!text.includes(route.seed), "Official result first view should not expose raw route seed", { routeId: route.id });
-  assert(!text.includes("Custom Road Result"), "Official seed manual run should not present as Custom Road");
-  await page.locator(".result-details-block summary").click();
-  const detailSeed = await page.locator(".seed-copy").inputValue();
-  assert(detailSeed === route.seed, "Manual official seed should remain available in result details", { routeId: route.id, detailSeed });
-  await clickAction(page, "preRace");
-  await page.waitForFunction(() => window.neonRoadRally?.screen === "preRace", null, { timeout: 5000 });
-  return { routeId: route.id, telemetry, manualSeed: route.seed };
 }
 
 async function assertLeaderboards(page) {
@@ -562,7 +696,6 @@ async function assertLeaderboards(page) {
   assertIncludes(text, "Time");
   assertIncludes(text, "Neon Palm Sprint");
   assertIncludes(text, "42.123s");
-  assertIncludes(text, "41.987s");
   assertNoNormalUiDebugTerms(text, "Time Attack board");
   const timeRowText = await page.locator(".leaderboard-list .leaderboard-item").first().innerText();
   assert(!/Official Race/i.test(timeRowText), "Time Attack row should not repeat Official Race", { timeRowText });
@@ -633,12 +766,16 @@ async function run() {
     }
 
     await selectTrack(page, "sunset-highway");
+    await assertOfficialLaunchState(page, "sunset-neon-palm-sprint");
+    await assertOfficialLaunchState(page, "sunset-orange-sky-switchback");
+    await assertPracticeOverridesOfficialLaunch(page, "sunset-neon-palm-sprint", "turbo");
+    await assertPracticeOverridesOfficialLaunch(page, "sunset-orange-sky-switchback", "overdrive");
+    await assertOfficialSetupLayoutIntegrity(page, "Sunset setup after launch-context toggles");
     const telemetrySamples = [];
     for (let index = 0; index < OFFICIAL_SCENARIOS.length; index += 1) {
       telemetrySamples.push(await runOfficialScenario(page, OFFICIAL_SCENARIOS[index], { returnToSetup: index < OFFICIAL_SCENARIOS.length - 1 }));
     }
     await assertOfficialTimeBoard(page);
-    telemetrySamples.push(await runManualOfficialSeedScenario(page));
     telemetrySamples.push(await runCustomScenario(page, { trackId: "midnight-ridge", seed: "CUSTOM-MIDNIGHT-RIDGE", returnToSetup: true }));
     telemetrySamples.push(await runCustomScenario(page, { trackId: "blackout-run", seed: "CUSTOM-BLACKOUT-RUN", returnToSetup: true }));
     telemetrySamples.push(await runCustomScenario(page, { trackId: "prism-highway", seed: "CUSTOM-PRISM-HIGHWAY", returnToSetup: true }));

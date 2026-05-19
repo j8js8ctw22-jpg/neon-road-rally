@@ -248,10 +248,15 @@ button {
 .setup-hidden-select {
   position: absolute;
   width: 1px;
+  min-width: 1px;
+  max-width: 1px;
   height: 1px;
+  min-height: 1px;
+  max-height: 1px;
   margin: -1px;
   overflow: hidden;
   clip: rect(0 0 0 0);
+  clip-path: inset(50%);
   white-space: nowrap;
   border: 0;
   padding: 0;
@@ -1042,15 +1047,23 @@ button {
 .official-route-list {
   display: grid;
   gap: 6px;
-  grid-template-columns: repeat(2, minmax(280px, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  max-width: 100%;
+  overflow-x: hidden;
 }
 
 .official-route-row {
   display: grid;
-  gap: 8px;
-  grid-template-columns: 34px minmax(120px, 1fr) minmax(76px, 0.32fr) minmax(88px, 0.36fr) minmax(94px, 0.48fr);
+  grid-template-areas:
+    "number name speed"
+    "number tag best";
+  grid-template-columns: 32px minmax(0, 1fr) minmax(72px, 0.52fr);
+  column-gap: 8px;
+  row-gap: 2px;
   align-items: center;
-  min-height: 42px;
+  min-width: 0;
+  max-width: 100%;
+  min-height: 54px;
   border: 1px solid rgba(40, 246, 255, 0.28);
   border-radius: 6px;
   padding: 7px 9px;
@@ -1058,6 +1071,8 @@ button {
   color: var(--text);
   cursor: pointer;
   text-align: left;
+  overflow: hidden;
+  box-sizing: border-box;
 }
 
 .official-route-row:hover,
@@ -1075,6 +1090,7 @@ button {
 }
 
 .official-route-number {
+  grid-area: number;
   display: grid;
   place-items: center;
   width: 26px;
@@ -1087,9 +1103,11 @@ button {
 }
 
 .official-route-row strong {
+  grid-area: name;
+  min-width: 0;
   color: #fff;
   font-size: 0.82rem;
-  line-height: 1.1;
+  line-height: 1.12;
   text-transform: uppercase;
   overflow-wrap: anywhere;
 }
@@ -1098,6 +1116,7 @@ button {
 .official-route-row em,
 .official-route-row small {
   min-width: 0;
+  max-width: 100%;
   font-size: 0.68rem;
   font-weight: 850;
   line-height: 1.2;
@@ -1106,16 +1125,22 @@ button {
 }
 
 .official-route-speed {
+  grid-area: speed;
   color: var(--cyan);
+  justify-self: end;
+  text-align: right;
 }
 
 .official-route-row em {
+  grid-area: tag;
   color: var(--muted);
   font-style: normal;
 }
 
 .official-route-row small {
+  grid-area: best;
   color: var(--green);
+  justify-self: end;
   text-align: right;
 }
 
@@ -4060,12 +4085,18 @@ button:disabled {
   }
 
   .official-route-row {
-    grid-template-columns: 32px minmax(0, 1fr) auto;
+    grid-template-areas:
+      "number name"
+      "number speed"
+      "number tag"
+      "number best";
+    grid-template-columns: 32px minmax(0, 1fr);
   }
 
+  .official-route-speed,
   .official-route-row em,
   .official-route-row small {
-    grid-column: 2 / -1;
+    justify-self: start;
     text-align: left;
   }
 
