@@ -97,6 +97,10 @@ button {
   width: min(720px, 100%);
 }
 
+.official-race-panel.panel.compact {
+  width: min(860px, 100%);
+}
+
 .title-panel {
   display: grid;
   gap: clamp(20px, 4vw, 42px);
@@ -883,6 +887,35 @@ button {
 
 .mode-ladder-note {
   margin: 0;
+}
+
+.official-race-flow {
+  gap: 10px;
+}
+
+.official-setup-title-row {
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+  align-items: start;
+}
+
+.official-setup-title-row h2 {
+  margin-bottom: 0;
+}
+
+.official-setup-section {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.official-start-action {
+  margin-bottom: 10px;
+}
+
+.official-start-action strong {
+  font-size: 1.02rem;
 }
 
 .race-type-card-grid {
@@ -3974,6 +4007,7 @@ button:disabled {
   .party-setup-compressed,
   .party-setup-main,
   .party-race-row,
+  .official-setup-title-row,
   .party-rules-grid,
   .party-driver-tools,
   .playtest-report-header,
@@ -3998,6 +4032,14 @@ button:disabled {
   .setup-step-strip,
   .mode-ladder {
     grid-template-columns: 1fr;
+  }
+
+  .official-setup-title-row {
+    flex-direction: column;
+  }
+
+  .official-setup-title-row .small-button {
+    width: 100%;
   }
 
   .party-setup-title-row {

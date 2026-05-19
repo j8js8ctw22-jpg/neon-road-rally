@@ -4836,6 +4836,17 @@ function getTrackMusicStatus(track = TRACKS[0]) {
   return String(track?.musicStatus || (track?.music ? "Track music configured." : "No track music configured."));
 }
 
+function getTrackArcadeFlavorTag(track = TRACKS[0]) {
+  const tags = {
+    "sunset-highway": "balanced",
+    "redline-run": "fast",
+    "midnight-ridge": "ridge",
+    "blackout-run": "dark",
+    "prism-highway": "rainbow"
+  };
+  return tags[track?.id] || "arcade";
+}
+
 function trackSupportsRaceType(track = TRACKS[0], raceTypeId = DEFAULT_RACE_TYPE_ID) {
   const id = normalizeRaceTypeId(raceTypeId);
   if (id === DEFAULT_RACE_TYPE_ID) return true;
@@ -29085,6 +29096,7 @@ class NeonRoadRally {
     const selectedId = normalizeTrackId(selectedTrackId, DEFAULT_TRACK_ID);
     const compact = options.compact === true;
     const simple = options.simple === true;
+    const flavor = options.flavor === true;
     return `
       <div class="track-select-grid" role="radiogroup" aria-label="Track Select">
         ${TRACKS.map((track) => {
@@ -29092,12 +29104,13 @@ class NeonRoadRally {
           const modes = Array.isArray(track.recommendedModes) ? track.recommendedModes.join(" | ") : "Solo / Seeded Run";
           const fuelReady = trackSupportsRaceType(track, FUEL_RUN_RACE_TYPE_ID);
           const supportLabel = fuelReady ? "Classic / Fuel" : "Classic";
+          const tagLabel = flavor ? getTrackArcadeFlavorTag(track) : supportLabel;
           return `
             <label class="track-option ${compact ? "is-compact" : ""} ${selected ? "selected" : ""}" data-track-card="${escapeAttr(track.id)}">
               <input type="radio" name="${escapeAttr(name)}" value="${escapeAttr(track.id)}" ${selected ? "checked" : ""}>
               <span class="track-option-title">
                 <strong>${escapeHtml(track.name)}</strong>
-                ${simple ? "" : `<em>${escapeHtml(supportLabel)}</em>`}
+                ${simple && !flavor ? "" : `<em>${escapeHtml(tagLabel)}</em>`}
               </span>
               ${compact ? "" : `
                 <span>${escapeHtml(track.cardIdentity || track.description)}</span>
@@ -29180,61 +29193,64 @@ class NeonRoadRally {
     const speedClass = getSpeedClassConfig(officialRoute?.speedClassId || this.profiles.data.speedClassId);
     const seed = officialRoute ? officialRoute.seed : this.resolveRoadSeed(this.pendingRoadSeed);
     const competitionKind = getCompetitionKindLabel(officialRoute);
-    const trackRoutes = getOfficialRoutesForTrack(track.id);
+    const startSummary = officialRoute
+      ? `${getOfficialRouteDisplayName(officialRoute)} • ${raceType.label} • ${speedClass.label}`
+      : `Practice / Custom Seed • ${raceType.label} • ${speedClass.label}`;
     this.pendingRoadSeed = seed;
     this.pendingTrackId = track.id;
     this.pendingRaceTypeId = raceType.id;
     this.pendingOfficialRouteId = officialRoute?.id || "";
     this.layer.classList.remove("is-empty");
     this.layer.innerHTML = `
-      <section class="panel compact pre-race-panel">
-        <div class="form-stack">
-          <div>
-            <span class="eyebrow">Official Race</span>
-            <h2>Choose Route</h2>
-          </div>
-          <div class="setup-step-strip" aria-label="Race setup order">
-            <span><strong>1</strong>Track</span>
-            <span><strong>2</strong>Rules</span>
-            <span><strong>3</strong>Route</span>
-            <span><strong>4</strong>Start</span>
-          </div>
-          <div class="setup-sticky-action solo-setup-action" aria-label="Ready to race">
+      <section class="panel compact pre-race-panel official-race-panel">
+        <div class="form-stack official-race-flow">
+          <div class="official-setup-title-row">
             <div>
-              <span class="eyebrow" id="soloSetupCompetitionLabel">4 · ${escapeHtml(competitionKind)}</span>
-              <strong id="soloSetupActionSummary">${escapeHtml(officialRoute ? getOfficialRouteDisplayName(officialRoute) : `${raceType.label} · ${track.name} · ${speedClass.label}`)}</strong>
-              <small id="soloSetupActionSeed">${escapeHtml(officialRoute ? `${raceType.label} · ${speedClass.label} · ${getOfficialRouteDisplayFeelTag(officialRoute)}` : `${raceType.label} · ${speedClass.label} · Practice ${seed}`)}</small>
+              <span class="eyebrow">Official Race</span>
+              <h2>Official Race</h2>
+            </div>
+            <button class="small-button" data-action="title">Back</button>
+          </div>
+          <div class="setup-sticky-action solo-setup-action official-start-action" aria-label="Ready to race">
+            <div>
+              <span class="eyebrow" id="soloSetupCompetitionLabel">${escapeHtml(competitionKind)}</span>
+              <strong id="soloSetupActionSummary">${escapeHtml(startSummary)}</strong>
             </div>
             <div class="setup-action-buttons">
               <button class="small-button primary" data-action="startSeededRace">Start Race</button>
-              <button class="small-button" data-action="title">Back</button>
             </div>
           </div>
-          <div class="setup-section-heading">
-            <span class="eyebrow">1 · Track</span>
-            <strong>Pick a board.</strong>
-          </div>
-          ${this.renderTrackSelect("preRaceTrack", track.id, { compact: true })}
-          <div class="setup-section-heading">
-            <span class="eyebrow">2 · Rules</span>
-            <strong>Classic or Fuel Run.</strong>
-          </div>
-          <div class="field official-rules-field">
-            <label class="setup-hidden-label" for="preRaceType">Race Type</label>
-            <select id="preRaceType" class="setup-hidden-select" aria-hidden="true" tabindex="-1">
-              ${this.renderRaceTypeOptionsForTrack(track, raceType.id)}
-            </select>
-            ${this.renderOfficialRouteRaceTypeButtons(raceType.id, "preRace")}
-          </div>
-          <div class="setup-section-heading">
-            <span class="eyebrow">3 · ${escapeHtml(track.name)} Routes</span>
-            <strong>Pick one route.</strong>
-          </div>
-          ${this.renderOfficialRouteChoiceGrid(officialRoute?.id || "", track.id, raceType.id)}
+          <section class="official-setup-section">
+            <div class="setup-section-heading">
+              <span class="eyebrow">Track</span>
+              <strong>Pick a board.</strong>
+            </div>
+            ${this.renderTrackSelect("preRaceTrack", track.id, { compact: true, simple: true, flavor: true })}
+          </section>
+          <section class="official-setup-section">
+            <div class="setup-section-heading">
+              <span class="eyebrow">Race Type</span>
+              <strong>Classic or Fuel Run.</strong>
+            </div>
+            <div class="field official-rules-field">
+              <label class="setup-hidden-label" for="preRaceType">Race Type</label>
+              <select id="preRaceType" class="setup-hidden-select" aria-hidden="true" tabindex="-1">
+                ${this.renderRaceTypeOptionsForTrack(track, raceType.id)}
+              </select>
+              ${this.renderOfficialRouteRaceTypeButtons(raceType.id, "preRace")}
+            </div>
+          </section>
+          <section class="official-setup-section official-route-section">
+            <div class="setup-section-heading">
+              <span class="eyebrow">Route</span>
+              <strong>${escapeHtml(track.name)}</strong>
+            </div>
+            ${this.renderOfficialRouteChoiceGrid(officialRoute?.id || "", track.id, raceType.id)}
+          </section>
           <details class="practice-setup-panel practice-collapsible" ${this.practiceSetupExpanded ? "open" : ""}>
             <summary>
               <span>Practice / Custom Seed</span>
-              <small>Arcade, Pro, random roads</small>
+              <small>Optional</small>
             </summary>
             <div class="practice-setup-body">
               <div class="field">
@@ -29285,7 +29301,6 @@ class NeonRoadRally {
     const musicSummary = document.getElementById("preRaceMusicSummary");
     const soloSetupCompetitionLabel = document.getElementById("soloSetupCompetitionLabel");
     const soloSetupActionSummary = document.getElementById("soloSetupActionSummary");
-    const soloSetupActionSeed = document.getElementById("soloSetupActionSeed");
     const practiceDetails = document.querySelector(".practice-collapsible");
     if (!input || !display) return;
     if (practiceDetails) {
@@ -29362,15 +29377,12 @@ class NeonRoadRally {
         trackSummary.textContent = `${track.name} Official 10`;
       }
       if (soloSetupActionSummary) {
-        soloSetupActionSummary.textContent = officialRoute ? getOfficialRouteDisplayName(officialRoute) : `${raceType.label} · ${track.name} · ${speedClass.label}`;
+        soloSetupActionSummary.textContent = officialRoute
+          ? `${getOfficialRouteDisplayName(officialRoute)} • ${raceType.label} • ${speedClass.label}`
+          : `Practice / Custom Seed • ${raceType.label} • ${speedClass.label}`;
       }
       if (soloSetupCompetitionLabel) {
-        soloSetupCompetitionLabel.textContent = `4 · ${competitionKind}`;
-      }
-      if (soloSetupActionSeed) {
-        soloSetupActionSeed.textContent = officialRoute
-          ? `${raceType.label} · ${speedClass.label} · ${getOfficialRouteDisplayFeelTag(officialRoute)}`
-          : `${raceType.label} · ${speedClass.label} · Practice ${normalized || "Random on start"}`;
+        soloSetupCompetitionLabel.textContent = competitionKind;
       }
       if (musicSummary) {
         musicSummary.textContent = getTrackMusicStatus(track);

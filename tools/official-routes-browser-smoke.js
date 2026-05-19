@@ -172,13 +172,15 @@ async function openSoloSetup(page) {
 async function assertNormalTrackCards(page, inputName = "preRaceTrack") {
   const cards = await page.$$eval(`input[name="${inputName}"]`, (nodes) => nodes.map((node) => ({
     id: node.value,
-    label: node.closest("[data-track-card]")?.textContent || ""
+    label: node.closest("[data-track-card]")?.textContent || "",
+    height: node.closest("[data-track-card]")?.getBoundingClientRect().height || 0
   })));
   assert(cards.length === NORMAL_TRACKS.length, `Expected ${NORMAL_TRACKS.length} normal track cards for ${inputName}`, { cards });
   for (const track of NORMAL_TRACKS) {
     const card = cards.find((item) => item.id === track.id);
     assert(card, `Missing normal track card: ${track.id}`, { cards });
     assertIncludes(card.label, track.name);
+    assert(card.height <= 70, "Track choices should stay compact", { track, card });
   }
 }
 
@@ -210,11 +212,38 @@ async function assertTrackOfficial10(page, trackId, label) {
   await selectTrack(page, trackId);
   const routes = TRACK_ROUTES[trackId];
   const text = await bodyText(page);
-  assertIncludes(text, `${label} Routes`);
+  assertIncludes(text, "Official Race");
+  assertIncludes(text, "Track");
+  assertIncludes(text, "Race Type");
+  assertIncludes(text, "Route");
+  assertIncludes(text, label);
   assertIncludes(text, "Practice / Custom Seed");
   assertNoNormalUiDebugTerms(text, `${label} setup`);
+  assert(!text.includes(routes[0].seed), "Main Official setup should hide raw route seeds", { route: routes[0].id, snippet: text.slice(0, 1200) });
   assert(!text.includes("Pursuit"), "Pursuit should not appear in normal setup", { snippet: text.slice(0, 1200) });
   assert(!text.includes("Boostline Prototype"), "Boostline prototype should not appear in normal setup", { snippet: text.slice(0, 1200) });
+  assert(!/\bArcade\b|\bPro\b/.test(text), "Arcade/Pro should stay inside collapsed Practice controls", { snippet: text.slice(0, 1200) });
+
+  const setupShape = await page.evaluate(() => {
+    const panel = document.querySelector(".pre-race-panel");
+    const summary = document.querySelector("#soloSetupActionSummary")?.textContent?.replace(/\s+/g, " ").trim() || "";
+    const raceButtons = Array.from(document.querySelectorAll('[data-race-type-choice="preRace"]')).map((node) => node.textContent.replace(/\s+/g, " ").trim());
+    const sectionLabels = Array.from(document.querySelectorAll(".official-setup-section .setup-section-heading .eyebrow")).map((node) => node.textContent.replace(/\s+/g, " ").trim());
+    return {
+      panelTitle: panel?.querySelector("h2")?.textContent?.trim() || "",
+      sectionLabels,
+      summary,
+      summaryCount: Array.from(panel?.querySelectorAll("*") || []).filter((node) => node.textContent?.replace(/\s+/g, " ").trim() === summary).length,
+      startBarCount: panel?.querySelectorAll(".solo-setup-action").length || 0,
+      stepStripCount: panel?.querySelectorAll(".setup-step-strip").length || 0,
+      raceButtons
+    };
+  });
+  assert(setupShape.panelTitle === "Official Race", "Official setup title should be simple", { setupShape });
+  assert(JSON.stringify(setupShape.sectionLabels) === JSON.stringify(["Track", "Race Type", "Route"]), "Official setup should use Track / Race Type / Route sections", { setupShape });
+  assert(setupShape.startBarCount === 1 && setupShape.stepStripCount === 0, "Official setup should use one start bar and no bulky step strip", { setupShape });
+  assert(setupShape.summaryCount === 1, "Start Race summary should appear once", { setupShape });
+  assert(JSON.stringify(setupShape.raceButtons) === JSON.stringify(["Classic", "Fuel Run"]), "Race Type should be a compact Classic/Fuel toggle", { setupShape });
 
   const practiceOpen = await page.$eval(".practice-collapsible", (node) => node.open);
   assert(!practiceOpen, "Practice / Custom Seed should be collapsed by default");
@@ -225,10 +254,15 @@ async function assertTrackOfficial10(page, trackId, label) {
   const routeLayout = await page.$eval(".official-route-list", (node) => {
     const rect = node.getBoundingClientRect();
     const style = window.getComputedStyle(node);
-    return { height: rect.height, columns: style.gridTemplateColumns.split(" ").filter(Boolean).length };
+    const rows = Array.from(node.querySelectorAll("[data-official-route-id]")).map((row) => row.getBoundingClientRect());
+    return {
+      height: rect.height,
+      columns: style.gridTemplateColumns.split(" ").filter(Boolean).length,
+      rowTops: Array.from(new Set(rows.map((row) => Math.round(row.top))))
+    };
   });
-  assert(routeLayout.height <= 360, "Official route list should avoid a huge-card layout", { routeLayout });
-  assert(routeLayout.columns === 1 || routeLayout.columns === 2, "Official route list should use one or two dense columns", { routeLayout });
+  assert(routeLayout.height <= 300, "Official route list should avoid a huge-card layout", { routeLayout });
+  assert(routeLayout.columns === 2 && routeLayout.rowTops.length === 5, "Official route list should use a dense two-column, five-row board on desktop", { routeLayout });
 
   const cards = await page.$$eval(".official-route-list [data-official-route-id]", (nodes) => (
     nodes.map((node) => ({
@@ -271,6 +305,12 @@ async function selectOfficialRoute(page, routeId) {
     { seed: route.seed, name: route.name },
     { timeout: 5000 }
   );
+  const selectedState = await page.$$eval(".official-route-list [data-official-route-id]", (nodes) => nodes.map((node) => ({
+    id: node.dataset.officialRouteId,
+    selected: node.classList.contains("is-selected")
+  })));
+  assert(selectedState.filter((item) => item.selected).length === 1, "One official route should be visibly selected", { selectedState });
+  assert(selectedState.some((item) => item.id === routeId && item.selected), "Selected route should match the clicked route", { selectedState, routeId });
 }
 
 async function finishCurrentRace(page, score, time, feedback = {}) {
@@ -337,6 +377,8 @@ async function runOfficialScenario(page, scenario, options = {}) {
   const readyText = await page.locator(".solo-setup-action").innerText();
   assertIncludes(readyText, "Official Race");
   assertIncludes(readyText, route.name);
+  assertIncludes(readyText, route.speedClass);
+  assert(!readyText.includes(route.seed), "Start Race summary should not expose raw official seeds", { readyText, routeId: route.id });
   await clickAction(page, "startSeededRace");
   const telemetry = await finishCurrentRace(page, scenario.score, scenario.time, scenario.feedback || {});
   const text = await bodyText(page);
@@ -410,12 +452,12 @@ async function runCustomScenario(page, options = {}) {
 
   await selectPracticeSpeed(page, "arcade");
   let readyText = await page.locator(".solo-setup-action").innerText();
-  assertIncludes(readyText, "Custom Road");
+  assertIncludes(readyText, "Practice / Custom Seed");
   assertIncludes(readyText, "Arcade");
 
   await selectPracticeSpeed(page, "pro");
   readyText = await page.locator(".solo-setup-action").innerText();
-  assertIncludes(readyText, "Custom Road");
+  assertIncludes(readyText, "Practice / Custom Seed");
   assertIncludes(readyText, "Pro");
 
   await selectPracticeSpeed(page, "turbo");
@@ -427,8 +469,9 @@ async function runCustomScenario(page, options = {}) {
     { timeout: 5000 }
   );
   readyText = await page.locator(".solo-setup-action").innerText();
-  assertIncludes(readyText, "Custom Road");
-  assertIncludes(readyText, seed);
+  assertIncludes(readyText, "Practice / Custom Seed");
+  assertIncludes(readyText, "Turbo");
+  assert(!readyText.includes(seed), "Practice start summary should not expose raw seeds", { readyText, seed });
   await clickAction(page, "startSeededRace");
   const telemetry = await finishCurrentRace(page, 98100, 48.321);
   const text = await bodyText(page);
