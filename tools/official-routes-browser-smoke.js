@@ -156,8 +156,8 @@ function assertNoNormalUiDebugTerms(text, label) {
     "migration",
     "signature",
     "hash",
+    "seed",
     "write",
-    "route seed",
     "snapshot",
     "internal",
     "telemetry",
@@ -183,14 +183,16 @@ async function openSoloSetup(page) {
 async function assertNormalTrackCards(page, inputName = "preRaceTrack") {
   const cards = await page.$$eval(`input[name="${inputName}"]`, (nodes) => nodes.map((node) => ({
     id: node.value,
-    label: node.closest("[data-track-card]")?.textContent || "",
-    height: node.closest("[data-track-card]")?.getBoundingClientRect().height || 0
+    label: node.closest("[data-track-card]")?.textContent.replace(/\s+/g, " ").trim() || "",
+    height: node.closest("[data-track-card]")?.getBoundingClientRect().height || 0,
+    descriptorCount: node.closest("[data-track-card]")?.querySelectorAll("em, small").length || 0
   })));
   assert(cards.length === NORMAL_TRACKS.length, `Expected ${NORMAL_TRACKS.length} normal track cards for ${inputName}`, { cards });
   for (const track of NORMAL_TRACKS) {
     const card = cards.find((item) => item.id === track.id);
     assert(card, `Missing normal track card: ${track.id}`, { cards });
-    assertIncludes(card.label, track.name);
+    assert(card.label === track.name, "Track choices should be name-only with no wrapped descriptors", { track, card });
+    assert(card.descriptorCount === 0, "Track choices should not render descriptor tags", { track, card });
     assert(card.height <= 70, "Track choices should stay compact", { track, card });
   }
 }
@@ -307,7 +309,7 @@ async function assertTrackOfficial10(page, trackId, label) {
   assertIncludes(text, "Race Type");
   assertIncludes(text, "Route");
   assertIncludes(text, label);
-  assertIncludes(text, "Practice / Custom Seed");
+  assertIncludes(text, "Custom Road");
   assertNoNormalUiDebugTerms(text, `${label} setup`);
   assert(!text.includes(routes[0].seed), "Main Official setup should hide raw route seeds", { route: routes[0].id, snippet: text.slice(0, 1200) });
   assert(!text.includes("Pursuit"), "Pursuit should not appear in normal setup", { snippet: text.slice(0, 1200) });
@@ -336,7 +338,7 @@ async function assertTrackOfficial10(page, trackId, label) {
   assert(JSON.stringify(setupShape.raceButtons) === JSON.stringify(["Classic", "Fuel Run"]), "Race Type should be a compact Classic/Fuel toggle", { setupShape });
 
   const practiceOpen = await page.$eval(".practice-collapsible", (node) => node.open);
-  assert(!practiceOpen, "Practice / Custom Seed should be collapsed by default");
+  assert(!practiceOpen, "Custom Road should be collapsed by default");
 
   const trackLayout = await page.$$eval("[data-track-card]", (nodes) => nodes.map((node) => node.getBoundingClientRect().height));
   assert(trackLayout.every((height) => height <= 90), "Track choices should be compact tiles", { trackLayout });
@@ -369,7 +371,6 @@ async function assertTrackOfficial10(page, trackId, label) {
     assert(card, `Missing official route row: ${route.id}`, { cards });
     assertIncludes(card.text, route.name);
     assertIncludes(card.text, route.speedClass);
-    assertIncludes(card.text, route.feelTag);
     assert(!card.text.includes(route.seed), "Official route setup cards should hide raw route seeds", { route, card: card.text });
     assert(!/Arcade|Pro/i.test(`${route.name} ${route.speedClass}`), "Official cards should not use Arcade/Pro", { route });
   }
@@ -467,7 +468,7 @@ async function assertPracticeOverridesOfficialLaunch(page, routeId, speedClassId
   assert(runState.officialRouteId === "", "Practice launch should not keep the selected Official route id", { runState, route });
   assert(runState.competitionKind === "Custom Road", "Practice launch should use Custom Road context", { runState, route });
   assert(runState.speedClassId === speedClassId, "Practice launch should use the selected custom speed", { runState, speedClassId });
-  assert(runState.seed === route.seed, "Practice launch should use the current custom seed input", { runState, route });
+  assert(runState.seed === route.seed, "Practice launch should use the current custom road code input", { runState, route });
   assert(!runState.routeSeedLocked, "Practice launch should not seed-lock an Official route", { runState, route });
   await returnToPreRace(page);
   await selectOfficialRoute(page, routeId);
@@ -601,7 +602,7 @@ async function selectPracticeSpeed(page, speedClassId) {
 async function expandPracticeSetup(page) {
   const details = page.locator(".practice-collapsible");
   const count = await details.count();
-  assert(count === 1, "Practice / Custom Seed section should exist", { count });
+  assert(count === 1, "Custom Road section should exist", { count });
   const open = await details.evaluate((node) => node.open);
   if (!open) {
     await page.locator(".practice-collapsible summary").click();
@@ -650,6 +651,7 @@ async function runCustomScenario(page, options = {}) {
   assertIncludes(text, "Custom Road Result");
   assertIncludes(text, "Custom Road");
   assertIncludes(text, seed);
+  assertNoNormalUiDebugTerms(text, "Custom Road result");
   assert(!text.includes("Official Race Result"), "Custom result should not present as Official Race");
   if (options.returnToSetup) {
     await clickAction(page, "preRace");
@@ -672,10 +674,10 @@ async function assertLeaderboards(page) {
   assertIncludes(text, "Neon Palm Sprint");
   assertIncludes(text, "Time Attack");
   assertIncludes(text, "Survival");
-  assertIncludes(text, "Bonus Score");
+  assertIncludes(text, "Endurance Score");
   assertNoNormalUiDebugTerms(text, "Score Attack board");
   const boardTabs = await page.$$eval(".chase-board-tabs .chase-board-card", (nodes) => nodes.map((node) => node.textContent.trim()));
-  assert(JSON.stringify(boardTabs) === JSON.stringify(["Time Attack", "Score Attack", "Survival", "Bonus Score"]), "Chase board tabs should be compact labels", { boardTabs });
+  assert(JSON.stringify(boardTabs) === JSON.stringify(["Time Attack", "Score Attack", "Survival", "Endurance Score"]), "Chase board tabs should be compact labels", { boardTabs });
   const firstLeaderboardRowTop = await page.$eval(".leaderboard-list .leaderboard-item", (node) => node.getBoundingClientRect().top);
   assert(firstLeaderboardRowTop < 760, "Leaderboard rows should start above the fold", { firstLeaderboardRowTop });
   const yourBestHeight = await page.$eval(".leaderboard-chase-summary", (node) => node.getBoundingClientRect().height);

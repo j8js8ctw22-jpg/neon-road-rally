@@ -260,11 +260,11 @@ async function main() {
           "route signature",
           "signature",
           "hash",
+          "seed",
           "progress hash",
           "signature hash",
           "post-finish write",
           "write",
-          "route seed",
           "snapshot",
           "telemetry",
           "version",
@@ -405,7 +405,7 @@ async function main() {
       assertCopyIncludes(survivalBoardCopy, "Time Attack", "Endurance Survival leaderboard");
       assertCopyIncludes(survivalBoardCopy, "Score Attack", "Endurance Survival leaderboard");
       assertCopyIncludes(survivalBoardCopy, "Survival", "Endurance Survival leaderboard");
-      assertCopyIncludes(survivalBoardCopy, "Bonus Score", "Endurance Survival leaderboard");
+      assertCopyIncludes(survivalBoardCopy, "Endurance Score", "Endurance Survival leaderboard");
       assertCopyIncludes(survivalBoardCopy, "Track", "Endurance Survival leaderboard");
       assertCopyIncludes(survivalBoardCopy, "Route", "Endurance Survival leaderboard");
       assertCopyIncludes(survivalBoardCopy, "Rules", "Endurance Survival leaderboard");
@@ -418,7 +418,7 @@ async function main() {
       assertCopyIncludes(survivalBoardCopy, "Your run", "Endurance Survival leaderboard");
       assertPlayerCopyClean(survivalBoardCopy, "Endurance Survival leaderboard");
       const enduranceScoreBoardCopy = renderLeaderboardCopy(first.app, LEADERBOARD_VIEW_ENDURANCE_SCORE, { officialRouteId: first.route.id });
-      assertCopyIncludes(enduranceScoreBoardCopy, "Bonus Score", "Endurance Score leaderboard");
+      assertCopyIncludes(enduranceScoreBoardCopy, "Endurance Score", "Endurance Score leaderboard");
       assertCopyIncludes(enduranceScoreBoardCopy, formatScore(first.app.lastSummary.officialEnduranceResult.postFinishScore), "Endurance Score leaderboard");
       assertPlayerCopyClean(enduranceScoreBoardCopy, "Endurance Score leaderboard");
       const timeBoardCopy = renderLeaderboardCopy(first.app, LEADERBOARD_VIEW_TIME_ATTACK, { officialRouteId: first.route.id });

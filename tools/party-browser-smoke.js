@@ -85,8 +85,8 @@ async function run() {
       "migration",
       "signature",
       "hash",
+      "seed",
       "write",
-      "route seed",
       "snapshot",
       "internal",
       "telemetry",
@@ -113,14 +113,15 @@ async function run() {
   async function assertPartyTrackSelection() {
     const cards = await page.$$eval('input[name="partyTrack"]', (nodes) => nodes.map((node) => ({
       id: node.value,
-      label: node.closest("[data-track-card]")?.textContent || ""
+      label: node.closest("[data-track-card]")?.textContent.replace(/\s+/g, " ").trim() || "",
+      descriptorCount: node.closest("[data-track-card]")?.querySelectorAll("em, small").length || 0
     })));
     if (cards.length !== NORMAL_TRACKS.length) {
       throw new Error(`Party setup expected ${NORMAL_TRACKS.length} normal tracks, saw ${cards.length}: ${JSON.stringify(cards)}`);
     }
     for (const track of NORMAL_TRACKS) {
       const card = cards.find((item) => item.id === track.id);
-      if (!card || !card.label.includes(track.name)) {
+      if (!card || card.label !== track.name || card.descriptorCount !== 0) {
         throw new Error(`Party setup missing normal track ${track.name}: ${JSON.stringify(cards)}`);
       }
       await page.locator(`[data-track-card="${track.id}"]`).click();
@@ -214,7 +215,7 @@ async function run() {
       manageOpen: document.querySelector(".party-manage-details")?.open ?? true,
       optionsOpen: document.querySelector(".party-options-panel")?.open ?? true,
       visibleManagementCopy: /Rename|Remove|Up|Down/.test(text),
-      hiddenOptionsCopyVisible: /Round|Seed Text|Roster Order|Random Once|Random Every Round/.test(text)
+      hiddenOptionsCopyVisible: /Round|Road Code|Roster Order|Random Once|Random Every Round/.test(text)
     };
   });
   if (JSON.stringify(partySetupUi.sectionLabels) !== JSON.stringify(["Drivers", "Shared Race"])) {

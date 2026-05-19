@@ -1056,8 +1056,8 @@ button {
   display: grid;
   grid-template-areas:
     "number name speed"
-    "number tag best";
-  grid-template-columns: 32px minmax(0, 1fr) minmax(72px, 0.52fr);
+    "number name best";
+  grid-template-columns: 32px minmax(0, 1fr) minmax(76px, 0.46fr);
   column-gap: 8px;
   row-gap: 2px;
   align-items: center;
@@ -1113,7 +1113,6 @@ button {
 }
 
 .official-route-speed,
-.official-route-row em,
 .official-route-row small {
   min-width: 0;
   max-width: 100%;
@@ -1129,12 +1128,6 @@ button {
   color: var(--cyan);
   justify-self: end;
   text-align: right;
-}
-
-.official-route-row em {
-  grid-area: tag;
-  color: var(--muted);
-  font-style: normal;
 }
 
 .official-route-row small {
@@ -2247,6 +2240,14 @@ button:disabled {
 
 .leaderboard-extra-details {
   margin-top: 4px;
+}
+
+.leaderboard-route-details {
+  margin-top: 8px;
+}
+
+.leaderboard-route-details .official-route-list {
+  margin-top: 8px;
 }
 
 .leaderboard-rank {
@@ -4088,13 +4089,11 @@ button:disabled {
     grid-template-areas:
       "number name"
       "number speed"
-      "number tag"
       "number best";
     grid-template-columns: 32px minmax(0, 1fr);
   }
 
   .official-route-speed,
-  .official-route-row em,
   .official-route-row small {
     justify-self: start;
     text-align: left;

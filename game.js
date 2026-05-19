@@ -2082,8 +2082,8 @@ const PARTY_ROUND_TYPES = [
 ];
 const PARTY_RACE_TYPE_IDS = [DEFAULT_RACE_TYPE_ID, FUEL_RUN_RACE_TYPE_ID];
 const PARTY_SEED_MODES = [
-  { id: PARTY_SEED_MODE_SAME_ROUND, label: "Same Seed for Round" },
-  { id: PARTY_SEED_MODE_NEW_ROUND, label: "New Seed Each Round" }
+  { id: PARTY_SEED_MODE_SAME_ROUND, label: "Same Road for Round" },
+  { id: PARTY_SEED_MODE_NEW_ROUND, label: "New Road Each Round" }
 ];
 const PARTY_STARTING_ORDER_MODES = [
   { id: PARTY_STARTING_ORDER_MODE_ROSTER, label: "Roster Order", helper: "Use the selected roster order every round." },
@@ -2198,7 +2198,7 @@ const PARTY_SETUP_HELP_ITEMS = [
   { title: "Best of 3", text: "each player gets 3 tries; best score wins." },
   { title: "Total Score", text: "all runs add together." },
   { title: "Fuel Run", text: "collect gas cans and survive to the finish; running out ends the run." },
-  { title: "Same Seed", text: "everyone races the same road." },
+  { title: "Same Road", text: "everyone races the same road." },
   { title: "Random Once", text: "shuffle the first turn order, then keep it." },
   { title: "Random Every Round", text: "shuffle again before each new round." }
 ];
@@ -3753,15 +3753,15 @@ const CHALLENGES = [
   },
   {
     id: "party-seed-sampler",
-    name: "Party Seed Sampler",
-    description: "A fixed Sunset seed for future side-by-side comparison.",
+    name: "Party Road Sampler",
+    description: "A fixed Sunset road for future side-by-side comparison.",
     trackId: "sunset-highway",
     raceType: "classic",
     raceMode: "pro",
     seed: "PARTY-SEED",
     difficulty: "Normal",
     objective: { type: "reachProgress", label: "Reach 50% progress", targetPercent: 50 },
-    purpose: "A good fixed seed for future Party Mode comparison"
+    purpose: "A good fixed road for future Party Mode comparison"
   },
   {
     id: "the-dare",
@@ -4851,8 +4851,8 @@ function formatPreRaceStartSummary(officialRoute, track, raceType, speedClass, s
   if (officialRoute) {
     return `${getOfficialRouteDisplayName(officialRoute)} • ${raceType.label} • ${speedClass.label}`;
   }
-  const seedText = normalizeRoadSeed(seed, "") || "Random seed";
-  return `${track.name} • ${raceType.label} • ${speedClass.label} • ${seedText}`;
+  const roadCodeText = normalizeRoadSeed(seed, "") || "Random road";
+  return `${track.name} • ${raceType.label} • ${speedClass.label} • ${roadCodeText}`;
 }
 
 function trackSupportsRaceType(track = TRACKS[0], raceTypeId = DEFAULT_RACE_TYPE_ID) {
@@ -23159,7 +23159,7 @@ class NeonRoadRally {
           <span><strong>Race Type</strong>${escapeHtml(getRaceTypeLabel(challenge.raceType || DEFAULT_RACE_TYPE_ID))}</span>
           <span><strong>Speed Class</strong>${escapeHtml(getSpeedClassLabel(challenge.raceMode))}</span>
           <span><strong>Difficulty</strong>${escapeHtml(getChallengeDifficultyLabel(challenge))}</span>
-          <span><strong>Fixed Seed</strong>${escapeHtml(normalizeRoadSeed(challenge.seed, DEFAULT_ROAD_SEED))}</span>
+          <span><strong>Road Code</strong>${escapeHtml(normalizeRoadSeed(challenge.seed, DEFAULT_ROAD_SEED))}</span>
           <span><strong>Status</strong>${escapeHtml(statusText)}</span>
           <span><strong>Best Score</strong>${escapeHtml(bestScore)}</span>
           <span><strong>Best Progress</strong>${escapeHtml(bestProgress)}</span>
@@ -27249,7 +27249,7 @@ class NeonRoadRally {
           <span><strong>Race Type</strong>${escapeHtml(raceTypeLabel)}</span>
           <span><strong>Speed Class</strong>${escapeHtml(speedLabel)}</span>
           ${isPartyPick ? `<span><strong>Party Type</strong>${escapeHtml(partyRoundLabel)}</span>` : ""}
-          ${isPartyPick ? `<span><strong>Seed</strong>${escapeHtml(partySeedLabel)}</span>` : ""}
+          ${isPartyPick ? `<span><strong>Road</strong>${escapeHtml(partySeedLabel)}</span>` : ""}
         </div>
         ${pick.note ? `<p class="playtest-pick-note">${escapeHtml(pick.note)}</p>` : ""}
         ${includeActions ? `
@@ -27333,7 +27333,7 @@ class NeonRoadRally {
             "Classic and Fuel Run are the core race types.",
             "Score Attack is highest score wins.",
             "Time Attack is fastest finished run wins.",
-            "Same seed means same road, so you can practice exact routes and chase records."
+            "Same road code means same road, so you can practice exact routes and chase records."
           ]
         },
         {
@@ -27377,9 +27377,9 @@ class NeonRoadRally {
         },
         {
           title: "Challenge Mode",
-          chips: ["Fixed Seeds", "Objectives", "Practice"],
+          chips: ["Fixed Roads", "Objectives", "Practice"],
           points: [
-            "Challenge Mode uses fixed seeds and specific objectives.",
+            "Challenge Mode uses fixed road codes and specific objectives.",
             "It is good for replay, practice, and learning a track without changing the setup every run."
           ]
         }
@@ -27387,10 +27387,10 @@ class NeonRoadRally {
       party: [
         {
           title: "Party Mode",
-          chips: ["Local", "Pass Keyboard", "Same Seed"],
+          chips: ["Local", "Pass Keyboard", "Same Road"],
           points: [
             "Party Mode is local pass-the-keyboard competition on one computer.",
-            "Players use the same seed for fair comparison.",
+            "Players use the same road for fair comparison.",
             "One Run Each, Best of 3, and Total Score decide the winner by highest score.",
             "Party Fuel: Take turns in Fuel Run and see who can survive longest or score highest."
           ]
@@ -27543,7 +27543,7 @@ class NeonRoadRally {
           <div class="eyebrow">Local Arcade Racer</div>
           <h1 class="game-title"><span>Neon</span><span>Road</span><span>Rally</span></h1>
           <p class="subtitle title-tagline">Five tracks. One clean line. Beat the board.</p>
-          <p class="subtitle">Official Race is the main route board. Practice / Custom Seed is optional.</p>
+          <p class="subtitle">Official Race is the main route board. Custom Road is optional practice.</p>
           <div class="title-status-grid">
             <div class="title-status-card ${player ? "title-driver-status" : ""}">
               <div>
@@ -29111,7 +29111,7 @@ class NeonRoadRally {
       <div class="track-select-grid" role="radiogroup" aria-label="Track Select">
         ${TRACKS.map((track) => {
           const selected = track.id === selectedId;
-          const modes = Array.isArray(track.recommendedModes) ? track.recommendedModes.join(" | ") : "Solo / Seeded Run";
+          const modes = Array.isArray(track.recommendedModes) ? track.recommendedModes.join(" | ") : "Solo / Custom Road";
           const fuelReady = trackSupportsRaceType(track, FUEL_RUN_RACE_TYPE_ID);
           const supportLabel = fuelReady ? "Classic / Fuel" : "Classic";
           const tagLabel = flavor ? getTrackArcadeFlavorTag(track) : supportLabel;
@@ -29120,7 +29120,7 @@ class NeonRoadRally {
               <input type="radio" name="${escapeAttr(name)}" value="${escapeAttr(track.id)}" ${selected ? "checked" : ""}>
               <span class="track-option-title">
                 <strong>${escapeHtml(track.name)}</strong>
-                ${simple && !flavor ? "" : `<em>${escapeHtml(tagLabel)}</em>`}
+                ${simple ? "" : `<em>${escapeHtml(tagLabel)}</em>`}
               </span>
               ${compact ? "" : `
                 <span>${escapeHtml(track.cardIdentity || track.description)}</span>
@@ -29215,7 +29215,7 @@ class NeonRoadRally {
         <div class="form-stack official-race-flow">
           <div class="official-setup-title-row">
             <div>
-              <span class="eyebrow">Official Race</span>
+              <span class="eyebrow">Race Board</span>
               <h2>Official Race</h2>
             </div>
             <button class="small-button" data-action="title">Back</button>
@@ -29232,14 +29232,14 @@ class NeonRoadRally {
           <section class="official-setup-section">
             <div class="setup-section-heading">
               <span class="eyebrow">Track</span>
-              <strong>Pick a board.</strong>
+              <strong>${escapeHtml(track.name)}</strong>
             </div>
             ${this.renderTrackSelect("preRaceTrack", track.id, { compact: true, simple: true, flavor: true })}
           </section>
           <section class="official-setup-section">
             <div class="setup-section-heading">
               <span class="eyebrow">Race Type</span>
-              <strong>Classic or Fuel Run.</strong>
+              <strong>${escapeHtml(raceType.label)}</strong>
             </div>
             <div class="field official-rules-field">
               <label class="setup-hidden-label" for="preRaceType">Race Type</label>
@@ -29258,29 +29258,29 @@ class NeonRoadRally {
           </section>
           <details class="practice-setup-panel practice-collapsible" ${this.practiceSetupExpanded ? "open" : ""}>
             <summary>
-              <span>Practice / Custom Seed</span>
-              <small>Optional</small>
+              <span>Custom Road</span>
+              <small>Practice</small>
             </summary>
             <div class="practice-setup-body">
               <div class="field">
-                <label for="preRaceSpeedClass">Practice Speed</label>
+                <label for="preRaceSpeedClass">Speed</label>
                 ${this.renderSpeedClassLadder(track, speedClass.id)}
                 <select id="preRaceSpeedClass" class="setup-hidden-select" aria-hidden="true" tabindex="-1">
                   ${this.renderSpeedClassOptionsForTrack(track, speedClass.id)}
                 </select>
               </div>
               <div class="seed-display" aria-live="polite">
-                <span>Seed</span>
+                <span>Road Code</span>
                 <strong id="roadSeedDisplay">${escapeHtml(seed)}</strong>
               </div>
               <div class="field">
-                <label for="roadSeedInput">Type a Seed</label>
+                <label for="roadSeedInput">Road Code</label>
                 <input id="roadSeedInput" type="text" maxlength="${ROAD_SEED_MAX_LENGTH}" value="${escapeAttr(seed)}" autocomplete="off" spellcheck="false" inputmode="text">
               </div>
               <input id="officialRouteInput" type="hidden" value="${escapeAttr(officialRoute?.id || "")}">
               <p id="fuelRunBoostHint" class="hint" ${raceType.id === FUEL_RUN_RACE_TYPE_ID ? "" : "hidden"}>Fuel: grab gas cans; empty tank ends the run.</p>
               <div class="row setup-action-row">
-                <button class="small-button" data-action="randomSeed">Random Seed</button>
+                <button class="small-button" data-action="randomSeed">Random Road</button>
                 <button class="small-button" data-action="howToPlay">How To Play</button>
                 <button class="small-button" data-action="title">Back to Title</button>
               </div>
@@ -29367,12 +29367,12 @@ class NeonRoadRally {
       this.pendingRaceTypeId = raceType.id;
       this.pendingTrackId = track.id;
       this.syncModeLadderMetrics(track);
-      display.textContent = normalized || "Random seed on start";
+      display.textContent = normalized || "Random road on start";
       if (seedSummary) {
-        seedSummary.textContent = officialRoute ? "Official route" : (normalized || "Random on start");
+        seedSummary.textContent = officialRoute ? "Official route" : (normalized || "Random road on start");
       }
       if (seedLabel) {
-        seedLabel.textContent = officialRoute ? "Route Lock" : "Seed";
+        seedLabel.textContent = officialRoute ? "Route Lock" : "Road Code";
       }
       if (routeSummary) {
         routeSummary.textContent = officialRoute ? getOfficialRouteDisplayName(officialRoute) : competitionKind;
@@ -29501,7 +29501,7 @@ class NeonRoadRally {
     this.pendingOfficialRouteId = "";
     this.preRaceLaunchContext = "practice";
     this.practiceSetupExpanded = true;
-    this.showPreRaceScreen("Custom Road seed ready.");
+    this.showPreRaceScreen("Custom Road ready.");
   }
 
   handleStartSeededRace() {
@@ -29765,7 +29765,7 @@ class NeonRoadRally {
           <section class="party-setup-section">
             <div class="setup-section-heading">
               <span class="eyebrow">Shared Race</span>
-              <strong>Track, type, and speed.</strong>
+              <strong>${escapeHtml(track.name)} · ${escapeHtml(partyRaceType.label)} · ${escapeHtml(getSpeedClassLabel(setup.raceMode))}</strong>
             </div>
             <div class="field party-field-compact">
               <label>Track</label>
@@ -29797,7 +29797,7 @@ class NeonRoadRally {
                   </select>
                 </div>
                 <div class="field">
-                  <label for="partySeedMode">Seed</label>
+                  <label for="partySeedMode">Road</label>
                   <select id="partySeedMode">
                     ${PARTY_SEED_MODES.map((item) => `<option value="${escapeAttr(item.id)}" ${item.id === setup.seedMode ? "selected" : ""}>${escapeHtml(item.label)}</option>`).join("")}
                   </select>
@@ -29809,12 +29809,12 @@ class NeonRoadRally {
                   </select>
                 </div>
                 <div class="field">
-                  <label for="partySeedInput">Seed Text</label>
+                  <label for="partySeedInput">Road Code</label>
                   <input id="partySeedInput" type="text" maxlength="${ROAD_SEED_MAX_LENGTH}" value="${escapeAttr(setup.sharedSeed)}" autocomplete="off" spellcheck="false" inputmode="text">
                 </div>
               </div>
               <div class="row setup-action-row">
-                <button class="small-button" data-action="partyRandomSeed">Random Seed</button>
+                <button class="small-button" data-action="partyRandomSeed">Random Road</button>
               </div>
             </details>
           </section>
@@ -29861,8 +29861,8 @@ class NeonRoadRally {
       const raceTypeConfig = getRaceTypeConfig(selectedRaceType);
       this.syncModeLadderMetrics(track);
       this.syncModeLadderSelection(mode);
-      if (display) display.textContent = normalized || "Random seed on start";
-      if (partySeedSummary) partySeedSummary.textContent = normalized || "Random on start";
+      if (display) display.textContent = normalized || "Random road on start";
+      if (partySeedSummary) partySeedSummary.textContent = normalized || "Random road on start";
       if (trackSummary) trackSummary.textContent = track.name;
       if (raceTypeSummary) raceTypeSummary.textContent = raceTypeConfig.label;
       if (speedSummary) speedSummary.textContent = getSpeedClassLabel(mode);
@@ -29877,8 +29877,8 @@ class NeonRoadRally {
       if (seedModeSummary) seedModeSummary.textContent = getPartySeedModeLabel(seedMode?.value || this.getPartySetup().seedMode);
       if (seedModeHint) {
         seedModeHint.textContent = normalizePartySeedMode(seedMode?.value || this.getPartySetup().seedMode) === PARTY_SEED_MODE_SAME_ROUND
-          ? "Same seed is fairest for serious competition."
-          : "New seed each round is more chaotic.";
+          ? "Same road is fairest for serious competition."
+          : "New road each round is more chaotic.";
       }
       if (startingOrderSummary) startingOrderSummary.textContent = getPartyStartingOrderLabel(startingOrder?.value || this.getPartySetup().startingOrderMode);
       if (startingOrderHint) startingOrderHint.textContent = getPartyStartingOrderHelperText(startingOrder?.value || this.getPartySetup().startingOrderMode);
@@ -29887,7 +29887,7 @@ class NeonRoadRally {
         partySetupActionSummary.textContent = `${driverCount} ${driverCount === 1 ? "driver" : "drivers"} · ${raceTypeConfig.label} · ${track.name} · ${getSpeedClassLabel(mode)}`;
       }
       if (partySetupActionSeed) {
-        partySetupActionSeed.textContent = `${getPartyRoundTypeLabel(roundType?.value || this.getPartySetup().roundType)} · ${getPartyStartingOrderLabel(startingOrder?.value || this.getPartySetup().startingOrderMode)} · Seed ${normalized || "Random on start"}`;
+        partySetupActionSeed.textContent = `${getPartyRoundTypeLabel(roundType?.value || this.getPartySetup().roundType)} · ${getPartyStartingOrderLabel(startingOrder?.value || this.getPartySetup().startingOrderMode)} · ${normalized || "Random road on start"}`;
       }
     };
     const syncTrackDependentControls = () => {
@@ -30068,7 +30068,7 @@ class NeonRoadRally {
   handlePartyRandomSeed() {
     this.readPartySetupForm();
     this.getPartySetup().sharedSeed = generateReadableRoadSeed();
-    this.showPartySetupScreen("Random party seed ready.");
+    this.showPartySetupScreen("Random road ready.");
   }
 
   handlePartyStartRound() {
@@ -30255,9 +30255,9 @@ class NeonRoadRally {
             <div class="score-card"><strong>Track</strong><span>${escapeHtml(session.track.name)}</span></div>
             <div class="score-card"><strong>Race Type</strong><span>${escapeHtml(getRaceTypeLabel(session.raceType))}</span></div>
             <div class="score-card"><strong>Speed Class</strong><span>${escapeHtml(getSpeedClassLabel(session.raceMode))}</span></div>
-            <div class="score-card"><strong>Current Seed</strong><span>${escapeHtml(roundSeed)}</span></div>
+            <div class="score-card"><strong>Road Code</strong><span>${escapeHtml(roundSeed)}</span></div>
             <div class="score-card"><strong>Round Type</strong><span>${escapeHtml(getPartyRoundTypeLabel(session.roundType))}</span></div>
-            <div class="score-card"><strong>Seed Behavior</strong><span>${escapeHtml(getPartySeedModeLabel(session.seedMode))}</span></div>
+            <div class="score-card"><strong>Road Rule</strong><span>${escapeHtml(getPartySeedModeLabel(session.seedMode))}</span></div>
             <div class="score-card"><strong>Starting Order</strong><span>${escapeHtml(getPartyStartingOrderLabel(session.startingOrderMode))}</span></div>
           </div>
           ${this.renderPartyTurnOrderPanel(session)}
@@ -30996,7 +30996,7 @@ class NeonRoadRally {
           if (gasMissed > 0) add("Fuel chances missed", `${gasMissed} gas can${gasMissed === 1 ? "" : "s"} left on the road.`);
         }
       } else if (status === "outOfFuel") {
-        add("Out of fuel", "Grab gas cans earlier or rerun the same seed to plan the route.");
+        add("Out of fuel", "Grab gas cans earlier or replay the same road to plan the route.");
         const gasMissed = Math.max(0, (summary.gasCansSpawned || 0) - (summary.gasCansCollected || 0));
         if (summary.raceTypeId === FUEL_RUN_RACE_TYPE_ID
           && gasMissed === 0
@@ -31007,7 +31007,7 @@ class NeonRoadRally {
         if (missedBoosts > 0) add("Missed reachable boosts", "Boost route also had reachable pads left behind.");
       } else {
         const crashLabel = progress >= 0.72 ? "Late crash" : (progress <= 0.35 ? "Early crash" : "Crash ended run");
-        add(crashLabel, `${Math.round(progress * 100)}% progress. Rerun the same seed to practice the trouble spot.`);
+        add(crashLabel, `${Math.round(progress * 100)}% progress. Replay the same road to practice the trouble spot.`);
         if (missedBoosts > 0) add("Missed reachable boosts", "Reachable boost pads were left before the run ended.");
       }
       if (!items.length) add("Next target", "Chase a cleaner line, stronger boost route, or faster finish.");
@@ -31108,7 +31108,7 @@ class NeonRoadRally {
             <span class="eyebrow">${final ? "Party Winner" : "Current Party Race"}</span>
             <h2>${final && leader ? escapeHtml(leader.playerName) : "Party Standings"}</h2>
             ${final && leader ? `<div class="party-winner-banner"><strong>${escapeHtml(leader.playerName)}</strong><span>${escapeHtml(session.scoringLabel)} ${formatScore(leader.rankScore)}</span></div>` : ""}
-            <p class="hint">${escapeHtml(getPartyRoundTypeLabel(session.roundType))} · ${escapeHtml(session.track.name)} · ${escapeHtml(getRaceTypeLabel(session.raceType))} · ${escapeHtml(getSpeedClassLabel(session.raceMode))} · ${final ? "Final seed" : `Round ${session.roundNumber} seed`} ${escapeHtml(roundSeed)}</p>
+            <p class="hint">${escapeHtml(getPartyRoundTypeLabel(session.roundType))} · ${escapeHtml(session.track.name)} · ${escapeHtml(getRaceTypeLabel(session.raceType))} · ${escapeHtml(getSpeedClassLabel(session.raceMode))} · ${final ? "Final road" : `Round ${session.roundNumber} road`} ${escapeHtml(roundSeed)}</p>
             <p class="hint">${escapeHtml(getPartySeedModeLabel(session.seedMode))} · Starting order: ${escapeHtml(getPartyStartingOrderLabel(session.startingOrderMode))} · ${session.completedRuns}/${session.totalRuns} runs complete</p>
             ${partyCallouts}
             ${this.renderTitleCallouts(summary) || summary?.newlyEarnedBadges?.length ? `<div class="score-callout-row">${this.renderTitleCallouts(summary)}${this.renderNewBadgeCallouts(summary)}</div>` : ""}
@@ -31127,7 +31127,7 @@ class NeonRoadRally {
             <div>
               <span class="eyebrow">Latest Run</span>
               <strong>${escapeHtml(summary.playerName)}</strong>
-              <span class="meta">${escapeHtml(summary.carName)} · Round ${summary.partyRoundIndex || recentResult?.roundNumber || 1} · Seed ${escapeHtml(summary.partySeed || summary.seed)} · ${escapeHtml(getRunStatusLabel(summary.status, summary.reason))} · ${formatRunElapsedTime(summary)}</span>
+              <span class="meta">${escapeHtml(summary.carName)} · Round ${summary.partyRoundIndex || recentResult?.roundNumber || 1} · ${escapeHtml(summary.partySeed || summary.seed)} · ${escapeHtml(getRunStatusLabel(summary.status, summary.reason))} · ${formatRunElapsedTime(summary)}</span>
             </div>
             <div class="party-last-score">
               <span data-tally-value="${escapeAttr(summary.finalScore)}">${formatScore(summary.finalScore)}</span>
@@ -31155,8 +31155,8 @@ class NeonRoadRally {
         ${this.renderPartyAwardsPanel(session)}
         <div class="party-action-row">
           ${final ? `
-            <button class="small-button primary" data-action="partyRematchSameSeed">Rematch Same Seed</button>
-            <button class="small-button primary" data-action="partyRematchNewSeed">Rematch New Seed</button>
+            <button class="small-button primary" data-action="partyRematchSameSeed">Rematch Same Road</button>
+            <button class="small-button primary" data-action="partyRematchNewSeed">Rematch New Road</button>
             <button class="small-button" data-action="partyChangeSetup">Change Setup</button>
             <button class="small-button" data-action="title">Back to Title</button>
           ` : `
@@ -31165,7 +31165,7 @@ class NeonRoadRally {
             <button class="small-button" data-action="title">Back to Title</button>
           `}
         </div>
-        ${!final && nextPlayer ? `<p class="hint next-player-hint">Next up: ${escapeHtml(nextPlayer.name)} · ${escapeHtml(getPartyStartingOrderLabel(session.startingOrderMode))} · Round ${session.roundNumber} seed ${escapeHtml(roundSeed)}. Press Enter to continue.</p>` : `<p class="hint next-player-hint">Press Enter for a same-seed rematch.</p>`}
+        ${!final && nextPlayer ? `<p class="hint next-player-hint">Next up: ${escapeHtml(nextPlayer.name)} · ${escapeHtml(getPartyStartingOrderLabel(session.startingOrderMode))} · Round ${session.roundNumber} road ${escapeHtml(roundSeed)}. Press Enter to continue.</p>` : `<p class="hint next-player-hint">Press Enter for a same-road rematch.</p>`}
         <p class="status-line">${escapeHtml(message)}</p>
       </section>
     `;
@@ -31197,7 +31197,7 @@ class NeonRoadRally {
     };
     this.pendingRoadSeed = this.partySession.sharedSeed;
     this.pendingRaceTypeId = this.partySession.raceType;
-    this.showPartyTurnScreen(useSameSeed ? "Rematch with the same settings and seed set." : "Rematch with the same settings and new seed.");
+    this.showPartyTurnScreen(useSameSeed ? "Rematch with the same road." : "Rematch with a new road.");
   }
 
   handlePartyChangeSetup() {
@@ -31979,7 +31979,7 @@ class NeonRoadRally {
       },
       {
         view: LEADERBOARD_VIEW_ENDURANCE_SCORE,
-        title: "Bonus Score"
+        title: "Endurance Score"
       }
     ];
     return `
@@ -31997,7 +31997,7 @@ class NeonRoadRally {
     const activeView = this.normalizeLeaderboardView(view);
     if (activeView === LEADERBOARD_VIEW_TIME_ATTACK) return "Time Attack";
     if (activeView === LEADERBOARD_VIEW_ENDURANCE_SURVIVAL) return "Survival";
-    if (activeView === LEADERBOARD_VIEW_ENDURANCE_SCORE) return "Bonus Score";
+    if (activeView === LEADERBOARD_VIEW_ENDURANCE_SCORE) return "Endurance Score";
     return "Score Attack";
   }
 
@@ -32183,11 +32183,6 @@ class NeonRoadRally {
           <strong>${escapeHtml(leader.value)}</strong>
           <small>${escapeHtml(leader.detail)}</small>
         </div>
-        <div>
-          <span>Route</span>
-          <strong>${escapeHtml(route ? getOfficialRouteDisplayName(route) : "Pick a route")}</strong>
-          <small>${escapeHtml(route ? `${route.speedClassLabel} · ${getOfficialRouteDisplayFeelTag(route)}` : this.getLeaderboardPrimaryLabel(activeView))}</small>
-        </div>
       </div>
     `;
   }
@@ -32216,18 +32211,12 @@ class NeonRoadRally {
     return `
       <div class="official-route-grid official-route-list compact-official-route-grid" aria-label="Official routes">
         ${routes.map((route, index) => {
-          const stats = this.getOfficialRouteRecordSummary(route, raceTypeId);
-          const routeStatText = view === LEADERBOARD_VIEW_TIME_ATTACK
-            ? stats.leaderTimeText
-            : (view === LEADERBOARD_VIEW_ENDURANCE_SURVIVAL
-              ? stats.leaderSurvivalText
-              : (view === LEADERBOARD_VIEW_ENDURANCE_SCORE ? stats.leaderEnduranceScoreText : stats.leaderScoreText));
+          const routeStatText = this.getOfficialRouteSetupPbText(route, raceTypeId);
           return `
             <button class="official-route-row is-${escapeAttr(route.speedClassId)} ${route.id === selectedId ? "is-selected" : ""}" type="button" data-action="leaderboard" data-view="${escapeAttr(view)}" data-official-route-id="${escapeAttr(route.id)}" data-race-type-id="${escapeAttr(raceTypeId)}">
               <span class="official-route-number">${String(index + 1).padStart(2, "0")}</span>
               <strong>${escapeHtml(getOfficialRouteDisplayName(route))}</strong>
               <span class="official-route-speed">${escapeHtml(route.speedClassLabel)}</span>
-              <em>${escapeHtml(getOfficialRouteDisplayFeelTag(route))}</em>
               <small>${escapeHtml(routeStatText)}</small>
             </button>
           `;
@@ -32250,7 +32239,6 @@ class NeonRoadRally {
             <span class="official-route-number">${String(index + 1).padStart(2, "0")}</span>
             <strong>${escapeHtml(getOfficialRouteDisplayName(route))}</strong>
             <span class="official-route-speed">${escapeHtml(route.speedClassLabel)}</span>
-            <em>${escapeHtml(getOfficialRouteDisplayFeelTag(route))}</em>
             <small>${escapeHtml(pbText)}</small>
           </button>
         `;
@@ -32640,8 +32628,6 @@ class NeonRoadRally {
         <h2>Route Boards</h2>
         ${this.renderLeaderboardTabs(activeView)}
         ${this.renderLeaderboardFilterSummary(boardFilter, activeView)}
-        ${enduranceView ? "" : this.renderOfficialRouteRaceTypeButtons(boardFilter.raceTypeId, "leaderboard")}
-        ${this.renderOfficialRoutePicker(officialRoute?.id || DEFAULT_OFFICIAL_ROUTE_ID, activeView, { trackId: boardFilter.trackId, raceTypeId: boardFilter.raceTypeId })}
         ${this.renderLeaderboardYourBestPanel(officialRoute, activeView, boardFilter.raceTypeId)}
         <div class="leaderboard-section-heading">
           <span class="eyebrow">${escapeHtml(leaderboardTitle)}</span>
@@ -32650,6 +32636,11 @@ class NeonRoadRally {
         <ol class="leaderboard-list">
           ${mainRows}
         </ol>
+        <details class="result-details-block leaderboard-route-details">
+          <summary>Change Route</summary>
+          ${enduranceView ? "" : this.renderOfficialRouteRaceTypeButtons(boardFilter.raceTypeId, "leaderboard")}
+          ${this.renderOfficialRoutePicker(officialRoute?.id || DEFAULT_OFFICIAL_ROUTE_ID, activeView, { trackId: boardFilter.trackId, raceTypeId: boardFilter.raceTypeId })}
+        </details>
         ${timeExtras}
         ${scoreExtras}
         <div class="row" style="margin-top:16px">
@@ -32737,7 +32728,7 @@ class NeonRoadRally {
     const officialRouteDisplayName = getOfficialRouteEntryDisplayName(summary);
     const routeLine = summary.officialRouteId
       ? officialRouteDisplayName
-      : `Practice · ${summary.seed}`;
+      : `Custom Road · ${summary.seed}`;
     const setupLine = `${summary.trackName} · ${summary.raceTypeLabel || getRaceTypeLabel(summary.raceTypeId)} · ${summary.speedClassLabel}`;
     const timeAttackLabel = enduranceResult ? "Official Time" : (status === "finished" ? (boostlineRun ? "Finish Time" : "Time Attack") : "Progress");
     const timeAttackValue = enduranceResult || status === "finished" ? resultTimeText : `${progressPercent}%`;
@@ -32797,9 +32788,6 @@ class NeonRoadRally {
             </div>
           </div>
         </div>
-        ${resultDetailPanel}
-        ${this.renderPursuitResultPanel(summary)}
-        ${this.renderChallengeResultPanel(summary)}
         <div class="row score-action-row">
           <button class="small-button primary" data-action="restart">${escapeHtml(restartLabel)}</button>
           ${summary.partyMode ? "" : `<button class="small-button" data-action="preRace">Change Route</button>`}
@@ -32807,6 +32795,9 @@ class NeonRoadRally {
 	          <button class="small-button" data-action="players">Driver Garage</button>
           <button class="small-button" data-action="title">Back to Title</button>
         </div>
+        ${resultDetailPanel}
+        ${this.renderPursuitResultPanel(summary)}
+        ${this.renderChallengeResultPanel(summary)}
         <details class="result-details-block">
           <summary>Details</summary>
           <h2>Score Breakdown</h2>
@@ -32857,7 +32848,7 @@ class NeonRoadRally {
           <div class="score-card"><strong>Track</strong><span>${escapeHtml(summary.trackName)}</span></div>
           <div class="score-card"><strong>Race Type</strong><span>${escapeHtml(summary.raceTypeLabel || getRaceTypeLabel(summary.raceTypeId))}</span></div>
           <div class="score-card"><strong>Speed Class</strong><span>${escapeHtml(summary.speedClassLabel)}</span></div>
-          <div class="score-card"><strong>Seed</strong><input class="seed-copy" type="text" value="${escapeAttr(summary.seed)}" readonly aria-label="Seed used"></div>
+          <div class="score-card"><strong>Road Code</strong><input class="seed-copy" type="text" value="${escapeAttr(summary.seed)}" readonly aria-label="Road code used"></div>
           <div class="score-card"><strong>Crash / Outcome</strong><span>${escapeHtml(outcomeText)}</span></div>
           ${summary.raceTypeId === FUEL_RUN_RACE_TYPE_ID ? `
             <div class="score-card"><strong>Fuel Collected</strong><span>${Math.max(0, summary.gasCansCollected || 0).toLocaleString()} gas cans</span></div>

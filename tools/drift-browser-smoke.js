@@ -101,7 +101,7 @@ async function assertDriftDashTeachingCopy(page) {
 
   await openSoloSetup(page);
   const setupText = await bodyText(page);
-  assertIncludes(setupText, "Practice / Custom Seed");
+  assertIncludes(setupText, "Custom Road");
   assert(
     !setupText.includes("Drift dash: Shift+A/D cuts across lanes fast for boosts and traffic gaps; release to settle."),
     "Normal setup should keep Drift Dash teaching copy out of the compressed default flow",
