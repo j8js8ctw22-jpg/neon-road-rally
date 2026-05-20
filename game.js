@@ -31980,9 +31980,9 @@ class NeonRoadRally {
       }
     ];
     return `
-      <div class="arcade-segmented-tabs chase-board-tabs leaderboard-board-tabs" aria-label="Board type">
+      <div class="segmented segmented--cyan arcade-segmented-tabs chase-board-tabs leaderboard-board-tabs" aria-label="Board type">
         ${cards.map((card) => `
-          <button class="arcade-tab chase-board-card chase-board-pill ${activeView === card.view ? "is-selected" : ""}" data-action="setLeaderboardView" data-view="${escapeAttr(card.view)}">
+          <button type="button" class="arcade-tab chase-board-card chase-board-pill ${activeView === card.view ? "is-selected" : ""}" aria-pressed="${activeView === card.view ? "true" : "false"}" data-action="setLeaderboardView" data-view="${escapeAttr(card.view)}">
             <strong>${escapeHtml(card.title)}</strong>
           </button>
         `).join("")}
@@ -31993,7 +31993,7 @@ class NeonRoadRally {
   getLeaderboardTitle(view) {
     const activeView = this.normalizeLeaderboardView(view);
     if (activeView === LEADERBOARD_VIEW_TIME_ATTACK) return "Time Attack";
-    if (activeView === LEADERBOARD_VIEW_ENDURANCE_SURVIVAL) return "Survival";
+    if (activeView === LEADERBOARD_VIEW_ENDURANCE_SURVIVAL) return "Endurance Survival";
     if (activeView === LEADERBOARD_VIEW_ENDURANCE_SCORE) return "Endurance Score";
     return "Score Attack";
   }
@@ -32717,39 +32717,65 @@ class NeonRoadRally {
         </details>
       `
       : "";
+    const primaryLabel = this.getLeaderboardPrimaryLabel(activeView);
+    const routeNumber = officialRoute ? this.getOfficialRouteShortNumber(officialRoute) : "";
+    const selectedRouteMeta = officialRoute
+      ? [routeNumber ? `Route ${routeNumber}` : "", officialRoute.speedClassLabel].filter(Boolean).join(" · ")
+      : "Official route";
     const routeAction = officialRoute ? `
-      <button class="small-button primary arcade-primary-action" data-action="raceOfficialRoute" data-official-route-id="${escapeAttr(officialRoute.id)}" data-race-type-id="${escapeAttr(boardFilter.raceTypeId)}">Race This Route</button>
-    ` : `<button class="small-button primary arcade-primary-action" data-action="preRace">Back to Official Race</button>`;
+      <button class="btn btn--primary btn--lg arcade-primary-action leaderboard-race-action" data-action="raceOfficialRoute" data-official-route-id="${escapeAttr(officialRoute.id)}" data-race-type-id="${escapeAttr(boardFilter.raceTypeId)}">Race This Route</button>
+    ` : `<button class="btn btn--primary btn--lg arcade-primary-action leaderboard-race-action" data-action="preRace">Back to Official Race</button>`;
     this.layer.classList.remove("is-empty");
     this.layer.innerHTML = `
-      <section class="panel compact arcade-page-shell leaderboard-chase-panel leaderboard-arcade-page">
-        <div class="arcade-header leaderboard-header">
-          <div>
-            <span class="eyebrow">Local Records</span>
-            <h2>Leaderboards</h2>
+      <section class="arcade-page-shell leaderboard-chase-panel leaderboard-arcade-page leaderboard-screen-panel nrr">
+        <div class="nrr-bg" aria-hidden="true"></div>
+        <div class="leaderboard-page page">
+          <div class="page-head arcade-header leaderboard-header">
+            <div class="leaderboard-title-copy">
+              <span class="crumb">Title &gt; Leaderboards · Local</span>
+              <h1>Leaderboards</h1>
+              <span class="leaderboard-route-line">${escapeHtml(officialRouteName)} · ${escapeHtml(selectedRouteMeta)}</span>
+            </div>
+            <div class="actions arcade-header-actions leaderboard-header-actions">
+              <button class="btn btn--ghost arcade-secondary-action" data-action="title">Back</button>
+              ${routeAction}
+            </div>
           </div>
-          <div class="arcade-header-actions leaderboard-header-actions">
-            ${routeAction}
-            <button class="small-button arcade-secondary-action" data-action="title">Back</button>
+
+          <div class="leaderboard-control-deck">
+            ${this.renderLeaderboardTabs(activeView)}
+            ${this.renderLeaderboardFilterSummary(boardFilter, activeView)}
           </div>
+
+          ${this.renderLeaderboardYourBestPanel(officialRoute, activeView, boardFilter.raceTypeId)}
+
+          <div class="leaderboard-table-shell">
+            <div class="arcade-scoreboard-header leaderboard-board-context">
+              <span>${escapeHtml(this.getLeaderboardChaseLabel(activeView))}</span>
+              <strong>${escapeHtml(boardContext)}</strong>
+            </div>
+            <div class="leaderboard-table-heading" aria-hidden="true">
+              <span>Rank</span>
+              <span>Driver</span>
+              <span>${escapeHtml(primaryLabel)}</span>
+              <span>Run</span>
+              <span>Detail</span>
+              <span>Date</span>
+              <span></span>
+            </div>
+            <ol class="arcade-scoreboard leaderboard-list">
+              ${mainRows}
+            </ol>
+          </div>
+
+          ${timeExtras}
+          ${scoreExtras}
+          <details class="arcade-tools-panel result-details-block leaderboard-data-tools">
+            <summary>Data Tools</summary>
+            <p class="status-line">${escapeHtml(this.profiles.saveStatus)}</p>
+            <button class="danger-button" data-action="resetData">Reset Local Data</button>
+          </details>
         </div>
-        ${this.renderLeaderboardTabs(activeView)}
-        ${this.renderLeaderboardFilterSummary(boardFilter, activeView)}
-        ${this.renderLeaderboardYourBestPanel(officialRoute, activeView, boardFilter.raceTypeId)}
-        <div class="arcade-scoreboard-header leaderboard-board-context">
-          <span>${escapeHtml(this.getLeaderboardChaseLabel(activeView))}</span>
-          <strong>${escapeHtml(boardContext)}</strong>
-        </div>
-        <ol class="arcade-scoreboard leaderboard-list">
-          ${mainRows}
-        </ol>
-        ${timeExtras}
-        ${scoreExtras}
-        <details class="arcade-tools-panel result-details-block leaderboard-data-tools">
-          <summary>Data Tools</summary>
-          <p class="status-line">${escapeHtml(this.profiles.saveStatus)}</p>
-          <button class="danger-button" data-action="resetData">Reset Local Data</button>
-        </details>
       </section>
     `;
     this.bindLayerButtons();
