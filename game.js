@@ -27525,89 +27525,66 @@ class NeonRoadRally {
     const badgeProgress = player ? this.profiles.getPlayerBadgeProgress(player) : null;
     const titleCount = player ? this.profiles.getPlayerTitles(player).length : 0;
     const playerDetail = player
-      ? `Badges ${badgeProgress.earnedCount}/${badgeProgress.totalCount} - Titles ${titleCount}/${TITLE_DEFINITIONS.length}`
-      : "Add a local driver to save badges and scores";
-    const soloAction = hasDriver ? "start" : "players";
-    const soloActionLabel = hasDriver ? "Official Race" : "Create Driver";
-    const soloActionHelp = hasDriver
-      ? "Main path: pick a track, choose an Official 10 route, and chase the board."
-      : "Add a local driver, then start the Official Race path.";
-    const keyboardHint = hasDriver
-      ? "A/D change lanes. Shift+A/D drift dash. Space uses manual boost."
-      : "Add one local driver to save scores, badges, titles, and car style.";
-    const audioStatus = `${this.audio.masterMuted ? "Muted" : "On"} · Music ${this.audio.musicMuted ? "Off" : "On"} · SFX ${this.audio.sfxMuted ? "Off" : "On"}`;
+      ? `${badgeProgress.earnedCount}/${badgeProgress.totalCount} badges - ${titleCount}/${TITLE_DEFINITIONS.length} titles`
+      : "Create driver";
+    const audioStatus = this.audio.masterMuted ? "Audio muted" : "Audio on";
     this.layer.classList.remove("is-empty");
     this.layer.innerHTML = `
-      <section class="panel title-panel show-title-panel">
-        <div class="title-block">
-          <div class="eyebrow">Local Arcade Racer</div>
-          <h1 class="game-title"><span>Neon</span><span>Road</span><span>Rally</span></h1>
-          <p class="subtitle title-tagline">Five tracks. One clean line. Beat the board.</p>
-          <p class="subtitle">Official Race is the main route board. Custom Road is optional practice.</p>
-          <div class="title-status-grid">
-            <div class="title-status-card ${player ? "title-driver-status" : ""}">
-              <div>
-                <span>Active Driver</span>
-                <strong>${playerName}</strong>
-                <small>${playerDetail}</small>
-              </div>
-              ${player ? this.renderDriverMiniCanvas(player, "title-car-chip") : ""}
+      <section class="title-panel nrr show-title-panel">
+        <div class="nrr-bg" aria-hidden="true"></div>
+        <div class="title-page">
+          <div class="title-block">
+            <div class="title-brand">
+              <div class="micro title-kicker">Local Arcade Racer</div>
+              <h1 class="game-title"><span>Neon</span><span>Road</span><span>Rally</span></h1>
+              <div class="title-tagline">Five tracks. Fifty official routes. One clean line.</div>
             </div>
-            <div class="title-status-card">
-              <span>Default Speed</span>
-              <strong>${escapeHtml(selectedSpeedClass.label)}</strong>
-              <small>Practice default</small>
-            </div>
-            <div class="title-status-card">
-              <span>Audio</span>
-              <strong>${escapeHtml(audioStatus)}</strong>
-              <small>Change in Settings</small>
+            <div class="title-foot">
+              <button class="driver-chip title-driver-badge" data-action="players">
+                ${player ? this.renderDriverMiniCanvas(player, "title-driver-car") : `<span class="avatar-tile" aria-hidden="true"></span>`}
+                <span class="title-driver-copy">
+                  <span class="driver-name">${playerName}</span>
+                  <span class="driver-meta">${escapeHtml(playerDetail)}</span>
+                </span>
+              </button>
+              <span class="micro title-utility-copy">${escapeHtml(audioStatus)} - ${escapeHtml(selectedSpeedClass.label)} default</span>
             </div>
           </div>
-          <p class="keyboard-hints">${escapeHtml(keyboardHint)}</p>
-          ${this.renderNewDriverHint()}
-        </div>
-        <div class="title-menu-card">
-          <div class="menu-stack main-menu">
-            <div class="title-menu-section">
-              <span class="menu-section-label">Start Playing</span>
-              <div class="title-primary-actions">
-                <button class="menu-button primary title-action-card" data-action="${escapeAttr(soloAction)}"><strong>${escapeHtml(soloActionLabel)}</strong><span>${escapeHtml(soloActionHelp)}</span></button>
-                <button class="menu-button title-action-card is-party" data-action="partyMode"><strong>Party Mode</strong><span>2-8 local drivers take turns on the same computer.</span></button>
-              </div>
-            </div>
-            <div class="title-menu-section">
-              <span class="menu-section-label">Drivers, Records, Help</span>
-              <div class="title-secondary-actions">
-                <button class="menu-button" data-action="players"><strong>Driver Garage</strong><span>Drivers, car look, badges, titles, and local progress.</span></button>
-                <button class="menu-button" data-action="leaderboard"><strong>Leaderboards</strong><span>Route boards and local records.</span></button>
-                <button class="menu-button" data-action="challengeMode"><strong>Challenges</strong><span>Fixed-seed goals for quick retries.</span></button>
-                <button class="menu-button" data-action="howToPlay"><strong>How To Play</strong><span>Controls, race types, Party rules, and rewards.</span></button>
-              </div>
-            </div>
-            <div class="title-menu-section">
-              <span class="menu-section-label">Options</span>
-              <button class="menu-button is-quiet" data-action="settings"><strong>Settings</strong><span>Audio, fullscreen, default speed, and optional Playtest Tools.</span></button>
-            </div>
+
+          <div class="title-action-stack">
+            <button class="btn btn--primary btn--xl btn--block title-hero-action" data-action="start">
+              <span class="title-action-top">
+                <span>Main</span>
+                <span class="kbd">Enter</span>
+              </span>
+              <strong>Start Race</strong>
+              <span class="title-action-meta">Official routes</span>
+            </button>
+
+            <button class="btn btn--secondary btn--lg btn--block title-party-action" data-action="partyMode">
+              <strong>Party Race</strong>
+              <span class="title-action-meta">2-8 local drivers</span>
+            </button>
+
+            <div class="title-menu-divider" aria-hidden="true"></div>
+
+            <button class="menu-btn title-menu-btn" data-action="players">
+              <span>Garage</span>
+              <span class="title-menu-side"><span class="menu-meta">${hasDriver ? playerName : "Add driver"}</span><span class="menu-arrow">></span></span>
+            </button>
+            <button class="menu-btn title-menu-btn" data-action="leaderboard">
+              <span>Records</span>
+              <span class="title-menu-side"><span class="menu-meta">Leaderboards</span><span class="menu-arrow">></span></span>
+            </button>
+            <button class="menu-btn title-menu-btn" data-action="howToPlay">
+              <span>How To Play</span>
+              <span class="menu-arrow">></span>
+            </button>
+            <button class="menu-btn title-menu-btn" data-action="settings">
+              <span>Settings</span>
+              <span class="menu-arrow">></span>
+            </button>
           </div>
-          <div class="title-utility-row">
-            <button class="small-button" data-action="players">${hasDriver ? "Switch Driver" : "Add Driver"}</button>
-            <button class="small-button" data-action="toggleMasterAudio">Audio: ${this.audio.masterMuted ? "Muted" : "On"}</button>
-            <button class="small-button" data-action="toggleMusic">Music: ${this.audio.musicMuted ? "Muted" : "On"}</button>
-            <button class="small-button" data-action="toggleSfx">SFX: ${this.audio.sfxMuted ? "Muted" : "On"}</button>
-            <button class="small-button" data-action="fullscreen">Fullscreen</button>
-          </div>
-          ${this.debugMode ? `
-            <div class="title-dev-row">
-              <button class="small-button" data-action="runSeedTest">Seed Determinism</button>
-              <button class="small-button" data-action="runSimulation">Classic Simulation</button>
-              <button class="small-button" data-action="runFuelSimulation">Fuel Run Simulation</button>
-              <button class="small-button" data-action="runTargetedDirectorChecks">Targeted Director Checks</button>
-              <button class="small-button" data-action="showPlaytestReport">Playtest Tools</button>
-              <button class="small-button" data-action="roadDirectorLab">Road Director Lab</button>
-              <button class="small-button" data-action="vehicleScaleDebug">Vehicle Scale Check</button>
-            </div>
-          ` : ""}
         </div>
       </section>
     `;
