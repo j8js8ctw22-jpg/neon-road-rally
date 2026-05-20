@@ -382,7 +382,13 @@ async function run() {
 
   await clickText("Settings");
   await page.waitForFunction(() => window.neonRoadRally?.screen === "settings", null, { timeout: 5000 });
-  await clickText("Playtest Tools");
+  const settingsToolsSummary = page.locator(".settings-tools-details > summary");
+  if (await settingsToolsSummary.count()) {
+    await settingsToolsSummary.click();
+    await clickAction("showPlaytestReport");
+  } else {
+    await clickText("Playtest Tools");
+  }
   await page.waitForFunction(() => window.neonRoadRally?.screen === "playtestReport", null, { timeout: 5000 });
   await expectText("Playtest Report");
 

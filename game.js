@@ -27833,69 +27833,115 @@ class NeonRoadRally {
     const selectedSpeedClass = getSpeedClassConfig(this.profiles.data.speedClassId);
     this.layer.classList.remove("is-empty");
     this.layer.innerHTML = `
-      <section class="panel compact settings-panel">
-        <div class="form-stack">
-          <div>
-            <span class="eyebrow">Game Settings</span>
-            <h2>Settings</h2>
-            <p class="hint">Audio, fullscreen, and your default Practice speed live here. Optional local QA tools stay separate below.</p>
-          </div>
-          <div class="score-grid">
-            <div class="score-card"><strong>Default Speed Class</strong><span>${escapeHtml(selectedSpeedClass.label)}</span></div>
-            <div class="score-card"><strong>Audio</strong><span>${this.audio.masterMuted ? "Muted" : "On"} · Music ${this.audio.musicMuted ? "muted" : "on"} · SFX ${this.audio.sfxMuted ? "muted" : "on"}</span></div>
-          </div>
-          <div class="speed-class-panel">
-            <div class="speed-class-header">
-              <span>Default Solo Speed Class</span>
-              <strong>${escapeHtml(selectedSpeedClass.label)} · Score x${selectedSpeedClass.scoreMultiplier.toFixed(2)}</strong>
-            </div>
-            <div class="speed-class-grid">
-              ${getNormalVisibleSpeedClasses().concat(getTrainingSpeedClasses()).map((speedClass) => `
-                <button class="speed-class-button ${speedClass.training ? "is-training" : ""} ${speedClass.id === selectedSpeedClass.id ? "is-selected" : ""}" data-action="setSpeedClass" data-id="${escapeAttr(speedClass.id)}">
-                  <strong>${escapeHtml(speedClass.label)}</strong>
-                  <span>${Math.round(getSpeedClassStartSpeed(speedClass.id))}-${Math.round(getSpeedClassEndSpeed(speedClass.id, TRACKS[0]))} MPH · x${speedClass.scoreMultiplier.toFixed(2)}</span>
-                  <small>${escapeHtml(speedClass.description || "")}</small>
-                </button>
-              `).join("")}
-            </div>
-          </div>
-          <div class="audio-grid">
-            <div class="field">
-              <label for="masterVolume">Master volume</label>
-              <input id="masterVolume" type="range" min="0" max="1" step="0.05" value="${this.audio.masterVolume}">
-            </div>
-            <div class="field">
-              <label for="musicVolume">Music volume</label>
-              <input id="musicVolume" type="range" min="0" max="1" step="0.05" value="${this.audio.musicVolume}">
-            </div>
-            <div class="field">
-              <label for="sfxVolume">SFX volume</label>
-              <input id="sfxVolume" type="range" min="0" max="1" step="0.05" value="${this.audio.sfxVolume}">
-            </div>
-          </div>
-          ${this.renderAudioTestControls()}
-          ${this.renderResetCleanupReminder()}
-          <div class="row">
-            <button class="small-button" data-action="toggleMasterAudio">Mute All: ${this.audio.masterMuted ? "On" : "Off"}</button>
-            <button class="small-button" data-action="toggleMusic">Music: ${this.audio.musicMuted ? "Muted" : "On"}</button>
-            <button class="small-button" data-action="toggleSfx">SFX: ${this.audio.sfxMuted ? "Muted" : "On"}</button>
-            <button class="small-button primary" data-action="title">Back to Title</button>
-          </div>
-          <div class="settings-quick-row">
-            <button class="small-button" data-action="fullscreen">Fullscreen</button>
-            <button class="small-button" data-action="howToPlay">How To Play</button>
-          </div>
-          <div class="settings-advanced-tools">
+      <section class="settings-screen-panel nrr">
+        <div class="nrr-bg" aria-hidden="true"></div>
+        <div class="settings-page page">
+          <header class="page-head settings-page-head">
             <div>
-              <span class="eyebrow">Optional Local Tools</span>
-              <strong>Playtest Tools</strong>
-              <small>Local run reports and debug-only inspection. Not needed for normal play.</small>
+              <span class="crumb">Title &gt; Settings</span>
+              <h1>Settings</h1>
             </div>
-            <button class="small-button" data-action="showPlaytestReport">Open Playtest Tools</button>
-            ${this.debugMode ? `<button class="small-button" data-action="roadDirectorLab">Road Director Lab</button>` : ""}
+            <div class="actions settings-header-actions">
+              <button class="btn btn--ghost" data-action="title">Back</button>
+              <button class="btn btn--primary" data-action="title">Done</button>
+            </div>
+          </header>
+
+          <div class="settings-main-grid">
+            <section class="settings-section settings-audio-section">
+              <div class="settings-section-heading">
+                <span class="label">Audio</span>
+                <strong>${this.audio.masterMuted ? "Muted" : "On"}</strong>
+              </div>
+              <div class="settings-slider-stack">
+                <div class="settings-slider-row">
+                  <label for="masterVolume">Master</label>
+                  <input id="masterVolume" type="range" min="0" max="1" step="0.05" value="${this.audio.masterVolume}">
+                  <span>${Math.round(this.audio.masterVolume * 100)}</span>
+                </div>
+                <div class="settings-slider-row">
+                  <label for="musicVolume">Music</label>
+                  <input id="musicVolume" type="range" min="0" max="1" step="0.05" value="${this.audio.musicVolume}">
+                  <span>${Math.round(this.audio.musicVolume * 100)}</span>
+                </div>
+                <div class="settings-slider-row">
+                  <label for="sfxVolume">SFX</label>
+                  <input id="sfxVolume" type="range" min="0" max="1" step="0.05" value="${this.audio.sfxVolume}">
+                  <span>${Math.round(this.audio.sfxVolume * 100)}</span>
+                </div>
+              </div>
+              <div class="settings-toggle-row">
+                <button class="chip ${this.audio.masterMuted ? "chip--active" : ""}" data-action="toggleMasterAudio">Mute All</button>
+                <button class="chip ${this.audio.musicMuted ? "chip--active" : ""}" data-action="toggleMusic">Music</button>
+                <button class="chip ${this.audio.sfxMuted ? "chip--active" : ""}" data-action="toggleSfx">SFX</button>
+              </div>
+              <details class="settings-quiet-details">
+                <summary>Sound Check</summary>
+                ${this.renderAudioTestControls()}
+              </details>
+            </section>
+
+            <section class="settings-section settings-controls-section">
+              <div class="settings-section-heading">
+                <span class="label label--cyan">Controls</span>
+                <strong>Keyboard</strong>
+              </div>
+              <div class="settings-key-grid">
+                <span><b>A / D</b><em>Change lane</em></span>
+                <span><b>Shift + A/D</b><em>Drift Dash</em></span>
+                <span><b>Space</b><em>Manual boost</em></span>
+                <span><b>Esc</b><em>Pause</em></span>
+                <span><b>R</b><em>Restart</em></span>
+                <span><b>F</b><em>Fullscreen</em></span>
+              </div>
+              <button class="btn btn--ghost settings-help-action" data-action="howToPlay">How To Play</button>
+            </section>
+
+            <section class="settings-section settings-defaults-section">
+              <div class="settings-section-heading">
+                <span class="label">Default Speed</span>
+                <strong>${escapeHtml(selectedSpeedClass.label)}</strong>
+              </div>
+              <div class="speed-pill settings-speed-pill" aria-label="Default speed class">
+                ${getNormalVisibleSpeedClasses().concat(getTrainingSpeedClasses()).map((speedClass) => `
+                  <button data-action="setSpeedClass" data-id="${escapeAttr(speedClass.id)}" aria-pressed="${speedClass.id === selectedSpeedClass.id ? "true" : "false"}">
+                    ${escapeHtml(speedClass.label)}
+                  </button>
+                `).join("")}
+              </div>
+            </section>
+
+            <section class="settings-section settings-display-section">
+              <div class="settings-section-heading">
+                <span class="label label--cyan">Display</span>
+                <strong>${document.fullscreenElement ? "Fullscreen" : "Window"}</strong>
+              </div>
+              <button class="btn btn--secondary settings-fullscreen-action" data-action="fullscreen">Fullscreen</button>
+            </section>
           </div>
-          <p class="keyboard-hints">F toggles fullscreen while menus are open.</p>
-          <p class="status-line">${escapeHtml(message)}</p>
+
+          <details class="settings-tools-details">
+            <summary>More Options</summary>
+            <div class="settings-tools-body">
+              <div class="settings-tool-row">
+                <div>
+                  <span class="label label--dim">Playtest Tools</span>
+                  <strong>Local Reports</strong>
+                </div>
+                <button class="btn btn--ghost" data-action="showPlaytestReport">Open</button>
+                ${this.debugMode ? `<button class="btn btn--ghost" data-action="roadDirectorLab">Road Director Lab</button>` : ""}
+              </div>
+              <div class="settings-tool-row">
+                <div>
+                  <span class="label label--dim">Data Tools</span>
+                  <strong>Local Data</strong>
+                </div>
+                <button class="danger-button" data-action="resetData">Reset Local Data</button>
+              </div>
+              ${this.renderResetCleanupReminder()}
+            </div>
+          </details>
+          <p class="status-line settings-status-line">${escapeHtml(message)}</p>
         </div>
       </section>
     `;
@@ -31512,6 +31558,27 @@ class NeonRoadRally {
     const carNickname = getCarGarageLabel(car);
     const bodyStyle = getCarBodyStyleLabel(car.bodyStyle);
     const lastPlayed = this.getPlayerLastPlayedLabel(player);
+    if (context === "garage") {
+      return `
+        <article class="garage-driver-row ${isCurrent ? "is-active" : ""}">
+          ${this.renderDriverMiniCanvas(player, "mini-car-preview garage-row-preview")}
+          <div class="garage-driver-copy">
+            <strong>${escapeHtml(player.name)}</strong>
+            <span>${escapeHtml(bodyStyle)}${carNickname !== "No nickname" ? ` · ${escapeHtml(carNickname)}` : ""}</span>
+          </div>
+          <div class="garage-driver-meta">
+            <span><b>${formatScore(player.bestScore)}</b><small>Best</small></span>
+            <span><b>${badgeProgress.earnedCount}/${badgeProgress.totalCount}</b><small>Badges</small></span>
+            <span><b>${titleCount}</b><small>Titles</small></span>
+            <span><b>${escapeHtml(lastPlayed)}</b><small>Last</small></span>
+          </div>
+          <div class="garage-driver-actions">
+            ${isCurrent ? `<span class="chip chip--cyan">Active</span>` : `<button class="btn btn--secondary btn--sm" data-action="selectPlayer" data-id="${escapeAttr(player.id)}">Use Driver</button>`}
+            <button class="btn btn--ghost btn--sm" data-action="promptRenamePlayer" data-id="${escapeAttr(player.id)}" data-return-screen="garage">Rename</button>
+          </div>
+        </article>
+      `;
+    }
     const classes = [
       "driver-card",
       isCurrent ? "is-active" : "",
@@ -31553,25 +31620,27 @@ class NeonRoadRally {
   renderGarageStats(player) {
     if (!player) {
       return `
-        <div class="score-grid garage-stat-grid">
-          <div class="score-card"><strong>Driver</strong><span>No active driver</span></div>
-          <div class="score-card"><strong>Badges</strong><span>0/${getVisibleBadgeDefinitions().length}</span></div>
-          <div class="score-card"><strong>Titles</strong><span>0/${TITLE_DEFINITIONS.length}</span></div>
-          <div class="score-card"><strong>Best Score</strong><span>0</span></div>
+        <div class="stat-row garage-stat-strip">
+          <div class="stat"><span class="stat-label">Driver</span><span class="stat-value">None</span><span class="stat-sub">Add driver</span></div>
+          <div class="stat"><span class="stat-label">Best Score</span><span class="stat-value">0</span><span class="stat-sub">No runs</span></div>
+          <div class="stat"><span class="stat-label">Badges</span><span class="stat-value">0/${getVisibleBadgeDefinitions().length}</span><span class="stat-sub">Local</span></div>
+          <div class="stat"><span class="stat-label">Titles</span><span class="stat-value">0</span><span class="stat-sub">Local</span></div>
         </div>
       `;
     }
     const badgeProgress = this.profiles.getPlayerBadgeProgress(player);
     const titleCount = this.profiles.getPlayerTitles(player).length;
-    const challengeStats = getPlayerChallengeTitleStats(player);
+    const bestTime = Object.values(normalizeBestTimeRecords(player.bestTimes || player.personalBestTimes))
+      .filter((record) => Number.isFinite(Number(record.finishTimeMs)))
+      .sort((a, b) => a.finishTimeMs - b.finishTimeMs)[0] || null;
+    const bestTimeText = bestTime ? formatFinishTimeMs(bestTime.finishTimeMs) : "None";
     return `
-      <div class="score-grid garage-stat-grid">
-        <div class="score-card"><strong>Driver</strong><span>${escapeHtml(player.name)}</span></div>
-        <div class="score-card"><strong>Badges</strong><span>${badgeProgress.earnedCount}/${badgeProgress.totalCount}</span></div>
-        <div class="score-card"><strong>Titles</strong><span>${titleCount}/${TITLE_DEFINITIONS.length}</span></div>
-        <div class="score-card"><strong>Best Score</strong><span>${formatScore(player.bestScore)}</span></div>
-        <div class="score-card"><strong>Challenges</strong><span>${challengeStats.completedCount}/${CHALLENGES.length} complete</span></div>
-        <div class="score-card"><strong>Last Played</strong><span>${escapeHtml(this.getPlayerLastPlayedLabel(player))}</span></div>
+      <div class="stat-row garage-stat-strip">
+        <div class="stat"><span class="stat-label">Best Score</span><span class="stat-value stat-value--green">${formatScore(player.bestScore)}</span><span class="stat-sub">Local PB</span></div>
+        <div class="stat"><span class="stat-label">Best Time</span><span class="stat-value stat-value--green">${escapeHtml(bestTimeText)}</span><span class="stat-sub">${bestTime ? escapeHtml(getTrackById(bestTime.trackId).name) : "No finish"}</span></div>
+        <div class="stat"><span class="stat-label">Badges</span><span class="stat-value">${badgeProgress.earnedCount}/${badgeProgress.totalCount}</span><span class="stat-sub">Earned</span></div>
+        <div class="stat"><span class="stat-label">Titles</span><span class="stat-value">${titleCount}/${TITLE_DEFINITIONS.length}</span><span class="stat-sub">Held</span></div>
+        <div class="stat"><span class="stat-label">Last</span><span class="stat-value">${escapeHtml(this.getPlayerLastPlayedLabel(player))}</span><span class="stat-sub">Played</span></div>
       </div>
     `;
   }
@@ -31586,125 +31655,148 @@ class NeonRoadRally {
     const car = normalizeCarConfig(player?.car || DEFAULT_CAR);
     const carStyle = normalizeCarStyle(car.carStyle);
     const nickname = getOptionalCarNickname(car);
-    const activeCopy = player
-      ? `${escapeHtml(player.name)} is the active local driver. This profile owns scores, badges, titles, Party results, and car look.`
-      : "Create a local driver to save badges, titles, car style, and scores.";
+    const driverTitle = player ? escapeHtml(player.name) : "Add Driver";
+    const badgeProgress = player ? this.profiles.getPlayerBadgeProgress(player) : null;
+    const driverMeta = player
+      ? `${badgeProgress.earnedCount}/${badgeProgress.totalCount} badges · ${this.profiles.getPlayerTitles(player).length}/${TITLE_DEFINITIONS.length} titles`
+      : "No active driver";
+    const headerAction = player
+      ? `<button class="btn btn--primary garage-race-action" data-action="start">Race</button>`
+      : `<button class="btn btn--primary garage-race-action" data-action="focusGarageSection" data-target="garageAddDriver">Add Driver</button>`;
     this.audio.playMusic("title", false);
     this.layer.classList.remove("is-empty");
     this.layer.innerHTML = `
-      <section class="panel garage-panel">
-        <div class="garage-hero">
-          <div class="garage-driver-summary">
-            <span class="eyebrow">Driver Garage</span>
-            <h2>${player ? escapeHtml(player.name) : "Add a Driver"}</h2>
-            <p class="hint">${activeCopy}</p>
-            <div class="garage-action-row">
-              <button class="small-button" data-action="focusGarageSection" data-target="garageDriverList">Change Driver</button>
-              <button class="small-button" data-action="focusGarageSection" data-target="garageAddDriver">Add Driver</button>
-              <button class="small-button" data-action="focusGarageSection" data-target="garageRenameDriver" ${player ? "" : "disabled"}>Rename Driver</button>
-              <button class="small-button" data-action="focusGarageSection" data-target="garageCarStyle" ${player ? "" : "disabled"}>Car Look</button>
-              <button class="small-button" data-action="resetCarStyle" ${player ? "" : "disabled"}>Reset Visual Style</button>
-              <button class="small-button" data-action="title">Back</button>
+      <section class="garage-screen-panel garage-panel nrr">
+        <div class="nrr-bg" aria-hidden="true"></div>
+        <div class="garage-page page">
+          <header class="page-head garage-page-head">
+            <div>
+              <span class="crumb">Title &gt; Driver Garage</span>
+              <h1>${driverTitle}</h1>
+            </div>
+            <div class="actions garage-header-actions">
+              <button class="btn btn--ghost" data-action="title">Back</button>
+              ${headerAction}
+            </div>
+          </header>
+
+          <div class="garage-stage">
+            <div class="garage-primary-column">
+              <section class="garage-identity-section">
+                <div class="driver-chip garage-profile-chip">
+                  ${player ? this.renderDriverMiniCanvas(player, "garage-profile-car") : `<span class="avatar-tile" aria-hidden="true"></span>`}
+                  <span class="garage-profile-copy">
+                    <span class="driver-name">${driverTitle}</span>
+                    <span class="driver-meta">${escapeHtml(driverMeta)}</span>
+                  </span>
+                </div>
+                <canvas id="carPreview" class="car-preview garage-main-preview" width="360" height="250" aria-label="Active driver car preview"></canvas>
+                <div class="garage-quick-actions">
+                  <button class="btn btn--secondary" data-action="focusGarageSection" data-target="garageDriverList">Switch Driver</button>
+                  <button class="btn btn--ghost" data-action="focusGarageSection" data-target="garageAddDriver">Add Driver</button>
+                  <button class="btn btn--ghost" data-action="focusGarageSection" data-target="garageRenameDriver" ${player ? "" : "disabled"}>Rename</button>
+                </div>
+              </section>
+
+              <section class="garage-section garage-look-section" id="garageCarStyle">
+                <div class="garage-section-heading">
+                  <span class="label">Car Look</span>
+                  <strong>${escapeHtml(getCarBodyStyleLabel(car.bodyStyle))}</strong>
+                </div>
+                <div class="field">
+                  <label for="carName">Car Nickname</label>
+                  <input id="carName" type="text" maxlength="${LOCAL_CAR_NAME_MAX_LENGTH}" value="${escapeAttr(nickname)}" placeholder="Optional nickname" ${player ? "" : "disabled"}>
+                </div>
+                <div class="field">
+                  <label for="bodyStyle">Body Style</label>
+                  <select id="bodyStyle" ${player ? "" : "disabled"}>
+                    ${CAR_BODY_STYLES.map((style) => `<option value="${escapeAttr(style.id)}" ${style.id === car.bodyStyle ? "selected" : ""}>${escapeHtml(style.name)}</option>`).join("")}
+                  </select>
+                </div>
+                <label class="check-field garage-check-field">
+                  <input id="useSprite" type="checkbox" ${car.useSprite !== false ? "checked" : ""} ${player ? "" : "disabled"}>
+                  <span>Sprite Car</span>
+                </label>
+                <span id="spriteStatus" class="micro garage-sprite-status">Preview ready</span>
+                <div class="garage-paint-fields">
+                  <div class="field">
+                    <label>Body Color</label>
+                    ${renderPaintOptionGroup("carBodyColor", CAR_BODY_COLOR_OPTIONS, carStyle.bodyColor, DEFAULT_CAR_STYLE.bodyColor, "Body Color")}
+                  </div>
+                  <div class="field">
+                    <label>Accent Color</label>
+                    ${renderPaintOptionGroup("carAccentColor", CAR_ACCENT_COLOR_OPTIONS, carStyle.accentColor, DEFAULT_CAR_STYLE.accentColor, "Accent Color")}
+                  </div>
+                  <div class="field">
+                    <label>Boost Trail</label>
+                    ${renderPaintOptionGroup("carBoostTrail", CAR_BOOST_TRAIL_OPTIONS, carStyle.boostTrail, DEFAULT_CAR_STYLE.boostTrail, "Boost Trail")}
+                  </div>
+                </div>
+                <div class="garage-form-actions">
+                  <button class="btn btn--secondary" data-action="saveCar" ${player ? "" : "disabled"}>Save Style</button>
+                  <button class="btn btn--ghost" data-action="resetCarStyle" ${player ? "" : "disabled"}>Reset Look</button>
+                </div>
+              </section>
+            </div>
+
+            <div class="garage-support-column">
+              <section class="garage-section garage-manage-section">
+                <div class="garage-section-heading">
+                  <span class="label label--cyan">Drivers</span>
+                  <strong>${players.length}/${LOCAL_PLAYER_MAX_COUNT} local</strong>
+                </div>
+                <div class="garage-management-strip">
+                  <section id="garageRenameDriver" class="garage-inline-form">
+                    <label for="driverRenameName">Rename Driver</label>
+                    <div class="garage-inline-controls">
+                      <input id="driverRenameName" type="text" maxlength="${LOCAL_PLAYER_NAME_MAX_LENGTH}" value="${player ? escapeAttr(player.name) : ""}" placeholder="DRIVER NAME" ${player ? "" : "disabled"}>
+                      <button class="btn btn--secondary btn--sm" data-action="renameDriver" ${player ? "" : "disabled"}>Rename</button>
+                    </div>
+                  </section>
+                  <section id="garageAddDriver" class="garage-inline-form">
+                    <label for="newDriverName">Add Driver</label>
+                    <div class="garage-inline-controls">
+                      <input id="newDriverName" type="text" maxlength="${LOCAL_PLAYER_NAME_MAX_LENGTH}" value="" placeholder="DRIVER ${players.length + 1}">
+                      <button class="btn btn--secondary btn--sm" data-action="createPlayer">Add</button>
+                    </div>
+                  </section>
+                </div>
+              </section>
+
+              <section class="garage-section garage-list-section" id="garageDriverList">
+                <div class="garage-section-heading">
+                  <span class="label">Driver List</span>
+                  <strong>${player ? escapeHtml(player.name) : "No active driver"}</strong>
+                </div>
+                <div class="driver-card-grid garage-driver-list">
+                  ${players.length ? players.map((item) => this.renderDriverCard(item, { context: "garage", currentId: player?.id || "" })).join("") : `<span class="micro">No local drivers yet.</span>`}
+                </div>
+              </section>
+
+              <section class="garage-section garage-career-section">
+                <div class="garage-section-heading">
+                  <span class="label label--cyan">Career</span>
+                  <strong>Local profile</strong>
+                </div>
+                ${this.renderGarageStats(player)}
+              </section>
+
+              <section class="garage-section garage-rewards-section" id="garageRewards">
+                <div class="garage-section-heading">
+                  <span class="label">Records & Rewards</span>
+                  <strong>${player ? "Badges and titles" : "Add a driver"}</strong>
+                </div>
+                <details class="garage-rewards-details">
+                  <summary>Titles and Badges</summary>
+                  <div class="garage-rewards-body">
+                    ${this.renderPlayerTitlePanel(player)}
+                    ${this.renderPlayerBadgePanel(player)}
+                  </div>
+                </details>
+              </section>
             </div>
           </div>
-          <div class="garage-preview-card">
-            <canvas id="carPreview" class="car-preview" width="360" height="250" aria-label="Active driver car preview"></canvas>
-            <p class="hint">Driver name is the profile identity. Paint, style, and boost trail are cosmetic for fair local competition.</p>
-          </div>
-        </div>
-
-        ${this.renderGarageStats(player)}
-
-        <div class="garage-layout">
-          <section class="garage-section" id="garageRenameDriver">
-            <div class="garage-section-heading">
-              <span class="eyebrow">Driver Profile</span>
-              <h3>Name, Records, Rewards</h3>
-            </div>
-            <div class="field">
-              <label for="driverRenameName">Driver Name</label>
-              <input id="driverRenameName" type="text" maxlength="${LOCAL_PLAYER_NAME_MAX_LENGTH}" value="${player ? escapeAttr(player.name) : ""}" placeholder="DRIVER NAME" ${player ? "" : "disabled"}>
-            </div>
-            <div class="row">
-              <button class="small-button primary" data-action="renameDriver" ${player ? "" : "disabled"}>Rename Driver</button>
-              <button class="small-button" data-action="focusGarageSection" data-target="garageDriverList">Change Driver</button>
-            </div>
-          </section>
-
-          <section class="garage-section" id="garageCarStyle">
-            <div class="garage-section-heading">
-              <span class="eyebrow">Car Look</span>
-              <h3>Paint and Style</h3>
-            </div>
-            <p class="hint">Car nickname is optional flavor. The driver name remains the main identity everywhere.</p>
-            <div class="field">
-              <label for="carName">Optional Car Nickname</label>
-              <input id="carName" type="text" maxlength="${LOCAL_CAR_NAME_MAX_LENGTH}" value="${escapeAttr(nickname)}" placeholder="Optional nickname" ${player ? "" : "disabled"}>
-            </div>
-            <div class="field">
-              <label for="bodyStyle">Body Style</label>
-              <select id="bodyStyle" ${player ? "" : "disabled"}>
-                ${CAR_BODY_STYLES.map((style) => `<option value="${escapeAttr(style.id)}" ${style.id === car.bodyStyle ? "selected" : ""}>${escapeHtml(style.name)}</option>`).join("")}
-              </select>
-            </div>
-            <label class="check-field">
-              <input id="useSprite" type="checkbox" ${car.useSprite !== false ? "checked" : ""} ${player ? "" : "disabled"}>
-              <span>Use Sprite Car</span>
-            </label>
-            <p id="spriteStatus" class="hint">Paint cache waiting for a loaded sprite.</p>
-            <div class="field">
-              <label>Body Color</label>
-              ${renderPaintOptionGroup("carBodyColor", CAR_BODY_COLOR_OPTIONS, carStyle.bodyColor, DEFAULT_CAR_STYLE.bodyColor, "Body Color")}
-            </div>
-            <div class="field">
-              <label>Accent Color</label>
-              ${renderPaintOptionGroup("carAccentColor", CAR_ACCENT_COLOR_OPTIONS, carStyle.accentColor, DEFAULT_CAR_STYLE.accentColor, "Accent Color")}
-            </div>
-            <div class="field">
-              <label>Boost Trail</label>
-              ${renderPaintOptionGroup("carBoostTrail", CAR_BOOST_TRAIL_OPTIONS, carStyle.boostTrail, DEFAULT_CAR_STYLE.boostTrail, "Boost Trail")}
-            </div>
-            <div class="row">
-              <button class="small-button primary" data-action="saveCar" ${player ? "" : "disabled"}>Save Style</button>
-              <button class="small-button" data-action="resetCarStyle" ${player ? "" : "disabled"}>Reset Visual Style</button>
-            </div>
-          </section>
-
-          <section class="garage-section" id="garageDriverList">
-            <div class="garage-section-heading">
-              <span class="eyebrow">Choose Driver</span>
-              <h3>Drivers on This Device</h3>
-            </div>
-            <div class="driver-card-grid">
-              ${players.length ? players.map((item) => this.renderDriverCard(item, { context: "garage", currentId: player?.id || "" })).join("") : `<p class="hint">No local drivers yet.</p>`}
-            </div>
-          </section>
-
-          <section class="garage-section" id="garageAddDriver">
-            <div class="garage-section-heading">
-              <span class="eyebrow">Add Driver</span>
-              <h3>New Local Profile</h3>
-            </div>
-            <p class="hint">Adds one local driver in this browser. You can rename immediately and style the car here.</p>
-            <div class="field">
-              <label for="newDriverName">New Driver Name</label>
-              <input id="newDriverName" type="text" maxlength="${LOCAL_PLAYER_NAME_MAX_LENGTH}" value="" placeholder="DRIVER ${players.length + 1}">
-            </div>
-            <div class="row">
-              <button class="small-button primary" data-action="createPlayer">Add Driver</button>
-              <button class="small-button" data-action="title">Back</button>
-            </div>
-            <p class="status-line">${escapeHtml(message)}</p>
-          </section>
-
-          <section class="garage-section is-wide" id="garageRewards">
-            <div class="garage-section-heading">
-              <span class="eyebrow">Records & Rewards</span>
-              <h3>Titles and Badges</h3>
-            </div>
-            ${this.renderPlayerTitlePanel(player)}
-            ${this.renderPlayerBadgePanel(player)}
-          </section>
+          <p class="status-line garage-status-line">${escapeHtml(message)}</p>
         </div>
       </section>
     `;
@@ -31822,21 +31914,14 @@ class NeonRoadRally {
     const spriteStatus = document.getElementById("spriteStatus");
     if (spriteStatus) {
       const status = this.carSprites.getStatus(car.bodyStyle);
-      const path = this.carSprites.getPath(car.bodyStyle);
-      const paintInfo = this.carSprites.getPaintDebugInfo(car.bodyStyle, car.carStyle);
-      const paintDetail = paintInfo.status === "recolored"
-        ? `Paint recolored. Body ${formatPaintDebugRatio(paintInfo.bodyRatio)}, accent ${formatPaintDebugRatio(paintInfo.accentRatio)}, protected ${formatPaintDebugRatio(paintInfo.protectedRatio)}. Cache ${paintInfo.cacheSize}.`
-        : (paintInfo.status === "fallback"
-          ? `Paint fallback: ${paintInfo.fallbackReason || "sprite was not cleanly recolorable"}. Cache ${paintInfo.cacheSize}.`
-          : `Original sprite paint. Cache ${paintInfo.cacheSize}.`);
       if (car.useSprite === false) {
-        spriteStatus.textContent = "Sprite car mode is off. Preset colors are shown with the classic canvas car.";
+        spriteStatus.textContent = "Classic car preview";
       } else if (status === "loaded") {
-        spriteStatus.textContent = `Using sprite asset: ${path}. ${paintDetail}`;
+        spriteStatus.textContent = "Sprite look ready";
       } else if (status === "loading") {
-        spriteStatus.textContent = `Looking for sprite asset: ${path}. Falling back to canvas until it loads.`;
+        spriteStatus.textContent = "Sprite look loading";
       } else {
-        spriteStatus.textContent = `Sprite asset not loaded: ${path}. Showing classic canvas fallback with selected colors.`;
+        spriteStatus.textContent = "Classic car preview";
       }
     }
   }
