@@ -29603,7 +29603,7 @@ class NeonRoadRally {
   renderPartyDriverRows(players, selectedIds, selectedPlayers) {
     return `
       <div class="party-driver-list" aria-label="Party drivers">
-        ${players.map((player) => {
+        ${players.length ? players.map((player) => {
           const selected = selectedIds.has(player.id);
           const disabled = !selected && selectedPlayers.length >= PARTY_MAX_PLAYERS;
           const badgeProgress = this.profiles.getPlayerBadgeProgress(player);
@@ -29616,10 +29616,19 @@ class NeonRoadRally {
                 <strong>${escapeHtml(player.name)}</strong>
                 <span>${escapeHtml(carLabel)} · Best ${formatScore(player.bestScore)} · ${badgeProgress.earnedCount}/${badgeProgress.totalCount} badges</span>
               </div>
-              <button class="small-button party-driver-toggle ${selected ? "is-on" : "primary"}" data-action="partyTogglePlayer" data-id="${escapeAttr(player.id)}" ${disabled ? "disabled" : ""}>${selected ? "In" : "Add"}</button>
+              <button class="small-button party-driver-toggle ${selected ? "is-on" : ""}" data-action="partyTogglePlayer" data-id="${escapeAttr(player.id)}" ${disabled ? "disabled" : ""}>${selected ? "In" : "Add"}</button>
             </div>
           `;
-        }).join("")}
+        }).join("") : `
+          <div class="party-driver-row party-driver-empty">
+            <span class="avatar-tile" aria-hidden="true"></span>
+            <div>
+              <strong>No drivers yet</strong>
+              <span>Add two drivers to start.</span>
+            </div>
+            <span class="party-driver-toggle" aria-hidden="true"></span>
+          </div>
+        `}
       </div>
     `;
   }
@@ -29649,45 +29658,6 @@ class NeonRoadRally {
     this.setScreen("partySetup");
     this.audio.playMusic("title", false);
     const players = this.profiles.data.players;
-    if (players.length < PARTY_MIN_PLAYERS) {
-      this.layer.classList.remove("is-empty");
-      this.layer.innerHTML = `
-        <section class="panel compact">
-          <h2>Party Mode</h2>
-          <p class="hint">Add at least two local drivers, then pass the keyboard after each run.</p>
-          <div class="driver-card-grid party-driver-grid">
-            ${players.length ? players.map((player) => this.renderDriverCard(player, { context: "party", selectedIds: new Set(), currentId: this.profiles.data.currentPlayerId })).join("") : `<p class="hint">No local drivers yet.</p>`}
-          </div>
-          <div class="field" style="margin-top:16px">
-            <label for="partyNewDriverName">New Driver Name</label>
-            <input id="partyNewDriverName" type="text" maxlength="${LOCAL_PLAYER_NAME_MAX_LENGTH}" value="" placeholder="DRIVER ${players.length + 1}">
-          </div>
-          <div class="row" style="margin-top:16px">
-            <button class="small-button primary" data-action="partyQuickAddDriver">Add Driver</button>
-            <button class="small-button" data-action="players">Driver Garage</button>
-            <button class="small-button" data-action="howToPlay">How To Play</button>
-            <button class="small-button" data-action="title">Back to Title</button>
-          </div>
-          <p class="status-line">${escapeHtml(message || "Party Mode needs 2-8 local players.")}</p>
-        </section>
-      `;
-      this.bindLayerButtons();
-      const partyInput = document.getElementById("partyNewDriverName");
-      if (partyInput) {
-        partyInput.addEventListener("keydown", (event) => {
-          if (event.key === "Enter") {
-            event.preventDefault();
-            if (event.repeat) return;
-            this.audio.activate();
-            this.audio.playSfx("menu");
-            this.handlePartyQuickAddDriver();
-          }
-        });
-      }
-      this.renderDriverMiniPreviews();
-      return;
-    }
-
     const setup = this.getPartySetup();
     const track = getTrackById(setup.trackId);
     setup.raceType = normalizePartyRaceType(setup.raceType, track);
@@ -29695,128 +29665,144 @@ class NeonRoadRally {
     const selectedPlayers = this.getPartySetupSelectedPlayers();
     const selectedIds = new Set(setup.selectedPlayerIds);
     const driverSummary = `${selectedPlayers.length} ${selectedPlayers.length === 1 ? "driver" : "drivers"}`;
+    const partyRaceTypes = getPartyRaceTypesForTrack(track, partyRaceType.id);
+    const partyRaceTypeToggle = `
+      <div class="segmented segmented--cyan party-race-type-toggle" aria-label="Race Type">
+        ${partyRaceTypes.map((raceType) => `
+          <button type="button" aria-pressed="${raceType.id === partyRaceType.id ? "true" : "false"}" data-race-type-choice="party" data-value="${escapeAttr(raceType.id)}">
+            ${escapeHtml(raceType.label)}
+          </button>
+        `).join("")}
+      </div>
+    `;
     this.layer.classList.remove("is-empty");
     this.layer.innerHTML = `
-      <section class="panel party-panel party-setup-simple">
-        <div class="party-setup-title-row">
-          <div>
-            <span class="eyebrow">Party Mode</span>
-            <h2>Set Up Party</h2>
+      <section class="party-panel party-setup-screen nrr">
+        <div class="nrr-bg" aria-hidden="true"></div>
+        <div class="party-setup-page page">
+          <div class="page-head party-setup-title-row">
+            <div class="party-title-copy">
+              <span class="crumb">Title &gt; Party Mode</span>
+              <h1>Set Up Party</h1>
+            </div>
+            <div class="actions party-title-actions">
+              <button class="btn btn--ghost" data-action="howToPlay">How To Play</button>
+              <button class="btn btn--ghost" data-action="title">Back</button>
+            </div>
           </div>
-          <div class="row party-title-actions">
-            <button class="small-button" data-action="howToPlay">How To Play</button>
-            <button class="small-button" data-action="title">Back</button>
+
+          <div class="setup-sticky-action party-start-action" aria-label="Start current party setup">
+            <div class="party-start-copy">
+              <span class="label">Start</span>
+              <strong id="partySetupActionSummary">${escapeHtml(driverSummary)} · ${escapeHtml(partyRaceType.label)} · ${escapeHtml(track.name)} · ${escapeHtml(getSpeedClassLabel(setup.raceMode))}</strong>
+            </div>
+            <button class="btn btn--primary btn--lg" data-action="partyStartRound" ${selectedPlayers.length < PARTY_MIN_PLAYERS ? "disabled" : ""}>Start Party Race</button>
           </div>
-        </div>
-        <div class="setup-sticky-action party-start-action" aria-label="Start current party setup">
-          <div>
-            <span class="eyebrow">Start</span>
-            <strong id="partySetupActionSummary">${escapeHtml(driverSummary)} · ${escapeHtml(partyRaceType.label)} · ${escapeHtml(track.name)} · ${escapeHtml(getSpeedClassLabel(setup.raceMode))}</strong>
+
+          <div class="party-setup-main">
+            <section class="party-setup-section party-drivers-section">
+              <div class="setup-section-heading">
+                <span class="eyebrow">Drivers</span>
+                <strong>${selectedPlayers.length}/${PARTY_MAX_PLAYERS} selected</strong>
+              </div>
+              <div class="party-driver-tools">
+                <div class="field">
+                  <label for="partyNewDriverName">Add Driver</label>
+                  <input id="partyNewDriverName" type="text" maxlength="${LOCAL_PLAYER_NAME_MAX_LENGTH}" value="" placeholder="DRIVER ${players.length + 1}">
+                </div>
+                <button class="btn btn--secondary party-add-driver-button" data-action="partyQuickAddDriver">Add Driver</button>
+              </div>
+              ${this.renderPartyDriverRows(players, selectedIds, selectedPlayers)}
+              <details class="party-mini-details party-manage-details">
+                <summary>Manage Drivers</summary>
+                <div class="party-quick-rename">
+                  <div class="field">
+                    <label for="partyRenamePlayer">Driver</label>
+                    <select id="partyRenamePlayer">
+                      ${players.map((player) => `<option value="${escapeAttr(player.id)}" ${selectedIds.has(player.id) ? "selected" : ""}>${escapeHtml(player.name)}</option>`).join("")}
+                    </select>
+                  </div>
+                  <div class="field">
+                    <label for="partyRenameName">New Name</label>
+                    <input id="partyRenameName" type="text" maxlength="${LOCAL_PLAYER_NAME_MAX_LENGTH}" value="" placeholder="Driver name">
+                  </div>
+                  <button class="small-button" data-action="partyInlineRenamePlayer">Save</button>
+                  <button class="small-button" data-action="players">Garage</button>
+                </div>
+                <ol class="profile-list party-order-list party-order-compact">
+                  ${selectedPlayers.length ? selectedPlayers.map((player, index) => `
+                    <li class="profile-item party-order-card">
+                      <strong>${index + 1}. ${escapeHtml(player.name)}</strong>
+                      <div class="row">
+                        <button class="small-button" data-action="partyMovePlayer" data-id="${escapeAttr(player.id)}" data-dir="-1" ${index === 0 ? "disabled" : ""}>Up</button>
+                        <button class="small-button" data-action="partyMovePlayer" data-id="${escapeAttr(player.id)}" data-dir="1" ${index === selectedPlayers.length - 1 ? "disabled" : ""}>Down</button>
+                        <button class="small-button" data-action="partyRemovePlayer" data-id="${escapeAttr(player.id)}">Remove</button>
+                      </div>
+                    </li>
+                  `).join("") : `<li class="profile-item"><span class="meta">Choose 2-${PARTY_MAX_PLAYERS} drivers.</span></li>`}
+                </ol>
+              </details>
+            </section>
+
+            <section class="party-setup-section party-shared-race-section">
+              <div class="setup-section-heading">
+                <span class="eyebrow">Shared Race</span>
+                <strong>${escapeHtml(track.name)} · ${escapeHtml(partyRaceType.label)} · ${escapeHtml(getSpeedClassLabel(setup.raceMode))}</strong>
+              </div>
+              <div class="field party-field-compact party-track-field">
+                <label>Track</label>
+                ${this.renderTrackSelect("partyTrack", track.id, { compact: true, simple: true })}
+              </div>
+              <div class="party-race-row">
+                <div class="field party-field-compact">
+                  <label class="party-visible-label" for="partyRaceType">Race Type</label>
+                  <select id="partyRaceType" class="setup-hidden-select" aria-hidden="true" tabindex="-1">
+                    ${partyRaceTypes.map((raceType) => `<option value="${escapeAttr(raceType.id)}" ${raceType.id === partyRaceType.id ? "selected" : ""}>${escapeHtml(raceType.label)}</option>`).join("")}
+                  </select>
+                  ${partyRaceTypeToggle}
+                </div>
+                <div class="field party-field-compact">
+                  <label for="partyRaceMode">Speed</label>
+                  ${this.renderSpeedClassLadder(track, setup.raceMode, { compact: true })}
+                  <select id="partyRaceMode" class="setup-hidden-select" aria-hidden="true" tabindex="-1">
+                    ${this.renderSpeedClassOptionsForTrack(track, setup.raceMode)}
+                  </select>
+                </div>
+              </div>
+              <details class="party-mini-details party-options-panel">
+                <summary>Party Options</summary>
+                <div class="party-rules-grid">
+                  <div class="field">
+                    <label for="partyRoundType">Round</label>
+                    <select id="partyRoundType">
+                      ${PARTY_ROUND_TYPES.map((item) => `<option value="${escapeAttr(item.id)}" ${item.id === setup.roundType ? "selected" : ""}>${escapeHtml(item.label)}${item.totalRounds > 1 ? ` - ${item.totalRounds} runs each` : ""}</option>`).join("")}
+                    </select>
+                  </div>
+                  <div class="field">
+                    <label for="partySeedMode">Road</label>
+                    <select id="partySeedMode">
+                      ${PARTY_SEED_MODES.map((item) => `<option value="${escapeAttr(item.id)}" ${item.id === setup.seedMode ? "selected" : ""}>${escapeHtml(item.label)}</option>`).join("")}
+                    </select>
+                  </div>
+                  <div class="field">
+                    <label for="partyStartingOrder">Order</label>
+                    <select id="partyStartingOrder">
+                      ${PARTY_STARTING_ORDER_MODES.map((item) => `<option value="${escapeAttr(item.id)}" ${item.id === setup.startingOrderMode ? "selected" : ""}>${escapeHtml(item.label)}</option>`).join("")}
+                    </select>
+                  </div>
+                  <div class="field">
+                    <label for="partySeedInput">Road Code</label>
+                    <input id="partySeedInput" type="text" maxlength="${ROAD_SEED_MAX_LENGTH}" value="${escapeAttr(setup.sharedSeed)}" autocomplete="off" spellcheck="false" inputmode="text">
+                  </div>
+                </div>
+                <div class="row setup-action-row">
+                  <button class="small-button" data-action="partyRandomSeed">Random Road</button>
+                </div>
+              </details>
+            </section>
           </div>
-          <button class="small-button primary" data-action="partyStartRound" ${selectedPlayers.length < PARTY_MIN_PLAYERS ? "disabled" : ""}>Start Party Round</button>
+          <div class="status-line party-status-line" role="status">${message ? escapeHtml(message) : ""}</div>
         </div>
-        <div class="party-setup-main">
-          <section class="party-setup-section">
-            <div class="setup-section-heading">
-              <span class="eyebrow">Drivers</span>
-              <strong>${selectedPlayers.length}/${PARTY_MAX_PLAYERS} selected</strong>
-            </div>
-            <div class="party-driver-tools">
-              <div class="field">
-                <label for="partyNewDriverName">Add Driver</label>
-                <input id="partyNewDriverName" type="text" maxlength="${LOCAL_PLAYER_NAME_MAX_LENGTH}" value="" placeholder="DRIVER ${players.length + 1}">
-              </div>
-              <button class="small-button" data-action="partyQuickAddDriver">Add</button>
-            </div>
-            ${this.renderPartyDriverRows(players, selectedIds, selectedPlayers)}
-            <details class="party-mini-details party-manage-details">
-              <summary>Manage Drivers</summary>
-              <div class="party-quick-rename">
-                <div class="field">
-                  <label for="partyRenamePlayer">Driver</label>
-                  <select id="partyRenamePlayer">
-                    ${players.map((player) => `<option value="${escapeAttr(player.id)}" ${selectedIds.has(player.id) ? "selected" : ""}>${escapeHtml(player.name)}</option>`).join("")}
-                  </select>
-                </div>
-                <div class="field">
-                  <label for="partyRenameName">New Name</label>
-                  <input id="partyRenameName" type="text" maxlength="${LOCAL_PLAYER_NAME_MAX_LENGTH}" value="" placeholder="Driver name">
-                </div>
-                <button class="small-button" data-action="partyInlineRenamePlayer">Save</button>
-                <button class="small-button" data-action="players">Garage</button>
-              </div>
-              <ol class="profile-list party-order-list party-order-compact">
-                ${selectedPlayers.length ? selectedPlayers.map((player, index) => `
-                  <li class="profile-item party-order-card">
-                    <strong>${index + 1}. ${escapeHtml(player.name)}</strong>
-                    <div class="row">
-                      <button class="small-button" data-action="partyMovePlayer" data-id="${escapeAttr(player.id)}" data-dir="-1" ${index === 0 ? "disabled" : ""}>Up</button>
-                      <button class="small-button" data-action="partyMovePlayer" data-id="${escapeAttr(player.id)}" data-dir="1" ${index === selectedPlayers.length - 1 ? "disabled" : ""}>Down</button>
-                      <button class="small-button" data-action="partyRemovePlayer" data-id="${escapeAttr(player.id)}">Remove</button>
-                    </div>
-                  </li>
-                `).join("") : `<li class="profile-item"><span class="meta">Choose 2-${PARTY_MAX_PLAYERS} drivers.</span></li>`}
-              </ol>
-            </details>
-          </section>
-          <section class="party-setup-section">
-            <div class="setup-section-heading">
-              <span class="eyebrow">Shared Race</span>
-              <strong>${escapeHtml(track.name)} · ${escapeHtml(partyRaceType.label)} · ${escapeHtml(getSpeedClassLabel(setup.raceMode))}</strong>
-            </div>
-            <div class="field party-field-compact">
-              <label>Track</label>
-              ${this.renderTrackSelect("partyTrack", track.id, { compact: true, simple: true })}
-            </div>
-            <div class="party-race-row">
-              <div class="field">
-                <label class="setup-hidden-label" for="partyRaceType">Race Type</label>
-                <select id="partyRaceType" class="setup-hidden-select" aria-hidden="true" tabindex="-1">
-                  ${getPartyRaceTypesForTrack(track, partyRaceType.id).map((raceType) => `<option value="${escapeAttr(raceType.id)}" ${raceType.id === partyRaceType.id ? "selected" : ""}>${escapeHtml(raceType.label)}</option>`).join("")}
-                </select>
-                ${this.renderRaceTypeExplainCards(track, partyRaceType.id, "party", { party: true, compact: true })}
-              </div>
-              <div class="field">
-                <label for="partyRaceMode">Speed</label>
-                ${this.renderSpeedClassLadder(track, setup.raceMode, { compact: true })}
-                <select id="partyRaceMode" class="setup-hidden-select" aria-hidden="true" tabindex="-1">
-                  ${this.renderSpeedClassOptionsForTrack(track, setup.raceMode)}
-                </select>
-              </div>
-            </div>
-            <details class="party-mini-details party-options-panel">
-              <summary>Party Options</summary>
-              <div class="party-rules-grid">
-                <div class="field">
-                  <label for="partyRoundType">Round</label>
-                  <select id="partyRoundType">
-                    ${PARTY_ROUND_TYPES.map((item) => `<option value="${escapeAttr(item.id)}" ${item.id === setup.roundType ? "selected" : ""}>${escapeHtml(item.label)}${item.totalRounds > 1 ? ` - ${item.totalRounds} runs each` : ""}</option>`).join("")}
-                  </select>
-                </div>
-                <div class="field">
-                  <label for="partySeedMode">Road</label>
-                  <select id="partySeedMode">
-                    ${PARTY_SEED_MODES.map((item) => `<option value="${escapeAttr(item.id)}" ${item.id === setup.seedMode ? "selected" : ""}>${escapeHtml(item.label)}</option>`).join("")}
-                  </select>
-                </div>
-                <div class="field">
-                  <label for="partyStartingOrder">Order</label>
-                  <select id="partyStartingOrder">
-                    ${PARTY_STARTING_ORDER_MODES.map((item) => `<option value="${escapeAttr(item.id)}" ${item.id === setup.startingOrderMode ? "selected" : ""}>${escapeHtml(item.label)}</option>`).join("")}
-                  </select>
-                </div>
-                <div class="field">
-                  <label for="partySeedInput">Road Code</label>
-                  <input id="partySeedInput" type="text" maxlength="${ROAD_SEED_MAX_LENGTH}" value="${escapeAttr(setup.sharedSeed)}" autocomplete="off" spellcheck="false" inputmode="text">
-                </div>
-              </div>
-              <div class="row setup-action-row">
-                <button class="small-button" data-action="partyRandomSeed">Random Road</button>
-              </div>
-            </details>
-          </section>
-        </div>
-        <p class="status-line">${message ? escapeHtml(message) : ""}</p>
       </section>
     `;
     this.bindLayerButtons();

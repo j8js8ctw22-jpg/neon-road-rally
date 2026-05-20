@@ -231,7 +231,7 @@ async function run() {
       startActionCount: partySetupUi.startActionCount
     })}`);
   }
-  if (partySetupUi.startTop > 360) throw new Error(`Start Party Round should remain high in the setup flow: ${partySetupUi.startTop}`);
+  if (partySetupUi.startTop > 360) throw new Error(`Start Party Race should remain high in the setup flow: ${partySetupUi.startTop}`);
   if (!/3 drivers · Classic · .* · /.test(partySetupUi.startSummary)) {
     throw new Error(`Start summary should use selected settings once: ${partySetupUi.startSummary}`);
   }
@@ -298,7 +298,7 @@ async function run() {
   await setPartyOption("#partyStartingOrder", "randomOnce");
   await setPartyOption("#partyStartingOrder", "randomEveryRound");
   await page.selectOption("#partyRoundType", "bestOf3");
-  await page.getByRole("button", { name: /Start Party Round/i }).first().click();
+  await page.getByRole("button", { name: /Start Party Race/i }).first().click();
   await page.waitForFunction(() => window.neonRoadRally?.screen === "partyTurn", null, { timeout: 5000 });
   await expectText("Starting Order");
   await expectText("At the keyboard now");
@@ -334,7 +334,7 @@ async function run() {
   await openPartyOptions();
   await page.selectOption("#partyRoundType", "oneRunEach");
   await page.selectOption("#partyStartingOrder", "randomOnce");
-  await page.getByRole("button", { name: /Start Party Round/i }).first().click();
+  await page.getByRole("button", { name: /Start Party Race/i }).first().click();
   await page.waitForFunction(() => window.neonRoadRally?.screen === "partyTurn", null, { timeout: 5000 });
 
   const fuelRuns = [
