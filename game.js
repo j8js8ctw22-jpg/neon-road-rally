@@ -19216,7 +19216,7 @@ class Renderer {
 
   drawSectionNotice() {
     const run = this.game.run;
-    if (!ARCADE_FEEL.enabled || !run || run.sectionNoticeTimer <= 0 || this.game.screen !== "game") return;
+    if (!ARCADE_FEEL.enabled || !run || run.sectionNoticeTimer <= 0 || run.raceStateCalloutTimer > 0 || this.game.screen !== "game") return;
     const label = String(run.currentSectionLabel || "").toUpperCase();
     if (!label) return;
     const t = clamp(run.sectionNoticeTimer / 1.25, 0, 1);
@@ -19244,92 +19244,288 @@ class Renderer {
     ctx.restore();
   }
 
+  getLiveHudRouteLabel(run) {
+    const routeName = run.officialRouteName || run.track?.name || "Route";
+    if (run.partyMode) return `${run.player?.name || "Party"} · ${run.track?.name || "Shared Race"}`;
+    if (run.challengeMode) return run.challengeName || "Challenge Run";
+    return routeName;
+  }
+
+  getLiveHudTopParts(run, progress) {
+    const enduranceRun = isOfficialEnduranceRun(run);
+    const modeLabel = run.speedClass?.label || getSpeedClassLabel(run.speedClassId);
+    const raceTypeLabel = enduranceRun ? "Bonus Survival" : getRaceTypeLabel(run.raceTypeId);
+    const sectionLabel = String(run.currentSectionLabel || getTrackSection(run.track, progress).label || "").toUpperCase();
+    if (enduranceRun) {
+      const officialTimeText = run.officialFinishTimeMs !== null && run.officialFinishTimeMs !== undefined
+        ? formatFinishTimeMs(run.officialFinishTimeMs)
+        : "Locked";
+      return {
+        left: `Lap ${getOfficialEnduranceLapNumber(run)} · ${Math.round(progress * 100)}%`,
+        center: `Official ${officialTimeText} locked`,
+        right: `Survive ${formatTime(run.officialEnduranceSurvivalTime || 0)}`
+      };
+    }
+    if (run.partyMode) {
+      return {
+        left: `Party ${run.partyTurnNumber || 1}/${Math.max(1, run.partyTotalPlayers || 1)}`,
+        center: this.getLiveHudRouteLabel(run),
+        right: `Round ${run.partyRoundNumber || 1}/${Math.max(1, run.partyTotalRounds || 1)} · ${raceTypeLabel}`
+      };
+    }
+    return {
+      left: sectionLabel || raceTypeLabel,
+      center: this.getLiveHudRouteLabel(run),
+      right: `${raceTypeLabel} · ${modeLabel}`
+    };
+  }
+
+  getLiveHudCallout(run) {
+    if (!run || run.raceStateCalloutTimer <= 0 || !run.raceStateCalloutText) return null;
+    const text = sanitizeName(run.raceStateCalloutText, "", DISPLAY_TEXT_MAX_LENGTH);
+    if (!text) return null;
+    const tone = String(run.raceStateCalloutTone || "info").toLowerCase();
+    const color = tone === "danger" ? "#ff4d6d" : (tone === "boost" ? "#ff3d9a" : "#ffd23f");
+    return { text, color };
+  }
+
+  drawLiveHudTopStrip(ctx, run, progress) {
+    const parts = this.getLiveHudTopParts(run, progress);
+    const w = this.width;
+    const stripH = 36;
+    ctx.save();
+    const fade = ctx.createLinearGradient(0, 0, 0, stripH);
+    fade.addColorStop(0, "rgba(0, 0, 0, 0.62)");
+    fade.addColorStop(1, "rgba(0, 0, 0, 0)");
+    ctx.fillStyle = fade;
+    ctx.fillRect(0, 0, w, stripH);
+    ctx.strokeStyle = "rgba(140, 110, 255, 0.18)";
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(0, stripH - 0.5);
+    ctx.lineTo(w, stripH - 0.5);
+    ctx.stroke();
+    ctx.font = "700 11px 'JetBrains Mono', 'IBM Plex Mono', monospace";
+    ctx.textBaseline = "middle";
+    ctx.textAlign = "left";
+    ctx.fillStyle = "#ffd23f";
+    drawFittedText(ctx, parts.left, 22, stripH / 2, Math.max(150, w * 0.28));
+    ctx.textAlign = "center";
+    ctx.fillStyle = "#5ee8ff";
+    drawFittedText(ctx, parts.center, w / 2, stripH / 2, Math.max(180, w * 0.38));
+    ctx.textAlign = "right";
+    ctx.fillStyle = "#ffd23f";
+    drawFittedText(ctx, parts.right, w - 22, stripH / 2, Math.max(150, w * 0.28));
+    ctx.restore();
+  }
+
+  drawLiveHudScore(ctx, run) {
+    const w = this.width;
+    const compact = w < 760;
+    const x = w - (compact ? 22 : 36);
+    const y = compact ? 48 : 56;
+    ctx.save();
+    ctx.textAlign = "right";
+    ctx.textBaseline = "top";
+    ctx.shadowBlur = 30;
+    ctx.shadowColor = "rgba(0, 0, 0, 0.72)";
+    ctx.fillStyle = "#ffd23f";
+    ctx.font = "700 10px 'JetBrains Mono', 'IBM Plex Mono', monospace";
+    ctx.fillText("SCORE", x, y);
+    ctx.fillStyle = "#f3f0ff";
+    ctx.font = `700 ${compact ? 42 : 56}px 'JetBrains Mono', 'IBM Plex Mono', monospace`;
+    ctx.fillText(formatScore(run.score), x, y + 16);
+    if (isOfficialEnduranceRun(run)) {
+      ctx.fillStyle = "#ffd23f";
+      ctx.font = "700 11px 'JetBrains Mono', 'IBM Plex Mono', monospace";
+      drawFittedText(ctx, `BONUS ${formatScore(run.officialEndurancePostScore || 0)} · SURVIVAL`, x, y + (compact ? 62 : 76), compact ? 250 : 320);
+    } else if (run.paceFeedbackText && run.comparableBestTimeMs !== null) {
+      ctx.fillStyle = "#4dffa8";
+      ctx.font = "700 12px 'JetBrains Mono', 'IBM Plex Mono', monospace";
+      drawFittedText(ctx, `PB PACE ${String(run.paceFeedbackText).toUpperCase()}`, x, y + (compact ? 62 : 76), compact ? 230 : 280);
+    }
+    ctx.restore();
+  }
+
+  drawLiveHudSpeed(ctx, run) {
+    const w = this.width;
+    const h = this.height;
+    const compact = w < 760 || h < 680;
+    const x = compact ? 22 : 36;
+    const y = h - (compact ? 118 : 142);
+    const modeLabel = run.speedClass?.label || getSpeedClassLabel(run.speedClassId);
+    ctx.save();
+    ctx.textAlign = "left";
+    ctx.textBaseline = "top";
+    ctx.shadowBlur = 30;
+    ctx.shadowColor = "rgba(0, 0, 0, 0.72)";
+    ctx.fillStyle = "#ffd23f";
+    ctx.font = "700 10px 'JetBrains Mono', 'IBM Plex Mono', monospace";
+    ctx.fillText("SPEED", x, y);
+    ctx.fillStyle = (run.boostTimer > 0 || run.padBoostTimer > 0 || run.driftBoostTimer > 0) ? "#ff3d9a" : "#f3f0ff";
+    ctx.font = `700 ${compact ? 58 : 82}px 'JetBrains Mono', 'IBM Plex Mono', monospace`;
+    const speedText = String(Math.round(run.currentSpeed || 0));
+    ctx.fillText(speedText, x, y + 14);
+    const speedWidth = ctx.measureText(speedText).width;
+    ctx.fillStyle = "rgba(243, 240, 255, 0.6)";
+    ctx.font = `700 ${compact ? 15 : 20}px 'JetBrains Mono', 'IBM Plex Mono', monospace`;
+    ctx.fillText("MPH", x + speedWidth + 10, y + (compact ? 51 : 74));
+    ctx.fillStyle = "rgba(243, 240, 255, 0.58)";
+    ctx.font = "700 11px 'JetBrains Mono', 'IBM Plex Mono', monospace";
+    drawFittedText(ctx, `${modeLabel} CLASS`, x, y + (compact ? 88 : 112), compact ? 260 : 320);
+    ctx.restore();
+  }
+
+  drawLiveHudBoost(ctx, run) {
+    const w = this.width;
+    const h = this.height;
+    const compact = w < 760 || h < 680;
+    const x = w - (compact ? 22 : 36);
+    const y = h - (compact ? 92 : 104);
+    const total = 3;
+    const boosts = clamp(Math.round(run.manualBoosts || 0), 0, total);
+    const ready = boosts > 0 && run.raceActive && !run.ended;
+    ctx.save();
+    ctx.textAlign = "right";
+    ctx.textBaseline = "top";
+    ctx.shadowBlur = 24;
+    ctx.shadowColor = "rgba(0, 0, 0, 0.74)";
+    ctx.fillStyle = "#ffd23f";
+    ctx.font = "700 10px 'JetBrains Mono', 'IBM Plex Mono', monospace";
+    ctx.fillText("BOOST", x, y);
+    const dotW = compact ? 24 : 28;
+    const dotH = compact ? 9 : 10;
+    const gap = 6;
+    const dotsW = total * dotW + (total - 1) * gap;
+    const startX = x - dotsW;
+    const dotY = y + 24;
+    for (let i = 0; i < total; i += 1) {
+      const dx = startX + i * (dotW + gap);
+      const filled = i < boosts;
+      ctx.fillStyle = filled ? "#ff3d9a" : "rgba(255, 255, 255, 0.04)";
+      ctx.strokeStyle = filled ? "#ff3d9a" : "rgba(140, 110, 255, 0.32)";
+      ctx.lineWidth = 1;
+      ctx.shadowBlur = filled ? 12 : 0;
+      ctx.shadowColor = "#ff3d9a";
+      ctx.beginPath();
+      ctx.roundRect(dx, dotY, dotW, dotH, 3);
+      ctx.fill();
+      ctx.stroke();
+    }
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = ready ? "#ff3d9a" : "rgba(243, 240, 255, 0.42)";
+    ctx.font = "700 11px 'JetBrains Mono', 'IBM Plex Mono', monospace";
+    ctx.fillText(ready ? "SPACE READY" : "CHARGING", x, dotY + 18);
+    ctx.restore();
+  }
+
+  drawLiveHudProgress(ctx, run, progress) {
+    const w = this.width;
+    const h = this.height;
+    const compact = w < 760;
+    const barW = Math.min(compact ? w - 300 : 440, Math.max(180, w * 0.38));
+    if (barW < 140) return;
+    const x = w / 2 - barW / 2;
+    const y = h - (compact ? 30 : 32);
+    const label = isOfficialEnduranceRun(run)
+      ? `LAP ${getOfficialEnduranceLapNumber(run)} · ${Math.round(progress * 100)}%`
+      : `ROUTE PROGRESS · ${Math.round(progress * 100)}%`;
+    ctx.save();
+    ctx.textAlign = "center";
+    ctx.textBaseline = "bottom";
+    ctx.shadowBlur = 24;
+    ctx.shadowColor = "rgba(0, 0, 0, 0.72)";
+    ctx.fillStyle = "rgba(243, 240, 255, 0.58)";
+    ctx.font = "700 10px 'JetBrains Mono', 'IBM Plex Mono', monospace";
+    ctx.fillText(label, w / 2, y - 8);
+    ctx.fillStyle = "rgba(140, 110, 255, 0.18)";
+    ctx.fillRect(x, y, barW, 4);
+    const gradient = ctx.createLinearGradient(x, y, x + barW, y);
+    gradient.addColorStop(0, "#5ee8ff");
+    gradient.addColorStop(1, "#ff3d9a");
+    ctx.fillStyle = gradient;
+    ctx.shadowBlur = 12;
+    ctx.shadowColor = "#5ee8ff";
+    ctx.fillRect(x, y, barW * clamp(progress, 0, 1), 4);
+    ctx.restore();
+  }
+
+  drawLiveHudFuel(ctx, run) {
+    if (!isFuelRunRaceType(run.raceTypeId)) return;
+    const w = this.width;
+    const h = this.height;
+    const max = Math.max(1, run.fuelMax || FUEL_RUN_CONFIG.fuelMax);
+    const fuel = clamp(Number.isFinite(run.fuel) ? run.fuel : 0, 0, max);
+    const pct = clamp(fuel / max, 0, 1);
+    const critical = run.criticalFuelActive || fuel <= (run.criticalFuelThreshold || max * 0.18);
+    const low = run.lowFuelActive || fuel <= (run.lowFuelThreshold || max * 0.33);
+    const color = critical ? "#ff4d6d" : (low ? "#ffd23f" : "#4dffa8");
+    const gaugeH = Math.min(190, Math.max(142, h * 0.24));
+    const x = w - 44;
+    const y = h * 0.5 - gaugeH / 2;
+    const barW = 16;
+    ctx.save();
+    ctx.textAlign = "right";
+    ctx.textBaseline = "top";
+    ctx.shadowBlur = 26;
+    ctx.shadowColor = "rgba(0, 0, 0, 0.72)";
+    ctx.fillStyle = "#ffd23f";
+    ctx.font = "700 10px 'JetBrains Mono', 'IBM Plex Mono', monospace";
+    ctx.fillText("FUEL", x + barW, y - 23);
+    ctx.fillStyle = "rgba(0, 0, 0, 0.5)";
+    ctx.strokeStyle = "rgba(140, 110, 255, 0.32)";
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.roundRect(x, y, barW, gaugeH, 2);
+    ctx.fill();
+    ctx.stroke();
+    const fillH = Math.max(0, gaugeH * pct - 4);
+    ctx.fillStyle = color;
+    ctx.shadowBlur = critical || low ? 16 : 10;
+    ctx.shadowColor = color;
+    ctx.fillRect(x + 2, y + gaugeH - 2 - fillH, barW - 4, fillH);
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = color;
+    ctx.font = "700 18px 'JetBrains Mono', 'IBM Plex Mono', monospace";
+    ctx.fillText(`${Math.ceil(fuel)}%`, x + barW, y + gaugeH + 8);
+    if (critical || low) {
+      ctx.fillStyle = critical ? "#ff4d6d" : "#ffd23f";
+      ctx.font = "700 10px 'JetBrains Mono', 'IBM Plex Mono', monospace";
+      ctx.fillText(critical ? "CRITICAL" : "LOW", x + barW, y + gaugeH + 32);
+    }
+    ctx.restore();
+  }
+
+  drawLiveHudCallout(ctx, run) {
+    const callout = this.getLiveHudCallout(run);
+    if (!callout) return;
+    const t = clamp(run.raceStateCalloutTimer / 1.4, 0, 1);
+    const alpha = Math.min(1, t * 1.8);
+    const y = this.height < 700 ? 88 : 100;
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillStyle = callout.color;
+    ctx.shadowBlur = 32;
+    ctx.shadowColor = callout.color;
+    ctx.font = `700 ${this.width < 760 ? 34 : 52}px 'Antonio', 'Oswald', Impact, sans-serif`;
+    drawFittedText(ctx, callout.text.toUpperCase(), this.width / 2, y, Math.max(240, this.width - 420));
+    ctx.restore();
+  }
+
   drawHud() {
     const ctx = this.ctx;
     const run = this.game.run;
     const w = this.width;
     const progress = clamp(run.distance / run.track.distanceToFinish, 0, 1);
-    const modeLabel = run.speedClass?.label || getSpeedClassLabel(run.speedClassId);
-    const enduranceRun = isOfficialEnduranceRun(run);
-    const raceTypeLabel = enduranceRun ? "Endurance" : getRaceTypeLabel(run.raceTypeId);
-    const hudHeight = CAMERA_CONFIG.hudHeight;
-    const hudItems = w >= 760
-      ? [
-        ["PLAYER", run.player.name],
-        ["SCORE", formatScore(run.score)],
-        ["SPEED", `${Math.round(run.currentSpeed)} MPH`],
-        ["BOOST", `${run.manualBoosts}/3`],
-        ["TYPE", raceTypeLabel],
-        ["MODE", modeLabel]
-      ]
-      : [
-        ["SCORE", formatScore(run.score)],
-        ["SPEED", `${Math.round(run.currentSpeed)}`],
-        ["BOOST", `${run.manualBoosts}/3`],
-        ["TYPE", getRaceTypeConfig(run.raceTypeId).shortLabel || raceTypeLabel],
-        ["MODE", modeLabel]
-      ];
-    ctx.save();
-    ctx.fillStyle = "rgba(5, 7, 18, 0.82)";
-    ctx.fillRect(0, 0, w, hudHeight);
-    ctx.strokeStyle = "rgba(40, 246, 255, 0.7)";
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.moveTo(0, hudHeight);
-    ctx.lineTo(w, hudHeight);
-    ctx.stroke();
-
-    ctx.font = "700 14px Trebuchet MS, Verdana, sans-serif";
-    ctx.fillStyle = "#f6fbff";
-    ctx.textBaseline = "top";
-    const left = 16;
-    const col = (w - left * 2) / hudItems.length;
-    hudItems.forEach(([label, value], index) => {
-      drawHudLabel(ctx, label, value, left + col * index, 6, Math.max(54, col - 10));
-    });
-
-    const barX = 16;
-    const barY = 40;
-    const barW = Math.min(w - 32, w >= 760 ? 460 : 320);
-    ctx.fillStyle = "rgba(255, 255, 255, 0.14)";
-    ctx.fillRect(barX, barY, barW, 8);
-    ctx.fillStyle = "#44ff99";
-    ctx.shadowBlur = 12;
-    ctx.shadowColor = "#44ff99";
-    ctx.fillRect(barX, barY, barW * progress, 8);
-    ctx.shadowBlur = 0;
-    ctx.fillStyle = "#b8c6d9";
-    ctx.font = "700 11px Trebuchet MS, Verdana, sans-serif";
-    const sectionLabel = String(run.currentSectionLabel || getTrackSection(run.track, progress).label || "").toUpperCase();
-    const contextParts = enduranceRun
-      ? getOfficialEnduranceHudContextParts(run, progress)
-      : [`${Math.round(progress * 100)}%`, sectionLabel];
-    if (run.paceFeedbackText && run.comparableBestTimeMs !== null) {
-      contextParts.push(`PB PACE ${String(run.paceFeedbackText).toUpperCase()}`);
-    }
-    if (run.challengeMode) contextParts.push(`CHALLENGE ${run.challengeName}`);
-    if (run.partyMode) contextParts.push(`PARTY ${run.partyTurnNumber}/${run.partyTotalPlayers}`);
-    if (w >= 760) contextParts.push(this.getRaceControlHintText());
-    if (w >= 840) contextParts.push(`SEED ${formatRoadSeed(run.roadSeed)}`);
-    const statusX = w >= 760 ? barX + barW + 18 : barX;
-    const statusY = w >= 760 ? 38 : 50;
-    const showAudioHint = w >= 760;
-    const audioHintWidth = showAudioHint ? 132 : 0;
-    const statusMaxWidth = w >= 760
-      ? Math.max(80, w - statusX - audioHintWidth - 20)
-      : w - 32;
-    drawFittedText(ctx, contextParts.join("  "), statusX, statusY, statusMaxWidth);
-    if (showAudioHint) {
-      const audioHint = this.game.audio.masterMuted
-        ? "AUDIO MUTED"
-        : `${this.game.audio.musicMuted ? "MUSIC MUTED" : "M MUSIC"}  ${this.game.audio.sfxMuted ? "SFX MUTED" : "N SFX"}`;
-      ctx.textAlign = "right";
-      ctx.fillStyle = this.game.audio.masterMuted ? "#ffe45e" : "rgba(184, 198, 217, 0.88)";
-      ctx.font = "800 10px Trebuchet MS, Verdana, sans-serif";
-      drawFittedText(ctx, audioHint, w - 14, statusY, audioHintWidth);
-      ctx.textAlign = "left";
-    }
-    ctx.restore();
+    this.drawLiveHudTopStrip(ctx, run, progress);
+    this.drawLiveHudScore(ctx, run);
+    this.drawLiveHudSpeed(ctx, run);
+    this.drawLiveHudBoost(ctx, run);
+    this.drawLiveHudProgress(ctx, run, progress);
+    this.drawLiveHudFuel(ctx, run);
+    this.drawLiveHudCallout(ctx, run);
   }
 
   drawFuelGauge(ctx, x, y, width, height) {
@@ -27117,17 +27313,35 @@ class NeonRoadRally {
     if (this.run.paused) {
       if (this.input) this.input.clearGameplayInput();
       this.audio.stopMusic(0.15);
-      const controlHint = this.renderer?.getRaceControlHintText ? this.renderer.getRaceControlHintText() : "SHIFT+A/D DRIFT";
+      const run = this.run;
+      const controlHint = this.renderer?.getRaceControlHintText ? this.renderer.getRaceControlHintText() : "SHIFT+A/D DRIFT DASH";
+      const routeLabel = run.officialRouteName || run.track?.name || "Current Route";
+      const raceLabel = isOfficialEnduranceRun(run)
+        ? "Bonus Survival"
+        : (run.partyMode ? "Party Race" : getRaceTypeLabel(run.raceTypeId));
       this.layer.innerHTML = `
-        <section class="panel pause-card">
-          <h2>Paused</h2>
-          <p class="hint">Esc resumes. Restart uses the same current setup.</p>
-          <p class="hint">${escapeHtml(controlHint)} cuts across lanes. Release Shift or direction to settle.</p>
-          <p class="hint">Audio: M toggles music. N toggles SFX. Full audio controls are in Settings.</p>
-          <div class="row" style="justify-content:center">
-            <button class="small-button" data-action="resume">Resume</button>
-            <button class="small-button" data-action="restart">Restart Run</button>
-            <button class="small-button" data-action="title">Title</button>
+        <section class="pause-overlay nrr" role="dialog" aria-modal="true" aria-label="Paused">
+          <div class="pause-scrim" aria-hidden="true"></div>
+          <div class="pause-card">
+            <span class="micro pause-route">${escapeHtml(raceLabel)} · ${escapeHtml(routeLabel)}</span>
+            <h2>Paused</h2>
+            <div class="pause-actions">
+              <button class="btn btn--primary btn--lg btn--block" data-action="resume">
+                <span>Resume</span><span class="kbd">Esc</span>
+              </button>
+              <button class="btn btn--secondary btn--block" data-action="restart">
+                <span>Race Again</span>
+              </button>
+              <button class="btn btn--ghost btn--block" data-action="title">
+                <span>End Run</span>
+              </button>
+            </div>
+            <div class="pause-control-strip" aria-label="Controls">
+              <span><b>Move</b> Arrows</span>
+              <span><b>Boost</b> Space</span>
+              <span><b>Drift</b> ${escapeHtml(controlHint)}</span>
+              <span><b>Audio</b> M / N</span>
+            </div>
           </div>
         </section>
       `;
