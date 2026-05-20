@@ -91,7 +91,10 @@ async function run() {
       "internal",
       "telemetry",
       "version",
-      "scope"
+      "scope",
+      "officialfullroute",
+      "runprogress",
+      "debug"
     ].forEach((term) => {
       if (lower.includes(term)) throw new Error(`${label} should not expose ${term}: ${String(text).slice(0, 1000)}`);
     });

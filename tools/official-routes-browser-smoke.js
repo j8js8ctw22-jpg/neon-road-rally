@@ -162,7 +162,10 @@ function assertNoNormalUiDebugTerms(text, label) {
     "internal",
     "telemetry",
     "version",
-    "scope"
+    "scope",
+    "officialfullroute",
+    "runprogress",
+    "debug"
   ].forEach((term) => {
     assert(!lower.includes(term), `${label} should not expose ${term}`, { snippet: String(text).slice(0, 1000) });
   });
@@ -661,6 +664,31 @@ async function runCustomScenario(page, options = {}) {
 }
 
 async function assertLeaderboards(page) {
+  await page.evaluate(() => {
+    const app = window.neonRoadRally;
+    const player = app?.profiles?.getCurrentPlayer?.();
+    if (!app || !player) return;
+    const routeId = "sunset-neon-palm-sprint";
+    if ((app.profiles.data.enduranceLeaderboard || []).some((entry) => entry.officialRouteId === routeId)) return;
+    app.profiles.data.enduranceLeaderboard.push({
+      recordId: "smoke-endurance-sunset-neon-palm",
+      playerId: player.id,
+      playerName: player.name,
+      officialRouteId: routeId,
+      trackId: "sunset-highway",
+      raceTypeId: "classic",
+      speedClassId: "turbo",
+      officialFinishTimeMs: 42123,
+      officialFinishScore: 112300,
+      survivalTime: 37.5,
+      postFinishScore: 56700,
+      currentLap: 4,
+      lapReached: 4,
+      enduranceLapsCompleted: 3,
+      endedBy: "Crash",
+      date: new Date().toISOString()
+    });
+  });
   await page.evaluate(() => window.neonRoadRally?.showLeaderboard("scoreAttack", {
     officialRouteId: "sunset-neon-palm-sprint",
     raceTypeId: "classic"
@@ -668,25 +696,154 @@ async function assertLeaderboards(page) {
   await page.waitForFunction(() => window.neonRoadRally?.screen === "leaderboard", null, { timeout: 5000 });
   let text = await bodyText(page);
   assertIncludes(text, "Score Attack");
-  assertIncludes(text, "Chase Boards");
-  assertIncludes(text, "Route Boards");
+  assertIncludes(text, "Leaderboards");
   assertIncludes(text, "Your Best");
+  assertIncludes(text, "Leader");
+  assertIncludes(text, "Next Chase");
+  assertIncludes(text, "Race This Route");
   assertIncludes(text, "Neon Palm Sprint");
   assertIncludes(text, "Time Attack");
   assertIncludes(text, "Survival");
   assertIncludes(text, "Endurance Score");
   assertNoNormalUiDebugTerms(text, "Score Attack board");
-  const boardTabs = await page.$$eval(".chase-board-tabs .chase-board-card", (nodes) => nodes.map((node) => node.textContent.trim()));
+  const arcadePrimitives = await page.$eval(".leaderboard-chase-panel", (panel) => ({
+    pageShell: panel.classList.contains("arcade-page-shell"),
+    header: Boolean(panel.querySelector(".arcade-header")),
+    tabs: Boolean(panel.querySelector(".arcade-segmented-tabs")),
+    filterBar: Boolean(panel.querySelector(".arcade-filter-bar")),
+    statStrip: Boolean(panel.querySelector(".arcade-stat-strip")),
+    boardContext: Boolean(panel.querySelector(".arcade-scoreboard-header")),
+    scoreboard: Boolean(panel.querySelector(".arcade-scoreboard")),
+    row: Boolean(panel.querySelector(".arcade-score-row")),
+    primaryValue: Boolean(panel.querySelector(".arcade-primary-value")),
+    currentChip: Boolean(panel.querySelector(".arcade-you-chip")),
+    toolsPanel: Boolean(panel.querySelector(".arcade-tools-panel"))
+  }));
+  assert(Object.values(arcadePrimitives).every(Boolean), "Leaderboard should use reusable arcade UI primitives", arcadePrimitives);
+  const boardTabs = await page.$$eval(".arcade-segmented-tabs .arcade-tab", (nodes) => nodes.map((node) => node.textContent.trim()));
   assert(JSON.stringify(boardTabs) === JSON.stringify(["Time Attack", "Score Attack", "Survival", "Endurance Score"]), "Chase board tabs should be compact labels", { boardTabs });
+  const boardTabMaxHeight = await page.$$eval(".arcade-segmented-tabs .arcade-tab", (nodes) => Math.max(...nodes.map((node) => node.getBoundingClientRect().height)));
+  assert(boardTabMaxHeight <= 42, "Chase board tabs should stay slim", { boardTabMaxHeight });
+  const filterShape = await page.$eval(".arcade-filter-bar", (node) => {
+    const routeSelect = node.querySelector("#leaderboardRoute");
+    const routeSelectStyle = routeSelect ? window.getComputedStyle(routeSelect) : null;
+    const children = Array.from(node.children).map((child) => {
+      const rect = child.getBoundingClientRect();
+      return {
+        text: child.textContent.replace(/\s+/g, " ").trim(),
+        width: rect.width,
+        height: rect.height
+      };
+    });
+    return {
+      height: node.getBoundingClientRect().height,
+      routeSelectTag: routeSelect?.tagName || "",
+      routeValue: routeSelect?.value || "",
+      routeOptions: routeSelect ? Array.from(routeSelect.options).map((option) => option.textContent.trim()) : [],
+      routeWhiteSpace: routeSelectStyle?.whiteSpace || "",
+      routeCardCount: node.querySelectorAll(".official-route-row, .official-route-card, .official-route-list, .leaderboard-route-menu").length,
+      emptyChildren: children.filter((child) => !child.text || child.width < 40 || child.height < 16),
+      text: node.textContent.replace(/\s+/g, " ").trim()
+    };
+  });
+  assert(filterShape.height <= 64, "Leaderboard route controls should stay in one compact bar", { filterShape });
+  assert(filterShape.routeSelectTag === "SELECT", "Leaderboard route selector should be a compact select control", { filterShape });
+  assert(filterShape.routeCardCount === 0, "Leaderboard route selector should not render route cards or grids", { filterShape });
+  assert(filterShape.routeWhiteSpace === "nowrap", "Leaderboard route names should stay horizontal in the compact selector", { filterShape });
+  assert(filterShape.emptyChildren.length === 0, "Leaderboard filters should not create empty columns", { filterShape });
+  assert(filterShape.routeOptions.some((option) => option.includes("Last Light Gauntlet") && option.includes("Redline")), "Route dropdown should expose normal route names with speed", { filterShape });
+  assertIncludes(filterShape.text, "Track");
+  assertIncludes(filterShape.text, "Race Type");
+  assertIncludes(filterShape.text, "Route");
   const firstLeaderboardRowTop = await page.$eval(".leaderboard-list .leaderboard-item", (node) => node.getBoundingClientRect().top);
-  assert(firstLeaderboardRowTop < 760, "Leaderboard rows should start above the fold", { firstLeaderboardRowTop });
-  const yourBestHeight = await page.$eval(".leaderboard-chase-summary", (node) => node.getBoundingClientRect().height);
-  assert(yourBestHeight <= 120, "Your Best summary should stay compact", { yourBestHeight });
+  assert(firstLeaderboardRowTop < 610, "Leaderboard rows should start high on the page", { firstLeaderboardRowTop });
+  const yourBestHeight = await page.$eval(".arcade-stat-strip", (node) => node.getBoundingClientRect().height);
+  assert(yourBestHeight <= 78, "Chase summary should stay compact", { yourBestHeight });
+  const currentDriverRows = await page.locator(".leaderboard-list .leaderboard-item.is-current-driver .arcade-you-chip").count();
+  assert(currentDriverRows >= 1, "Current driver chip should be visible in the ranked row", { currentDriverRows });
   const scoreRowText = await page.locator(".leaderboard-list .leaderboard-item").first().innerText();
+  assertIncludes(scoreRowText, "finish");
+  assert(/\d{1,3}(,\d{3})+/.test(scoreRowText), "Score Attack row should emphasize a score value", { scoreRowText });
+  const scorePrimaryValue = await page.locator(".leaderboard-list .leaderboard-item .arcade-primary-value strong").first().innerText();
+  assert(/\d{1,3}(,\d{3})+/.test(scorePrimaryValue), "Score Attack row should prioritize score", { scorePrimaryValue, scoreRowText });
+  assertIncludes(scoreRowText, "You");
   assert(!/Official Race/i.test(scoreRowText), "Leaderboard row should not repeat Official Race", { scoreRowText });
   assert(!/Sunset Highway|Classic|Turbo/i.test(scoreRowText), "Filtered leaderboard row should not repeat selected track/rules/speed", { scoreRowText });
   const lowerScoreText = text.toLowerCase();
   assert(!lowerScoreText.includes("sunset-palm-sprint-turbo"), "Main Score Attack board should hide raw official seeds");
+  assert(!/save loaded/i.test(text), "Save status should stay hidden behind Data Tools", { snippet: text.slice(0, 1000) });
+  await page.selectOption("#leaderboardRoute", "sunset-last-light-gauntlet");
+  await page.dispatchEvent("#leaderboardRoute", "change");
+  await page.waitForFunction(
+    () => window.neonRoadRally?.leaderboardOfficialRouteId === "sunset-last-light-gauntlet"
+      && document.querySelector('[data-action="raceOfficialRoute"]')?.dataset.officialRouteId === "sunset-last-light-gauntlet",
+    null,
+    { timeout: 5000 }
+  );
+  let routeChangeText = await bodyText(page);
+  assertIncludes(routeChangeText, "Last Light Gauntlet");
+  assertIncludes(routeChangeText, "Redline");
+  const routeControlMetrics = await page.$eval("#leaderboardRoute", (node) => {
+    const rect = node.getBoundingClientRect();
+    const style = window.getComputedStyle(node);
+    return {
+      width: rect.width,
+      height: rect.height,
+      whiteSpace: style.whiteSpace,
+      value: node.value,
+      routeCardCount: document.querySelectorAll(".leaderboard-chase-panel .official-route-row, .leaderboard-chase-panel .official-route-list, .leaderboard-route-menu").length,
+      pageScrollWidth: document.documentElement.scrollWidth,
+      viewportWidth: window.innerWidth
+    };
+  });
+  assert(routeControlMetrics.height <= 44, "Route selector should not expand into vertical route text", { routeControlMetrics });
+  assert(routeControlMetrics.width >= 220, "Route selector should keep enough width for horizontal names", { routeControlMetrics });
+  assert(routeControlMetrics.whiteSpace === "nowrap", "Route selector should ellipsize instead of wrapping", { routeControlMetrics });
+  assert(routeControlMetrics.routeCardCount === 0, "Route selector open state should not rely on route card markup", { routeControlMetrics });
+  assert(routeControlMetrics.pageScrollWidth <= routeControlMetrics.viewportWidth + 1, "Leaderboard route selector should not create horizontal page scroll", { routeControlMetrics });
+  await page.setViewportSize({ width: 1024, height: 768 });
+  await page.evaluate(() => window.neonRoadRally?.showLeaderboard("scoreAttack", {
+    officialRouteId: "sunset-last-light-gauntlet",
+    raceTypeId: "classic"
+  }));
+  await page.waitForFunction(
+    () => window.neonRoadRally?.leaderboardOfficialRouteId === "sunset-last-light-gauntlet",
+    null,
+    { timeout: 5000 }
+  );
+  const narrowRouteMetrics = await page.$eval(".leaderboard-chase-panel", (panel) => {
+    const routeSelect = panel.querySelector("#leaderboardRoute");
+    const firstRow = panel.querySelector(".leaderboard-list .leaderboard-item");
+    const style = routeSelect ? window.getComputedStyle(routeSelect) : null;
+    return {
+      pageScrollWidth: document.documentElement.scrollWidth,
+      viewportWidth: window.innerWidth,
+      panelScrollWidth: panel.scrollWidth,
+      panelClientWidth: panel.clientWidth,
+      routeHeight: routeSelect?.getBoundingClientRect().height || 0,
+      routeWhiteSpace: style?.whiteSpace || "",
+      firstRowTop: firstRow?.getBoundingClientRect().top || 9999,
+      routeCardCount: panel.querySelectorAll(".official-route-row, .official-route-card, .official-route-list, .leaderboard-route-menu").length
+    };
+  });
+  assert(narrowRouteMetrics.pageScrollWidth <= narrowRouteMetrics.viewportWidth + 1, "Leaderboard should not horizontally scroll at narrower laptop width", { narrowRouteMetrics });
+  assert(narrowRouteMetrics.panelScrollWidth <= narrowRouteMetrics.panelClientWidth + 1, "Leaderboard panel should not overflow at narrower laptop width", { narrowRouteMetrics });
+  assert(narrowRouteMetrics.routeHeight <= 44, "Route selector should stay one-line at narrower laptop width", { narrowRouteMetrics });
+  assert(narrowRouteMetrics.routeWhiteSpace === "nowrap", "Route selector should keep route names horizontal at narrower laptop width", { narrowRouteMetrics });
+  assert(narrowRouteMetrics.routeCardCount === 0, "Narrow leaderboard should not reintroduce route card markup", { narrowRouteMetrics });
+  assert(narrowRouteMetrics.firstRowTop < 700, "Leaderboard rows should remain in the first view at narrower laptop width", { narrowRouteMetrics });
+  await clickAction(page, "raceOfficialRoute");
+  await page.waitForFunction(() => window.neonRoadRally?.screen === "preRace", null, { timeout: 5000 });
+  const raceTargetText = await bodyText(page);
+  assertIncludes(raceTargetText, "Official Race");
+  assertIncludes(raceTargetText, "Last Light Gauntlet");
+  assertIncludes(raceTargetText, "Redline");
+  await page.setViewportSize({ width: 1366, height: 900 });
+  await page.evaluate(() => window.neonRoadRally?.showLeaderboard("scoreAttack", {
+    officialRouteId: "sunset-neon-palm-sprint",
+    raceTypeId: "classic"
+  }));
+  await page.waitForFunction(() => window.neonRoadRally?.screen === "leaderboard", null, { timeout: 5000 });
   await page.locator(".leaderboard-extra-details summary").click();
   text = await bodyText(page);
   assertIncludes(text, "Practice Scores");
@@ -695,11 +852,14 @@ async function assertLeaderboards(page) {
   await page.waitForFunction(() => window.neonRoadRally?.leaderboardView === "timeAttack", null, { timeout: 5000 });
   text = await bodyText(page);
   assertIncludes(text, "Time Attack");
-  assertIncludes(text, "Time");
+  assertIncludes(text, "Fastest finish");
   assertIncludes(text, "Neon Palm Sprint");
   assertIncludes(text, "42.123s");
   assertNoNormalUiDebugTerms(text, "Time Attack board");
   const timeRowText = await page.locator(".leaderboard-list .leaderboard-item").first().innerText();
+  assertIncludes(timeRowText, "42.123s");
+  const timePrimaryValue = await page.locator(".leaderboard-list .leaderboard-item .arcade-primary-value strong").first().innerText();
+  assert(timePrimaryValue === "42.123s", "Time Attack row should prioritize finish time", { timePrimaryValue });
   assert(!/Official Race/i.test(timeRowText), "Time Attack row should not repeat Official Race", { timeRowText });
   const lowerTimeText = text.toLowerCase();
   assert(!lowerTimeText.includes("sunset-palm-sprint-turbo"), "Main Time Attack board should hide raw official seeds");
@@ -707,6 +867,30 @@ async function assertLeaderboards(page) {
   text = await bodyText(page);
   assertIncludes(text, "Practice Times");
   assertIncludes(text, "48.321s");
+
+  await clickAction(page, "setLeaderboardView", '[data-view="enduranceSurvival"]');
+  await page.waitForFunction(() => window.neonRoadRally?.leaderboardView === "enduranceSurvival", null, { timeout: 5000 });
+  text = await bodyText(page);
+  assertIncludes(text, "Survival");
+  assertIncludes(text, "Longest survival");
+  assertNoNormalUiDebugTerms(text, "Survival board");
+  const survivalRowText = await page.locator(".leaderboard-list .leaderboard-item").first().innerText();
+  assertIncludes(survivalRowText, "Lap 4");
+  assertIncludes(survivalRowText, "Crash");
+  const survivalPrimaryValue = await page.locator(".leaderboard-list .leaderboard-item .arcade-primary-value strong").first().innerText();
+  assert(/^\d+:\d{2} survival$/.test(survivalPrimaryValue), "Survival row should prioritize compact survival time", { survivalPrimaryValue, survivalRowText });
+
+  await clickAction(page, "setLeaderboardView", '[data-view="enduranceScore"]');
+  await page.waitForFunction(() => window.neonRoadRally?.leaderboardView === "enduranceScore", null, { timeout: 5000 });
+  text = await bodyText(page);
+  assertIncludes(text, "Endurance Score");
+  assertIncludes(text, "Best bonus score");
+  assertNoNormalUiDebugTerms(text, "Endurance Score board");
+  const enduranceScoreRowText = await page.locator(".leaderboard-list .leaderboard-item").first().innerText();
+  assertIncludes(enduranceScoreRowText, "Lap 4");
+  assertIncludes(enduranceScoreRowText, "Crash");
+  const enduranceScorePrimaryValue = await page.locator(".leaderboard-list .leaderboard-item .arcade-primary-value strong").first().innerText();
+  assert(/\d{2},\d{3}/.test(enduranceScorePrimaryValue), "Endurance Score row should prioritize bonus score", { enduranceScorePrimaryValue, enduranceScoreRowText });
 }
 
 async function assertNewTrackLeaderboards(page) {

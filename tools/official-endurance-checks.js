@@ -400,22 +400,22 @@ async function main() {
       assert.strictEqual(signatureAfter, signatureBefore, "Post-finish endurance should not change the first-lap full-route signature");
 
       const survivalBoardCopy = renderLeaderboardCopy(first.app, LEADERBOARD_VIEW_ENDURANCE_SURVIVAL, { officialRouteId: first.route.id });
-      assertCopyIncludes(survivalBoardCopy, "Chase Boards", "Endurance Survival leaderboard");
-      assertCopyIncludes(survivalBoardCopy, "Route Boards", "Endurance Survival leaderboard");
+      assertCopyIncludes(survivalBoardCopy, "Leaderboards", "Endurance Survival leaderboard");
       assertCopyIncludes(survivalBoardCopy, "Time Attack", "Endurance Survival leaderboard");
       assertCopyIncludes(survivalBoardCopy, "Score Attack", "Endurance Survival leaderboard");
       assertCopyIncludes(survivalBoardCopy, "Survival", "Endurance Survival leaderboard");
       assertCopyIncludes(survivalBoardCopy, "Endurance Score", "Endurance Survival leaderboard");
       assertCopyIncludes(survivalBoardCopy, "Track", "Endurance Survival leaderboard");
       assertCopyIncludes(survivalBoardCopy, "Route", "Endurance Survival leaderboard");
-      assertCopyIncludes(survivalBoardCopy, "Rules", "Endurance Survival leaderboard");
+      assertCopyIncludes(survivalBoardCopy, "Race Type", "Endurance Survival leaderboard");
       assertCopyIncludes(survivalBoardCopy, "Your Best", "Endurance Survival leaderboard");
-      assertCopyIncludes(survivalBoardCopy, "Board Leader", "Endurance Survival leaderboard");
+      assertCopyIncludes(survivalBoardCopy, "Leader", "Endurance Survival leaderboard");
+      assertCopyIncludes(survivalBoardCopy, "Next Chase", "Endurance Survival leaderboard");
       assertCopyIncludes(survivalBoardCopy, getOfficialRouteDisplayName(first.route), "Endurance Survival leaderboard");
       assertCopyIncludes(survivalBoardCopy, "Classic", "Endurance Survival leaderboard");
       assertCopyIncludes(survivalBoardCopy, "Lap 2", "Endurance Survival leaderboard");
-      assertCopyIncludes(survivalBoardCopy, "Ended by player", "Endurance Survival leaderboard");
-      assertCopyIncludes(survivalBoardCopy, "Your run", "Endurance Survival leaderboard");
+      assertCopyIncludes(survivalBoardCopy, "Player ended", "Endurance Survival leaderboard");
+      assertCopyIncludes(survivalBoardCopy, "You", "Endurance Survival leaderboard");
       assertPlayerCopyClean(survivalBoardCopy, "Endurance Survival leaderboard");
       const enduranceScoreBoardCopy = renderLeaderboardCopy(first.app, LEADERBOARD_VIEW_ENDURANCE_SCORE, { officialRouteId: first.route.id });
       assertCopyIncludes(enduranceScoreBoardCopy, "Endurance Score", "Endurance Score leaderboard");
