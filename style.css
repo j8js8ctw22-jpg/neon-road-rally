@@ -5278,6 +5278,11 @@ button:disabled {
   animation: result-panel-pop 180ms ease-out both;
 }
 
+.result-screen-panel.score-results-panel,
+.result-screen-panel.party-results-panel {
+  animation: none;
+}
+
 .playtest-report-header {
   display: grid;
   gap: 16px;
@@ -5842,6 +5847,11 @@ button:disabled {
   overflow: hidden;
 }
 
+.result-screen-panel .nrr-bg::before,
+.result-screen-panel .nrr-bg::after {
+  opacity: 0.24;
+}
+
 .result-screen-panel .result-page {
   position: absolute;
   inset: 36px 0 0;
@@ -5851,6 +5861,7 @@ button:disabled {
   overflow-y: auto;
   padding: var(--s-8) var(--s-9) var(--s-7);
   scrollbar-gutter: stable;
+  contain: paint;
 }
 
 .result-screen-panel .result-header {
@@ -5879,18 +5890,18 @@ button:disabled {
 .result-screen-panel h1 {
   color: var(--green);
   font-size: 64px;
-  text-shadow: 0 0 30px rgba(77, 255, 168, 0.35);
+  text-shadow: 0 0 18px rgba(77, 255, 168, 0.26);
 }
 
 .result-screen-panel.is-crashed h1,
 .result-screen-panel.is-busted h1 {
   color: var(--red);
-  text-shadow: 0 0 30px rgba(255, 77, 109, 0.28);
+  text-shadow: 0 0 18px rgba(255, 77, 109, 0.22);
 }
 
 .result-screen-panel.is-fuel-empty h1 {
   color: var(--yellow);
-  text-shadow: 0 0 30px rgba(255, 210, 63, 0.28);
+  text-shadow: 0 0 18px rgba(255, 210, 63, 0.22);
 }
 
 .result-screen-panel .result-route-line {
@@ -5942,18 +5953,18 @@ button:disabled {
   letter-spacing: 0;
   line-height: 0.9;
   overflow-wrap: anywhere;
-  text-shadow: 0 0 50px rgba(77, 255, 168, 0.35);
+  text-shadow: 0 0 24px rgba(77, 255, 168, 0.26);
 }
 
 .result-screen-panel.is-crashed .result-primary-value,
 .result-screen-panel.is-busted .result-primary-value {
   color: var(--red);
-  text-shadow: 0 0 42px rgba(255, 77, 109, 0.25);
+  text-shadow: 0 0 22px rgba(255, 77, 109, 0.2);
 }
 
 .result-screen-panel.is-fuel-empty .result-primary-value {
   color: var(--yellow);
-  text-shadow: 0 0 42px rgba(255, 210, 63, 0.25);
+  text-shadow: 0 0 22px rgba(255, 210, 63, 0.2);
 }
 
 .result-screen-panel .result-chip-strip {
@@ -6024,6 +6035,7 @@ button:disabled {
   gap: 48px;
   align-items: start;
   padding-top: var(--s-1);
+  contain: layout paint;
 }
 
 .result-screen-panel .result-reward-strip {
@@ -6125,6 +6137,7 @@ button:disabled {
   margin-top: var(--s-3);
   border-color: var(--line-2);
   background: rgba(255, 255, 255, 0.03);
+  contain: layout paint;
 }
 
 .result-screen-panel .result-details-block[open] {

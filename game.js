@@ -3812,7 +3812,10 @@ const ARCADE_FEEL = {
   countdownSeconds: 3.55,
   countdownGoSeconds: 0.55,
   crashScoreDelayMs: 640,
-  finishScoreDelayMs: 720,
+  finishScoreDelayMs: 240,
+  finishVisualCoastMs: 320,
+  finishSpeedCarryHoldSeconds: 1.55,
+  finishSpeedCarryReleaseSeconds: 0.75,
   screenShakeIntensity: 0.82,
   screenShakeDecay: 2.6,
   crashPauseMs: 110,
@@ -3828,15 +3831,15 @@ const ARCADE_FEEL = {
   rampLaunchPulseMs: 300,
   rampLandingPulseMs: 430,
   rampClearSparkMs: 520,
-  finishFlashSeconds: 0.9,
-  finishStripeMs: 760,
+  finishFlashSeconds: 0.24,
+  finishStripeMs: 360,
   nearMissPopupCooldown: 0.38,
   nearMissSparkMs: 260,
   fuelWarningPulseMs: 620,
   fuelSavedPulseMs: 520,
   fuelSavedPopupCooldown: 1.1,
   floatingTextSeconds: 1.15,
-  scoreTallyMs: 950,
+  scoreTallyMs: 360,
   highSpeedLineStartRatio: 0.38
 };
 
@@ -7307,6 +7310,8 @@ class PlayerProfileManager {
   constructor(storageKey) {
     this.storageKey = storageKey;
     this.saveStatus = "Not saved yet";
+    this.saveBatchDepth = 0;
+    this.savePending = false;
     this.data = this.load();
   }
 
@@ -7395,12 +7400,33 @@ class PlayerProfileManager {
   }
 
   save() {
+    if (this.saveBatchDepth > 0) {
+      this.savePending = true;
+      this.saveStatus = "Save queued";
+      return true;
+    }
     if (safeStorageSetItem(this.storageKey, JSON.stringify(this.data))) {
       this.saveStatus = `Saved ${new Date().toLocaleTimeString()}`;
       return true;
     }
     this.saveStatus = "Save failed";
     return false;
+  }
+
+  beginSaveBatch() {
+    if (this.saveBatchDepth <= 0) {
+      this.savePending = false;
+      this.saveBatchDepth = 0;
+    }
+    this.saveBatchDepth += 1;
+  }
+
+  endSaveBatch() {
+    if (this.saveBatchDepth <= 0) return true;
+    this.saveBatchDepth -= 1;
+    if (this.saveBatchDepth > 0 || !this.savePending) return true;
+    this.savePending = false;
+    return this.save();
   }
 
   resetAll() {
@@ -18630,27 +18656,28 @@ class Renderer {
   drawFinishFlash() {
     const run = this.game.run;
     if (!ARCADE_FEEL.enabled || (run.finishFlashTimer <= 0 && run.finishStripeTimer <= 0)) return;
-    const progress = 1 - run.finishFlashTimer / ARCADE_FEEL.finishFlashSeconds;
-    const alpha = (1 - progress) * 0.34;
+    const flashDuration = Math.max(0.001, ARCADE_FEEL.finishFlashSeconds);
+    const progress = clamp(1 - run.finishFlashTimer / flashDuration, 0, 1);
+    const fade = 1 - progress;
     const ctx = this.ctx;
     ctx.save();
     if (run.finishFlashTimer > 0) {
-      ctx.globalAlpha = alpha;
+      ctx.globalAlpha = fade * 0.1;
       ctx.fillStyle = "#f6fbff";
       ctx.fillRect(0, 0, this.width, this.height);
       const roadPulse = ctx.createRadialGradient(this.width / 2, this.height * 0.58, 12, this.width / 2, this.height * 0.58, Math.max(260, this.width * 0.5));
-      roadPulse.addColorStop(0, "rgba(255, 228, 94, 0.26)");
-      roadPulse.addColorStop(0.42, "rgba(68, 255, 153, 0.15)");
+      roadPulse.addColorStop(0, "rgba(255, 228, 94, 0.18)");
+      roadPulse.addColorStop(0.42, "rgba(68, 255, 153, 0.08)");
       roadPulse.addColorStop(1, "rgba(40, 246, 255, 0)");
-      ctx.globalAlpha = (1 - progress) * 0.7;
+      ctx.globalAlpha = fade * 0.42;
       ctx.fillStyle = roadPulse;
       ctx.fillRect(0, this.height * 0.12, this.width, this.height * 0.76);
-      ctx.globalAlpha = (1 - progress) * 0.9;
+      ctx.globalAlpha = fade * 0.72;
       ctx.fillStyle = "#ffe45e";
       ctx.font = `800 ${Math.max(36, Math.min(72, this.width * 0.07))}px Trebuchet MS, Verdana, sans-serif`;
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
-      ctx.shadowBlur = 24;
+      ctx.shadowBlur = 14;
       ctx.shadowColor = "#ffe45e";
       ctx.fillText(isPursuitRaceType(run.raceTypeId) ? "ESCAPED!" : "FINISH!", this.width / 2, this.height * 0.32);
     }
@@ -21929,6 +21956,10 @@ class NeonRoadRally {
       boostAudioActive: false,
       finishFlashTimer: 0,
       finishStripeTimer: 0,
+      finishVisualCoastTimer: 0,
+      finishSpeedCarryTimer: 0,
+      finishSpeedCarrySpeed: 0,
+      finishSpeedCarryReleaseSeconds: 0,
       crashBeatTimer: 0,
       crashSparkTimer: 0,
       fuelOutBeatTimer: 0,
@@ -22009,6 +22040,8 @@ class NeonRoadRally {
     if (this.screen === "game" && !this.run.paused && !this.run.ended && !debugFrozen) {
       if (!this.run.pendingEndStatus) this.input.update(dt);
       this.updateRun(dt);
+    } else if (this.screen === "game" && !this.run.paused && this.run.ended && !debugFrozen) {
+      this.updateFinishVisualCoast(dt);
     } else if (this.screen !== "game") {
       this.attractDistance = (this.attractDistance + dt * 210) % 100000;
     }
@@ -22058,6 +22091,63 @@ class NeonRoadRally {
       });
       run.floatingTexts = run.floatingTexts.filter((text) => text.life > 0);
     }
+  }
+
+  updateFinishVisualCoast(dt) {
+    const run = this.run;
+    if (!run?.finished || dt <= 0) return;
+    const remaining = Math.max(0, run.finishVisualCoastTimer || 0);
+    if (remaining <= 0) return;
+    const step = Math.min(dt, remaining);
+    const fallbackSpeed = run.baseCruiseSpeed || getTrackCruiseSpeed(run.track || TRACKS[0], 1, run.speedClassId);
+    const visualSpeed = Math.max(SPEED_TUNING.minSpeed, Number.isFinite(run.currentSpeed) ? run.currentSpeed : fallbackSpeed);
+    const distanceDelta = visualSpeed * step;
+    run.lastDistanceDelta = distanceDelta;
+    run.distance += distanceDelta;
+    run.finishVisualCoastTimer = Math.max(0, remaining - dt);
+  }
+
+  captureFinishSpeedCarryState(run = this.run) {
+    if (!run) return null;
+    const speed = Math.max(
+      SPEED_TUNING.minSpeed,
+      Number.isFinite(run.currentSpeed) ? run.currentSpeed : 0,
+      Number.isFinite(run.baseCruiseSpeed) ? run.baseCruiseSpeed : 0
+    );
+    return {
+      speed,
+      boostTimer: Math.max(0, run.boostTimer || 0),
+      padBoostTimer: Math.max(0, run.padBoostTimer || 0),
+      driftBoostTimer: Math.max(0, run.driftBoostTimer || 0),
+      driftBoostMultiplier: clampNumber(run.driftBoostMultiplier, 1, DRIFT_TUNING.maxBoostMultiplier, 1),
+      boostMultiplier: Math.max(1, run.boostMultiplier || 1)
+    };
+  }
+
+  applyFinishSpeedCarryState(run, carryState) {
+    if (!run || !carryState) return;
+    const speed = Math.max(SPEED_TUNING.minSpeed, Number(carryState.speed) || 0);
+    const holdSeconds = Math.max(0, ARCADE_FEEL.finishSpeedCarryHoldSeconds || 0);
+    const releaseSeconds = Math.max(0, ARCADE_FEEL.finishSpeedCarryReleaseSeconds || 0);
+    run.finishSpeedCarrySpeed = Math.max(run.finishSpeedCarrySpeed || 0, speed);
+    run.finishSpeedCarryTimer = Math.max(run.finishSpeedCarryTimer || 0, holdSeconds + releaseSeconds);
+    run.finishSpeedCarryReleaseSeconds = releaseSeconds;
+    run.currentSpeed = Math.max(run.currentSpeed || 0, speed);
+    run.lastDistanceDelta = Math.max(run.lastDistanceDelta || 0, speed / 60);
+    run.boostTimer = Math.max(run.boostTimer || 0, carryState.boostTimer || 0);
+    run.padBoostTimer = Math.max(run.padBoostTimer || 0, carryState.padBoostTimer || 0);
+    run.driftBoostTimer = Math.max(run.driftBoostTimer || 0, carryState.driftBoostTimer || 0);
+    run.driftBoostMultiplier = Math.max(run.driftBoostMultiplier || 1, carryState.driftBoostMultiplier || 1);
+    run.boostMultiplier = Math.max(run.boostMultiplier || 1, carryState.boostMultiplier || 1);
+  }
+
+  getFinishSpeedCarryFloor(run, normalSpeed = 0) {
+    const speed = Math.max(0, Number(run?.finishSpeedCarrySpeed) || 0);
+    const timer = Math.max(0, Number(run?.finishSpeedCarryTimer) || 0);
+    if (!speed || !timer) return 0;
+    const releaseSeconds = Math.max(0.001, Number(run?.finishSpeedCarryReleaseSeconds) || ARCADE_FEEL.finishSpeedCarryReleaseSeconds || 0.001);
+    if (timer > releaseSeconds) return speed;
+    return lerp(Math.max(0, normalSpeed), speed, easeOutCubic(clamp(timer / releaseSeconds, 0, 1)));
   }
 
   updateRaceSection(showInitialNotice = false) {
@@ -22723,6 +22813,7 @@ class NeonRoadRally {
     run.padBoostTimer = Math.max(0, run.padBoostTimer - dt);
     run.oilTimer = Math.max(0, run.oilTimer - dt);
     run.slowdownTimer = Math.max(0, run.slowdownTimer - dt);
+    run.finishSpeedCarryTimer = Math.max(0, (run.finishSpeedCarryTimer || 0) - dt);
     run.raceStateCalloutTimer = Math.max(0, (run.raceStateCalloutTimer || 0) - dt);
     this.updateBoostAudioState();
 
@@ -22776,7 +22867,9 @@ class NeonRoadRally {
     run.debugSpeedScale = debugScale;
     run.speedCap = speedCap;
     run.speedCapped = rawBase > run.track.maxSpeed || unclampedSpeed > speedCap;
-    run.currentSpeed = clamp(unclampedSpeed, SPEED_TUNING.minSpeed, speedCap);
+    const normalSpeed = clamp(unclampedSpeed, SPEED_TUNING.minSpeed, speedCap);
+    const carriedSpeedFloor = this.getFinishSpeedCarryFloor(run, normalSpeed);
+    run.currentSpeed = clamp(Math.max(normalSpeed, carriedSpeedFloor), SPEED_TUNING.minSpeed, speedCap);
     const distanceDelta = run.currentSpeed * dt;
     run.lastDistanceDelta = distanceDelta;
     run.distance += distanceDelta;
@@ -22893,7 +22986,7 @@ class NeonRoadRally {
     run.roadDirectorSequence = [];
   }
 
-  resetOfficialEnduranceLapState(run, lap, carryDistance = 0) {
+  resetOfficialEnduranceLapState(run, lap, carryDistance = 0, speedCarryState = null) {
     if (!run) return;
     run.officialEnduranceLap = Math.max(2, normalizeNonNegativeInteger(lap, 2, 99));
     run.distance = Math.max(0, carryDistance);
@@ -22920,12 +23013,14 @@ class NeonRoadRally {
     this.obstacles.reset(run.track);
     this.updateRaceSection(true);
     this.updateOfficialEnduranceStats();
+    this.applyFinishSpeedCarryState(run, speedCarryState);
   }
 
   startOfficialEnduranceAfterFinish(summary) {
     const run = this.run;
     if (!run || !summary) return;
     const officialSummary = this.createOfficialFinishSummarySnapshot(summary);
+    const speedCarryState = this.captureFinishSpeedCarryState(run);
     run.officialEnduranceActive = true;
     run.officialFinishLocked = true;
     run.officialFinishSummary = officialSummary;
@@ -22947,7 +23042,7 @@ class NeonRoadRally {
     run.officialEnduranceEndReason = "";
     run.officialRouteSeedLocked = false;
     run.routeSeedLocked = false;
-    this.resetOfficialEnduranceLapState(run, 2, 0);
+    this.resetOfficialEnduranceLapState(run, 2, 0, speedCarryState);
     run.finishFlashTimer = Math.max(run.finishFlashTimer || 0, ARCADE_FEEL.finishFlashSeconds);
     run.finishStripeTimer = Math.max(run.finishStripeTimer || 0, ARCADE_FEEL.finishStripeMs / 1000);
     run.officialEnduranceLastLapNotice = "Lap 2 / Bonus Survival";
@@ -22985,11 +23080,12 @@ class NeonRoadRally {
   advanceOfficialEnduranceLap() {
     const run = this.run;
     if (!isOfficialEnduranceRun(run)) return;
+    const speedCarryState = this.captureFinishSpeedCarryState(run);
     const finishDistance = Math.max(1, run.track.distanceToFinish || 1);
     const carryDistance = Math.max(0, run.distance - finishDistance);
     run.officialEnduranceCompletedLaps = Math.max(1, run.officialEnduranceCompletedLaps || 1) + 1;
     const nextLap = Math.max(2, (run.officialEnduranceLap || 2) + 1);
-    this.resetOfficialEnduranceLapState(run, nextLap, carryDistance);
+    this.resetOfficialEnduranceLapState(run, nextLap, carryDistance, speedCarryState);
     run.finishFlashTimer = Math.max(run.finishFlashTimer || 0, ARCADE_FEEL.finishFlashSeconds * 0.75);
     run.finishStripeTimer = Math.max(run.finishStripeTimer || 0, ARCADE_FEEL.finishStripeMs / 1000);
     run.officialEnduranceLastLapNotice = `Lap ${nextLap} / Bonus Survival`;
@@ -24424,6 +24520,7 @@ class NeonRoadRally {
   endRace(status, reason, options = {}) {
     const run = this.run;
     if (run.ended) return;
+    this.profiles.beginSaveBatch();
     status = normalizeRunStatus(status);
     const debugSpeedScaleActive = Math.abs((this.debugSpeedScale || 1) - 1) > 0.001;
     const officialEnduranceFinal = Boolean(options.officialEnduranceFinal || isOfficialEnduranceRun(run));
@@ -24454,6 +24551,7 @@ class NeonRoadRally {
     if (status === "finished") {
       run.finishFlashTimer = ARCADE_FEEL.finishFlashSeconds;
       run.finishStripeTimer = ARCADE_FEEL.finishStripeMs / 1000;
+      run.finishVisualCoastTimer = ARCADE_FEEL.finishVisualCoastMs / 1000;
       run.bonuses.finish = 5000;
       run.scoreBreakdown.finish = run.bonuses.finish;
       this.addBaseScore(run.bonuses.finish);
@@ -24919,10 +25017,12 @@ class NeonRoadRally {
     }
 
     if (continueOfficialEndurance) {
+      this.profiles.endSaveBatch();
       this.startOfficialEnduranceAfterFinish(this.lastSummary);
       return;
     }
 
+    this.profiles.endSaveBatch();
     setTimeout(() => {
       if (this.screen !== "game") return;
       if (this.lastSummary?.partyMode && this.partySession?.isPartyMode) {
