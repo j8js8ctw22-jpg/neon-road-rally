@@ -1,5 +1,4 @@
 :root {
-  /* Claude Design package tokens. */
   --bg-deep: #07061a;
   --bg: #0e0a26;
   --bg-elev: #160f33;
@@ -7517,6 +7516,14 @@ button:disabled {
   color: var(--ink);
   font-size: 14px;
   text-transform: uppercase;
+}
+
+.settings-tool-row small {
+  display: block;
+  margin-top: 4px;
+  color: var(--ink-dim);
+  font-size: 12px;
+  line-height: 1.35;
 }
 
 .settings-screen-panel .reset-cleanup-reminder {

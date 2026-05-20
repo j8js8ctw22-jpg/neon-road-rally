@@ -11,7 +11,7 @@
 // ---------------------------------------------------------------------------
 
 const STORAGE_KEY = "neonRoadRally.v1";
-const GAME_VERSION = "show-build-local";
+const GAME_VERSION = "web-alpha-2026-05-20";
 const RACE_PACING_RULES_VERSION = "pace-duration-v2";
 const LEGACY_PACING_RULES_VERSION = "legacy";
 const PURSUIT_PACING_RULES_VERSION = "pursuit-v1";
@@ -27,6 +27,7 @@ const LOCAL_PLAYER_MAX_COUNT = 16;
 const LEADERBOARD_MAX_ENTRIES = 20;
 const LEADERBOARD_STORAGE_MAX_ENTRIES = 320;
 const LEADERBOARD_IMPORT_SCAN_LIMIT = 600;
+const DEBUG_QUERY_PARAM = "debug";
 const LEADERBOARD_VIEW_SCORE_ATTACK = "scoreAttack";
 const LEADERBOARD_VIEW_TIME_ATTACK = "timeAttack";
 const LEADERBOARD_VIEW_ENDURANCE_SURVIVAL = "enduranceSurvival";
@@ -6234,6 +6235,25 @@ function safeJsonParse(raw) {
   }
 }
 
+function isLocalDebugHost() {
+  if (typeof window === "undefined" || !window.location) return false;
+  const hostname = String(window.location.hostname || "").toLowerCase();
+  return hostname === "localhost" || hostname === "127.0.0.1";
+}
+
+function isDebugQueryEnabled() {
+  if (typeof window === "undefined" || !window.location) return false;
+  try {
+    return new URLSearchParams(window.location.search).get(DEBUG_QUERY_PARAM) === "1";
+  } catch (error) {
+    return false;
+  }
+}
+
+function isDebugAccessAllowed() {
+  return isLocalDebugHost() || isDebugQueryEnabled();
+}
+
 function safeStorageGetItem(key) {
   try {
     return localStorage.getItem(key);
@@ -9413,6 +9433,7 @@ class InputManager {
     }
 
     if (key === "`") {
+      if (!this.game.isDebugAccessAllowed()) return;
       this.game.debugMode = !this.game.debugMode;
       if (!this.game.debugMode && this.game.run) {
         this.game.run.debugFrozen = false;
@@ -9443,7 +9464,7 @@ class InputManager {
       return;
     }
 
-    if (this.game.debugMode) {
+    if (this.game.debugMode && this.game.isDebugAccessAllowed()) {
       const lower = lowerKey;
       if (event.shiftKey && (key === "+" || key === "=")) {
         event.preventDefault();
@@ -21517,6 +21538,10 @@ class NeonRoadRally {
     requestAnimationFrame((time) => this.loop(time));
   }
 
+  isDebugAccessAllowed() {
+    return isDebugAccessAllowed();
+  }
+
   createEmptyRun() {
     const player = this.profiles.getCurrentPlayer() || {
       name: "PLAYER 1",
@@ -27931,6 +27956,7 @@ class NeonRoadRally {
     this.audio.updateMusicState({ id: "menu", label: "Menu", sectionId: "menu", intensity: 0, raceTypeId: "menu" });
     this.audio.playMusic("title", false);
     const selectedSpeedClass = getSpeedClassConfig(this.profiles.data.speedClassId);
+    const debugToolsVisible = this.debugMode && this.isDebugAccessAllowed();
     this.layer.classList.remove("is-empty");
     this.layer.innerHTML = `
       <section class="settings-screen-panel nrr">
@@ -28028,13 +28054,15 @@ class NeonRoadRally {
                   <span class="label label--dim">Playtest Tools</span>
                   <strong>Local Reports</strong>
                 </div>
+                <button class="btn btn--ghost" data-action="copyFeedbackReport">Copy Feedback Report</button>
                 <button class="btn btn--ghost" data-action="showPlaytestReport">Open</button>
-                ${this.debugMode ? `<button class="btn btn--ghost" data-action="roadDirectorLab">Road Director Lab</button>` : ""}
+                ${debugToolsVisible ? `<button class="btn btn--ghost" data-action="roadDirectorLab">Road Director Lab</button>` : ""}
               </div>
               <div class="settings-tool-row">
                 <div>
                   <span class="label label--dim">Data Tools</span>
                   <strong>Local Data</strong>
+                  <small>No accounts or cloud saves. Progress and records stay in this browser. Clearing browser data can erase them.</small>
                 </div>
                 <button class="danger-button" data-action="resetData">Reset Local Data</button>
               </div>
@@ -28556,6 +28584,69 @@ class NeonRoadRally {
     return JSON.stringify(payload, null, 2);
   }
 
+  buildFeedbackReportExportText(filterValue = this.playtestReportFilter) {
+    const aggregate = this.buildPlaytestReportAggregate(filterValue);
+    const runs = aggregate.runs || [];
+    const latest = runs.length ? runs[runs.length - 1] : null;
+    const formatNumber = (value, digits = 1) => {
+      const numeric = Number(value);
+      return Number.isFinite(numeric) ? numeric.toFixed(digits) : (0).toFixed(digits);
+    };
+    const latestRoute = latest
+      ? (latest.officialRouteName || latest.challengeName || latest.trackName || "Unknown route")
+      : "No runs recorded yet";
+    const latestMode = latest
+      ? `${latest.raceTypeLabel || getRaceTypeLabel(latest.raceTypeId)} / ${latest.raceModeLabel || getSpeedClassLabel(latest.raceModeId)}`
+      : "No mode recorded yet";
+    const latestResult = latest
+      ? `${latest.result || getRunStatusLabel(latest.status)}${latest.endReason ? ` (${latest.endReason})` : ""}`
+      : "No result recorded yet";
+    const latestProgress = latest
+      ? (latest.finishTimeMs !== null && latest.finishTimeMs !== undefined
+        ? formatFinishTimeMs(latest.finishTimeMs)
+        : `${Math.round(latest.finishProgressPercent || 0)}% progress`)
+      : "No finish or progress recorded yet";
+    const latestFps = latest && latest.frameSampleCount
+      ? `avg ${formatNumber(latest.averageFps, 0)} fps, avg frame ${formatNumber(latest.averageFrameMs, 1)} ms, worst ${formatNumber(latest.worstFrameMs, 1)} ms, slow frames ${formatNumber(latest.slowFramePercent, 1)}%`
+      : "not recorded yet";
+    const latestMisses = latest
+      ? `missed reachable boosts ${latest.boostPadsMissedReachable || 0}; missed gas cans ${latest.gasCansMissed || 0} (${latest.gasCansCollected || 0}/${latest.gasCansSpawned || 0} collected)`
+      : "not recorded yet";
+    const latestDrift = latest
+      ? `${latest.driftDashesCompleted || 0} dashes, ${formatNumber(latest.driftLanesCrossed || 0, 1)} lanes crossed, ${latest.driftNearMisses || 0} drift near misses, ${latest.crashesWhileDrifting || 0} drift crashes`
+      : "not recorded yet";
+    return [
+      "Neon Road Rally Feedback Report",
+      `Build version: ${GAME_VERSION}`,
+      `Generated: ${new Date().toISOString()}`,
+      "Local only: no accounts, backend, cloud saves, or personal data submission.",
+      "",
+      "Latest Run",
+      `Route: ${latestRoute}`,
+      `Mode: ${latestMode}`,
+      `Result: ${latestResult}`,
+      `Finish/crash progress: ${latestProgress}`,
+      `Score: ${latest ? formatScore(latest.finalScore || 0) : "0"}`,
+      `FPS summary: ${latestFps}`,
+      `Missed boosts/gas cans: ${latestMisses}`,
+      `Drift usage: ${latestDrift}`,
+      "",
+      "Session Summary",
+      `Runs in report: ${aggregate.filteredCount}/${aggregate.totalStored}`,
+      `Completion rate: ${this.formatPlaytestPercent(aggregate.completionRate)}`,
+      `Average score: ${formatScore(aggregate.averageScore || 0)}`,
+      `Average FPS: ${formatNumber(aggregate.averageFps, 0)}`,
+      `Total missed reachable boosts: ${aggregate.totalBoostPadsMissedReachable}`,
+      `Total missed gas cans: ${aggregate.fuelSummary.totalGasCansMissed}`,
+      "",
+      "Tester Prompts",
+      "What felt fun?",
+      "What felt confusing?",
+      "What felt unfair?",
+      "Did anything lag or stutter?"
+    ].join("\n");
+  }
+
   hasRoadDirectorRunState(run = this.run) {
     return Boolean(run && (
       this.screen === "game"
@@ -28953,7 +29044,7 @@ class NeonRoadRally {
   }
 
   showRoadDirectorLabScreen(message = "") {
-    if (!this.debugMode) {
+    if (!this.debugMode || !this.isDebugAccessAllowed()) {
       this.showSettingsScreen("Enable debug mode to open Road Director Lab.");
       return;
     }
@@ -29290,6 +29381,7 @@ class NeonRoadRally {
           <div class="score-card"><strong>Party Fuel Summary</strong><span class="is-compact">${aggregate.partyFuelRunSummary.runs} runs · ${this.formatPlaytestPercent(aggregate.partyFuelRunSummary.completionRate)} finished · gas ${aggregate.partyFuelRunSummary.gasCansCollected}/${aggregate.partyFuelRunSummary.gasCansSpawned} · out ${aggregate.partyFuelRunSummary.outOfFuelCount} · avg finish fuel ${this.formatPlaytestDecimal(aggregate.partyFuelRunSummary.averageFuelRemainingOnFinishes)}</span></div>
         </div>
         <div class="row playtest-action-row">
+          <button class="small-button primary" data-action="copyFeedbackReport">Copy Feedback Report</button>
           <button class="small-button primary" data-action="copyPlaytestReport">Copy Playtest Report</button>
           <button class="danger-button" data-action="clearPlaytestReports">Clear Playtest Reports</button>
           <button class="small-button" data-action="settings">Back to Settings</button>
@@ -33617,6 +33709,7 @@ class NeonRoadRally {
         else if (action === "resetCarStyle") this.handleResetCarStyle();
         else if (action === "resetData") this.handleResetData();
         else if (action === "copyPlaytestReport") this.handleCopyPlaytestReport();
+        else if (action === "copyFeedbackReport") this.handleCopyFeedbackReport();
         else if (action === "copyRoadDirectorReport") this.handleCopyRoadDirectorReport();
         else if (action === "clearPlaytestReports") this.handleClearPlaytestReports();
       });
@@ -33832,6 +33925,25 @@ class NeonRoadRally {
       await navigator.clipboard.writeText(text);
       this.playtestReportCopyText = "";
       this.showPlaytestReportScreen("Playtest report copied to clipboard.");
+    } catch (error) {
+      this.playtestReportCopyText = text;
+      this.showPlaytestReportScreen("Clipboard copy failed. Use the manual copy box below.");
+    }
+  }
+
+  async handleCopyFeedbackReport() {
+    const text = this.buildFeedbackReportExportText(this.playtestReportFilter);
+    try {
+      if (!navigator.clipboard || typeof navigator.clipboard.writeText !== "function") {
+        throw new Error("Clipboard API unavailable");
+      }
+      await navigator.clipboard.writeText(text);
+      this.playtestReportCopyText = "";
+      if (this.screen === "playtestReport") {
+        this.showPlaytestReportScreen("Feedback report copied to clipboard.");
+      } else {
+        this.showSettingsScreen("Feedback report copied to clipboard.");
+      }
     } catch (error) {
       this.playtestReportCopyText = text;
       this.showPlaytestReportScreen("Clipboard copy failed. Use the manual copy box below.");
