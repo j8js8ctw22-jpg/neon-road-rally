@@ -29065,6 +29065,7 @@ class NeonRoadRally {
     document.querySelectorAll(`[data-race-type-choice="${groupName}"]`).forEach((card) => {
       const selected = card.dataset.value === selectedId;
       card.classList.toggle("is-selected", selected);
+      if (card.hasAttribute("aria-pressed")) card.setAttribute("aria-pressed", selected ? "true" : "false");
       if (card.classList.contains("small-button")) card.classList.toggle("primary", selected);
     });
   }
@@ -29188,82 +29189,88 @@ class NeonRoadRally {
     this.pendingOfficialRouteId = officialRoute?.id || "";
     this.layer.classList.remove("is-empty");
     this.layer.innerHTML = `
-      <section class="panel compact pre-race-panel official-race-panel">
-        <div class="form-stack official-race-flow">
-          <div class="official-setup-title-row">
+      <section class="pre-race-panel official-race-panel nrr">
+        <div class="nrr-bg" aria-hidden="true"></div>
+        <div class="official-race-page page">
+          <header class="official-race-header page-head">
             <div>
-              <span class="eyebrow">Race Board</span>
+              <span class="crumb">Race Board</span>
               <h2>Official Race</h2>
             </div>
-            <button class="small-button" data-action="title">Back</button>
+            <div class="official-race-header-actions actions">
+              <div class="official-launch-summary solo-setup-action" aria-label="Ready to race">
+                <span id="soloSetupCompetitionLabel">${escapeHtml(competitionKind)}</span>
+                <strong id="soloSetupActionSummary">${escapeHtml(startSummary)}</strong>
+              </div>
+              <button class="btn btn--ghost" data-action="title">Back</button>
+              <button class="btn btn--primary official-start-button" data-action="startSeededRace">Start Race</button>
+            </div>
+          </header>
+          <div class="official-race-grid">
+            <div class="official-setup-column">
+              <section class="official-setup-section">
+                <div class="setup-section-heading">
+                  <span class="label eyebrow">Track</span>
+                  <strong id="preRaceTrackSummary">${escapeHtml(track.name)}</strong>
+                </div>
+                ${this.renderTrackSelect("preRaceTrack", track.id, { compact: true, simple: true, flavor: true })}
+              </section>
+              <section class="official-setup-section">
+                <div class="setup-section-heading">
+                  <span class="label eyebrow">Race Type</span>
+                  <strong id="preRaceTypeSummary">${escapeHtml(raceType.label)}</strong>
+                </div>
+                <div class="field official-rules-field">
+                  <label class="setup-hidden-label" for="preRaceType">Race Type</label>
+                  <select id="preRaceType" class="setup-hidden-select" aria-hidden="true" tabindex="-1">
+                    ${this.renderRaceTypeOptionsForTrack(track, raceType.id)}
+                  </select>
+                  ${this.renderOfficialRouteRaceTypeButtons(raceType.id, "preRace")}
+                </div>
+              </section>
+              <details class="practice-setup-panel practice-collapsible official-practice-disclosure" ${this.practiceSetupExpanded ? "open" : ""}>
+                <summary>
+                  <span>Custom Road / Practice</span>
+                  <small>Optional</small>
+                </summary>
+                <div class="practice-setup-body official-practice-body">
+                  <div class="field">
+                    <label for="preRaceSpeedClass">Class</label>
+                    ${this.renderSpeedClassLadder(track, speedClass.id)}
+                    <select id="preRaceSpeedClass" class="setup-hidden-select" aria-hidden="true" tabindex="-1">
+                      ${this.renderSpeedClassOptionsForTrack(track, speedClass.id)}
+                    </select>
+                  </div>
+                  <div class="official-practice-road-row">
+                    <div class="seed-display" aria-live="polite">
+                      <span>Road Code</span>
+                      <strong id="roadSeedDisplay">${escapeHtml(seed)}</strong>
+                    </div>
+                    <div class="field official-road-code-field">
+                      <label for="roadSeedInput">Road Code</label>
+                      <input id="roadSeedInput" type="text" maxlength="${ROAD_SEED_MAX_LENGTH}" value="${escapeAttr(seed)}" autocomplete="off" spellcheck="false" inputmode="text">
+                    </div>
+                  </div>
+                  <input id="officialRouteInput" type="hidden" value="${escapeAttr(officialRoute?.id || "")}">
+                  <span id="fuelRunBoostHint" class="chip chip--cyan official-practice-chip" ${raceType.id === FUEL_RUN_RACE_TYPE_ID ? "" : "hidden"}>Fuel Run</span>
+                  <div class="row setup-action-row official-practice-actions">
+                    <button class="btn btn--secondary" data-action="startPracticeRace">Start Practice</button>
+                    <button class="btn btn--ghost" data-action="randomSeed">Random Road</button>
+                    <button class="btn btn--ghost" data-action="howToPlay">How To Play</button>
+                    <button class="btn btn--ghost" data-action="title">Back</button>
+                  </div>
+                </div>
+              </details>
+            </div>
+            <section class="official-setup-section official-route-section">
+              <div class="setup-section-heading">
+                <span class="label label--cyan eyebrow">Route</span>
+                <strong id="preRaceRouteSummary">${escapeHtml(officialRoute ? getOfficialRouteDisplayName(officialRoute) : competitionKind)}</strong>
+              </div>
+              ${this.renderOfficialRouteChoiceGrid(officialRoute?.id || "", track.id, raceType.id)}
+            </section>
           </div>
-          <div class="setup-sticky-action solo-setup-action official-start-action" aria-label="Ready to race">
-            <div>
-              <span class="eyebrow" id="soloSetupCompetitionLabel">${escapeHtml(competitionKind)}</span>
-              <strong id="soloSetupActionSummary">${escapeHtml(startSummary)}</strong>
-            </div>
-            <div class="setup-action-buttons">
-              <button class="small-button primary" data-action="startSeededRace">Start Race</button>
-            </div>
-          </div>
-          <section class="official-setup-section">
-            <div class="setup-section-heading">
-              <span class="eyebrow">Track</span>
-              <strong>${escapeHtml(track.name)}</strong>
-            </div>
-            ${this.renderTrackSelect("preRaceTrack", track.id, { compact: true, simple: true, flavor: true })}
-          </section>
-          <section class="official-setup-section">
-            <div class="setup-section-heading">
-              <span class="eyebrow">Race Type</span>
-              <strong>${escapeHtml(raceType.label)}</strong>
-            </div>
-            <div class="field official-rules-field">
-              <label class="setup-hidden-label" for="preRaceType">Race Type</label>
-              <select id="preRaceType" class="setup-hidden-select" aria-hidden="true" tabindex="-1">
-                ${this.renderRaceTypeOptionsForTrack(track, raceType.id)}
-              </select>
-              ${this.renderOfficialRouteRaceTypeButtons(raceType.id, "preRace")}
-            </div>
-          </section>
-          <section class="official-setup-section official-route-section">
-            <div class="setup-section-heading">
-              <span class="eyebrow">Route</span>
-              <strong>${escapeHtml(track.name)}</strong>
-            </div>
-            ${this.renderOfficialRouteChoiceGrid(officialRoute?.id || "", track.id, raceType.id)}
-          </section>
-          <details class="practice-setup-panel practice-collapsible" ${this.practiceSetupExpanded ? "open" : ""}>
-            <summary>
-              <span>Custom Road</span>
-              <small>Practice</small>
-            </summary>
-            <div class="practice-setup-body">
-              <div class="field">
-                <label for="preRaceSpeedClass">Speed</label>
-                ${this.renderSpeedClassLadder(track, speedClass.id)}
-                <select id="preRaceSpeedClass" class="setup-hidden-select" aria-hidden="true" tabindex="-1">
-                  ${this.renderSpeedClassOptionsForTrack(track, speedClass.id)}
-                </select>
-              </div>
-              <div class="seed-display" aria-live="polite">
-                <span>Road Code</span>
-                <strong id="roadSeedDisplay">${escapeHtml(seed)}</strong>
-              </div>
-              <div class="field">
-                <label for="roadSeedInput">Road Code</label>
-                <input id="roadSeedInput" type="text" maxlength="${ROAD_SEED_MAX_LENGTH}" value="${escapeAttr(seed)}" autocomplete="off" spellcheck="false" inputmode="text">
-              </div>
-              <input id="officialRouteInput" type="hidden" value="${escapeAttr(officialRoute?.id || "")}">
-              <p id="fuelRunBoostHint" class="hint" ${raceType.id === FUEL_RUN_RACE_TYPE_ID ? "" : "hidden"}>Fuel: grab gas cans; empty tank ends the run.</p>
-              <div class="row setup-action-row">
-                <button class="small-button" data-action="randomSeed">Random Road</button>
-                <button class="small-button" data-action="howToPlay">How To Play</button>
-                <button class="small-button" data-action="title">Back to Title</button>
-              </div>
-            </div>
-          </details>
-          <p class="status-line">${escapeHtml(message)}</p>
+          ${message ? `<p class="status-line official-status-line">${escapeHtml(message)}</p>` : ""}
         </div>
       </section>
     `;
@@ -29359,7 +29366,9 @@ class NeonRoadRally {
       }
       this.syncModeLadderSelection(speedClass.id);
       document.querySelectorAll(".official-route-row[data-official-route-id]").forEach((card) => {
-        card.classList.toggle("is-selected", card.dataset.officialRouteId === officialRoute?.id);
+        const selected = card.dataset.officialRouteId === officialRoute?.id;
+        card.classList.toggle("is-selected", selected);
+        card.dataset.active = selected ? "true" : "false";
       });
       if (raceTypeSummary) {
         raceTypeSummary.textContent = raceType.label;
@@ -29452,6 +29461,8 @@ class NeonRoadRally {
         if (event.repeat) return;
         this.audio.activate();
         this.audio.playSfx("menu");
+        setPracticeLaunchContext();
+        this.practiceSetupExpanded = true;
         this.handleStartSeededRace();
       }
     });
@@ -29509,6 +29520,15 @@ class NeonRoadRally {
       officialRouteId: this.pendingOfficialRouteId,
       customRoad: !officialLaunchActive
     });
+  }
+
+  handleStartPracticeRace() {
+    if (this.screen !== "preRace") return;
+    this.preRaceLaunchContext = "practice";
+    this.pendingOfficialRouteId = "";
+    const officialRouteInput = document.getElementById("officialRouteInput");
+    if (officialRouteInput) officialRouteInput.value = "";
+    this.handleStartSeededRace();
   }
 
   handleStartBoostlinePrototype() {
@@ -32224,11 +32244,11 @@ class NeonRoadRally {
   renderOfficialRouteRaceTypeButtons(selectedRaceTypeId = DEFAULT_RACE_TYPE_ID, groupName = "preRace") {
     const selectedId = normalizeRaceTypeId(selectedRaceTypeId, DEFAULT_RACE_TYPE_ID);
     return `
-      <div class="official-rules-toggle" aria-label="Official race rules">
+      <div class="segmented segmented--cyan official-rules-toggle" aria-label="Race Type">
         ${OFFICIAL_ROUTE_RACE_TYPE_IDS.map((raceTypeId) => {
           const raceType = getRaceTypeConfig(raceTypeId);
           return `
-            <button class="small-button ${raceTypeId === selectedId ? "primary" : ""}" type="button" data-race-type-choice="${escapeAttr(groupName)}" data-value="${escapeAttr(raceTypeId)}">
+            <button type="button" aria-pressed="${raceTypeId === selectedId ? "true" : "false"}" data-race-type-choice="${escapeAttr(groupName)}" data-value="${escapeAttr(raceTypeId)}">
               ${escapeHtml(raceType.label)}
             </button>
           `;
@@ -32265,15 +32285,16 @@ class NeonRoadRally {
     const safeRaceTypeId = normalizeRaceTypeId(raceTypeId, DEFAULT_RACE_TYPE_ID);
     const routes = getOfficialRoutesForTrack(safeTrackId);
     return `
-      <div class="official-route-grid official-route-list" aria-label="Official routes">
+      <div class="official-route-grid official-route-list official-route-board" aria-label="Official routes">
         ${routes.map((route, index) => {
           const pbText = this.getOfficialRouteSetupPbText(route, safeRaceTypeId);
+          const pbClass = /^No\b/i.test(pbText) ? "route-pb empty" : "route-pb";
           return `
-          <button class="official-route-row is-${escapeAttr(route.speedClassId)} ${route.id === selectedId ? "is-selected" : ""}" type="button" data-official-route-id="${escapeAttr(route.id)}">
-            <span class="official-route-number">${String(index + 1).padStart(2, "0")}</span>
-            <strong>${escapeHtml(getOfficialRouteDisplayName(route))}</strong>
-            <span class="official-route-speed">${escapeHtml(route.speedClassLabel)}</span>
-            <small>${escapeHtml(pbText)}</small>
+          <button class="route-row official-route-row is-${escapeAttr(route.speedClassId)} ${route.id === selectedId ? "is-selected" : ""}" ${route.id === selectedId ? "data-active=\"true\"" : ""} type="button" data-official-route-id="${escapeAttr(route.id)}">
+            <span class="route-num official-route-number">${String(index + 1).padStart(2, "0")}</span>
+            <strong class="route-name">${escapeHtml(getOfficialRouteDisplayName(route))}</strong>
+            <span class="route-class official-route-speed">${escapeHtml(route.speedClassLabel)}</span>
+            <small class="${pbClass}">${escapeHtml(pbText)}</small>
           </button>
         `;
         }).join("")}
@@ -33003,7 +33024,7 @@ class NeonRoadRally {
   }
 
   bindLayerButtons() {
-    const oneShotActions = new Set(["start", "startChallenge", "startSeededRace", "startBoostlinePrototype", "partyStartRound", "partyStartRun"]);
+    const oneShotActions = new Set(["start", "startChallenge", "startSeededRace", "startPracticeRace", "startBoostlinePrototype", "partyStartRound", "partyStartRun"]);
     this.layer.querySelectorAll("button[data-action]").forEach((button) => {
       button.addEventListener("click", () => {
         this.audio.activate();
@@ -33054,6 +33075,7 @@ class NeonRoadRally {
         else if (action === "focusGarageSection") this.focusGarageSection(button.dataset.target);
         else if (action === "randomSeed") this.handleRandomSeed();
         else if (action === "startSeededRace") this.handleStartSeededRace();
+        else if (action === "startPracticeRace") this.handleStartPracticeRace();
         else if (action === "startBoostlinePrototype") this.handleStartBoostlinePrototype();
         else if (action === "partyTogglePlayer") this.handlePartyTogglePlayer(button.dataset.id);
         else if (action === "partyRemovePlayer") this.handlePartyTogglePlayer(button.dataset.id);
