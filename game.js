@@ -32866,41 +32866,132 @@ class NeonRoadRally {
     const resultDetailPanel = enduranceResult
       ? this.renderOfficialEnduranceResultPanel(summary)
       : (boostlineRun ? this.renderBoostlineResultPanel(summary) : `${rewardStrip}${improvementNotes}`);
+    const resultStateClass = enduranceResult
+      ? "is-endurance"
+      : (status === "finished"
+        ? "is-finished"
+        : (status === "outOfFuel" ? "is-fuel-empty" : (status === "busted" ? "is-busted" : "is-crashed")));
+    const primaryResultLabel = enduranceResult
+      ? "Bonus Survival"
+      : (status === "finished"
+        ? (summary.officialRouteId ? "Finish Time · Time Attack" : "Finish Time")
+        : (status === "outOfFuel" ? "Out of Fuel" : "Progress"));
+    const primaryResultValue = enduranceResult
+      ? formatTime(enduranceResult.survivalTime || 0)
+      : (status === "finished" ? resultTimeText : `${progressPercent}%`);
+    const primaryResultSub = enduranceResult
+      ? `${secondaryMetricPlacement} · ${secondaryMetricDetail}`
+      : (status === "finished"
+        ? `${timeAttackPlacement} · PB Delta: ${paceDeltaText}`
+        : (status === "outOfFuel"
+          ? `Tank empty at ${progressPercent}% progress`
+          : `${outcomeText} at ${progressPercent}% progress`));
+    const scoreStatValue = enduranceResult
+      ? formatScore(enduranceResult.officialFinishScore || summary.finalScore || 0)
+      : formatScore(summary.finalScore);
+    const scoreStatLabel = boostlineRun ? "Boost Chain" : "Score Attack";
+    const scoreStatSub = boostlineRun
+      ? `${secondaryMetricPlacement} · ${secondaryMetricDetail}`
+      : `${scoreAttackPlacement} · ${scoreAttackDetail}`;
+    const supportStatLabel = enduranceResult
+      ? "Bonus Score"
+      : (summary.raceTypeId === FUEL_RUN_RACE_TYPE_ID ? "Fuel" : "Progress");
+    const supportStatValue = enduranceResult
+      ? formatScore(enduranceResult.postFinishScore || 0)
+      : (summary.raceTypeId === FUEL_RUN_RACE_TYPE_ID
+        ? `${Math.max(0, summary.fuelRemaining || 0)} / ${FUEL_RUN_CONFIG.fuelMax}`
+        : `${progressPercent}%`);
+    const supportStatSub = enduranceResult
+      ? `${secondaryMetricPlacement} · ${secondaryMetricDetail}`
+      : (summary.raceTypeId === FUEL_RUN_RACE_TYPE_ID
+        ? `${Math.max(0, summary.gasCansCollected || 0).toLocaleString()} gas cans`
+        : `${Math.round(summary.distance).toLocaleString()} / ${summary.trackDistance.toLocaleString()}`);
+    const timeStatToneClass = enduranceResult || status === "finished"
+      ? "stat-value stat-value--green"
+      : "stat-value stat-value--cyan";
+    const chipItems = [];
+    if (enduranceResult) {
+      chipItems.push({ label: "Official Race Locked", tone: "green" });
+      chipItems.push({ label: secondaryMetricPlacement, tone: "cyan" });
+    }
+    if (timeAttackPlacement && !["No finish time", "Not saved"].includes(timeAttackPlacement)) {
+      chipItems.push({ label: timeAttackPlacement, tone: timeAttackPlacement.includes("Top 20") ? "yellow" : "cyan" });
+    }
+    if (summary.newPersonalBestTime || summary.newPersonalBest) {
+      chipItems.push({ label: summary.newPersonalBestTime ? "New Time PB" : "New Score PB", tone: "green" });
+    }
+    if (!summary.newPersonalBestTime && !summary.newPersonalBest && scoreAttackPlacement && scoreAttackPlacement.includes("Top 20")) {
+      chipItems.push({ label: scoreAttackPlacement, tone: "yellow" });
+    }
+    if (status === "finished" && !chipItems.some((item) => item.tone === "green")) {
+      chipItems.push({ label: "Finished", tone: "green" });
+    }
+    const resultChipMarkup = chipItems.slice(0, 4).map((item) => `
+      <span class="chip chip--${escapeAttr(item.tone)}">${escapeHtml(item.label)}</span>
+    `).join("");
+    const routeContextLine = summary.challengeMode
+      ? `${summary.challengeName} · ${routeLine}`
+      : routeLine;
+    const resultExtras = `${resultDetailPanel}${this.renderPursuitResultPanel(summary)}${this.renderChallengeResultPanel(summary)}`;
     this.layer.classList.remove("is-empty");
     this.layer.innerHTML = `
-      <section class="panel score-results-panel">
-        <div class="score-hero ${summary.newHighScore ? "is-high-score" : ""}">
-          <div class="result-hero-copy">
-            <span class="eyebrow">${escapeHtml(resultEyebrow)}</span>
-            <h2>${escapeHtml(resultHeadline)}</h2>
-            <p class="result-outcome-line">${escapeHtml(outcomeDetail)}</p>
-            <p class="result-route-line">${summary.challengeMode ? `${escapeHtml(summary.challengeName)} · ` : ""}${escapeHtml(routeLine)}</p>
-            <p class="hint">${escapeHtml(setupLine)}.</p>
-          </div>
-          <div class="result-metric-stack">
-            <div class="result-primary-metric">
-              <span>${escapeHtml(timeAttackLabel)}</span>
-              <strong>${escapeHtml(timeAttackValue)}</strong>
-              <small><b>${escapeHtml(timeAttackPlacement)}</b><em>${escapeHtml(timeAttackDetail)}</em></small>
+      <section class="score-results-panel result-screen-panel nrr ${escapeAttr(resultStateClass)} ${summary.newHighScore ? "is-high-score" : ""}">
+        <div class="nrr-bg" aria-hidden="true"></div>
+        <div class="result-page page">
+          <div class="result-header page-head">
+            <div class="result-title-copy">
+              <span class="crumb">${escapeHtml(resultEyebrow)} · ${escapeHtml(setupLine)}</span>
+              <h1>${escapeHtml(resultHeadline)}</h1>
+              <div class="result-route-line">
+                <span>${escapeHtml(routeContextLine)}</span>
+              </div>
             </div>
-            <div class="result-secondary-metric">
-              <span>${escapeHtml(secondaryMetricLabel)}</span>
-              <strong ${boostlineRun || enduranceResult ? "" : `id="finalScoreValue" class="tally-score"`}>${escapeHtml(secondaryMetricValue)}</strong>
-              <small><b>${escapeHtml(secondaryMetricPlacement)}</b><em>${escapeHtml(secondaryMetricDetail)}</em></small>
+            <div class="actions result-actions">
+              <button class="btn btn--ghost" data-action="title">Back to Title</button>
+              ${showResultBoardAction ? `<button class="btn btn--secondary" data-action="leaderboard" data-view="${escapeAttr(resultBoardView)}" data-track-id="${escapeAttr(summary.trackId)}" data-race-type-id="${escapeAttr(resultBoardRaceTypeId)}" data-speed-class-id="${escapeAttr(summary.speedClass)}" data-official-route-id="${escapeAttr(summary.officialRouteId || "")}">View Route Boards</button>` : ""}
+              <button class="btn btn--primary btn--lg" data-action="restart"><span>${escapeHtml(restartLabel)}</span><span class="kbd">↵</span></button>
             </div>
           </div>
-        </div>
-        <div class="row score-action-row">
-          <button class="small-button primary" data-action="restart">${escapeHtml(restartLabel)}</button>
-          ${summary.partyMode ? "" : `<button class="small-button" data-action="preRace">Change Route</button>`}
-	          ${showResultBoardAction ? `<button class="small-button" data-action="leaderboard" data-view="${escapeAttr(resultBoardView)}" data-track-id="${escapeAttr(summary.trackId)}" data-race-type-id="${escapeAttr(resultBoardRaceTypeId)}" data-speed-class-id="${escapeAttr(summary.speedClass)}" data-official-route-id="${escapeAttr(summary.officialRouteId || "")}">View Route Boards</button>` : ""}
-	          <button class="small-button" data-action="players">Driver Garage</button>
-          <button class="small-button" data-action="title">Back to Title</button>
-        </div>
-        ${resultDetailPanel}
-        ${this.renderPursuitResultPanel(summary)}
-        ${this.renderChallengeResultPanel(summary)}
-        <details class="result-details-block">
+
+          <div class="result-payoff">
+            <div class="result-primary-block">
+              <span class="label">${escapeHtml(primaryResultLabel)}</span>
+              <strong class="result-primary-value">${escapeHtml(primaryResultValue)}</strong>
+              <div class="result-chip-strip">
+                ${resultChipMarkup || `<span class="chip chip--cyan">${escapeHtml(outcomeText)}</span>`}
+                <span class="result-primary-detail">${escapeHtml(primaryResultSub)}</span>
+              </div>
+            </div>
+            <div class="result-side-board">
+              <div class="label label--cyan">Score Board</div>
+              <div class="stat-row result-stat-row">
+                <div class="stat">
+                  <span class="stat-label">${escapeHtml(timeAttackLabel)}</span>
+                  <span class="${escapeAttr(timeStatToneClass)}">${escapeHtml(timeAttackValue)}</span>
+                  <span class="stat-sub">${escapeHtml(timeAttackPlacement)} · ${escapeHtml(timeAttackDetail)}</span>
+                </div>
+                <div class="stat">
+                  <span class="stat-label">${escapeHtml(scoreStatLabel)}</span>
+                  <span id="finalScoreValue" class="stat-value" ${boostlineRun ? "" : `data-tally-value="${escapeAttr(enduranceResult ? (enduranceResult.officialFinishScore || summary.finalScore || 0) : summary.finalScore)}"`}>${escapeHtml(boostlineRun ? secondaryMetricValue : scoreStatValue)}</span>
+                  <span class="stat-sub">${escapeHtml(scoreStatSub)}</span>
+                </div>
+                <div class="stat">
+                  <span class="stat-label">${escapeHtml(supportStatLabel)}</span>
+                  <span class="stat-value stat-value--cyan">${escapeHtml(supportStatValue)}</span>
+                  <span class="stat-sub">${escapeHtml(supportStatSub)}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="result-quiet-actions">
+            ${summary.partyMode ? "" : `<button class="btn btn--ghost" data-action="preRace">Change Route</button>`}
+            <button class="btn btn--ghost" data-action="players">Driver Garage</button>
+          </div>
+
+          ${resultExtras ? `<div class="result-followup-grid">${resultExtras}</div>` : ""}
+
+        <details class="result-details-block disclosure-panel">
           <summary>Details</summary>
           <h2>Score Breakdown</h2>
           ${this.renderScoreBreakdown(summary)}
@@ -32974,6 +33065,7 @@ class NeonRoadRally {
           <div class="score-card"><strong>Top 20</strong><span>${escapeHtml(leaderboardText)}</span></div>
           </div>
         </details>
+        </div>
       </section>
     `;
     this.bindLayerButtons();

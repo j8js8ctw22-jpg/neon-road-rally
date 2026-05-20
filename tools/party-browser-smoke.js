@@ -183,7 +183,7 @@ async function run() {
     return final;
   }
 
-  await clickText("Party Mode");
+  await clickText("Party Race");
   await expectText("Party Mode");
   await page.evaluate(() => {
     const app = window.neonRoadRally;
@@ -353,7 +353,7 @@ async function run() {
 
   await page.getByRole("button", { name: /(Return|Back) to Title/i }).click();
   await page.waitForFunction(() => window.neonRoadRally?.screen === "title", null, { timeout: 5000 });
-  await clickText("Official Race|Solo Race");
+  await clickText("Start Race");
   await page.waitForFunction(() => window.neonRoadRally?.screen === "preRace", null, { timeout: 5000 });
   await page.selectOption("#preRaceType", "classic");
   await page.selectOption("#preRaceType", "fuelRun");
@@ -367,13 +367,13 @@ async function run() {
   await page.getByRole("button", { name: /^Back( to Title)?$/ }).click();
   await page.waitForFunction(() => window.neonRoadRally?.screen === "title", null, { timeout: 5000 });
 
-  await clickText("Driver Garage");
+  await clickText("Garage");
   await page.waitForFunction(() => window.neonRoadRally?.screen === "players", null, { timeout: 5000 });
   await expectText("Driver Garage");
   await clickAction("title");
   await page.waitForFunction(() => window.neonRoadRally?.screen === "title", null, { timeout: 5000 });
 
-  await clickText("Leaderboard");
+  await clickText("Records");
   await page.waitForFunction(() => window.neonRoadRally?.screen === "leaderboard", null, { timeout: 5000 });
   await expectText("Score Attack");
   await expectText("Time Attack");
