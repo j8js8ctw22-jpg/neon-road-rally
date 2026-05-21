@@ -50,12 +50,15 @@ async function setupHarness(page) {
       reset(options = {}) {
         const laneFloat = Number.isFinite(options.laneFloat) ? options.laneFloat : 2;
         const targetLane = Number.isFinite(options.targetLane) ? options.targetLane : Math.round(laneFloat);
-        app.startRace({
+        const raceTypeId = options.raceTypeId || "classic";
+        const raceOptions = {
           trackId: "sunset-highway",
           speedClassId: "turbo",
-          raceTypeId: options.raceTypeId || "classic",
-          seed: "FLOW-BREAK-QA"
-        });
+          raceTypeId,
+          seed: "SUNSET-PALM-SPRINT-TURBO"
+        };
+        if (raceTypeId === "classic") raceOptions.officialRouteId = "sunset-neon-palm-sprint";
+        app.startRace(raceOptions);
         app.run.debugFrozen = true;
         app.run.countdownTimer = 0;
         app.run.raceActive = true;
@@ -190,6 +193,11 @@ async function setupHarness(page) {
           visibleHazardsAtTrigger: run.flowBreakVisibleHazardsAtTrigger || 0,
           zeroEffectTriggers: run.flowBreakTriggeredWithZeroEffect || 0,
           noForwardHazardTriggers: run.flowBreakTriggeredWithNoForwardHazard || 0,
+          triggerHazardType: run.flowBreakTriggerHazardType || "",
+          triggeredByMajorHazard: Boolean(run.flowBreakTriggeredByMajorHazard),
+          minorHazardsCleared: run.flowBreakMinorHazardsCleared || 0,
+          majorHazardsCleared: run.flowBreakMajorHazardsCleared || 0,
+          ignoredMinorHazardCount: run.flowBreakIgnoredMinorHazardCount || 0,
           sparksCreated: run.flowBreakSparksCreated || 0,
           sparksSpawnedAhead: run.flowBreakSparksSpawnedAhead || 0,
           sparksSpawnedBehind: run.flowBreakSparksSpawnedBehind || 0,
@@ -301,6 +309,11 @@ async function runRealRouteSample(page, outDir) {
         visibleHazardsAtTrigger: run.flowBreakVisibleHazardsAtTrigger || 0,
         zeroEffectTriggers: run.flowBreakTriggeredWithZeroEffect || 0,
         noForwardHazardTriggers: run.flowBreakTriggeredWithNoForwardHazard || 0,
+        triggerHazardType: run.flowBreakTriggerHazardType || "",
+        triggeredByMajorHazard: Boolean(run.flowBreakTriggeredByMajorHazard),
+        minorHazardsCleared: run.flowBreakMinorHazardsCleared || 0,
+        majorHazardsCleared: run.flowBreakMajorHazardsCleared || 0,
+        ignoredMinorHazardCount: run.flowBreakIgnoredMinorHazardCount || 0,
         sparksCreated: run.flowBreakSparksCreated || 0,
         sparksSpawnedAhead: run.flowBreakSparksSpawnedAhead || 0,
         sparksSpawnedBehind: run.flowBreakSparksSpawnedBehind || 0,
@@ -374,7 +387,8 @@ async function runLiveFlowBreakFrameSample(page) {
       trackId: "sunset-highway",
       speedClassId: "turbo",
       raceTypeId: "classic",
-      seed: "FLOW-BREAK-LIVE-FRAME"
+      seed: "SUNSET-PALM-SPRINT-TURBO",
+      officialRouteId: "sunset-neon-palm-sprint"
     });
     if (!window.__flowBreakQaOriginalCollisionUpdate) {
       window.__flowBreakQaOriginalCollisionUpdate = app.collision.update.bind(app.collision);
@@ -442,6 +456,10 @@ async function runLiveFlowBreakFrameSample(page) {
     return {
       triggered: run.flowBreaksTriggered || 0,
       hazardsCleared: run.flowBreakHazardsCleared || 0,
+      triggerHazardType: run.flowBreakTriggerHazardType || "",
+      triggeredByMajorHazard: Boolean(run.flowBreakTriggeredByMajorHazard),
+      minorHazardsCleared: run.flowBreakMinorHazardsCleared || 0,
+      majorHazardsCleared: run.flowBreakMajorHazardsCleared || 0,
       sparksCreated: run.flowBreakSparksCreated || 0,
       sparksCollected: run.flowBreakSparksCollected || 0,
       flowBreakFrameWorstMs: Number((run.flowBreakFrameWorstMs || 0).toFixed(2)),
@@ -517,9 +535,33 @@ async function run() {
 
     await page.evaluate(() => window.__flowBreakQa.reset());
     await page.evaluate(() => window.__flowBreakQa.armFromFlow());
+    const coneOnlyId = await page.evaluate(() => window.__flowBreakQa.add("cone", 2, 2200));
+    const coneOnly = await page.evaluate(() => window.__flowBreakQa.tick());
+    assert.strictEqual(coneOnly.armed, true, "Cone-only forward zone should keep Flow Break armed");
+    assert.strictEqual(coneOnly.triggered, 0, "Cone-only forward zone should not trigger Flow Break");
+    assert(!findObstacle(coneOnly, coneOnlyId).flowBreakCleared, "Cone-only hazard should not be cleared without a major trigger");
+    assert(coneOnly.ignoredMinorHazardCount >= 1, "Cone-only forward zone should record an ignored minor hazard");
+    assert.strictEqual(coneOnly.zeroEffectTriggers, 0, "Cone-only wait should not create zero-effect telemetry");
+    assert.strictEqual(coneOnly.noForwardHazardTriggers, 0, "Cone-only wait should not create no-forward trigger telemetry");
+
+    await page.evaluate(() => window.__flowBreakQa.reset());
+    await page.evaluate(() => window.__flowBreakQa.armFromFlow());
+    const oilOnlyId = await page.evaluate(() => window.__flowBreakQa.add("oil", 2, 2200));
+    const branchOnlyId = await page.evaluate(() => window.__flowBreakQa.add("branch", 2, 2350));
+    const minorOnly = await page.evaluate(() => window.__flowBreakQa.tick());
+    assert.strictEqual(minorOnly.armed, true, "Oil/branch-only forward zone should keep Flow Break armed");
+    assert.strictEqual(minorOnly.triggered, 0, "Oil/branch-only forward zone should not trigger Flow Break");
+    assert(!findObstacle(minorOnly, oilOnlyId).flowBreakCleared, "Oil should not be cleared without a major trigger");
+    assert(!findObstacle(minorOnly, branchOnlyId).flowBreakCleared, "Branch should not be cleared without a major trigger");
+    assert(minorOnly.ignoredMinorHazardCount >= 2, "Oil/branch-only forward zone should record ignored minor hazards");
+
+    await page.evaluate(() => window.__flowBreakQa.reset());
+    await page.evaluate(() => window.__flowBreakQa.armFromFlow());
 
     const slowId = await page.evaluate(() => window.__flowBreakQa.add("slowCar", 2, 2200));
     const truckClusterId = await page.evaluate(() => window.__flowBreakQa.add("truck", 1, 2450));
+    const coneClusterId = await page.evaluate(() => window.__flowBreakQa.add("cone", 2, 2260));
+    const branchClusterId = await page.evaluate(() => window.__flowBreakQa.add("branch", 1, 2380));
     const farLaneId = await page.evaluate(() => window.__flowBreakQa.add("slowCar", 4, 2300));
     const boostId = await page.evaluate(() => window.__flowBreakQa.add("boostPad", 2, 2050));
     const rampId = await page.evaluate(() => window.__flowBreakQa.add("ramp", 2, 2150));
@@ -536,6 +578,8 @@ async function run() {
     assert.strictEqual(triggered.triggered, 1, "Flow Break trigger count should increment");
     assert(findObstacle(triggered, slowId).flowBreakCleared, "Same-lane slow car should be cleared");
     assert(findObstacle(triggered, truckClusterId).flowBreakCleared, "Nearby truck should be clearable by Flow Break");
+    assert(findObstacle(triggered, coneClusterId).flowBreakCleared, "Minor hazard should clear when a nearby major hazard triggers Flow Break");
+    assert(findObstacle(triggered, branchClusterId).flowBreakCleared, "Branch should clear when a nearby major hazard triggers Flow Break");
     assert(!findObstacle(triggered, farLaneId).flowBreakCleared, "Far-lane hazard outside radius should not clear");
     assert(!findObstacle(triggered, boostId).flowBreakCleared, "Boost pad should not clear");
     assert(!findObstacle(triggered, rampId).flowBreakCleared, "Ramp should not clear");
@@ -547,6 +591,10 @@ async function run() {
     assert(triggered.visibleHazardsAtTrigger >= 1, "Flow Break should record visible hazards at trigger");
     assert.strictEqual(triggered.zeroEffectTriggers, 0, "Flow Break should not trigger with zero effect");
     assert.strictEqual(triggered.noForwardHazardTriggers, 0, "Flow Break should not trigger without a forward hazard");
+    assert(["slowCar", "truck", "fastCar", "barrier"].includes(triggered.triggerHazardType), "Flow Break trigger should record a major hazard type");
+    assert.strictEqual(triggered.triggeredByMajorHazard, true, "Flow Break trigger should be marked as major-hazard driven");
+    assert(triggered.majorHazardsCleared >= 2, "Major hazard clear telemetry should increment");
+    assert(triggered.minorHazardsCleared >= 2, "Minor hazards can clear after a major-triggered Flow Break");
     assert(triggered.sparksCreated >= 2, "Flow Break should create boost sparks");
     assert(triggered.sparksSpawnedAhead >= 2, "Flow Break sparks should spawn ahead of the player");
     assert.strictEqual(triggered.sparksSpawnedBehind, 0, "Flow Break should not spawn sparks behind the player");
@@ -559,6 +607,21 @@ async function run() {
     await page.screenshot({ path: sparksShot });
 
     const sparkAhead = triggered.sparks[0].ahead;
+    const turboSparkDisplayProbe = await page.evaluate(() => {
+      const app = window.neonRoadRally;
+      const rawBefore = 3890;
+      const rawAfter = rawBefore * 1.16;
+      return {
+        rawBefore,
+        rawAfter,
+        displayBefore: getDisplayedSpeedForRaw(rawBefore, app.run.track, app.run.speedClassId),
+        displayAfter: getDisplayedSpeedForRaw(rawAfter, app.run.track, app.run.speedClassId)
+      };
+    });
+    await page.evaluate(() => {
+      window.neonRoadRally.run.currentSpeed = 3890;
+      window.neonRoadRally.run.baseCruiseSpeed = Math.max(window.neonRoadRally.run.baseCruiseSpeed || 0, 3890);
+    });
     const collected = await page.evaluate((delta) => window.__flowBreakQa.advance(delta), Math.max(0, sparkAhead - 120));
     assert(collected.sparksCollected >= 1, "Boost spark should be collectable");
     assert(collected.sparkBoostTimer > 0, "Collected spark should grant a short speed reward");
@@ -570,6 +633,8 @@ async function run() {
     assert(collected.sparkSpeedAfter > collected.sparkSpeedBefore, "Spark pickup should increase raw speed");
     assert(collected.sparkDisplaySpeedBefore !== null, "Spark pickup should record display speed before reward");
     assert(collected.sparkDisplaySpeedAfter >= collected.sparkDisplaySpeedBefore, "Spark pickup should not lower displayed speed");
+    assert(turboSparkDisplayProbe.displayAfter > 230, "Turbo spark overrun should display above the base Turbo range");
+    assert(turboSparkDisplayProbe.displayAfter >= turboSparkDisplayProbe.displayBefore + 12, "Turbo spark pickup should show an obvious displayed-speed jump");
     assert(collected.sparkBoostMultiplier >= 1.16, "Spark pickup should record its boost multiplier");
     assert(collected.sparkPickupTimer > 0, "Spark pickup should trigger visible HUD feedback");
     const collectedShot = path.join(OUT_DIR, "boost-spark-collected.png");
@@ -583,6 +648,7 @@ async function run() {
     const liveFrameSample = await runLiveFlowBreakFrameSample(page);
     assert(liveFrameSample.triggered >= 1, "Live frame sample should trigger Flow Break");
     assert(liveFrameSample.hazardsCleared >= 1, "Live frame sample should clear hazards");
+    assert.strictEqual(liveFrameSample.triggeredByMajorHazard, true, "Live frame sample should trigger from a major hazard");
     if (!(liveFrameSample.flowBreakFrameWorstMs < 120)) {
       console.log("FLOW_BREAK_LIVE_FRAME_SAMPLE", JSON.stringify(liveFrameSample, null, 2));
     }
@@ -593,6 +659,15 @@ async function run() {
     const truckId = await page.evaluate(() => window.__flowBreakQa.add("truck", 2, 2600));
     const truck = await page.evaluate(() => window.__flowBreakQa.tick());
     assert(findObstacle(truck, truckId).flowBreakCleared, "Truck should be clearable by Flow Break");
+    assert.strictEqual(truck.triggerHazardType, "truck", "Truck should be recorded as the trigger hazard");
+    assert.strictEqual(truck.triggeredByMajorHazard, true, "Truck trigger should be marked as major hazard");
+
+    await page.evaluate(() => window.__flowBreakQa.reset());
+    await page.evaluate(() => window.__flowBreakQa.armFromFlow());
+    const barrierId = await page.evaluate(() => window.__flowBreakQa.add("barrier", 2, 2200));
+    const barrier = await page.evaluate(() => window.__flowBreakQa.tick());
+    assert(findObstacle(barrier, barrierId).flowBreakCleared, "Barrier should trigger and clear through Flow Break");
+    assert.strictEqual(barrier.triggerHazardType, "barrier", "Barrier should be recorded as the trigger hazard");
 
     await page.evaluate(() => window.__flowBreakQa.reset());
     await page.evaluate(() => window.__flowBreakQa.armFromFlow());
@@ -638,6 +713,7 @@ async function run() {
     assert.strictEqual(realRouteSample.sparksSpawnedBehind, 0, "Real route sample should not spawn behind-player sparks");
     assert(realRouteSample.sparksCollected >= 1, "Real route sample should collect at least one boost spark");
     assert(realRouteSample.sparkSpeedAfter > realRouteSample.sparkSpeedBefore, "Real route spark pickup should increase raw speed");
+    assert.strictEqual(realRouteSample.triggeredByMajorHazard, true, "Real route sample should trigger from a major hazard");
     assert.strictEqual(realRouteSample.zeroEffectTriggers, 0, "Real route sample should have no zero-effect Flow Break triggers");
     assert.strictEqual(realRouteSample.noForwardHazardTriggers, 0, "Real route sample should not trigger without a forward hazard");
 
@@ -657,11 +733,15 @@ async function run() {
       armed,
       emptyRoad,
       noEffectWait,
+      coneOnly,
+      minorOnly,
       triggered,
+      turboSparkDisplayProbe,
       collected,
       frameCost,
       liveFrameSample,
       truck,
+      barrier,
       collision,
       fuel,
       party,

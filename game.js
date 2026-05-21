@@ -3046,14 +3046,15 @@ const SPEED_CLASSES = [
 ];
 const DISPLAY_SPEED_LABEL = "SPEED";
 const DISPLAY_SPEED_UNIT = "MPH";
+const DISPLAY_SPEED_OVERRUN_EASE = 1.2;
 const DISPLAY_SPEED_RANGES = {
-  sunday: { min: 45, max: 72 },
-  rookie: { min: 65, max: 98 },
-  arcade: { min: 90, max: 145 },
-  pro: { min: 130, max: 190 },
-  turbo: { min: 165, max: 230 },
-  overdrive: { min: 200, max: 270 },
-  redline: { min: 240, max: 320 }
+  sunday: { min: 45, max: 72, overrunMax: 88 },
+  rookie: { min: 65, max: 98, overrunMax: 118 },
+  arcade: { min: 90, max: 145, overrunMax: 176 },
+  pro: { min: 130, max: 190, overrunMax: 225 },
+  turbo: { min: 165, max: 230, overrunMax: 300 },
+  overdrive: { min: 200, max: 270, overrunMax: 340 },
+  redline: { min: 240, max: 320, overrunMax: 405 }
 };
 const NORMAL_SPEED_CLASS_IDS = ["arcade", "pro", "turbo", "overdrive", "redline"];
 const TRAINING_SPEED_CLASS_IDS = ["sunday", "rookie"];
@@ -3800,6 +3801,13 @@ const SPEED_TUNING = {
   roadStripeScrollScale: 0.82
 };
 
+const ENDURANCE_ESCALATION_CONFIG = {
+  secondsPerStep: 12,
+  stepMultiplier: 0.02,
+  completedLapMultiplier: 0.045,
+  maxSpeedMultiplier: 1.34
+};
+
 const DRIFT_TUNING = {
   minChargeSeconds: 0.12,
   maxChargeSeconds: 0.55,
@@ -4250,6 +4258,7 @@ const RAMP_TARGET_TYPES = new Set([...HARD_VEHICLE_TYPES, ...MINOR_HAZARD_TYPES]
 const RAMP_LANDING_UNSAFE_TYPES = new Set([...HARD_VEHICLE_TYPES, ...MINOR_HAZARD_TYPES]);
 const RAMP_PATH_COLLECTIBLE_TYPES = new Set(["gasCan", "boostPad"]);
 const FLOW_BREAK_CLEARABLE_TYPES = new Set([...HARD_VEHICLE_TYPES, ...MINOR_HAZARD_TYPES]);
+const FLOW_BREAK_MAJOR_TRIGGER_TYPES = new Set([...HARD_VEHICLE_TYPES]);
 const CAMERA_HAZARD_SCALE_TYPES = new Set(["cone", "oil", "deer", "ramp", "boostPad", "gasCan", "branch"]);
 
 const OBSTACLE_INFO = {
@@ -5087,8 +5096,15 @@ function getDisplayedSpeedForRaw(rawSpeed, track = TRACKS[0], speedClassId = DEF
   const numericRaw = Number(rawSpeed);
   const sourceSpeed = Number.isFinite(numericRaw) ? numericRaw : classStart;
   const rawSpan = Math.max(1, classEnd - classStart);
-  const progress = clamp((sourceSpeed - classStart) / rawSpan, 0, 1);
-  return Math.round(lerp(range.min, range.max, progress));
+  if (sourceSpeed <= classEnd) {
+    const progress = clamp((sourceSpeed - classStart) / rawSpan, 0, 1);
+    return Math.round(lerp(range.min, range.max, progress));
+  }
+  const overrunMax = Math.max(range.max, Number.isFinite(range.overrunMax) ? range.overrunMax : range.max);
+  if (overrunMax <= range.max) return Math.round(range.max);
+  const overrunRatio = Math.max(0, (sourceSpeed - classEnd) / rawSpan);
+  const easedOverrun = clamp(1 - Math.exp(-overrunRatio * DISPLAY_SPEED_OVERRUN_EASE), 0, 1);
+  return Math.round(lerp(range.max, overrunMax, easedOverrun));
 }
 
 function formatDisplayedSpeed(rawSpeed, track = TRACKS[0], speedClassId = DEFAULT_SPEED_CLASS_ID) {
@@ -5117,9 +5133,35 @@ function getOfficialEnduranceLapNumber(run) {
   return Math.max(1, normalizeNonNegativeInteger(run?.officialEnduranceLap, 1, 99));
 }
 
+function getOfficialEnduranceEscalationSeconds(run) {
+  if (!isOfficialEnduranceRun(run)) return 0;
+  const elapsed = Number(run?.elapsed);
+  const startElapsed = Number(run?.officialEnduranceStartElapsed);
+  if (Number.isFinite(elapsed) && Number.isFinite(startElapsed)) return Math.max(0, elapsed - startElapsed);
+  const survivalTime = Number(run?.officialEnduranceSurvivalTime);
+  if (Number.isFinite(survivalTime)) return Math.max(0, survivalTime);
+  return 0;
+}
+
 function getOfficialEnduranceSpeedMultiplier(run) {
   if (!isOfficialEnduranceRun(run)) return 1;
-  return clamp(1 + (getOfficialEnduranceLapNumber(run) - 1) * 0.055, 1, 1.24);
+  const seconds = getOfficialEnduranceEscalationSeconds(run);
+  const timeBonus = (seconds / ENDURANCE_ESCALATION_CONFIG.secondsPerStep) * ENDURANCE_ESCALATION_CONFIG.stepMultiplier;
+  const completedEnduranceLaps = Math.max(0, getOfficialEnduranceLapNumber(run) - 2);
+  const lapBonus = completedEnduranceLaps * ENDURANCE_ESCALATION_CONFIG.completedLapMultiplier;
+  return clamp(1 + timeBonus + lapBonus, 1, ENDURANCE_ESCALATION_CONFIG.maxSpeedMultiplier);
+}
+
+function getOfficialEnduranceBaselineSpeedFloor(run, enduranceSpeedMultiplier = getOfficialEnduranceSpeedMultiplier(run)) {
+  if (!isOfficialEnduranceRun(run)) return 0;
+  const track = run?.track || TRACKS[0];
+  const speedClassId = run?.speedClassId || DEFAULT_SPEED_CLASS_ID;
+  const finishBaseline = Math.max(
+    SPEED_TUNING.minSpeed,
+    Number.isFinite(run?.enduranceBaseSpeedAtOfficialFinish) ? run.enduranceBaseSpeedAtOfficialFinish : 0,
+    getTrackCruiseSpeed(track, 1, speedClassId)
+  );
+  return finishBaseline * enduranceSpeedMultiplier;
 }
 
 function getOfficialEndurancePressureMultiplier(run) {
@@ -6812,6 +6854,13 @@ function normalizePlaytestRunSummary(entry) {
     paceBehindTime: normalizeOptionalFiniteNumber(entry.paceBehindTime, 0, 24 * 60 * 60),
     paceFeedbackActiveTime: normalizeOptionalFiniteNumber(entry.paceFeedbackActiveTime, 0, 24 * 60 * 60),
     paceFeedbackSampleCount: normalizeNonNegativeInteger(entry.paceFeedbackSampleCount, 0, 999999),
+    enduranceSpeedMultiplier: normalizeNonNegativeNumber(entry.enduranceSpeedMultiplier, 0, 10),
+    enduranceEscalationSeconds: normalizeNonNegativeNumber(entry.enduranceEscalationSeconds, 0, 24 * 60 * 60),
+    enduranceLap: normalizeNonNegativeInteger(entry.enduranceLap, 0, 999),
+    speedAtOfficialFinish: normalizeNonNegativeNumber(entry.speedAtOfficialFinish, 0, 99999),
+    speedAfterLapStart: normalizeNonNegativeNumber(entry.speedAfterLapStart, 0, 99999),
+    maxEnduranceSpeed: normalizeNonNegativeNumber(entry.maxEnduranceSpeed, 0, 99999),
+    boostsCollectedAfterFinish: normalizeNonNegativeInteger(entry.boostsCollectedAfterFinish, 0, 9999),
     neonFlowEnabled: Boolean(entry.neonFlowEnabled),
     neonFlowTotalEarned: normalizeNonNegativeInteger(entry.neonFlowTotalEarned, 0, 99999),
     flowBreaksArmed: normalizeNonNegativeInteger(entry.flowBreaksArmed, 0, 999),
@@ -6826,6 +6875,11 @@ function normalizePlaytestRunSummary(entry) {
     flowBreakVisibleHazardsAtTrigger: normalizeNonNegativeInteger(entry.flowBreakVisibleHazardsAtTrigger, 0, 9999),
     flowBreakTriggeredWithZeroEffect: normalizeNonNegativeInteger(entry.flowBreakTriggeredWithZeroEffect, 0, 9999),
     flowBreakTriggeredWithNoForwardHazard: normalizeNonNegativeInteger(entry.flowBreakTriggeredWithNoForwardHazard, 0, 9999),
+    flowBreakTriggerHazardType: sanitizeName(entry.flowBreakTriggerHazardType, "", DISPLAY_TEXT_MAX_LENGTH),
+    flowBreakTriggeredByMajorHazard: Boolean(entry.flowBreakTriggeredByMajorHazard),
+    flowBreakMinorHazardsCleared: normalizeNonNegativeInteger(entry.flowBreakMinorHazardsCleared, 0, 9999),
+    flowBreakMajorHazardsCleared: normalizeNonNegativeInteger(entry.flowBreakMajorHazardsCleared, 0, 9999),
+    flowBreakIgnoredMinorHazardCount: normalizeNonNegativeInteger(entry.flowBreakIgnoredMinorHazardCount, 0, 99999),
     flowBreakSparksCreated: normalizeNonNegativeInteger(entry.flowBreakSparksCreated, 0, 9999),
     flowBreakSparksSpawnedAhead: normalizeNonNegativeInteger(entry.flowBreakSparksSpawnedAhead, 0, 9999),
     flowBreakSparksSpawnedBehind: normalizeNonNegativeInteger(entry.flowBreakSparksSpawnedBehind, 0, 9999),
@@ -10177,7 +10231,11 @@ class RoadDirector {
     const cadence = getTrackDirectorCadence(speedClassId, track);
     const modeIntensity = TRACK_DIRECTOR.modeIntensity[speedClassId] || 1;
     const endurancePressureMultiplier = getOfficialEndurancePressureMultiplier(run);
-    const cruiseSpeed = getTrackCruiseSpeed(track, progress, speedClassId) * getOfficialEnduranceSpeedMultiplier(run);
+    const enduranceSpeedMultiplier = getOfficialEnduranceSpeedMultiplier(run);
+    const cruiseSpeed = Math.max(
+      getTrackCruiseSpeed(track, progress, speedClassId) * enduranceSpeedMultiplier,
+      getOfficialEnduranceBaselineSpeedFloor(run, enduranceSpeedMultiplier)
+    );
     const launchPacing = this.getLaunchPacingConfig(speedClassId, section);
     const seedLocked = this.isSeedLocked();
     let playerLane = Math.round(clamp(
@@ -15865,6 +15923,7 @@ class CollisionSystem {
     if (obstacle.type === "boostPad") {
       const chainContinues = (run.padBoostTimer || 0) > 0.12;
       run.boostPadsCollected += 1;
+      if (isOfficialEnduranceRun(run)) run.boostsCollectedAfterFinish = Math.max(0, (run.boostsCollectedAfterFinish || 0) + 1);
       run.currentBoostPadChain = chainContinues ? Math.max(1, (run.currentBoostPadChain || 0) + 1) : 1;
       run.bestBoostPadChain = Math.max(run.bestBoostPadChain || 0, run.currentBoostPadChain || 0);
       if (!obstacle.boostReachableRecorded) {
@@ -22012,6 +22071,14 @@ class NeonRoadRally {
       officialEnduranceLastLapNotice: "",
       officialEnduranceEndReason: "",
       officialEnduranceLeaderboardRecorded: false,
+      enduranceSpeedMultiplier: 1,
+      enduranceEscalationSeconds: 0,
+      enduranceLap: 1,
+      speedAtOfficialFinish: 0,
+      enduranceBaseSpeedAtOfficialFinish: 0,
+      speedAfterLapStart: 0,
+      maxEnduranceSpeed: 0,
+      boostsCollectedAfterFinish: 0,
       fuelMax: 0,
       fuel: 0,
       fuelDrainPerSecond: 0,
@@ -22151,6 +22218,12 @@ class NeonRoadRally {
       flowBreakVisibleHazardsAtTrigger: 0,
       flowBreakTriggeredWithZeroEffect: 0,
       flowBreakTriggeredWithNoForwardHazard: 0,
+      flowBreakTriggerHazardType: "",
+      flowBreakTriggeredByMajorHazard: false,
+      flowBreakMinorHazardsCleared: 0,
+      flowBreakMajorHazardsCleared: 0,
+      flowBreakIgnoredMinorHazardCount: 0,
+      flowBreakIgnoredMinorHazardIds: new Set(),
       flowBreakSparksCreated: 0,
       flowBreakSparksSpawnedAhead: 0,
       flowBreakSparksSpawnedBehind: 0,
@@ -22612,6 +22685,7 @@ class NeonRoadRally {
     );
     return {
       speed,
+      baseSpeed: Math.max(SPEED_TUNING.minSpeed, Number.isFinite(run.baseCruiseSpeed) ? run.baseCruiseSpeed : 0),
       boostTimer: Math.max(0, run.boostTimer || 0),
       padBoostTimer: Math.max(0, run.padBoostTimer || 0),
       driftBoostTimer: Math.max(0, run.driftBoostTimer || 0),
@@ -23295,8 +23369,10 @@ class NeonRoadRally {
   isNeonFlowEnabledForRun(run = this.run) {
     if (!run) return false;
     const raceTypeId = normalizeRaceTypeId(run.raceTypeId, DEFAULT_RACE_TYPE_ID);
+    const officialClassicRun = Boolean(run.officialRouteId || run.officialFinishLocked);
     return Boolean(
       raceTypeId === DEFAULT_RACE_TYPE_ID
+      && officialClassicRun
       && !run.partyMode
       && !run.challengeMode
       && !isFuelRunRaceType(raceTypeId)
@@ -23451,6 +23527,24 @@ class NeonRoadRally {
     return FLOW_BREAK_CLEARABLE_TYPES.has(type);
   }
 
+  isFlowBreakMajorTriggerType(type) {
+    return FLOW_BREAK_MAJOR_TRIGGER_TYPES.has(type);
+  }
+
+  recordFlowBreakIgnoredMinorHazards(candidates = []) {
+    const run = this.run;
+    if (!run || !Array.isArray(candidates) || !candidates.length) return;
+    if (!(run.flowBreakIgnoredMinorHazardIds instanceof Set)) run.flowBreakIgnoredMinorHazardIds = new Set();
+    for (const { obstacle, decision } of candidates) {
+      const type = decision?.type || obstacle?.type || "";
+      if (!obstacle?.id || this.isFlowBreakMajorTriggerType(type)) continue;
+      const key = `${obstacle.id}:${type}`;
+      if (run.flowBreakIgnoredMinorHazardIds.has(key)) continue;
+      run.flowBreakIgnoredMinorHazardIds.add(key);
+      run.flowBreakIgnoredMinorHazardCount = Math.max(0, (run.flowBreakIgnoredMinorHazardCount || 0) + 1);
+    }
+  }
+
   getFlowBreakObstacleDecision(obstacle, run = this.run, zone = this.getFlowBreakZone(run, { active: true })) {
     const type = obstacle?.type || "";
     if (!obstacle || obstacle.hit || obstacle.remove) return { decision: "inactive", type };
@@ -23522,14 +23616,20 @@ class NeonRoadRally {
     const clearZone = this.getFlowBreakZone(run);
     const triggerZone = this.getFlowBreakTriggerZone(run);
     const triggerCandidates = this.getFlowBreakCandidates(run, triggerZone);
-    if (triggerCandidates.length) {
+    const majorTriggerCandidates = triggerCandidates.filter(({ decision }) => this.isFlowBreakMajorTriggerType(decision?.type));
+    if (majorTriggerCandidates.length) {
+      const triggerCandidate = majorTriggerCandidates[0];
       return {
         zone: clearZone,
         candidates: triggerCandidates,
         visibleCount: this.getVisibleFlowBreakCandidateCount(run, triggerCandidates),
-        reason: "visible-danger"
+        reason: "visible-danger",
+        triggerCandidate,
+        triggerHazardType: triggerCandidate.decision?.type || triggerCandidate.obstacle?.type || "",
+        triggeredByMajorHazard: true
       };
     }
+    this.recordFlowBreakIgnoredMinorHazards(triggerCandidates);
     const clusterReach = Math.min(clearZone.reach, this.getFlowBreakTriggerReach(run) + NEON_FLOW_CONFIG.triggerClusterBonusReach);
     const clusterZone = {
       ...clearZone,
@@ -23537,14 +23637,20 @@ class NeonRoadRally {
       maxDistance: (run?.distance || 0) + (clearZone.startAhead || 0) + clusterReach
     };
     const clusterCandidates = this.getFlowBreakCandidates(run, clusterZone);
-    if (clusterCandidates.length >= NEON_FLOW_CONFIG.triggerClusterMinCount) {
+    const majorClusterCandidates = clusterCandidates.filter(({ decision }) => this.isFlowBreakMajorTriggerType(decision?.type));
+    if (majorClusterCandidates.length && clusterCandidates.length >= NEON_FLOW_CONFIG.triggerClusterMinCount) {
+      const triggerCandidate = majorClusterCandidates[0];
       return {
         zone: clearZone,
         candidates: clusterCandidates,
         visibleCount: this.getVisibleFlowBreakCandidateCount(run, clusterCandidates),
-        reason: "danger-cluster"
+        reason: "danger-cluster",
+        triggerCandidate,
+        triggerHazardType: triggerCandidate.decision?.type || triggerCandidate.obstacle?.type || "",
+        triggeredByMajorHazard: true
       };
     }
+    this.recordFlowBreakIgnoredMinorHazards(clusterCandidates);
     return {
       zone: clearZone,
       candidates: [],
@@ -23566,8 +23672,13 @@ class NeonRoadRally {
     if (!run?.flowBreakArmed || !this.isNeonFlowEnabledForRun(run)) return false;
     const expectedCandidates = Array.isArray(options.candidates) ? options.candidates : this.getFlowBreakCandidates(run, zone);
     const forwardCandidateCount = expectedCandidates.filter((item) => (item?.decision?.ahead || 0) >= (zone.startAhead || 0)).length;
-    if (!options.emergency && !forwardCandidateCount) {
+    const triggerCandidate = options.triggerCandidate || expectedCandidates.find((item) => {
+      const type = item?.decision?.type || item?.obstacle?.type || "";
+      return this.isFlowBreakMajorTriggerType(type) && (item?.decision?.ahead || 0) >= (zone.startAhead || 0);
+    });
+    if (!options.emergency && (!forwardCandidateCount || !triggerCandidate)) {
       run.flowBreakTriggeredWithNoForwardHazard = Math.max(0, (run.flowBreakTriggeredWithNoForwardHazard || 0) + 1);
+      this.recordFlowBreakIgnoredMinorHazards(expectedCandidates);
       return false;
     }
     run.flowBreakArmed = false;
@@ -23585,6 +23696,8 @@ class NeonRoadRally {
     run.flowBreakNearestHazardDistance = this.getNearestFlowBreakHazardDistance(run, zone);
     run.flowBreakClearedThisUse = 0;
     run.flowBreakEmergencyObstacleId = options.emergencyObstacleId || "";
+    run.flowBreakTriggerHazardType = options.triggerHazardType || triggerCandidate?.decision?.type || triggerCandidate?.obstacle?.type || (options.emergency ? "collision" : "");
+    run.flowBreakTriggeredByMajorHazard = Boolean(options.emergency || options.triggeredByMajorHazard || triggerCandidate);
     run.flowBreakPerfWatchFrames = Math.max(run.flowBreakPerfWatchFrames || 0, NEON_FLOW_CONFIG.breakPerfWatchFrames);
     run.flowBreakVisibleHazardsAtTrigger = Math.max(0, (run.flowBreakVisibleHazardsAtTrigger || 0) + (Number.isFinite(options.visibleCount) ? options.visibleCount : this.getVisibleFlowBreakCandidateCount(run, expectedCandidates)));
     const cleared = this.clearFlowBreakHazards({ emergencyObstacleId: run.flowBreakEmergencyObstacleId });
@@ -23603,6 +23716,8 @@ class NeonRoadRally {
       run.flowBreakLateralRadiusLanes = 0;
       run.flowBreakClearedThisUse = 0;
       run.flowBreakEmergencyObstacleId = "";
+      run.flowBreakTriggerHazardType = "";
+      run.flowBreakTriggeredByMajorHazard = false;
       return false;
     }
     if (cleared <= 0 && options.emergency) {
@@ -23669,6 +23784,11 @@ class NeonRoadRally {
       obstacle.nearMissAwarded = true;
       cleared += 1;
       run.flowBreakHazardsCleared = Math.max(0, (run.flowBreakHazardsCleared || 0) + 1);
+      if (this.isFlowBreakMajorTriggerType(obstacle.type)) {
+        run.flowBreakMajorHazardsCleared = Math.max(0, (run.flowBreakMajorHazardsCleared || 0) + 1);
+      } else {
+        run.flowBreakMinorHazardsCleared = Math.max(0, (run.flowBreakMinorHazardsCleared || 0) + 1);
+      }
       if (ahead >= (zone.playerForwardAhead || 0)) run.flowBreakHazardsClearedAhead = Math.max(0, (run.flowBreakHazardsClearedAhead || 0) + 1);
       else run.flowBreakHazardsClearedBehind = Math.max(0, (run.flowBreakHazardsClearedBehind || 0) + 1);
       run.flowBreakClearedThisUse = Math.max(0, (run.flowBreakClearedThisUse || 0) + 1);
@@ -23783,6 +23903,7 @@ class NeonRoadRally {
     const sparkWasAlreadyActive = (run.flowBreakSparkBoostTimer || 0) > 0;
     spark.collected = true;
     run.flowBreakSparksCollected = Math.max(0, (run.flowBreakSparksCollected || 0) + 1);
+    if (isOfficialEnduranceRun(run)) run.boostsCollectedAfterFinish = Math.max(0, (run.boostsCollectedAfterFinish || 0) + 1);
     run.flowBreakSparkPickupCount = Math.max(0, (run.flowBreakSparkPickupCount || 0) + 1);
     const projectedSpeedAfter = speedBefore * NEON_FLOW_CONFIG.sparkBoostMultiplier;
     run.flowBreakSparkSpeedBefore = Math.round(speedBefore);
@@ -23839,6 +23960,7 @@ class NeonRoadRally {
     const run = this.run;
     if (!this.isNeonFlowEnabledForRun(run)) return false;
     if (run.flowBreakArmed) {
+      if (!this.isFlowBreakMajorTriggerType(obstacle?.type)) return false;
       const zone = this.getFlowBreakZone(run);
       const emergencyZone = this.getFlowBreakZone(run, { emergency: true });
       const emergencyDecision = this.getFlowBreakObstacleDecision(obstacle, run, emergencyZone);
@@ -23848,7 +23970,9 @@ class NeonRoadRally {
           emergencyObstacleId: obstacle.id,
           candidates: [],
           visibleCount: 1,
-          reason: "collision-prevent"
+          reason: "collision-prevent",
+          triggerHazardType: obstacle.type,
+          triggeredByMajorHazard: true
         });
         if (obstacle.flowBreakCleared || obstacle.hit || obstacle.remove) {
           run.flowBreakCollisionPrevented = Math.max(0, (run.flowBreakCollisionPrevented || 0) + 1);
@@ -23952,19 +24076,27 @@ class NeonRoadRally {
     const sparkBoost = run.flowBreakSparkBoostTimer > 0 ? NEON_FLOW_CONFIG.sparkBoostMultiplier : 1;
     const boostMultiplier = manualBoost * padBoost * driftBoost * sparkBoost;
     const enduranceSpeedMultiplier = getOfficialEnduranceSpeedMultiplier(run);
+    const enduranceBaselineFloor = getOfficialEnduranceBaselineSpeedFloor(run, enduranceSpeedMultiplier);
+    const effectiveBase = isOfficialEnduranceRun(run)
+      ? Math.max(base * enduranceSpeedMultiplier, enduranceBaselineFloor)
+      : base;
     const slowdown = run.slowdownTimer > 0 ? run.slowdownFactor : 1;
     const debugScale = this.debugSpeedScale || 1;
-    const unclampedSpeed = base * enduranceSpeedMultiplier * boostMultiplier * slowdown * debugScale;
-    const speedCap = run.track.maxSpeed * SPEED_TUNING.maxBoostOverrunMultiplier * Math.min(enduranceSpeedMultiplier, 1.18) * debugScale;
+    const unclampedSpeed = effectiveBase * boostMultiplier * slowdown * debugScale;
+    const speedCap = run.track.maxSpeed * SPEED_TUNING.maxBoostOverrunMultiplier * Math.min(enduranceSpeedMultiplier, ENDURANCE_ESCALATION_CONFIG.maxSpeedMultiplier) * debugScale;
     run.rawCruiseSpeed = rawBase;
-    run.baseCruiseSpeed = base;
+    run.baseCruiseSpeed = effectiveBase;
     run.boostMultiplier = boostMultiplier;
     run.debugSpeedScale = debugScale;
     run.speedCap = speedCap;
     run.speedCapped = rawBase > run.track.maxSpeed || unclampedSpeed > speedCap;
+    run.enduranceSpeedMultiplier = enduranceSpeedMultiplier;
+    run.enduranceEscalationSeconds = getOfficialEnduranceEscalationSeconds(run);
+    run.enduranceLap = getOfficialEnduranceLapNumber(run);
     const normalSpeed = clamp(unclampedSpeed, SPEED_TUNING.minSpeed, speedCap);
     const carriedSpeedFloor = this.getFinishSpeedCarryFloor(run, normalSpeed);
     run.currentSpeed = clamp(Math.max(normalSpeed, carriedSpeedFloor), SPEED_TUNING.minSpeed, speedCap);
+    if (isOfficialEnduranceRun(run)) run.maxEnduranceSpeed = Math.max(run.maxEnduranceSpeed || 0, run.currentSpeed || 0);
     if (run.flowBreakSparkBoostPendingSpeedRead) {
       run.flowBreakSparkSpeedAfter = Math.round(run.currentSpeed || 0);
       run.flowBreakSparkDisplaySpeedAfter = getDisplayedSpeedForRaw(run.currentSpeed || 0, run.track, run.speedClassId);
@@ -24065,6 +24197,9 @@ class NeonRoadRally {
       "flowBreakArmedUnused", "flowBreakHazardsCleared", "flowBreakHazardsClearedAhead",
       "flowBreakHazardsClearedBehind", "flowBreakVisibleHazardsAtTrigger",
       "flowBreakTriggeredWithZeroEffect", "flowBreakTriggeredWithNoForwardHazard",
+      "flowBreakTriggerHazardType", "flowBreakTriggeredByMajorHazard",
+      "flowBreakMinorHazardsCleared", "flowBreakMajorHazardsCleared",
+      "flowBreakIgnoredMinorHazardCount",
       "flowBreakSparksCreated", "flowBreakSparksSpawnedAhead", "flowBreakSparksSpawnedBehind",
       "flowBreakSparksCollected", "flowBreakSparkCollectableCount", "flowBreakSparkPickupCount",
       "flowBreakSparkSpeedBefore", "flowBreakSparkSpeedAfter", "flowBreakSparkDisplaySpeedBefore",
@@ -24127,6 +24262,11 @@ class NeonRoadRally {
     this.updateRaceSection(true);
     this.updateOfficialEnduranceStats();
     this.applyFinishSpeedCarryState(run, speedCarryState);
+    run.enduranceLap = getOfficialEnduranceLapNumber(run);
+    run.enduranceEscalationSeconds = getOfficialEnduranceEscalationSeconds(run);
+    run.enduranceSpeedMultiplier = getOfficialEnduranceSpeedMultiplier(run);
+    run.speedAfterLapStart = Math.round(Math.max(0, run.currentSpeed || 0));
+    run.maxEnduranceSpeed = Math.max(run.maxEnduranceSpeed || 0, run.currentSpeed || 0);
   }
 
   startOfficialEnduranceAfterFinish(summary) {
@@ -24153,6 +24293,18 @@ class NeonRoadRally {
     run.officialEndurancePostDriftDashesStart = run.driftDashesCompleted || 0;
     run.officialEndurancePostDriftBoostsStart = run.driftBoostsReleased || 0;
     run.officialEnduranceEndReason = "";
+    run.speedAtOfficialFinish = Math.round(Math.max(0, speedCarryState?.speed || run.currentSpeed || 0));
+    run.enduranceBaseSpeedAtOfficialFinish = Math.round(Math.max(
+      SPEED_TUNING.minSpeed,
+      speedCarryState?.baseSpeed || 0,
+      getTrackCruiseSpeed(run.track, 1, run.speedClassId)
+    ));
+    run.speedAfterLapStart = 0;
+    run.maxEnduranceSpeed = Math.max(run.maxEnduranceSpeed || 0, speedCarryState?.speed || run.currentSpeed || 0);
+    run.boostsCollectedAfterFinish = 0;
+    run.enduranceLap = 2;
+    run.enduranceEscalationSeconds = 0;
+    run.enduranceSpeedMultiplier = 1;
     run.officialRouteSeedLocked = false;
     run.routeSeedLocked = false;
     this.resetOfficialEnduranceLapState(run, 2, 0, speedCarryState);
@@ -24182,6 +24334,10 @@ class NeonRoadRally {
     run.officialEndurancePostDistance = postDistance;
     run.officialEnduranceTotalDistance = finishDistance + postDistance;
     run.officialEndurancePostScore = Math.max(0, Math.round((run.score || 0) - (run.officialEndurancePostScoreStart || 0)));
+    run.enduranceLap = getOfficialEnduranceLapNumber(run);
+    run.enduranceEscalationSeconds = getOfficialEnduranceEscalationSeconds(run);
+    run.enduranceSpeedMultiplier = getOfficialEnduranceSpeedMultiplier(run);
+    run.maxEnduranceSpeed = Math.max(run.maxEnduranceSpeed || 0, run.currentSpeed || 0);
     return {
       survivalTime: run.officialEnduranceSurvivalTime,
       postDistance: run.officialEndurancePostDistance,
@@ -24275,6 +24431,12 @@ class NeonRoadRally {
       postFinishDistance,
       totalDistance: finishDistance + postFinishDistance,
       postFinishScore,
+      enduranceSpeedMultiplier: run?.enduranceSpeedMultiplier || getOfficialEnduranceSpeedMultiplier(run),
+      enduranceEscalationSeconds: run?.enduranceEscalationSeconds || getOfficialEnduranceEscalationSeconds(run),
+      speedAtOfficialFinish: Math.max(0, run?.speedAtOfficialFinish || 0),
+      speedAfterLapStart: Math.max(0, run?.speedAfterLapStart || 0),
+      maxEnduranceSpeed: Math.max(0, run?.maxEnduranceSpeed || 0),
+      boostsCollectedAfterFinish: Math.max(0, run?.boostsCollectedAfterFinish || 0),
       postFinishBoostsUsed: Math.max(0, (run?.manualBoostsUsed || 0) - (run?.officialEndurancePostBoostsUsedStart || 0)),
       postFinishNearMisses: Math.max(0, (run?.nearMisses || 0) - (run?.officialEndurancePostNearMissesStart || 0)),
       postFinishDriftsStarted: Math.max(0, (run?.driftsStarted || 0) - (run?.officialEndurancePostDriftsStartedStart || 0)),
@@ -24362,6 +24524,13 @@ class NeonRoadRally {
     summary.enduranceElapsedTotal = run.elapsed;
     summary.enduranceCurrentLapDistance = Math.max(0, run.distance || 0);
     summary.enduranceTrackDistance = Math.max(1, run.track?.distanceToFinish || officialSummary.trackDistance || 1);
+    summary.enduranceSpeedMultiplier = run.enduranceSpeedMultiplier || getOfficialEnduranceSpeedMultiplier(run);
+    summary.enduranceEscalationSeconds = run.enduranceEscalationSeconds || getOfficialEnduranceEscalationSeconds(run);
+    summary.enduranceLap = run.enduranceLap || getOfficialEnduranceLapNumber(run);
+    summary.speedAtOfficialFinish = Math.max(0, run.speedAtOfficialFinish || 0);
+    summary.speedAfterLapStart = Math.max(0, run.speedAfterLapStart || 0);
+    summary.maxEnduranceSpeed = Math.max(0, run.maxEnduranceSpeed || 0);
+    summary.boostsCollectedAfterFinish = Math.max(0, run.boostsCollectedAfterFinish || 0);
     summary.bonuses = { ...(officialSummary.bonuses || summary.bonuses || {}) };
     summary.scoreBreakdown = { ...(officialSummary.scoreBreakdown || summary.scoreBreakdown || {}) };
     summary.medals = Array.isArray(officialSummary.medals) ? officialSummary.medals.map((medal) => ({ ...medal })) : summary.medals;
@@ -25477,6 +25646,13 @@ class NeonRoadRally {
       paceBehindTime: summary.paceBehindTime,
       paceFeedbackActiveTime: run.paceFeedbackActiveTime || 0,
       paceFeedbackSampleCount: run.paceFeedbackSampleCount || 0,
+      enduranceSpeedMultiplier: summary.enduranceSpeedMultiplier || run.enduranceSpeedMultiplier || 1,
+      enduranceEscalationSeconds: summary.enduranceEscalationSeconds || run.enduranceEscalationSeconds || 0,
+      enduranceLap: summary.enduranceLap || run.enduranceLap || 1,
+      speedAtOfficialFinish: summary.speedAtOfficialFinish || run.speedAtOfficialFinish || 0,
+      speedAfterLapStart: summary.speedAfterLapStart || run.speedAfterLapStart || 0,
+      maxEnduranceSpeed: summary.maxEnduranceSpeed || run.maxEnduranceSpeed || 0,
+      boostsCollectedAfterFinish: summary.boostsCollectedAfterFinish || run.boostsCollectedAfterFinish || 0,
       neonFlowEnabled: Boolean(summary.neonFlowEnabled),
       neonFlowTotalEarned: summary.neonFlowTotalEarned || 0,
       flowBreaksArmed: summary.flowBreaksArmed || 0,
@@ -25491,6 +25667,11 @@ class NeonRoadRally {
       flowBreakVisibleHazardsAtTrigger: summary.flowBreakVisibleHazardsAtTrigger || 0,
       flowBreakTriggeredWithZeroEffect: summary.flowBreakTriggeredWithZeroEffect || 0,
       flowBreakTriggeredWithNoForwardHazard: summary.flowBreakTriggeredWithNoForwardHazard || 0,
+      flowBreakTriggerHazardType: summary.flowBreakTriggerHazardType || "",
+      flowBreakTriggeredByMajorHazard: Boolean(summary.flowBreakTriggeredByMajorHazard),
+      flowBreakMinorHazardsCleared: summary.flowBreakMinorHazardsCleared || 0,
+      flowBreakMajorHazardsCleared: summary.flowBreakMajorHazardsCleared || 0,
+      flowBreakIgnoredMinorHazardCount: summary.flowBreakIgnoredMinorHazardCount || 0,
       flowBreakSparksCreated: summary.flowBreakSparksCreated || 0,
       flowBreakSparksSpawnedAhead: summary.flowBreakSparksSpawnedAhead || 0,
       flowBreakSparksSpawnedBehind: summary.flowBreakSparksSpawnedBehind || 0,
@@ -25969,6 +26150,13 @@ class NeonRoadRally {
       paceBehindTime,
       paceFeedbackActiveTime: run.paceFeedbackActiveTime || 0,
       paceFeedbackSampleCount: run.paceFeedbackSampleCount || 0,
+      enduranceSpeedMultiplier: run.enduranceSpeedMultiplier || 1,
+      enduranceEscalationSeconds: run.enduranceEscalationSeconds || 0,
+      enduranceLap: run.enduranceLap || getOfficialEnduranceLapNumber(run),
+      speedAtOfficialFinish: Math.max(0, run.speedAtOfficialFinish || 0),
+      speedAfterLapStart: Math.max(0, run.speedAfterLapStart || 0),
+      maxEnduranceSpeed: Math.max(0, run.maxEnduranceSpeed || 0),
+      boostsCollectedAfterFinish: Math.max(0, run.boostsCollectedAfterFinish || 0),
       neonFlowEnabled: this.isNeonFlowEnabledForRun(run),
       neonFlow: Math.round(run.neonFlow || 0),
       neonFlowTotalEarned: Math.round(run.neonFlowTotalEarned || 0),
@@ -25985,6 +26173,11 @@ class NeonRoadRally {
       flowBreakVisibleHazardsAtTrigger: Math.max(0, run.flowBreakVisibleHazardsAtTrigger || 0),
       flowBreakTriggeredWithZeroEffect: Math.max(0, run.flowBreakTriggeredWithZeroEffect || 0),
       flowBreakTriggeredWithNoForwardHazard: Math.max(0, run.flowBreakTriggeredWithNoForwardHazard || 0),
+      flowBreakTriggerHazardType: run.flowBreakTriggerHazardType || "",
+      flowBreakTriggeredByMajorHazard: Boolean(run.flowBreakTriggeredByMajorHazard),
+      flowBreakMinorHazardsCleared: Math.max(0, run.flowBreakMinorHazardsCleared || 0),
+      flowBreakMajorHazardsCleared: Math.max(0, run.flowBreakMajorHazardsCleared || 0),
+      flowBreakIgnoredMinorHazardCount: Math.max(0, run.flowBreakIgnoredMinorHazardCount || 0),
       flowBreakSparksCreated: Math.max(0, run.flowBreakSparksCreated || 0),
       flowBreakSparksSpawnedAhead: Math.max(0, run.flowBreakSparksSpawnedAhead || 0),
       flowBreakSparksSpawnedBehind: Math.max(0, run.flowBreakSparksSpawnedBehind || 0),
@@ -27611,9 +27804,11 @@ class NeonRoadRally {
           officialFinishLocked: officialEnduranceSimulation,
           officialEnduranceLap,
           officialEnduranceCompletedLaps: officialEnduranceSimulation ? officialEnduranceLap - 1 : 0,
+          officialEnduranceStartElapsed: 0,
           officialEnduranceSurvivalTime: 0,
           officialEndurancePostDistance: 0,
           officialEndurancePostScore: 0,
+          enduranceBaseSpeedAtOfficialFinish: officialEnduranceSimulation ? getTrackCruiseSpeed(runTrack, 1, speedClassId) : 0,
           officialEnduranceLapSeed: officialEnduranceSimulation ? lapSeed : "",
           roadSeed: seed,
           roadSeedSource: rngSeedSource,
@@ -27622,10 +27817,12 @@ class NeonRoadRally {
           roadDirectorSequence: [],
           distance: 0,
           elapsed: 0,
-          currentSpeed: getTrackCruiseSpeed(runTrack, 0, speedClassId) * getOfficialEnduranceSpeedMultiplier({
+          currentSpeed: (officialEnduranceSimulation ? getTrackCruiseSpeed(runTrack, 1, speedClassId) : getTrackCruiseSpeed(runTrack, 0, speedClassId)) * getOfficialEnduranceSpeedMultiplier({
             officialEnduranceActive: officialEnduranceSimulation,
             officialFinishLocked: officialEnduranceSimulation,
-            officialEnduranceLap
+            officialEnduranceLap,
+            officialEnduranceStartElapsed: 0,
+            elapsed: 0
           })
         };
         this.configureFuelForRun(simRun);
@@ -27648,7 +27845,11 @@ class NeonRoadRally {
           simRun.currentSectionLabel = section.label;
           simRun.sectionProgress = getTrackSectionProgress(section, progress);
           const sectionSafety = ensureSectionSafety(perSpeedClass[speedClassId].sectionSafety, section);
-          simRun.currentSpeed = getTrackCruiseSpeed(runTrack, progress, speedClassId) * getOfficialEnduranceSpeedMultiplier(simRun);
+          const enduranceMultiplier = getOfficialEnduranceSpeedMultiplier(simRun);
+          simRun.currentSpeed = Math.max(
+            getTrackCruiseSpeed(runTrack, progress, speedClassId) * enduranceMultiplier,
+            getOfficialEnduranceBaselineSpeedFloor(simRun, enduranceMultiplier)
+          );
           if (fuelRun) {
             this.updateFuelRunSimulationState(simRun, dt);
           }

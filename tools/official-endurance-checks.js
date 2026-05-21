@@ -303,6 +303,41 @@ async function main() {
         };
       }
 
+      function disableRoadHazardRuntime(app) {
+        app.obstacles.update = () => {};
+        app.collision.update = () => {};
+        app.updateFlowBreak = () => {};
+        app.updatePursuitRun = () => {};
+      }
+
+      function getRunDisplaySpeed(app, rawSpeed = app.run.currentSpeed || 0) {
+        return getDisplayedSpeedForRaw(rawSpeed, app.run.track, app.run.speedClassId);
+      }
+
+      function advanceEnduranceSeconds(app, seconds, dt = 1 / 30) {
+        const frames = Math.ceil(seconds / dt);
+        for (let frame = 0; frame < frames; frame += 1) app.updateRun(dt);
+        return {
+          speed: Math.round(app.run.currentSpeed || 0),
+          displaySpeed: getRunDisplaySpeed(app),
+          multiplier: Number((app.run.enduranceSpeedMultiplier || 1).toFixed(4)),
+          seconds: Number((app.run.enduranceEscalationSeconds || 0).toFixed(3)),
+          lap: app.run.enduranceLap || app.run.officialEnduranceLap
+        };
+      }
+
+      function startSpeedProbeRun(options = {}) {
+        const probe = startOfficialClassicRun();
+        const finishBase = getTrackCruiseSpeed(probe.app.run.track, 1, probe.app.run.speedClassId);
+        probe.app.run.baseCruiseSpeed = finishBase;
+        probe.app.run.currentSpeed = options.boostedAtFinish ? finishBase * SPEED_TUNING.manualBoostMultiplier : finishBase;
+        probe.app.run.boostTimer = options.boostedAtFinish ? 1.25 : 0;
+        probe.app.run.boostMultiplier = options.boostedAtFinish ? SPEED_TUNING.manualBoostMultiplier : 1;
+        finishFirstLap(probe.app);
+        disableRoadHazardRuntime(probe.app);
+        return { ...probe, finishBase };
+      }
+
       const preFinishCrash = startOfficialClassicRun();
       preFinishCrash.app.run.elapsed = 12.345;
       preFinishCrash.app.run.distance = preFinishCrash.app.run.track.distanceToFinish * 0.36;
@@ -328,6 +363,65 @@ async function main() {
       assertCopyIncludes(hudCopy, "SURVIVE", "Endurance HUD");
       assertCopyIncludes(hudCopy, "BOOST 3/3", "Endurance HUD");
       assertCopyIncludes(hudCopy, "ESC ENDS", "Endurance HUD");
+
+      const speedProbe = startSpeedProbeRun();
+      const speedAtFinish = speedProbe.app.run.speedAtOfficialFinish;
+      const speedAfterLapStart = speedProbe.app.run.speedAfterLapStart;
+      const displaySpeedAtFinish = getRunDisplaySpeed(speedProbe.app, speedAtFinish);
+      const displaySpeedAfterLapStart = getRunDisplaySpeed(speedProbe.app, speedAfterLapStart);
+      const speed2s = advanceEnduranceSeconds(speedProbe.app, 2);
+      const speed10s = advanceEnduranceSeconds(speedProbe.app, 8);
+      const speed20s = advanceEnduranceSeconds(speedProbe.app, 10);
+      const speed40s = advanceEnduranceSeconds(speedProbe.app, 20);
+      assert(speedAtFinish >= speedProbe.finishBase, "Endurance should capture the first-finish speed baseline");
+      assert(speedAfterLapStart >= speedAtFinish * 0.99, "Lap 2 start should not drop below first-finish speed");
+      assert(speed2s.speed >= speedAtFinish * 0.99, "Endurance speed 2s after finish should not reset to launch speed");
+      assert(speed10s.speed > speed2s.speed, "Endurance speed should rise by 10s after finish");
+      assert(speed20s.speed > speed10s.speed, "Endurance speed should keep rising by 20s after finish");
+      assert(speed40s.speed > speed20s.speed, "Endurance speed should keep rising by 40s after finish");
+      assert(speed40s.multiplier > speed2s.multiplier, "Endurance telemetry multiplier should increase over survival time");
+      assert(Math.round(speedProbe.app.run.maxEnduranceSpeed || 0) >= speed40s.speed - 1, "Max endurance speed telemetry should track the rising speed");
+      assert(displaySpeedAtFinish <= 230, "Turbo first-lap finish should stay in the base display range");
+      assert(displaySpeedAfterLapStart >= displaySpeedAtFinish, "Lap 2 display speed should not drop after the official finish");
+      assert(speed20s.displaySpeed > displaySpeedAtFinish, "Endurance escalation should display speed above the base Turbo cap by 20s");
+      assert(speed40s.displaySpeed > speed20s.displaySpeed, "Endurance display speed should keep rising through 40s");
+
+      const boostedFinishProbe = startSpeedProbeRun({ boostedAtFinish: true });
+      const boostedFinishSpeed = boostedFinishProbe.app.run.speedAtOfficialFinish;
+      assert(boostedFinishSpeed > boostedFinishProbe.finishBase, "Boosted finish should capture boosted crossing speed");
+      assert(boostedFinishProbe.app.run.currentSpeed >= boostedFinishSpeed * 0.99, "Boosted finish should carry into endurance without an abrupt wipe");
+      advanceEnduranceSeconds(boostedFinishProbe.app, 3);
+      assert(boostedFinishProbe.app.run.currentSpeed >= boostedFinishProbe.finishBase, "Boosted finish should settle back to endurance baseline, not launch speed");
+
+      const postFinishBoostProbe = startSpeedProbeRun();
+      advanceEnduranceSeconds(postFinishBoostProbe.app, 3);
+      const beforePadBoost = postFinishBoostProbe.app.run.currentSpeed;
+      const beforePadBoostDisplay = getRunDisplaySpeed(postFinishBoostProbe.app, beforePadBoost);
+      postFinishBoostProbe.app.collision.resolveHit({ type: "boostPad", lane: 2, distance: postFinishBoostProbe.app.run.distance, hit: false, remove: false }, OBSTACLE_INFO.boostPad);
+      postFinishBoostProbe.app.updateRun(1 / 60);
+      const afterPadBoostDisplay = getRunDisplaySpeed(postFinishBoostProbe.app);
+      assert(postFinishBoostProbe.app.run.currentSpeed > beforePadBoost, "Boost pad after finish should add speed above endurance baseline");
+      assert(afterPadBoostDisplay > beforePadBoostDisplay, "Boost pad after finish should visibly raise displayed speed");
+      assert(afterPadBoostDisplay > 230, "Boost pad after finish should display above the base Turbo range");
+      assert(postFinishBoostProbe.app.run.boostsCollectedAfterFinish >= 1, "Post-finish boost collection telemetry should increment");
+
+      const postFinishSparkProbe = startSpeedProbeRun();
+      advanceEnduranceSeconds(postFinishSparkProbe.app, 3);
+      const beforeSparkBoost = postFinishSparkProbe.app.run.currentSpeed;
+      const beforeSparkBoostDisplay = getRunDisplaySpeed(postFinishSparkProbe.app, beforeSparkBoost);
+      postFinishSparkProbe.app.collectFlowBreakSpark({
+        id: "endurance-spark-check",
+        laneFloat: 2,
+        distance: postFinishSparkProbe.app.run.distance + 900,
+        collected: false
+      });
+      postFinishSparkProbe.app.updateRun(1 / 60);
+      const afterSparkBoostDisplay = postFinishSparkProbe.app.run.flowBreakSparkDisplaySpeedAfter || getRunDisplaySpeed(postFinishSparkProbe.app);
+      assert(postFinishSparkProbe.app.run.currentSpeed > beforeSparkBoost, "Flow Break spark after finish should add speed above current endurance speed");
+      assert(afterSparkBoostDisplay > beforeSparkBoostDisplay, "Flow Break spark after finish should visibly raise displayed speed");
+      assert(afterSparkBoostDisplay > 230, "Flow Break spark after finish should display above the base Turbo range");
+      assert(postFinishSparkProbe.app.run.boostsCollectedAfterFinish >= 1, "Spark pickup should count as a post-finish boost collection");
+
       first.app.run.elapsed += 8.25;
       first.app.run.score += 2400;
       first.app.run.manualBoosts = 2;
@@ -715,6 +809,29 @@ async function main() {
           lap: boosts.app.run.officialEnduranceLap,
           completedLaps: boosts.app.run.officialEnduranceCompletedLaps,
           manualBoosts: boosts.app.run.manualBoosts
+        },
+        speedEscalation: {
+          speedAtOfficialFinish: speedAtFinish,
+          speedAfterLapStart,
+          displaySpeedAtOfficialFinish: displaySpeedAtFinish,
+          displaySpeedAfterLapStart,
+          speed2s,
+          speed10s,
+          speed20s,
+          speed40s,
+          boostedFinishSpeed,
+          boostPadBefore: Math.round(beforePadBoost),
+          boostPadAfter: Math.round(postFinishBoostProbe.app.run.currentSpeed || 0),
+          boostPadDisplayBefore: beforePadBoostDisplay,
+          boostPadDisplayAfter: afterPadBoostDisplay,
+          sparkBefore: Math.round(beforeSparkBoost),
+          sparkAfter: Math.round(postFinishSparkProbe.app.run.currentSpeed || 0),
+          sparkDisplayBefore: beforeSparkBoostDisplay,
+          sparkDisplayAfter: afterSparkBoostDisplay,
+          boostsCollectedAfterFinish: {
+            padProbe: postFinishBoostProbe.app.run.boostsCollectedAfterFinish || 0,
+            sparkProbe: postFinishSparkProbe.app.run.boostsCollectedAfterFinish || 0
+          }
         },
         safety: {
           lap1AveragePressureBudget: lap1Safety.director.averagePressureBudget,
