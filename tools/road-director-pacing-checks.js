@@ -182,8 +182,8 @@ async function main() {
           assert(previousSeconds - seconds >= 2, trackId + " " + speedClassId + " should be meaningfully faster than the previous speed class");
         }
         previousSeconds = seconds;
-        assert.strictEqual(classic.pacingRulesVersion, RACE_PACING_RULES_VERSION, "Classic should use current pacing rules version");
-        assert.strictEqual(fuel.pacingRulesVersion, RACE_PACING_RULES_VERSION, "Fuel Run should use current pacing rules version");
+        assert.strictEqual(classic.pacingRulesVersion, getActivePacingRulesVersion(DEFAULT_RACE_TYPE_ID), "Classic should use current pacing rules version");
+        assert.strictEqual(fuel.pacingRulesVersion, getActivePacingRulesVersion(FUEL_RUN_RACE_TYPE_ID), "Fuel Run should use current pacing rules version");
         assert.strictEqual(fuel.distanceToFinish, classic.distanceToFinish, "Fuel Run should share competitive race distance");
       });
     });

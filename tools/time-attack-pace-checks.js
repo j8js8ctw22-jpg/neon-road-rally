@@ -91,7 +91,7 @@ vm.runInContext(`
     trackId: "sunset-highway",
     raceTypeId: "classic",
       speedClass: "arcade",
-      pacingRulesVersion: RACE_PACING_RULES_VERSION,
+      pacingRulesVersion: getActivePacingRulesVersion(DEFAULT_RACE_TYPE_ID),
       seed: "ROAD-11111",
       finalScore: 900,
       time: 42.318,
@@ -100,7 +100,7 @@ vm.runInContext(`
   });
     assert(update && update.improved, "Faster finish should update best-time record even if score is lower");
     assert.strictEqual(manager.getBestTimeRecord("p1", "sunset-highway", "classic", "arcade").finishTimeMs, 42318, "Best-time record should store faster precise finish");
-    assert.strictEqual(manager.getBestTimeRecord("p1", "sunset-highway", "classic", "arcade").pacingRulesVersion, RACE_PACING_RULES_VERSION, "Current PB should use the active pacing rules version");
+    assert.strictEqual(manager.getBestTimeRecord("p1", "sunset-highway", "classic", "arcade").pacingRulesVersion, getActivePacingRulesVersion(DEFAULT_RACE_TYPE_ID), "Current PB should use the active pacing rules version");
 
     const slowerMs = getFinishTimeMsFromSeconds(43.037);
     const slowerDelta = (slowerMs - manager.getBestTimeRecord("p1", "sunset-highway", "classic", "arcade").finishTimeMs) / 1000;
@@ -122,7 +122,7 @@ vm.runInContext(`
     const legacyTimeRows = leaderboardHarness.getTimeAttackLeaderboardRows(timeFilter, { legacy: true });
     assert.strictEqual(currentTimeRows.length, 1, "Current Time Attack board should show current pacing records only");
     assert.strictEqual(currentTimeRows[0].finishTimeMs, 42318, "Current Time Attack board should rank by precise finish time");
-    assert.strictEqual(currentTimeRows[0].pacingRulesVersion, RACE_PACING_RULES_VERSION, "Current Time Attack row should carry current pacing version");
+    assert.strictEqual(currentTimeRows[0].pacingRulesVersion, getActivePacingRulesVersion(DEFAULT_RACE_TYPE_ID), "Current Time Attack row should carry current pacing version");
     assert.strictEqual(legacyTimeRows.length, 1, "Legacy Time Attack records should remain available separately");
     assert.strictEqual(legacyTimeRows[0].finishTimeMs, 42700, "Legacy Time Attack row should preserve old finish time");
     assert(isLegacyPacingRecord(legacyTimeRows[0]), "Legacy Time Attack row should be labeled as legacy pace");

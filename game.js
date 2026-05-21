@@ -13,6 +13,7 @@
 const STORAGE_KEY = "neonRoadRally.v1";
 const GAME_VERSION = "web-alpha-2026-05-20";
 const RACE_PACING_RULES_VERSION = "pace-duration-v2";
+const FLOW_PACING_RULES_VERSION = "flow-v1";
 const LEGACY_PACING_RULES_VERSION = "legacy";
 const PURSUIT_PACING_RULES_VERSION = "pursuit-v1";
 const PLAYTEST_REPORT_STORAGE_KEY = "neonRoadRally.playtestReports.v1";
@@ -3043,6 +3044,17 @@ const SPEED_CLASSES = [
   { id: "overdrive", label: "Overdrive", startSpeed: 3300, endSpeed: 5200, scoreMultiplier: 1.85, distanceMultiplier: 1.12, description: "High-speed dare run.", visibleNormal: true },
   { id: "redline", label: "Redline", startSpeed: 3800, endSpeed: 5900, scoreMultiplier: 2.15, distanceMultiplier: 1.12, description: "Maximum-speed local bragging rights.", visibleNormal: true }
 ];
+const DISPLAY_SPEED_LABEL = "SPEED";
+const DISPLAY_SPEED_UNIT = "MPH";
+const DISPLAY_SPEED_RANGES = {
+  sunday: { min: 45, max: 72 },
+  rookie: { min: 65, max: 98 },
+  arcade: { min: 90, max: 145 },
+  pro: { min: 130, max: 190 },
+  turbo: { min: 165, max: 230 },
+  overdrive: { min: 200, max: 270 },
+  redline: { min: 240, max: 320 }
+};
 const NORMAL_SPEED_CLASS_IDS = ["arcade", "pro", "turbo", "overdrive", "redline"];
 const TRAINING_SPEED_CLASS_IDS = ["sunday", "rookie"];
 const SPEED_CLASS_ORDER = TRAINING_SPEED_CLASS_IDS.concat(NORMAL_SPEED_CLASS_IDS);
@@ -3855,6 +3867,52 @@ const PACE_FEEDBACK_CONFIG = {
   deadbandSeconds: 0.015
 };
 
+const NEON_FLOW_CONFIG = {
+  maxFlow: 100,
+  maxArmedCharges: 1,
+  breakActiveSeconds: 0.72,
+  breakReachMin: 2100,
+  breakReachMax: 3800,
+  breakReachSpeedScale: 0.5,
+  breakFrontBufferMin: 140,
+  breakFrontBufferMax: 220,
+  breakFrontBufferSpeedScale: 0.028,
+  breakNearLateralRadiusLanes: 0.82,
+  breakLateralRadiusLanes: 1.65,
+  breakEmergencyBehindGraceDistance: 420,
+  breakMaxHazards: 4,
+  breakMaxVisualBursts: 4,
+  breakPerfWatchFrames: 28,
+  triggerReachMin: 1500,
+  triggerReachMax: 2850,
+  triggerReachSpeedScale: 0.42,
+  triggerClusterBonusReach: 650,
+  triggerClusterMinCount: 2,
+  sparkMinAhead: 1300,
+  sparkMaxAhead: 3400,
+  sparkMinAheadSeconds: 0.48,
+  sparkForwardSpacing: 260,
+  sparkNonClearableAvoidDistance: 220,
+  sparkBoostMultiplier: 1.16,
+  sparkBoostDuration: 1.05,
+  sparkCollectLaneTolerance: 0.55,
+  sparkLaneMagnet: 0.58,
+  sparkCollectAheadDistance: 430,
+  sparkBehindGraceDistance: 280,
+  sparkLifetimeSeconds: 5.6,
+  sparkMaxActive: 6,
+  slowdownPauseSeconds: 1.15,
+  slowdownFlowLoss: 10,
+  gains: {
+    nearMiss: 8,
+    driftNearMiss: 14,
+    boostPad: 10,
+    boostChain: 12,
+    rampTargetClear: 18,
+    cleanWindow: 6
+  }
+};
+
 const TRACK_VISUALS = {
   roadDetailIntensity: 0.48,
   sceneryDensity: 1,
@@ -3892,14 +3950,14 @@ const TRACK_RENDER_BUDGETS = {
     prismBandSpacing: 124
   },
   prism: {
-    backgroundGrid: true,
+    backgroundGrid: false,
     roadsideGlow: false,
     roadGradient: false,
-    roadEdgeDetails: true,
+    roadEdgeDetails: false,
     blackoutNoiseStreaks: 18,
     blackoutStudSpacing: 64,
     blackoutDashSpacing: 106,
-    prismBandSpacing: 188
+    prismBandSpacing: 248
   }
 };
 
@@ -4191,6 +4249,7 @@ const RAMP_CLEARABLE_TYPES = new Set(["slowCar", "fastCar", "truck", "barrier", 
 const RAMP_TARGET_TYPES = new Set([...HARD_VEHICLE_TYPES, ...MINOR_HAZARD_TYPES]);
 const RAMP_LANDING_UNSAFE_TYPES = new Set([...HARD_VEHICLE_TYPES, ...MINOR_HAZARD_TYPES]);
 const RAMP_PATH_COLLECTIBLE_TYPES = new Set(["gasCan", "boostPad"]);
+const FLOW_BREAK_CLEARABLE_TYPES = new Set([...HARD_VEHICLE_TYPES, ...MINOR_HAZARD_TYPES]);
 const CAMERA_HAZARD_SCALE_TYPES = new Set(["cone", "oil", "deer", "ramp", "boostPad", "gasCan", "branch"]);
 
 const OBSTACLE_INFO = {
@@ -4882,7 +4941,9 @@ function normalizePacingRulesVersion(value, fallback = RACE_PACING_RULES_VERSION
 }
 
 function getActivePacingRulesVersion(raceTypeId = DEFAULT_RACE_TYPE_ID) {
-  return isPursuitRaceType(raceTypeId) ? PURSUIT_PACING_RULES_VERSION : RACE_PACING_RULES_VERSION;
+  const raceType = normalizeRaceTypeId(raceTypeId, DEFAULT_RACE_TYPE_ID);
+  if (isPursuitRaceType(raceType)) return PURSUIT_PACING_RULES_VERSION;
+  return raceType === DEFAULT_RACE_TYPE_ID ? FLOW_PACING_RULES_VERSION : RACE_PACING_RULES_VERSION;
 }
 
 function getMissingPacingRulesFallback(raceTypeId = DEFAULT_RACE_TYPE_ID) {
@@ -5010,6 +5071,42 @@ function getTrackRawCruiseSpeed(track, progress, speedClassId = DEFAULT_SPEED_CL
 
 function getTrackCruiseSpeed(track, progress, speedClassId = DEFAULT_SPEED_CLASS_ID) {
   return clamp(getTrackRawCruiseSpeed(track, progress, speedClassId), SPEED_TUNING.minSpeed, track.maxSpeed);
+}
+
+function getDisplaySpeedRange(speedClassId = DEFAULT_SPEED_CLASS_ID) {
+  const id = normalizeSpeedClassId(speedClassId, DEFAULT_SPEED_CLASS_ID);
+  return DISPLAY_SPEED_RANGES[id] || DISPLAY_SPEED_RANGES[DEFAULT_SPEED_CLASS_ID];
+}
+
+function getDisplayedSpeedForRaw(rawSpeed, track = TRACKS[0], speedClassId = DEFAULT_SPEED_CLASS_ID) {
+  const safeTrack = track || TRACKS[0];
+  const id = normalizeSpeedClassId(speedClassId, DEFAULT_SPEED_CLASS_ID);
+  const range = getDisplaySpeedRange(id);
+  const classStart = getTrackCruiseSpeed(safeTrack, 0, id);
+  const classEnd = getTrackCruiseSpeed(safeTrack, 1, id);
+  const numericRaw = Number(rawSpeed);
+  const sourceSpeed = Number.isFinite(numericRaw) ? numericRaw : classStart;
+  const rawSpan = Math.max(1, classEnd - classStart);
+  const progress = clamp((sourceSpeed - classStart) / rawSpan, 0, 1);
+  return Math.round(lerp(range.min, range.max, progress));
+}
+
+function formatDisplayedSpeed(rawSpeed, track = TRACKS[0], speedClassId = DEFAULT_SPEED_CLASS_ID) {
+  const value = getDisplayedSpeedForRaw(rawSpeed, track, speedClassId);
+  return {
+    label: DISPLAY_SPEED_LABEL,
+    unit: DISPLAY_SPEED_UNIT,
+    value,
+    text: `${value} ${DISPLAY_SPEED_UNIT}`
+  };
+}
+
+function formatDisplaySpeedRangeForTrack(track = TRACKS[0], speedClassId = DEFAULT_SPEED_CLASS_ID) {
+  const safeTrack = track || TRACKS[0];
+  const id = normalizeSpeedClassId(speedClassId, DEFAULT_SPEED_CLASS_ID);
+  const start = getDisplayedSpeedForRaw(getTrackCruiseSpeed(safeTrack, 0, id), safeTrack, id);
+  const end = getDisplayedSpeedForRaw(getTrackCruiseSpeed(safeTrack, 1, id), safeTrack, id);
+  return `${Math.min(start, end)}-${Math.max(start, end)} ${DISPLAY_SPEED_UNIT}`;
 }
 
 function isOfficialEnduranceRun(run) {
@@ -6715,6 +6812,40 @@ function normalizePlaytestRunSummary(entry) {
     paceBehindTime: normalizeOptionalFiniteNumber(entry.paceBehindTime, 0, 24 * 60 * 60),
     paceFeedbackActiveTime: normalizeOptionalFiniteNumber(entry.paceFeedbackActiveTime, 0, 24 * 60 * 60),
     paceFeedbackSampleCount: normalizeNonNegativeInteger(entry.paceFeedbackSampleCount, 0, 999999),
+    neonFlowEnabled: Boolean(entry.neonFlowEnabled),
+    neonFlowTotalEarned: normalizeNonNegativeInteger(entry.neonFlowTotalEarned, 0, 99999),
+    flowBreaksArmed: normalizeNonNegativeInteger(entry.flowBreaksArmed, 0, 999),
+    flowBreaksTriggered: normalizeNonNegativeInteger(entry.flowBreaksTriggered, 0, 999),
+    flowBreakArmedUnused: normalizeNonNegativeInteger(entry.flowBreakArmedUnused, 0, NEON_FLOW_CONFIG.maxArmedCharges),
+    flowBreakHazardsCleared: normalizeNonNegativeInteger(entry.flowBreakHazardsCleared, 0, 9999),
+    flowBreakHazardsClearedAhead: normalizeNonNegativeInteger(entry.flowBreakHazardsClearedAhead, 0, 9999),
+    flowBreakHazardsClearedBehind: normalizeNonNegativeInteger(entry.flowBreakHazardsClearedBehind, 0, 9999),
+    flowBreakHazardsConsidered: normalizeNonNegativeInteger(entry.flowBreakHazardsConsidered, 0, 99999),
+    flowBreakHazardsSkippedOutOfZone: normalizeNonNegativeInteger(entry.flowBreakHazardsSkippedOutOfZone, 0, 99999),
+    flowBreakHazardsSkippedNotClearable: normalizeNonNegativeInteger(entry.flowBreakHazardsSkippedNotClearable, 0, 99999),
+    flowBreakVisibleHazardsAtTrigger: normalizeNonNegativeInteger(entry.flowBreakVisibleHazardsAtTrigger, 0, 9999),
+    flowBreakTriggeredWithZeroEffect: normalizeNonNegativeInteger(entry.flowBreakTriggeredWithZeroEffect, 0, 9999),
+    flowBreakTriggeredWithNoForwardHazard: normalizeNonNegativeInteger(entry.flowBreakTriggeredWithNoForwardHazard, 0, 9999),
+    flowBreakSparksCreated: normalizeNonNegativeInteger(entry.flowBreakSparksCreated, 0, 9999),
+    flowBreakSparksSpawnedAhead: normalizeNonNegativeInteger(entry.flowBreakSparksSpawnedAhead, 0, 9999),
+    flowBreakSparksSpawnedBehind: normalizeNonNegativeInteger(entry.flowBreakSparksSpawnedBehind, 0, 9999),
+    flowBreakSparksCollected: normalizeNonNegativeInteger(entry.flowBreakSparksCollected, 0, 9999),
+    flowBreakSparkCollectableCount: normalizeNonNegativeInteger(entry.flowBreakSparkCollectableCount, 0, 9999),
+    flowBreakSparkPickupCount: normalizeNonNegativeInteger(entry.flowBreakSparkPickupCount, 0, 9999),
+    flowBreakSparkSpeedBefore: normalizeOptionalFiniteNumber(entry.flowBreakSparkSpeedBefore, 0, 99999),
+    flowBreakSparkSpeedAfter: normalizeOptionalFiniteNumber(entry.flowBreakSparkSpeedAfter, 0, 99999),
+    flowBreakSparkDisplaySpeedBefore: normalizeOptionalFiniteNumber(entry.flowBreakSparkDisplaySpeedBefore, 0, 999),
+    flowBreakSparkDisplaySpeedAfter: normalizeOptionalFiniteNumber(entry.flowBreakSparkDisplaySpeedAfter, 0, 999),
+    flowBreakSparkBoostMultiplier: normalizeNonNegativeNumber(entry.flowBreakSparkBoostMultiplier, 0, 10),
+    flowBreakSparkBoostDuration: normalizeNonNegativeNumber(entry.flowBreakSparkBoostDuration, 0, 60),
+    flowBreakSparkNormalBoostActive: Boolean(entry.flowBreakSparkNormalBoostActive),
+    flowBreakSparkStackedWithBoost: Boolean(entry.flowBreakSparkStackedWithBoost),
+    flowBreakCollisionPrevented: normalizeNonNegativeInteger(entry.flowBreakCollisionPrevented, 0, 9999),
+    flowBreakFrameWorstMs: normalizeNonNegativeNumber(entry.flowBreakFrameWorstMs, 0, 1000),
+    flowBreakFrameSamples: normalizeNonNegativeInteger(entry.flowBreakFrameSamples, 0, 99999),
+    flowBreakNearestHazardDistance: normalizeOptionalFiniteNumber(entry.flowBreakNearestHazardDistance, 0, VIEW_DISTANCE * 2),
+    flowBreakForwardReach: normalizeNonNegativeNumber(entry.flowBreakForwardReach, 0, VIEW_DISTANCE * 2),
+    flowBreakFrontBuffer: normalizeNonNegativeNumber(entry.flowBreakFrontBuffer, 0, VIEW_DISTANCE),
     distanceCompleted: normalizeNonNegativeNumber(entry.distanceCompleted || entry.distance),
     finishProgressPercent: clampNumber(progressPercent, 0, 100, 0),
     endReason: sanitizeName(entry.endReason || entry.reason, "", DISPLAY_TEXT_MAX_LENGTH),
@@ -15622,6 +15753,7 @@ class CollisionSystem {
       const collision = rectsOverlapByThreshold(playerBox, obstacleBox, minOverlapPx);
 
       if (collision.hit) {
+        if (this.game.preventFlowBreakCollision(obstacle)) continue;
         const result = this.getCollisionResult(obstacle, info);
         this.logCollision(obstacle, info, playerBox, obstacleBox, collision.overlap, result, minOverlapPx);
         if (result === "airborne-pass") {
@@ -15639,7 +15771,12 @@ class CollisionSystem {
         this.game.addScoreEvent("nearMiss", 150);
         this.game.audio.playSfx("nearMiss");
         run.nearMisses += 1;
-        if (isRunDrifting(run)) run.driftNearMisses = Math.max(0, (run.driftNearMisses || 0) + 1);
+        if (isRunDrifting(run)) {
+          run.driftNearMisses = Math.max(0, (run.driftNearMisses || 0) + 1);
+          this.game.addNeonFlow("driftNearMiss");
+        } else {
+          this.game.addNeonFlow("nearMiss");
+        }
         run.collisionState = `near miss ${info.label}`;
       }
     }
@@ -15749,6 +15886,8 @@ class CollisionSystem {
         run.lastBoostCalloutAt = now;
       }
       this.game.addScoreEvent("boostPad", 400);
+      this.game.addNeonFlow("boostPad");
+      if (chainContinues) this.game.addNeonFlow("boostChain");
       this.game.audio.playSfx("boostPickup", {
         cooldownMs: 0,
         maxInstances: 2,
@@ -16435,11 +16574,13 @@ class Renderer {
     const run = this.game.run;
     if (!run || this.game.screen !== "game") return 1;
     const telemetryScale = clampNumber(run.performanceEffectScale, 0.62, 1, 1);
+    const theme = this.getCurrentTrackVisualTheme();
     const speedClassId = normalizeSpeedClassId(run.speedClassId, DEFAULT_SPEED_CLASS_ID);
     let highSpeedCeiling = 1;
     if (speedClassId === "turbo") highSpeedCeiling = 0.94;
     else if (speedClassId === "overdrive") highSpeedCeiling = 0.9;
     else if (speedClassId === "redline") highSpeedCeiling = 0.86;
+    if (theme.prismRoadSurface) highSpeedCeiling = Math.min(highSpeedCeiling, speedClassId === "redline" ? 0.76 : 0.8);
     const speedRatio = this.getVisualSpeedRatio();
     if (speedRatio > 1.05) highSpeedCeiling = Math.min(highSpeedCeiling, 0.9);
     if ((run.boostTimer || 0) > 0 || (run.padBoostTimer || 0) > 0) highSpeedCeiling -= 0.02;
@@ -16874,6 +17015,7 @@ class Renderer {
       this.drawObstacle(ctx, obstacle, x, y, scale);
     }
 
+    this.drawFlowBreak();
     this.drawBoostBurst();
     this.drawRampLaunchPulse();
     this.drawRampClearSpark();
@@ -16926,13 +17068,20 @@ class Renderer {
     ctx.fillRect(road.x, road.y, road.w, road.h);
 
     if (!theme.blackoutRoad) {
-      const shoulderWash = ctx.createLinearGradient(road.x, 0, road.x + road.w, 0);
-      shoulderWash.addColorStop(0, rgbaFromHex(theme.edgeColor || "#28f6ff", 0.12 + speedFeel * 0.04));
-      shoulderWash.addColorStop(0.18, "rgba(0, 0, 0, 0)");
-      shoulderWash.addColorStop(0.82, "rgba(0, 0, 0, 0)");
-      shoulderWash.addColorStop(1, rgbaFromHex(theme.edgeAltColor || "#ff3fd1", 0.12 + speedFeel * 0.04));
-      ctx.fillStyle = shoulderWash;
-      ctx.fillRect(road.x, road.y, road.w, road.h);
+      if (theme.prismRoadSurface) {
+        ctx.fillStyle = rgbaFromHex(theme.edgeColor || "#28f6ff", 0.06 + speedFeel * 0.02);
+        ctx.fillRect(road.x, road.y, road.laneW * 0.32, road.h);
+        ctx.fillStyle = rgbaFromHex(theme.edgeAltColor || "#ff3fd1", 0.06 + speedFeel * 0.02);
+        ctx.fillRect(road.x + road.w - road.laneW * 0.32, road.y, road.laneW * 0.32, road.h);
+      } else {
+        const shoulderWash = ctx.createLinearGradient(road.x, 0, road.x + road.w, 0);
+        shoulderWash.addColorStop(0, rgbaFromHex(theme.edgeColor || "#28f6ff", 0.12 + speedFeel * 0.04));
+        shoulderWash.addColorStop(0.18, "rgba(0, 0, 0, 0)");
+        shoulderWash.addColorStop(0.82, "rgba(0, 0, 0, 0)");
+        shoulderWash.addColorStop(1, rgbaFromHex(theme.edgeAltColor || "#ff3fd1", 0.12 + speedFeel * 0.04));
+        ctx.fillStyle = shoulderWash;
+        ctx.fillRect(road.x, road.y, road.w, road.h);
+      }
 
       ctx.fillStyle = theme.prismRoadSurface ? "rgba(255, 255, 255, 0.025)" : "rgba(255, 255, 255, 0.04)";
       for (let i = 0; i < LANES; i += 1) {
@@ -16963,23 +17112,34 @@ class Renderer {
     ctx.moveTo(road.x + road.w, road.y);
     ctx.lineTo(road.x + road.w, road.y + road.h);
     ctx.stroke();
+    if (theme.prismRoadSurface) {
+      ctx.shadowBlur = 0;
+      ctx.globalAlpha = alpha * 0.82;
+      ctx.fillStyle = theme.edgeColor || "#22f3ff";
+      ctx.fillRect(road.x - 10, road.y, 4, road.h);
+      ctx.fillStyle = theme.edgeAltColor || "#ff3edb";
+      ctx.fillRect(road.x + road.w + 6, road.y, 4, road.h);
+      ctx.globalAlpha = alpha * 0.9;
+      ctx.fillStyle = "rgba(246, 251, 255, 0.62)";
+      ctx.fillRect(road.x + road.w + 7, road.y, 2, road.h);
+    }
     if (budget.roadEdgeDetails) this.drawRoadEdgeDetails(scrollSource, alpha);
     if (theme.ridgeGuardrail) this.drawRidgeGuardrailGlints(scrollSource, alpha, theme);
     this.drawMusicRoadAtmosphere(scrollSource, alpha);
     if (theme.tunnelPanels) this.drawTrackTunnelPanels(scrollSource, alpha, theme);
 
     if (!theme.blackoutRoad) {
-      const dashHeight = 56 + speedFeel * 8;
-      const gap = Math.max(38, 46 - speedFeel * 7);
+      const dashHeight = theme.prismRoadSurface ? 66 + speedFeel * 6 : 56 + speedFeel * 8;
+      const gap = theme.prismRoadSurface ? Math.max(54, 66 - speedFeel * 5) : Math.max(38, 46 - speedFeel * 7);
       const scroll = (scrollSource * SPEED_TUNING.roadStripeScrollScale) % (dashHeight + gap);
       const lanePulse = 0.94 + Math.sin(scrollSource * 0.018) * 0.06 * clamp((visualIntensity + speedFeel * 0.4 - 0.8) / 0.55, 0, 1);
-      ctx.globalAlpha = alpha * clamp((visualIntensity + speedFeel * 0.18) * lanePulse, 0.78, 1.32);
+      ctx.globalAlpha = alpha * clamp((visualIntensity + speedFeel * 0.18) * lanePulse, theme.prismRoadSurface ? 0.58 : 0.78, theme.prismRoadSurface ? 0.94 : 1.32);
       for (let lane = 1; lane < LANES; lane += 1) {
         const x = road.x + lane * road.laneW;
         ctx.shadowColor = lane % 2 ? (theme.laneSecondary || "#ff3fd1") : (theme.lanePrimary || "#ffe45e");
         ctx.strokeStyle = lane % 2 ? (theme.laneSecondary || "#ff3fd1") : (theme.lanePrimary || "#ffe45e");
         ctx.lineWidth = (theme.sharpLaneMarkers ? 3.8 : 3) + speedFeel * 0.45;
-        ctx.shadowBlur = (8 + speedFeel * 4) * lerp(0.56, 1, effectScale);
+        ctx.shadowBlur = theme.prismRoadSurface ? 0 : (8 + speedFeel * 4) * lerp(0.56, 1, effectScale);
         for (let y = road.y - dashHeight + scroll; y < road.y + road.h + dashHeight; y += dashHeight + gap) {
           ctx.beginPath();
           ctx.moveTo(x, y);
@@ -17059,7 +17219,7 @@ class Renderer {
     const effectScale = this.getPerformanceEffectScale();
     const budget = this.getTrackRenderBudget(theme);
     const palette = this.getPrismPalette(theme);
-    const panelSpacing = budget.prismBandSpacing / Math.max(0.86, effectScale);
+    const panelSpacing = budget.prismBandSpacing / Math.max(0.72, effectScale);
     const panelScroll = (scrollSource * (0.32 + speedFeel * 0.1)) % panelSpacing;
     ctx.save();
     ctx.globalCompositeOperation = "source-over";
@@ -17078,7 +17238,7 @@ class Renderer {
       ctx.fillRect(x + road.laneW * 0.42, road.y, road.laneW * 0.16, road.h);
     }
 
-    ctx.globalAlpha = alpha * 0.26 * lerp(0.74, 1, effectScale);
+    ctx.globalAlpha = alpha * 0.2 * lerp(0.62, 1, effectScale);
     let bandIndex = 0;
     for (let y = road.y - panelSpacing + panelScroll; y < road.y + road.h + panelSpacing; y += panelSpacing) {
       const panelH = 10 + speedFeel * 2;
@@ -17810,7 +17970,10 @@ class Renderer {
       return;
     }
     if (visual.sprite) {
-      drawTrafficSprite(ctx, x, y, { ...visual, type: obstacle.type });
+      visual.type = obstacle.type;
+      visual.effectScale = this.getPerformanceEffectScale();
+      visual.fastRender = theme.prismRoadSurface || visual.effectScale < 0.86;
+      drawTrafficSprite(ctx, x, y, visual);
       this.drawReflectiveObstacleCue(ctx, x, y, visual.w, visual.h, scale, obstacle);
       if (obstacle.pursuitMarker || obstacle.pursuitRoadblock) {
         this.drawPursuitObstacleMarker(ctx, x, y, visual.w, visual.h, scale, obstacle);
@@ -18168,6 +18331,170 @@ class Renderer {
     ctx.restore();
   }
 
+  drawFlowBreak() {
+    const run = this.game.run;
+    if (!run || this.game.screen !== "game") return;
+    const active = (run.flowBreakActiveTimer || 0) > 0 && Number.isFinite(run.flowBreakCenterLaneFloat);
+    const armed = run.flowBreakArmed && this.game.isNeonFlowEnabledForRun(run);
+    const bursts = Array.isArray(run.flowBreakBursts) ? run.flowBreakBursts : [];
+    const sparks = Array.isArray(run.flowBreakSparks) ? run.flowBreakSparks : [];
+    if (!active && !armed && !bursts.length && !sparks.length) return;
+    const ctx = this.ctx;
+    const effectScale = clampNumber(run.renderEffectScale || run.performanceEffectScale || 1, 0.6, 1, 1);
+    const highDetail = effectScale >= 0.86;
+    const centerLaneFloat = active
+      ? run.flowBreakCenterLaneFloat
+      : this.game.getFlowBreakCenterLaneFloat(run);
+    const laneX = this.laneCenter(clamp(centerLaneFloat, 0, LANES - 1));
+    const radiusLanes = active
+      ? clampNumber(run.flowBreakLateralRadiusLanes, 0.5, 2.5, NEON_FLOW_CONFIG.breakLateralRadiusLanes)
+      : 0.46;
+    const zoneW = this.road.laneW * radiusLanes * 2;
+    ctx.save();
+    ctx.globalCompositeOperation = highDetail ? "screen" : "source-over";
+    if (active) {
+      const reach = Number.isFinite(run.flowBreakReach) ? run.flowBreakReach : this.game.getFlowBreakReach(run);
+      const startAhead = Number.isFinite(run.flowBreakStartAhead) && run.flowBreakStartAhead > 0
+        ? run.flowBreakStartAhead
+        : this.game.getFlowBreakZone(run, { active: true }).startAhead;
+      const yEnd = clamp(this.yForDistanceAt((run.distance || 0) + startAhead + reach, run.distance), this.road.y, this.height);
+      const yStart = clamp(this.yForDistanceAt((run.distance || 0) + startAhead, run.distance), this.road.y, this.height);
+      const yMid = (yStart + yEnd) / 2;
+      const breakT = clamp((run.flowBreakActiveTimer || 0) / Math.max(0.001, run.flowBreakDuration || NEON_FLOW_CONFIG.breakActiveSeconds), 0, 1);
+      const bloom = 1 - breakT;
+      const alpha = (0.12 + breakT * 0.2) * effectScale;
+      const gradient = ctx.createLinearGradient(laneX, yEnd, laneX, yStart);
+      gradient.addColorStop(0, "rgba(94, 232, 255, 0.04)");
+      gradient.addColorStop(0.34, `rgba(94, 232, 255, ${alpha})`);
+      gradient.addColorStop(0.68, `rgba(68, 255, 153, ${alpha * 0.72})`);
+      gradient.addColorStop(1, `rgba(255, 61, 154, ${alpha * 0.5})`);
+      ctx.fillStyle = gradient;
+      ctx.shadowBlur = highDetail ? 8 : 0;
+      ctx.shadowColor = "#5ee8ff";
+      const nearHalfW = this.road.laneW * 0.36;
+      const midHalfW = zoneW * (0.32 + bloom * 0.08);
+      const farHalfW = zoneW * 0.48;
+      ctx.beginPath();
+      ctx.moveTo(laneX - nearHalfW, yStart);
+      ctx.quadraticCurveTo(laneX - midHalfW, yMid, laneX - farHalfW, yEnd);
+      ctx.lineTo(laneX + farHalfW, yEnd);
+      ctx.quadraticCurveTo(laneX + midHalfW, yMid, laneX + nearHalfW, yStart);
+      ctx.quadraticCurveTo(laneX, yStart - this.road.laneW * 0.12, laneX - nearHalfW, yStart);
+      ctx.fill();
+      ctx.lineWidth = 2.2;
+      const waveCount = highDetail ? 3 : 1;
+      for (let i = 0; i < waveCount; i += 1) {
+        const wave = clamp(bloom * 1.2 - i * 0.18, 0, 1);
+        const y = lerp(yStart, yEnd, wave);
+        const scale = this.scaleForY(y);
+        const rx = lerp(nearHalfW, farHalfW, wave);
+        const ry = Math.max(8, rx * 0.16 * scale);
+        ctx.globalAlpha = (0.5 - i * 0.1) * breakT * effectScale;
+        ctx.strokeStyle = i === 0 ? "#f6fbff" : (i === 1 ? "#5ee8ff" : "#44ff99");
+        ctx.beginPath();
+        ctx.moveTo(laneX - rx, y + ry * 0.45);
+        ctx.lineTo(laneX, y - ry);
+        ctx.lineTo(laneX + rx, y + ry * 0.45);
+        ctx.stroke();
+      }
+      ctx.globalAlpha = 0.32 * breakT * effectScale;
+      ctx.strokeStyle = "#44ff99";
+      ctx.lineWidth = 3;
+      for (let side = -1; side <= 1; side += 1) {
+        ctx.beginPath();
+        ctx.moveTo(laneX + side * nearHalfW, yStart);
+        ctx.quadraticCurveTo(laneX + side * midHalfW, yMid, laneX + side * farHalfW, yEnd);
+        ctx.stroke();
+      }
+      if (highDetail) {
+        ctx.globalAlpha = 0.28 * breakT;
+        ctx.strokeStyle = "#5ee8ff";
+        ctx.lineWidth = 1.5;
+        for (let i = -1; i <= 1; i += 1) {
+          ctx.beginPath();
+          ctx.moveTo(laneX + i * this.road.laneW * 0.5, yStart);
+          ctx.lineTo(laneX + i * this.road.laneW * 0.74, yEnd);
+          ctx.stroke();
+        }
+      }
+      ctx.shadowBlur = 0;
+    } else if (armed) {
+      const y = this.getPlayerScreenY() - this.road.laneW * 0.32;
+      ctx.globalAlpha = (0.16 + Math.sin((run.elapsed || 0) * 9) * 0.04) * effectScale;
+      ctx.strokeStyle = "#5ee8ff";
+      ctx.lineWidth = 2;
+      ctx.shadowBlur = highDetail ? 6 : 0;
+      ctx.shadowColor = "#5ee8ff";
+      ctx.beginPath();
+      ctx.ellipse(laneX, y, this.road.laneW * 0.42, this.road.laneW * 0.16, 0, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.shadowBlur = 0;
+    }
+    for (const spark of sparks) {
+      if (!spark || spark.collected) continue;
+      const y = this.yForDistanceAt(spark.distance, run.distance);
+      if (y < this.road.y - 30 || y > this.height + 50) continue;
+      const x = this.laneCenter(clampNumber(spark.laneFloat, 0, LANES - 1, centerLaneFloat));
+      const scale = this.scaleForY(y);
+      const pulse = 0.5 + Math.sin((run.elapsed || 0) * 14 + spark.distance * 0.02) * 0.5;
+      ctx.globalAlpha = 0.84 + pulse * 0.14;
+      ctx.fillStyle = "#5ee8ff";
+      ctx.strokeStyle = "#44ff99";
+      ctx.lineWidth = 2.4;
+      ctx.shadowBlur = highDetail ? 7 + pulse * 3 : 0;
+      ctx.shadowColor = "#5ee8ff";
+      ctx.beginPath();
+      ctx.ellipse(x, y, 34 * scale, 12 * scale, 0, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(x, y - 24 * scale);
+      ctx.lineTo(x + 28 * scale, y);
+      ctx.lineTo(x, y + 24 * scale);
+      ctx.lineTo(x - 28 * scale, y);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+      ctx.globalAlpha = 0.55 + pulse * 0.2;
+      ctx.strokeStyle = "#f6fbff";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(x - 38 * scale, y + 12 * scale);
+      ctx.lineTo(x, y - 2 * scale);
+      ctx.lineTo(x + 38 * scale, y + 12 * scale);
+      ctx.stroke();
+      ctx.shadowBlur = 0;
+    }
+    const burstStart = Math.max(0, bursts.length - NEON_FLOW_CONFIG.breakMaxVisualBursts);
+    for (let index = burstStart; index < bursts.length; index += 1) {
+      const burst = bursts[index];
+      const y = this.yForDistanceAt(burst.distance, run.distance);
+      if (y < this.road.y - 30 || y > this.height + 50) continue;
+      const t = clamp((burst.timer || 0) / Math.max(0.001, burst.maxTimer || 0.42), 0, 1);
+      const x = this.laneCenter(clampNumber(burst.laneFloat, 0, LANES - 1, centerLaneFloat));
+      const radius = this.road.laneW * lerp(0.2, 0.46, 1 - t);
+      ctx.globalAlpha = t * 0.54 * effectScale;
+      ctx.strokeStyle = "#5ee8ff";
+      ctx.lineWidth = 2.6;
+      ctx.shadowBlur = highDetail ? 5 : 0;
+      ctx.shadowColor = "#5ee8ff";
+      ctx.beginPath();
+      ctx.ellipse(x, y, radius, radius * 0.42, 0, 0, Math.PI * 2);
+      ctx.stroke();
+      if (highDetail) {
+        ctx.globalAlpha = t * 0.42;
+        ctx.strokeStyle = "#44ff99";
+        ctx.lineWidth = 2;
+        for (let i = -1; i <= 1; i += 1) {
+          ctx.beginPath();
+          ctx.moveTo(x + i * radius * 0.18, y - radius * 0.38);
+          ctx.lineTo(x + i * radius * 0.48, y - radius * 0.82);
+          ctx.stroke();
+        }
+      }
+    }
+    ctx.restore();
+  }
+
   drawPlayer() {
     const run = this.game.run;
     const x = this.getPlayerVisualCenterX();
@@ -18177,12 +18504,13 @@ class Renderer {
     const landingPulse = landingDuration > 0 ? clamp((run.rampLandingPulseTimer || 0) / landingDuration, 0, 1) : 0;
     const boostTrailPunch = boostTrailDuration > 0 ? clamp((run.boostTrailPunchTimer || 0) / boostTrailDuration, 0, 1) : 0;
     const driftVisualIntensity = getRunDriftVisualIntensity(run);
+    const sparkBoostActive = (run.flowBreakSparkBoostTimer || 0) > 0;
     drawPlayerCar(this.ctx, x, y, run.player.car, {
-      boosting: run.boostTimer > 0 || run.padBoostTimer > 0 || run.driftBoostTimer > 0,
+      boosting: run.boostTimer > 0 || run.padBoostTimer > 0 || run.driftBoostTimer > 0 || sparkBoostActive,
       airborne: run.airborne,
       airborneLift: run.jumpOffset || 0,
       landingPulse,
-      boostTrailIntensity: run.boostTimer > 0 ? 0.92 + boostTrailPunch * 0.46 : (run.padBoostTimer > 0 ? 0.84 + boostTrailPunch * 0.42 : (run.driftBoostTimer > 0 ? 0.62 + boostTrailPunch * 0.28 : 0)),
+      boostTrailIntensity: run.boostTimer > 0 ? 0.92 + boostTrailPunch * 0.46 : (run.padBoostTimer > 0 ? 0.84 + boostTrailPunch * 0.42 : (sparkBoostActive ? 0.68 + boostTrailPunch * 0.34 : (run.driftBoostTimer > 0 ? 0.62 + boostTrailPunch * 0.28 : 0))),
       laneWidth: this.road.laneW,
       laneChanging: Math.abs(run.renderLaneFloat - run.targetLane) > 0.02,
       laneDelta: run.targetLane - run.renderLaneFloat,
@@ -19333,7 +19661,7 @@ class Renderer {
     const text = sanitizeName(run.raceStateCalloutText, "", DISPLAY_TEXT_MAX_LENGTH);
     if (!text) return null;
     const tone = String(run.raceStateCalloutTone || "info").toLowerCase();
-    const color = tone === "danger" ? "#ff4d6d" : (tone === "boost" ? "#ff3d9a" : "#ffd23f");
+    const color = tone === "danger" ? "#ff4d6d" : (tone === "flow" ? "#5ee8ff" : (tone === "boost" ? "#ff3d9a" : "#ffd23f"));
     return { text, color };
   }
 
@@ -19402,25 +19730,29 @@ class Renderer {
     const x = compact ? 22 : 36;
     const y = h - (compact ? 118 : 142);
     const modeLabel = run.speedClass?.label || getSpeedClassLabel(run.speedClassId);
+    const displaySpeed = formatDisplayedSpeed(run.currentSpeed || 0, run.track, run.speedClassId);
+    const sparkBoostActive = (run.flowBreakSparkBoostTimer || 0) > 0;
+    const sparkPulse = clamp((run.flowBreakSparkPickupTimer || 0) / 0.62, 0, 1);
     ctx.save();
     ctx.textAlign = "left";
     ctx.textBaseline = "top";
-    ctx.shadowBlur = 30;
-    ctx.shadowColor = "rgba(0, 0, 0, 0.72)";
+    ctx.shadowBlur = sparkBoostActive ? 18 : 30;
+    ctx.shadowColor = sparkBoostActive ? "rgba(94, 232, 255, 0.42)" : "rgba(0, 0, 0, 0.72)";
     ctx.fillStyle = "#ffd23f";
     ctx.font = "700 10px 'JetBrains Mono', 'IBM Plex Mono', monospace";
-    ctx.fillText("SPEED", x, y);
-    ctx.fillStyle = (run.boostTimer > 0 || run.padBoostTimer > 0 || run.driftBoostTimer > 0) ? "#ff3d9a" : "#f3f0ff";
+    ctx.fillText(displaySpeed.label, x, y);
+    ctx.fillStyle = sparkBoostActive ? "#5ee8ff" : ((run.boostTimer > 0 || run.padBoostTimer > 0 || run.driftBoostTimer > 0) ? "#ff3d9a" : "#f3f0ff");
     ctx.font = `700 ${compact ? 58 : 82}px 'JetBrains Mono', 'IBM Plex Mono', monospace`;
-    const speedText = String(Math.round(run.currentSpeed || 0));
+    const speedText = String(displaySpeed.value);
     ctx.fillText(speedText, x, y + 14);
     const speedWidth = ctx.measureText(speedText).width;
-    ctx.fillStyle = "rgba(243, 240, 255, 0.6)";
+    ctx.fillStyle = sparkBoostActive ? "rgba(94, 232, 255, 0.76)" : "rgba(243, 240, 255, 0.6)";
     ctx.font = `700 ${compact ? 15 : 20}px 'JetBrains Mono', 'IBM Plex Mono', monospace`;
-    ctx.fillText("MPH", x + speedWidth + 10, y + (compact ? 51 : 74));
-    ctx.fillStyle = "rgba(243, 240, 255, 0.58)";
+    ctx.fillText(displaySpeed.unit, x + speedWidth + 10, y + (compact ? 51 : 74));
+    ctx.fillStyle = sparkBoostActive ? rgbaFromHex("#5ee8ff", 0.72 + sparkPulse * 0.18) : "rgba(243, 240, 255, 0.58)";
     ctx.font = "700 11px 'JetBrains Mono', 'IBM Plex Mono', monospace";
-    drawFittedText(ctx, `${modeLabel} CLASS`, x, y + (compact ? 88 : 112), compact ? 260 : 320);
+    const boostText = `SPARK BOOST +${Math.round((NEON_FLOW_CONFIG.sparkBoostMultiplier - 1) * 100)}%`;
+    drawFittedText(ctx, sparkBoostActive ? boostText : `${modeLabel} CLASS`, x, y + (compact ? 88 : 112), compact ? 260 : 320);
     ctx.restore();
   }
 
@@ -19498,6 +19830,78 @@ class Renderer {
     ctx.restore();
   }
 
+  drawLiveHudNeonFlow(ctx, run) {
+    if (!this.game.isNeonFlowEnabledForRun(run) || this.game.screen !== "game") return;
+    const w = this.width;
+    const h = this.height;
+    const compact = w < 760 || h < 680;
+    const chipW = compact ? 164 : 190;
+    const chipH = compact ? 38 : 42;
+    const x = w - (compact ? 22 : 36) - chipW;
+    const y = h - (compact ? 152 : 166);
+    const breakArmed = Boolean(run.flowBreakArmed);
+    const breakActive = (run.flowBreakActiveTimer || 0) > 0;
+    const sparkBoost = (run.flowBreakSparkBoostTimer || 0) > 0;
+    const suppressed = (run.neonFlowSuppressedTimer || 0) > 0;
+    const pct = breakArmed || breakActive
+      ? 1
+      : clamp((run.neonFlow || 0) / Math.max(1, NEON_FLOW_CONFIG.maxFlow), 0, 1);
+    const tone = breakActive || sparkBoost || breakArmed ? "#5ee8ff" : (suppressed ? "#ffd23f" : "#ff3d9a");
+    const label = breakActive ? "FLOW BREAK" : (sparkBoost ? "SPARK BOOST" : (breakArmed ? "BREAK READY" : (suppressed ? "FLOW PAUSED" : "FLOW")));
+    const valueText = breakArmed ? "READY" : (breakActive ? "CONVERT" : (sparkBoost ? "SPEED" : `${Math.round(pct * 100)}%`));
+    const gainText = !breakArmed && !breakActive && !sparkBoost && (run.neonFlowLastGainTimer || 0) > 0 ? String(run.neonFlowLastGainText || "") : "";
+    ctx.save();
+    ctx.textBaseline = "middle";
+    ctx.textAlign = "left";
+    ctx.shadowBlur = 24;
+    ctx.shadowColor = "rgba(0, 0, 0, 0.72)";
+    ctx.fillStyle = "rgba(5, 7, 18, 0.68)";
+    ctx.strokeStyle = rgbaFromHex(tone, breakArmed || breakActive || sparkBoost ? 0.9 : 0.5);
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.roundRect(x, y, chipW, chipH, 6);
+    ctx.fill();
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+    const iconX = x + 15;
+    const iconY = y + chipH / 2;
+    ctx.globalCompositeOperation = "screen";
+    ctx.strokeStyle = tone;
+    ctx.lineWidth = 2;
+    ctx.shadowBlur = breakArmed || breakActive || sparkBoost ? 12 : 7;
+    ctx.shadowColor = tone;
+    ctx.beginPath();
+    ctx.arc(iconX, iconY, compact ? 8 : 9, 0, Math.PI * 2);
+    ctx.stroke();
+    if (breakArmed || breakActive || sparkBoost) {
+      ctx.beginPath();
+      ctx.arc(iconX, iconY, (compact ? 11 : 12) + Math.sin((run.elapsed || 0) * 12) * 1.5, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+    ctx.globalCompositeOperation = "source-over";
+    const barX = x + 32;
+    const barY = y + chipH - 9;
+    const barW = chipW - 44;
+    ctx.fillStyle = "rgba(246, 251, 255, 0.09)";
+    ctx.fillRect(barX, barY, barW, 3);
+    const gradient = ctx.createLinearGradient(barX, barY, barX + barW, barY);
+    gradient.addColorStop(0, "#ff3d9a");
+    gradient.addColorStop(1, "#5ee8ff");
+    ctx.fillStyle = gradient;
+    ctx.shadowBlur = breakArmed || breakActive || sparkBoost ? 15 : 8;
+    ctx.shadowColor = tone;
+    ctx.fillRect(barX, barY, barW * pct, 3);
+    ctx.shadowBlur = 0;
+    ctx.font = `900 ${compact ? 10 : 11}px 'JetBrains Mono', 'IBM Plex Mono', monospace`;
+    ctx.fillStyle = tone;
+    drawFittedText(ctx, label, x + 32, y + 13, chipW - 78);
+    ctx.textAlign = "right";
+    ctx.fillStyle = breakArmed || breakActive || sparkBoost ? "#f6fbff" : "rgba(246, 251, 255, 0.7)";
+    const rightText = gainText || valueText;
+    if (rightText) drawFittedText(ctx, rightText, x + chipW - 10, y + 12, chipW * 0.34);
+    ctx.restore();
+  }
+
   drawLiveHudFuel(ctx, run) {
     if (!isFuelRunRaceType(run.raceTypeId)) return;
     const w = this.width;
@@ -19572,6 +19976,7 @@ class Renderer {
     this.drawLiveHudSpeed(ctx, run);
     this.drawLiveHudBoost(ctx, run);
     this.drawLiveHudProgress(ctx, run, progress);
+    this.drawLiveHudNeonFlow(ctx, run);
     this.drawLiveHudFuel(ctx, run);
     this.drawLiveHudCallout(ctx, run);
   }
@@ -19799,7 +20204,7 @@ class Renderer {
       `zone render: player ${playerZonePlayer.w.toFixed(0)}x${playerZonePlayer.h.toFixed(0)} slow ${playerZoneTraffic.w.toFixed(0)}x${playerZoneTraffic.h.toFixed(0)}`,
       `boost mult: ${(run.boostMultiplier || 1).toFixed(2)}x`,
       `max speed: ${run.track.maxSpeed} cap ${(run.speedCap || run.track.maxSpeed).toFixed(0)} capped ${run.speedCapped ? "yes" : "no"}`,
-      `mph display: ${Math.round(run.currentSpeed)} MPH`,
+      `display speed: ${formatDisplayedSpeed(run.currentSpeed, run.track, run.speedClassId).text}`,
       `debug scale: ${(this.game.debugSpeedScale || 1).toFixed(2)}x`,
       `debug freeze: ${run.debugFrozen ? "on" : "off"} (H)`,
       `finish dist: ${run.track.distanceToFinish}`,
@@ -21409,6 +21814,8 @@ function drawTrafficSprite(ctx, x, y, visual) {
   const image = visual.sprite;
   if (!image || !visual.source) return;
   const type = visual.type || "";
+  const effectScale = clampNumber(visual.effectScale, 0.6, 1, 1);
+  const fastRender = Boolean(visual.fastRender || effectScale < 0.86);
   const underglow = type === "fastCar"
     ? "rgba(255, 51, 76, 0.38)"
     : (type === "truck" ? "rgba(255, 228, 94, 0.28)" : "rgba(40, 246, 255, 0.26)");
@@ -21419,17 +21826,19 @@ function drawTrafficSprite(ctx, x, y, visual) {
   ctx.beginPath();
   ctx.ellipse(x, y + visual.h * 0.34, visual.w * 0.46, visual.h * 0.11, 0, 0, Math.PI * 2);
   ctx.fill();
-  ctx.globalCompositeOperation = "lighter";
-  ctx.globalAlpha = parentAlpha * 0.2;
-  ctx.fillStyle = underglow;
-  ctx.beginPath();
-  ctx.ellipse(x, y + visual.h * 0.34, visual.w * 0.42, visual.h * 0.08, 0, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.globalCompositeOperation = "source-over";
+  if (!fastRender) {
+    ctx.globalCompositeOperation = "lighter";
+    ctx.globalAlpha = parentAlpha * 0.2;
+    ctx.fillStyle = underglow;
+    ctx.beginPath();
+    ctx.ellipse(x, y + visual.h * 0.34, visual.w * 0.42, visual.h * 0.08, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.globalCompositeOperation = "source-over";
+  }
   ctx.globalAlpha = parentAlpha;
   ctx.imageSmoothingEnabled = true;
-  ctx.imageSmoothingQuality = "high";
-  ctx.shadowBlur = type === "truck" ? 7 : 9;
+  ctx.imageSmoothingQuality = fastRender ? "medium" : "high";
+  ctx.shadowBlur = fastRender ? 0 : (type === "truck" ? 7 : 9) * lerp(0.64, 1, effectScale);
   ctx.shadowColor = type === "fastCar" ? "#ff334c" : (type === "truck" ? "#ffe45e" : "#28f6ff");
   ctx.drawImage(
     image,
@@ -21723,6 +22132,62 @@ class NeonRoadRally {
       paceFeedbackText: "",
       paceFeedbackActiveTime: 0,
       paceFeedbackSampleCount: 0,
+      neonFlow: 0,
+      neonFlowTotalEarned: 0,
+      neonFlowEvents: {},
+      neonFlowSuppressedTimer: 0,
+      neonFlowLastGainText: "",
+      neonFlowLastGainTimer: 0,
+      flowBreakArmed: false,
+      flowBreaksArmed: 0,
+      flowBreaksTriggered: 0,
+      flowBreakArmedUnused: 0,
+      flowBreakHazardsCleared: 0,
+      flowBreakHazardsClearedAhead: 0,
+      flowBreakHazardsClearedBehind: 0,
+      flowBreakHazardsConsidered: 0,
+      flowBreakHazardsSkippedOutOfZone: 0,
+      flowBreakHazardsSkippedNotClearable: 0,
+      flowBreakVisibleHazardsAtTrigger: 0,
+      flowBreakTriggeredWithZeroEffect: 0,
+      flowBreakTriggeredWithNoForwardHazard: 0,
+      flowBreakSparksCreated: 0,
+      flowBreakSparksSpawnedAhead: 0,
+      flowBreakSparksSpawnedBehind: 0,
+      flowBreakSparksCollected: 0,
+      flowBreakSparkCollectableCount: 0,
+      flowBreakSparkPickupCount: 0,
+      flowBreakSparkSpeedBefore: null,
+      flowBreakSparkSpeedAfter: null,
+      flowBreakSparkDisplaySpeedBefore: null,
+      flowBreakSparkDisplaySpeedAfter: null,
+      flowBreakSparkBoostMultiplier: NEON_FLOW_CONFIG.sparkBoostMultiplier,
+      flowBreakSparkBoostDuration: NEON_FLOW_CONFIG.sparkBoostDuration,
+      flowBreakSparkNormalBoostActive: false,
+      flowBreakSparkStackedWithBoost: false,
+      flowBreakSparkBoostPendingSpeedRead: false,
+      flowBreakSparkPickupTimer: 0,
+      flowBreakCollisionPrevented: 0,
+      flowBreakFrameWorstMs: 0,
+      flowBreakFrameSamples: 0,
+      flowBreakPerfWatchFrames: 0,
+      flowBreakActiveTimer: 0,
+      flowBreakDuration: 0,
+      flowBreakUseId: 0,
+      flowBreakCenterLaneFloat: null,
+      flowBreakReach: 0,
+      flowBreakForwardReach: 0,
+      flowBreakFrontBuffer: 0,
+      flowBreakPlayerForwardAhead: 0,
+      flowBreakStartAhead: 0,
+      flowBreakLateralRadiusLanes: 0,
+      flowBreakNearestHazardDistance: null,
+      flowBreakClearedThisUse: 0,
+      flowBreakEmergencyObstacleId: "",
+      flowBreakSparkBoostTimer: 0,
+      flowBreakVisualTimer: 0,
+      flowBreakBursts: [],
+      flowBreakSparks: [],
       distance: 0,
       baseScore: 0,
       score: 0,
@@ -22029,6 +22494,11 @@ class NeonRoadRally {
     if (!run || this.screen !== "game" || run.paused || run.debugFrozen) return;
     const frameMs = clampNumber(frameDt * 1000, 0, 250, 0);
     if (frameMs <= 0) return;
+    if ((run.flowBreakPerfWatchFrames || 0) > 0) {
+      run.flowBreakPerfWatchFrames = Math.max(0, (run.flowBreakPerfWatchFrames || 0) - 1);
+      run.flowBreakFrameWorstMs = Math.max(run.flowBreakFrameWorstMs || 0, frameMs);
+      run.flowBreakFrameSamples = Math.max(0, (run.flowBreakFrameSamples || 0) + 1);
+    }
     run.frameSampleCount = (run.frameSampleCount || 0) + 1;
     run.frameTimeSumMs = (run.frameTimeSumMs || 0) + frameMs;
     run.frameTimeMaxMs = Math.max(run.frameTimeMaxMs || 0, frameMs);
@@ -22087,6 +22557,7 @@ class NeonRoadRally {
     run.boostFlashTimer = Math.max(0, (run.boostFlashTimer || 0) - dt);
     run.boostStreakPunchTimer = Math.max(0, (run.boostStreakPunchTimer || 0) - dt);
     run.boostTrailPunchTimer = Math.max(0, (run.boostTrailPunchTimer || 0) - dt);
+    run.flowBreakSparkPickupTimer = Math.max(0, (run.flowBreakSparkPickupTimer || 0) - dt);
     run.driftReleaseBurstTimer = Math.max(0, (run.driftReleaseBurstTimer || 0) - dt);
     run.driftSkidSparkTimer = Math.max(0, (run.driftSkidSparkTimer || 0) - dt);
     run.driftFullChargeCueTimer = Math.max(0, (run.driftFullChargeCueTimer || 0) - dt);
@@ -22821,6 +23292,603 @@ class NeonRoadRally {
     return run.paceDeltaSeconds;
   }
 
+  isNeonFlowEnabledForRun(run = this.run) {
+    if (!run) return false;
+    const raceTypeId = normalizeRaceTypeId(run.raceTypeId, DEFAULT_RACE_TYPE_ID);
+    return Boolean(
+      raceTypeId === DEFAULT_RACE_TYPE_ID
+      && !run.partyMode
+      && !run.challengeMode
+      && !isFuelRunRaceType(raceTypeId)
+      && !isPursuitRaceType(raceTypeId)
+      && !isBoostlineRaceType(raceTypeId)
+    );
+  }
+
+  getNeonFlowGain(type) {
+    const value = NEON_FLOW_CONFIG.gains[String(type || "")];
+    return Number.isFinite(value) ? Math.max(0, value) : 0;
+  }
+
+  addNeonFlow(type, options = {}) {
+    const run = this.run;
+    if (!this.isNeonFlowEnabledForRun(run) || run.ended) return 0;
+    if ((run.neonFlowSuppressedTimer || 0) > 0 && options.ignoreSuppression !== true) return 0;
+    const amount = this.getNeonFlowGain(type);
+    if (!(amount > 0)) return 0;
+    if (run.flowBreakArmed) return 0;
+    run.neonFlowTotalEarned = Math.max(0, (run.neonFlowTotalEarned || 0) + amount);
+    run.neonFlowEvents = run.neonFlowEvents && typeof run.neonFlowEvents === "object" ? run.neonFlowEvents : {};
+    run.neonFlowEvents[type] = Math.max(0, (run.neonFlowEvents[type] || 0) + amount);
+    run.neonFlowLastGainText = `+${amount} FLOW`;
+    run.neonFlowLastGainTimer = 0.75;
+    const nextFlow = Math.max(0, (run.neonFlow || 0) + amount);
+    if (nextFlow >= NEON_FLOW_CONFIG.maxFlow) {
+      run.neonFlow = 0;
+      run.flowBreakArmed = true;
+      run.flowBreaksArmed = Math.max(0, (run.flowBreaksArmed || 0) + 1);
+      this.audio.playSfx("boostPickup", {
+        cooldownMs: 0,
+        maxInstances: 1,
+        volume: this.audio.sfxVolume * 0.64
+      });
+    } else {
+      run.neonFlow = nextFlow;
+    }
+    return amount;
+  }
+
+  applyNeonFlowSlowdownPenalty() {
+    const run = this.run;
+    if (!this.isNeonFlowEnabledForRun(run)) return;
+    run.neonFlowSuppressedTimer = Math.max(run.neonFlowSuppressedTimer || 0, NEON_FLOW_CONFIG.slowdownPauseSeconds);
+    if (run.flowBreakArmed) return;
+    run.neonFlow = Math.max(0, (run.neonFlow || 0) - NEON_FLOW_CONFIG.slowdownFlowLoss);
+  }
+
+  updateNeonFlowTimers(dt) {
+    const run = this.run;
+    if (!run) return;
+    run.neonFlowSuppressedTimer = Math.max(0, (run.neonFlowSuppressedTimer || 0) - dt);
+    run.neonFlowLastGainTimer = Math.max(0, (run.neonFlowLastGainTimer || 0) - dt);
+    run.flowBreakVisualTimer = Math.max(0, (run.flowBreakVisualTimer || 0) - dt);
+    if (Array.isArray(run.flowBreakBursts) && run.flowBreakBursts.length) {
+      let writeIndex = 0;
+      const keepFrom = Math.max(0, run.flowBreakBursts.length - 12);
+      for (let index = keepFrom; index < run.flowBreakBursts.length; index += 1) {
+        const burst = run.flowBreakBursts[index];
+        if (!burst) continue;
+        burst.timer = Math.max(0, (burst.timer || 0) - dt);
+        if (burst.timer <= 0) continue;
+        run.flowBreakBursts[writeIndex] = burst;
+        writeIndex += 1;
+      }
+      run.flowBreakBursts.length = writeIndex;
+    }
+  }
+
+  getFlowBreakReach(run = this.run) {
+    const speed = Math.max(1, Number.isFinite(run?.currentSpeed) ? run.currentSpeed : run?.baseCruiseSpeed || SPEED_TUNING.minSpeed);
+    return clamp(speed * NEON_FLOW_CONFIG.breakReachSpeedScale, NEON_FLOW_CONFIG.breakReachMin, NEON_FLOW_CONFIG.breakReachMax);
+  }
+
+  getFlowBreakTriggerReach(run = this.run) {
+    const speed = Math.max(1, Number.isFinite(run?.currentSpeed) ? run.currentSpeed : run?.baseCruiseSpeed || SPEED_TUNING.minSpeed);
+    return clamp(speed * NEON_FLOW_CONFIG.triggerReachSpeedScale, NEON_FLOW_CONFIG.triggerReachMin, NEON_FLOW_CONFIG.triggerReachMax);
+  }
+
+  getFlowBreakFrontBuffer(run = this.run) {
+    const speed = Math.max(1, Number.isFinite(run?.currentSpeed) ? run.currentSpeed : run?.baseCruiseSpeed || SPEED_TUNING.minSpeed);
+    return clamp(speed * NEON_FLOW_CONFIG.breakFrontBufferSpeedScale, NEON_FLOW_CONFIG.breakFrontBufferMin, NEON_FLOW_CONFIG.breakFrontBufferMax);
+  }
+
+  getFlowBreakPlayerForwardAhead(run = this.run) {
+    if (!this.renderer?.aheadForY || !this.renderer?.getPlayerScreenY) return 0;
+    const playerY = this.renderer.getPlayerScreenY();
+    const size = typeof this.renderer.getPlayerVisualSize === "function" ? this.renderer.getPlayerVisualSize() : { h: 0 };
+    const frontY = playerY - Math.max(0, size.h || 0) * 0.48;
+    return Math.max(0, this.renderer.aheadForY(frontY));
+  }
+
+  getFlowBreakCenterLaneFloat(run = this.run) {
+    return clampNumber(
+      Number.isFinite(run?.renderLaneFloat) ? run.renderLaneFloat : run?.playerLaneFloat,
+      0,
+      LANES - 1,
+      Number.isFinite(run?.targetLane) ? run.targetLane : TRACK_DIRECTOR.centerLane
+    );
+  }
+
+  getFlowBreakZone(run = this.run, options = {}) {
+    const active = options.active === true;
+    const emergency = options.emergency === true;
+    const centerLaneFloat = active && Number.isFinite(run?.flowBreakCenterLaneFloat)
+      ? run.flowBreakCenterLaneFloat
+      : this.getFlowBreakCenterLaneFloat(run);
+    const reach = active && Number.isFinite(run?.flowBreakReach) && run.flowBreakReach > 0
+      ? run.flowBreakReach
+      : this.getFlowBreakReach(run);
+    const frontBuffer = active && Number.isFinite(run?.flowBreakFrontBuffer) && run.flowBreakFrontBuffer > 0
+      ? run.flowBreakFrontBuffer
+      : this.getFlowBreakFrontBuffer(run);
+    const runDistance = run?.distance || 0;
+    const playerForwardAhead = active && Number.isFinite(run?.flowBreakPlayerForwardAhead)
+      ? Math.max(0, run.flowBreakPlayerForwardAhead)
+      : this.getFlowBreakPlayerForwardAhead(run);
+    const startAhead = active && Number.isFinite(run?.flowBreakStartAhead) && run.flowBreakStartAhead > 0
+      ? run.flowBreakStartAhead
+      : playerForwardAhead + frontBuffer;
+    return {
+      centerLaneFloat,
+      reach,
+      lateralRadiusLanes: NEON_FLOW_CONFIG.breakLateralRadiusLanes,
+      frontBuffer,
+      playerForwardAhead,
+      startAhead,
+      minDistance: emergency ? runDistance + playerForwardAhead - NEON_FLOW_CONFIG.breakEmergencyBehindGraceDistance : runDistance + startAhead,
+      maxDistance: runDistance + startAhead + reach,
+      emergency
+    };
+  }
+
+  getFlowBreakTriggerZone(run = this.run) {
+    const zone = this.getFlowBreakZone(run);
+    const triggerReach = Math.min(zone.reach, this.getFlowBreakTriggerReach(run));
+    return {
+      ...zone,
+      reach: triggerReach,
+      maxDistance: (run?.distance || 0) + (zone.startAhead || 0) + triggerReach
+    };
+  }
+
+  getFlowBreakObstacleLane(obstacle, run = this.run) {
+    return typeof this.renderer?.getObstacleLaneFloatAt === "function"
+      ? this.renderer.getObstacleLaneFloatAt(obstacle, run?.distance || 0)
+      : (Number.isFinite(obstacle?.laneFloat) ? obstacle.laneFloat : obstacle?.lane);
+  }
+
+  isFlowBreakClearableType(type) {
+    return FLOW_BREAK_CLEARABLE_TYPES.has(type);
+  }
+
+  getFlowBreakObstacleDecision(obstacle, run = this.run, zone = this.getFlowBreakZone(run, { active: true })) {
+    const type = obstacle?.type || "";
+    if (!obstacle || obstacle.hit || obstacle.remove) return { decision: "inactive", type };
+    const ahead = obstacle.distance - (run.distance || 0);
+    const obstacleLane = this.getFlowBreakObstacleLane(obstacle, run);
+    const laneDelta = Math.abs(obstacleLane - zone.centerLaneFloat);
+    const startAhead = Number.isFinite(zone.startAhead) ? zone.startAhead : (zone.playerForwardAhead || 0) + (zone.frontBuffer || 0);
+    const forwardSpan = Math.max(1, zone.maxDistance - ((run.distance || 0) + startAhead));
+    const forwardRatio = clamp((ahead - startAhead) / forwardSpan, 0, 1);
+    const lateralRadius = zone.emergency
+      ? Math.min(0.62, zone.lateralRadiusLanes)
+      : clamp(
+        NEON_FLOW_CONFIG.breakNearLateralRadiusLanes + forwardRatio * (zone.lateralRadiusLanes - NEON_FLOW_CONFIG.breakNearLateralRadiusLanes),
+        NEON_FLOW_CONFIG.breakNearLateralRadiusLanes,
+        zone.lateralRadiusLanes
+      );
+    const inZone = obstacle.distance >= zone.minDistance
+      && obstacle.distance <= zone.maxDistance
+      && laneDelta <= lateralRadius;
+    if (!this.isFlowBreakClearableType(type)) {
+      return inZone ? { decision: "notClearable", type, obstacleLane, laneDelta, ahead, lateralRadius } : { decision: "inactive", type };
+    }
+    if (!inZone) return { decision: "outOfZone", type, obstacleLane, laneDelta, ahead, lateralRadius };
+    return { decision: "clear", type, obstacleLane, laneDelta, ahead, lateralRadius, aheadOfPlayer: ahead >= 0 };
+  }
+
+  recordFlowBreakDecision(obstacle, decision) {
+    const run = this.run;
+    if (!run || !obstacle || !decision || obstacle.flowBreakLastDecisionUseId === run.flowBreakUseId) return;
+    obstacle.flowBreakLastDecisionUseId = run.flowBreakUseId;
+    run.flowBreakHazardsConsidered = Math.max(0, (run.flowBreakHazardsConsidered || 0) + 1);
+    if (decision.decision === "outOfZone") {
+      run.flowBreakHazardsSkippedOutOfZone = Math.max(0, (run.flowBreakHazardsSkippedOutOfZone || 0) + 1);
+    } else if (decision.decision !== "clear") {
+      run.flowBreakHazardsSkippedNotClearable = Math.max(0, (run.flowBreakHazardsSkippedNotClearable || 0) + 1);
+    }
+  }
+
+  getNearestFlowBreakHazardDistance(run = this.run, zone = this.getFlowBreakZone(run)) {
+    if (!run) return null;
+    let nearest = Infinity;
+    for (const obstacle of this.obstacles.obstacles) {
+      if (this.getFlowBreakObstacleDecision(obstacle, run, zone).decision !== "clear") continue;
+      const ahead = Math.max(0, obstacle.distance - (run.distance || 0));
+      nearest = Math.min(nearest, Math.max(0, ahead));
+    }
+    return Number.isFinite(nearest) ? Math.round(nearest) : null;
+  }
+
+  getFlowBreakCandidates(run = this.run, zone = this.getFlowBreakZone(run)) {
+    const candidates = [];
+    for (const obstacle of this.obstacles.obstacles) {
+      const decision = this.getFlowBreakObstacleDecision(obstacle, run, zone);
+      if (decision.decision === "clear") candidates.push({ obstacle, decision });
+    }
+    candidates.sort((a, b) => Math.max(0, a.decision.ahead || 0) - Math.max(0, b.decision.ahead || 0));
+    return candidates;
+  }
+
+  getVisibleFlowBreakCandidateCount(run = this.run, candidates = []) {
+    if (!run || !this.renderer) return candidates.length;
+    return candidates.filter(({ obstacle }) => {
+      const y = this.renderer.yForDistanceAt(obstacle.distance, run.distance || 0);
+      return y >= this.renderer.road.y - 20 && y <= this.renderer.height + 20;
+    }).length;
+  }
+
+  getFlowBreakTriggerPlan(run = this.run) {
+    const clearZone = this.getFlowBreakZone(run);
+    const triggerZone = this.getFlowBreakTriggerZone(run);
+    const triggerCandidates = this.getFlowBreakCandidates(run, triggerZone);
+    if (triggerCandidates.length) {
+      return {
+        zone: clearZone,
+        candidates: triggerCandidates,
+        visibleCount: this.getVisibleFlowBreakCandidateCount(run, triggerCandidates),
+        reason: "visible-danger"
+      };
+    }
+    const clusterReach = Math.min(clearZone.reach, this.getFlowBreakTriggerReach(run) + NEON_FLOW_CONFIG.triggerClusterBonusReach);
+    const clusterZone = {
+      ...clearZone,
+      reach: clusterReach,
+      maxDistance: (run?.distance || 0) + (clearZone.startAhead || 0) + clusterReach
+    };
+    const clusterCandidates = this.getFlowBreakCandidates(run, clusterZone);
+    if (clusterCandidates.length >= NEON_FLOW_CONFIG.triggerClusterMinCount) {
+      return {
+        zone: clearZone,
+        candidates: clusterCandidates,
+        visibleCount: this.getVisibleFlowBreakCandidateCount(run, clusterCandidates),
+        reason: "danger-cluster"
+      };
+    }
+    return {
+      zone: clearZone,
+      candidates: [],
+      visibleCount: 0,
+      reason: "armed-waiting"
+    };
+  }
+
+  maybeTriggerFlowBreak() {
+    const run = this.run;
+    if (!run?.flowBreakArmed || !this.isNeonFlowEnabledForRun(run) || run.ended || !run.raceActive || run.paused) return false;
+    const plan = this.getFlowBreakTriggerPlan(run);
+    if (!plan.candidates.length) return false;
+    return this.triggerFlowBreak(plan.zone, plan);
+  }
+
+  triggerFlowBreak(zone = this.getFlowBreakZone(this.run), options = {}) {
+    const run = this.run;
+    if (!run?.flowBreakArmed || !this.isNeonFlowEnabledForRun(run)) return false;
+    const expectedCandidates = Array.isArray(options.candidates) ? options.candidates : this.getFlowBreakCandidates(run, zone);
+    const forwardCandidateCount = expectedCandidates.filter((item) => (item?.decision?.ahead || 0) >= (zone.startAhead || 0)).length;
+    if (!options.emergency && !forwardCandidateCount) {
+      run.flowBreakTriggeredWithNoForwardHazard = Math.max(0, (run.flowBreakTriggeredWithNoForwardHazard || 0) + 1);
+      return false;
+    }
+    run.flowBreakArmed = false;
+    run.flowBreaksTriggered = Math.max(0, (run.flowBreaksTriggered || 0) + 1);
+    run.flowBreakUseId = Math.max(0, (run.flowBreakUseId || 0) + 1);
+    run.flowBreakActiveTimer = NEON_FLOW_CONFIG.breakActiveSeconds;
+    run.flowBreakDuration = NEON_FLOW_CONFIG.breakActiveSeconds;
+    run.flowBreakCenterLaneFloat = Number(zone.centerLaneFloat.toFixed(3));
+    run.flowBreakReach = zone.reach;
+    run.flowBreakForwardReach = zone.reach;
+    run.flowBreakFrontBuffer = zone.frontBuffer || this.getFlowBreakFrontBuffer(run);
+    run.flowBreakPlayerForwardAhead = zone.playerForwardAhead || this.getFlowBreakPlayerForwardAhead(run);
+    run.flowBreakStartAhead = zone.startAhead || (run.flowBreakPlayerForwardAhead + run.flowBreakFrontBuffer);
+    run.flowBreakLateralRadiusLanes = zone.lateralRadiusLanes;
+    run.flowBreakNearestHazardDistance = this.getNearestFlowBreakHazardDistance(run, zone);
+    run.flowBreakClearedThisUse = 0;
+    run.flowBreakEmergencyObstacleId = options.emergencyObstacleId || "";
+    run.flowBreakPerfWatchFrames = Math.max(run.flowBreakPerfWatchFrames || 0, NEON_FLOW_CONFIG.breakPerfWatchFrames);
+    run.flowBreakVisibleHazardsAtTrigger = Math.max(0, (run.flowBreakVisibleHazardsAtTrigger || 0) + (Number.isFinite(options.visibleCount) ? options.visibleCount : this.getVisibleFlowBreakCandidateCount(run, expectedCandidates)));
+    const cleared = this.clearFlowBreakHazards({ emergencyObstacleId: run.flowBreakEmergencyObstacleId });
+    if (cleared <= 0 && !options.emergency) {
+      run.flowBreakTriggeredWithZeroEffect = Math.max(0, (run.flowBreakTriggeredWithZeroEffect || 0) + 1);
+      run.flowBreakArmed = true;
+      run.flowBreaksTriggered = Math.max(0, (run.flowBreaksTriggered || 0) - 1);
+      run.flowBreakActiveTimer = 0;
+      run.flowBreakDuration = 0;
+      run.flowBreakCenterLaneFloat = null;
+      run.flowBreakReach = 0;
+      run.flowBreakForwardReach = 0;
+      run.flowBreakFrontBuffer = 0;
+      run.flowBreakPlayerForwardAhead = 0;
+      run.flowBreakStartAhead = 0;
+      run.flowBreakLateralRadiusLanes = 0;
+      run.flowBreakClearedThisUse = 0;
+      run.flowBreakEmergencyObstacleId = "";
+      return false;
+    }
+    if (cleared <= 0 && options.emergency) {
+      run.flowBreakTriggeredWithZeroEffect = Math.max(0, (run.flowBreakTriggeredWithZeroEffect || 0) + 1);
+    }
+    run.flowBreakVisualTimer = Math.max(run.flowBreakVisualTimer || 0, NEON_FLOW_CONFIG.breakActiveSeconds + 0.48);
+    run.screenShake = Math.max(run.screenShake || 0, 0.08);
+    this.showRaceStateCallout(cleared > 1 ? `FLOW BREAK x${cleared}` : "FLOW BREAK", "flow", 1.05, { replace: true });
+    this.addFloatingScoreText(cleared > 1 ? `FLOW BREAK x${cleared}` : "FLOW BREAK", {
+      color: "#5ee8ff",
+      size: 22,
+      life: 0.72,
+      yOffset: -94,
+      vy: -44
+    });
+    this.audio.playSfx("boostActive", {
+      cooldownMs: 0,
+      maxInstances: 1,
+      volume: this.audio.sfxVolume * 0.68
+    });
+    return true;
+  }
+
+  clearFlowBreakHazards(options = {}) {
+    const run = this.run;
+    if (!this.isNeonFlowEnabledForRun(run) || (run.flowBreakActiveTimer || 0) <= 0) return 0;
+    let cleared = 0;
+    const zone = this.getFlowBreakZone(run, { active: true });
+    const emergencyObstacleId = options.emergencyObstacleId || run.flowBreakEmergencyObstacleId || "";
+    const candidates = [];
+    for (const obstacle of this.obstacles.obstacles) {
+      let decision = this.getFlowBreakObstacleDecision(obstacle, run, zone);
+      if (emergencyObstacleId && obstacle?.id === emergencyObstacleId && decision.decision !== "clear") {
+        const type = obstacle?.type || "";
+        if (!this.isFlowBreakClearableType(type)) continue;
+        const ahead = obstacle.distance - (run.distance || 0);
+        const obstacleLane = this.getFlowBreakObstacleLane(obstacle, run);
+        const laneDelta = Math.abs(obstacleLane - zone.centerLaneFloat);
+        const playerForwardAhead = zone.playerForwardAhead || 0;
+        if (ahead >= playerForwardAhead - NEON_FLOW_CONFIG.breakEmergencyBehindGraceDistance && ahead <= (zone.startAhead || playerForwardAhead + (zone.frontBuffer || 0)) && laneDelta <= 0.62) {
+          decision = {
+            decision: "clear",
+            type,
+            obstacleLane,
+            laneDelta,
+            ahead,
+            lateralRadius: 0.62,
+            aheadOfPlayer: ahead >= 0,
+            emergency: true
+          };
+        }
+      }
+      if (decision.decision === "inactive") continue;
+      this.recordFlowBreakDecision(obstacle, decision);
+      if (decision.decision === "clear") candidates.push({ obstacle, decision });
+    }
+    candidates.sort((a, b) => Math.max(0, a.decision.ahead || 0) - Math.max(0, b.decision.ahead || 0));
+    for (const { obstacle, decision } of candidates) {
+      if ((run.flowBreakClearedThisUse || 0) >= NEON_FLOW_CONFIG.breakMaxHazards) break;
+      const ahead = obstacle.distance - run.distance;
+      obstacle.hit = true;
+      obstacle.remove = true;
+      obstacle.flowBreakCleared = true;
+      obstacle.nearMissAwarded = true;
+      cleared += 1;
+      run.flowBreakHazardsCleared = Math.max(0, (run.flowBreakHazardsCleared || 0) + 1);
+      if (ahead >= (zone.playerForwardAhead || 0)) run.flowBreakHazardsClearedAhead = Math.max(0, (run.flowBreakHazardsClearedAhead || 0) + 1);
+      else run.flowBreakHazardsClearedBehind = Math.max(0, (run.flowBreakHazardsClearedBehind || 0) + 1);
+      run.flowBreakClearedThisUse = Math.max(0, (run.flowBreakClearedThisUse || 0) + 1);
+      const label = OBSTACLE_INFO[obstacle.type]?.label || obstacle.type || "hazard";
+      run.collisionState = `flow break cleared ${label}`;
+      const sparkIndex = run.flowBreakClearedThisUse - 1;
+      const sparkLane = this.getFlowBreakSparkLane(decision.obstacleLane, sparkIndex);
+      const sparkDistance = this.getFlowBreakSparkDistance(sparkLane, obstacle.distance, sparkIndex);
+      this.createFlowBreakSpark(sparkLane, sparkDistance);
+      if (!Array.isArray(run.flowBreakBursts)) run.flowBreakBursts = [];
+      run.flowBreakBursts.push({
+        laneFloat: decision.obstacleLane,
+        distance: Math.max(obstacle.distance, sparkDistance - NEON_FLOW_CONFIG.sparkForwardSpacing * 0.35),
+        timer: 0.5,
+        maxTimer: 0.5,
+        label
+      });
+    }
+    if (cleared > 0) {
+      this.audio.playSfx("boostPickup", {
+        cooldownMs: 80,
+        maxInstances: 2,
+        volume: this.audio.sfxVolume * 0.52
+      });
+    }
+    return cleared;
+  }
+
+  getFlowBreakSparkLane(sourceLaneFloat, index = 0) {
+    const run = this.run;
+    const centerLaneFloat = Number.isFinite(run?.flowBreakCenterLaneFloat)
+      ? run.flowBreakCenterLaneFloat
+      : this.getFlowBreakCenterLaneFloat(run);
+    if (index <= 0) return clampNumber(centerLaneFloat, 0, LANES - 1, TRACK_DIRECTOR.centerLane);
+    const source = clampNumber(sourceLaneFloat, 0, LANES - 1, centerLaneFloat);
+    const delta = clamp(source - centerLaneFloat, -1, 1);
+    return clampNumber(centerLaneFloat + delta * NEON_FLOW_CONFIG.sparkLaneMagnet, 0, LANES - 1, centerLaneFloat);
+  }
+
+  getFlowBreakSparkDistance(laneFloat, sourceDistance, index = 0) {
+    const run = this.run;
+    if (!run) return sourceDistance;
+    const runDistance = run.distance || 0;
+    const speed = Math.max(1, Number.isFinite(run.currentSpeed) ? run.currentSpeed : run.baseCruiseSpeed || SPEED_TUNING.minSpeed);
+    const playerForwardAhead = Number.isFinite(run.flowBreakPlayerForwardAhead) ? Math.max(0, run.flowBreakPlayerForwardAhead) : this.getFlowBreakPlayerForwardAhead(run);
+    const minAhead = Math.max(
+      playerForwardAhead + Math.max(320, run.flowBreakFrontBuffer || 0),
+      clamp(speed * NEON_FLOW_CONFIG.sparkMinAheadSeconds, NEON_FLOW_CONFIG.sparkMinAhead, NEON_FLOW_CONFIG.sparkMaxAhead)
+    );
+    const zoneReach = Number.isFinite(run.flowBreakReach) && run.flowBreakReach > 0 ? run.flowBreakReach : this.getFlowBreakReach(run);
+    const maxAhead = Math.max(
+      minAhead,
+      Math.min(
+        playerForwardAhead + NEON_FLOW_CONFIG.sparkMaxAhead,
+        playerForwardAhead + zoneReach - Math.max(240, run.flowBreakFrontBuffer || 0)
+      )
+    );
+    const sourceAhead = sourceDistance - runDistance;
+    let sparkAhead = clamp(Math.max(sourceAhead, minAhead) + index * NEON_FLOW_CONFIG.sparkForwardSpacing, minAhead, maxAhead);
+    let sparkDistance = runDistance + sparkAhead;
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      const blocked = this.obstacles.obstacles.some((obstacle) => {
+        if (!obstacle || obstacle.hit || obstacle.remove || obstacle.flowBreakCleared) return false;
+        if (this.isFlowBreakClearableType(obstacle.type)) return false;
+        const obstacleLane = this.getFlowBreakObstacleLane(obstacle, run);
+        return Math.abs(obstacleLane - laneFloat) <= NEON_FLOW_CONFIG.sparkCollectLaneTolerance
+          && Math.abs(obstacle.distance - sparkDistance) <= NEON_FLOW_CONFIG.sparkNonClearableAvoidDistance;
+      });
+      if (!blocked) break;
+      sparkAhead = clamp(sparkAhead + NEON_FLOW_CONFIG.sparkForwardSpacing, minAhead, maxAhead);
+      sparkDistance = runDistance + sparkAhead;
+    }
+    return sparkDistance;
+  }
+
+  createFlowBreakSpark(laneFloat, distance) {
+    const run = this.run;
+    if (!run) return null;
+    if (!Array.isArray(run.flowBreakSparks)) run.flowBreakSparks = [];
+    run.flowBreakSparks = run.flowBreakSparks
+      .filter((spark) => !spark.collected && (spark.distance - (run.distance || 0)) > -VIEW_DISTANCE * 0.12)
+      .slice(-NEON_FLOW_CONFIG.sparkMaxActive);
+    if (run.flowBreakSparks.length >= NEON_FLOW_CONFIG.sparkMaxActive) return null;
+    const id = `flow-spark-${Math.max(0, (run.flowBreakSparksCreated || 0) + 1)}`;
+    const spark = {
+      id,
+      laneFloat: clampNumber(laneFloat, 0, LANES - 1, TRACK_DIRECTOR.centerLane),
+      distance,
+      createdAt: Number.isFinite(run.elapsed) ? run.elapsed : 0,
+      collected: false
+    };
+    run.flowBreakSparks.push(spark);
+    run.flowBreakSparksCreated = Math.max(0, (run.flowBreakSparksCreated || 0) + 1);
+    const playerForwardAhead = Number.isFinite(run.flowBreakPlayerForwardAhead) ? run.flowBreakPlayerForwardAhead : this.getFlowBreakPlayerForwardAhead(run);
+    const ahead = spark.distance - (run.distance || 0);
+    if (ahead > playerForwardAhead) run.flowBreakSparksSpawnedAhead = Math.max(0, (run.flowBreakSparksSpawnedAhead || 0) + 1);
+    else run.flowBreakSparksSpawnedBehind = Math.max(0, (run.flowBreakSparksSpawnedBehind || 0) + 1);
+    const speed = Math.max(1, Number.isFinite(run.currentSpeed) ? run.currentSpeed : run.baseCruiseSpeed || SPEED_TUNING.minSpeed);
+    const laneDelta = Math.abs(spark.laneFloat - this.getFlowBreakCenterLaneFloat(run));
+    if (ahead > playerForwardAhead && ahead <= speed * 2 && laneDelta <= 1.1) {
+      run.flowBreakSparkCollectableCount = Math.max(0, (run.flowBreakSparkCollectableCount || 0) + 1);
+    }
+    return spark;
+  }
+
+  collectFlowBreakSpark(spark) {
+    const run = this.run;
+    if (!run || !spark || spark.collected) return false;
+    const speedBefore = Number.isFinite(run.currentSpeed) ? run.currentSpeed : 0;
+    const displayBefore = getDisplayedSpeedForRaw(speedBefore, run.track, run.speedClassId);
+    const normalBoostActive = run.boostTimer > 0 || run.padBoostTimer > 0 || run.driftBoostTimer > 0;
+    const sparkWasAlreadyActive = (run.flowBreakSparkBoostTimer || 0) > 0;
+    spark.collected = true;
+    run.flowBreakSparksCollected = Math.max(0, (run.flowBreakSparksCollected || 0) + 1);
+    run.flowBreakSparkPickupCount = Math.max(0, (run.flowBreakSparkPickupCount || 0) + 1);
+    const projectedSpeedAfter = speedBefore * NEON_FLOW_CONFIG.sparkBoostMultiplier;
+    run.flowBreakSparkSpeedBefore = Math.round(speedBefore);
+    run.flowBreakSparkSpeedAfter = Math.round(projectedSpeedAfter);
+    run.flowBreakSparkDisplaySpeedBefore = displayBefore;
+    run.flowBreakSparkDisplaySpeedAfter = getDisplayedSpeedForRaw(projectedSpeedAfter, run.track, run.speedClassId);
+    run.flowBreakSparkBoostMultiplier = NEON_FLOW_CONFIG.sparkBoostMultiplier;
+    run.flowBreakSparkBoostDuration = NEON_FLOW_CONFIG.sparkBoostDuration;
+    run.flowBreakSparkNormalBoostActive = normalBoostActive;
+    run.flowBreakSparkStackedWithBoost = normalBoostActive || sparkWasAlreadyActive;
+    run.flowBreakSparkBoostPendingSpeedRead = true;
+    run.flowBreakSparkPickupTimer = Math.max(run.flowBreakSparkPickupTimer || 0, 0.62);
+    run.flowBreakSparkBoostTimer = Math.max(run.flowBreakSparkBoostTimer || 0, NEON_FLOW_CONFIG.sparkBoostDuration);
+    run.boostBurstTimer = Math.max(run.boostBurstTimer || 0, ARCADE_FEEL.boostBurstSeconds * 0.72);
+    run.boostFlashTimer = Math.max(run.boostFlashTimer || 0, ARCADE_FEEL.boostFlashMs / 1000 * 0.58);
+    run.boostTrailPunchTimer = Math.max(run.boostTrailPunchTimer || 0, ARCADE_FEEL.boostTrailPunchMs / 1000 * 0.62);
+    run.screenShake = Math.max(run.screenShake || 0, 0.08);
+    const boostPercent = Math.round((NEON_FLOW_CONFIG.sparkBoostMultiplier - 1) * 100);
+    this.addFloatingScoreText(`SPARK +${boostPercent}%`, {
+      color: "#5ee8ff",
+      size: 18,
+      life: 0.58,
+      yOffset: -86,
+      vy: -36
+    });
+    this.audio.playSfx("boostPickup", {
+      cooldownMs: 60,
+      maxInstances: 2,
+      volume: this.audio.sfxVolume * 0.58
+    });
+    return true;
+  }
+
+  updateFlowBreakSparks(dt) {
+    const run = this.run;
+    if (!run) return;
+    run.flowBreakSparkBoostTimer = Math.max(0, (run.flowBreakSparkBoostTimer || 0) - dt);
+    if (!Array.isArray(run.flowBreakSparks) || !run.flowBreakSparks.length) return;
+    const laneFloat = this.getFlowBreakCenterLaneFloat(run);
+    run.flowBreakSparks.forEach((spark) => {
+      if (!spark || spark.collected) return;
+      const ahead = spark.distance - (run.distance || 0);
+      const age = (run.elapsed || 0) - (spark.createdAt || 0);
+      const inCollectWindow = ahead <= NEON_FLOW_CONFIG.sparkCollectAheadDistance
+        && ahead >= -NEON_FLOW_CONFIG.sparkBehindGraceDistance
+        && Math.abs((spark.laneFloat ?? spark.lane ?? TRACK_DIRECTOR.centerLane) - laneFloat) <= NEON_FLOW_CONFIG.sparkCollectLaneTolerance;
+      if (inCollectWindow) this.collectFlowBreakSpark(spark);
+      else if (age > NEON_FLOW_CONFIG.sparkLifetimeSeconds || ahead < -VIEW_DISTANCE * 0.12) spark.expired = true;
+    });
+    run.flowBreakSparks = run.flowBreakSparks.filter((spark) => spark && !spark.collected && !spark.expired);
+  }
+
+  preventFlowBreakCollision(obstacle) {
+    const run = this.run;
+    if (!this.isNeonFlowEnabledForRun(run)) return false;
+    if (run.flowBreakArmed) {
+      const zone = this.getFlowBreakZone(run);
+      const emergencyZone = this.getFlowBreakZone(run, { emergency: true });
+      const emergencyDecision = this.getFlowBreakObstacleDecision(obstacle, run, emergencyZone);
+      if (emergencyDecision.decision === "clear") {
+        this.triggerFlowBreak(zone, {
+          emergency: true,
+          emergencyObstacleId: obstacle.id,
+          candidates: [],
+          visibleCount: 1,
+          reason: "collision-prevent"
+        });
+        if (obstacle.flowBreakCleared || obstacle.hit || obstacle.remove) {
+          run.flowBreakCollisionPrevented = Math.max(0, (run.flowBreakCollisionPrevented || 0) + 1);
+          run.collisionState = "flow break prevented collision";
+          return true;
+        }
+      }
+    }
+    if ((run.flowBreakActiveTimer || 0) <= 0) return false;
+    const zone = this.getFlowBreakZone(run, { active: true });
+    const decision = this.getFlowBreakObstacleDecision(obstacle, run, zone);
+    this.recordFlowBreakDecision(obstacle, decision);
+    let emergencyObstacleId = "";
+    if (decision.decision !== "clear") {
+      const emergencyZone = this.getFlowBreakZone(run, { emergency: true });
+      const emergencyDecision = this.getFlowBreakObstacleDecision(obstacle, run, emergencyZone);
+      if (emergencyDecision.decision !== "clear") return false;
+      emergencyObstacleId = obstacle.id;
+    }
+    const cleared = this.clearFlowBreakHazards({ emergencyObstacleId });
+    if (obstacle.hit || obstacle.remove || cleared > 0) {
+      run.flowBreakCollisionPrevented = Math.max(0, (run.flowBreakCollisionPrevented || 0) + 1);
+      run.collisionState = "flow break prevented collision";
+      return true;
+    }
+    return false;
+  }
+
+  updateFlowBreak(dt) {
+    const run = this.run;
+    if (!run) return;
+    this.updateFlowBreakSparks(dt);
+    if (!this.isNeonFlowEnabledForRun(run)) return;
+    if ((run.flowBreakActiveTimer || 0) > 0) {
+      run.flowBreakActiveTimer = Math.max(0, run.flowBreakActiveTimer - dt);
+    } else {
+      this.maybeTriggerFlowBreak();
+    }
+  }
+
   updateRun(dt) {
     const run = this.run;
     if (this.updatePendingEnd(dt)) return;
@@ -22840,6 +23908,7 @@ class NeonRoadRally {
     run.slowdownTimer = Math.max(0, run.slowdownTimer - dt);
     run.finishSpeedCarryTimer = Math.max(0, (run.finishSpeedCarryTimer || 0) - dt);
     run.raceStateCalloutTimer = Math.max(0, (run.raceStateCalloutTimer || 0) - dt);
+    this.updateNeonFlowTimers(dt);
     this.updateBoostAudioState();
 
     if (run.verticalInput !== 0) {
@@ -22880,7 +23949,8 @@ class NeonRoadRally {
     const manualBoost = run.boostTimer > 0 ? SPEED_TUNING.manualBoostMultiplier : 1;
     const padBoost = run.padBoostTimer > 0 ? SPEED_TUNING.padBoostMultiplier : 1;
     const driftBoost = run.driftBoostTimer > 0 ? clampNumber(run.driftBoostMultiplier, 1, DRIFT_TUNING.maxBoostMultiplier, 1) : 1;
-    const boostMultiplier = manualBoost * padBoost * driftBoost;
+    const sparkBoost = run.flowBreakSparkBoostTimer > 0 ? NEON_FLOW_CONFIG.sparkBoostMultiplier : 1;
+    const boostMultiplier = manualBoost * padBoost * driftBoost * sparkBoost;
     const enduranceSpeedMultiplier = getOfficialEnduranceSpeedMultiplier(run);
     const slowdown = run.slowdownTimer > 0 ? run.slowdownFactor : 1;
     const debugScale = this.debugSpeedScale || 1;
@@ -22895,6 +23965,11 @@ class NeonRoadRally {
     const normalSpeed = clamp(unclampedSpeed, SPEED_TUNING.minSpeed, speedCap);
     const carriedSpeedFloor = this.getFinishSpeedCarryFloor(run, normalSpeed);
     run.currentSpeed = clamp(Math.max(normalSpeed, carriedSpeedFloor), SPEED_TUNING.minSpeed, speedCap);
+    if (run.flowBreakSparkBoostPendingSpeedRead) {
+      run.flowBreakSparkSpeedAfter = Math.round(run.currentSpeed || 0);
+      run.flowBreakSparkDisplaySpeedAfter = getDisplayedSpeedForRaw(run.currentSpeed || 0, run.track, run.speedClassId);
+      run.flowBreakSparkBoostPendingSpeedRead = false;
+    }
     const distanceDelta = run.currentSpeed * dt;
     run.lastDistanceDelta = distanceDelta;
     run.distance += distanceDelta;
@@ -22927,9 +24002,11 @@ class NeonRoadRally {
       run.cleanTimer -= 10;
       run.cleanBonusCount += 1;
       this.addScoreEvent("clean", 100);
+      this.addNeonFlow("cleanWindow");
     }
 
     this.obstacles.update(dt);
+    this.updateFlowBreak(dt);
     this.maybePlayRampApproachSfx();
     this.collision.update();
     this.updatePursuitRun(dt);
@@ -22984,6 +24061,17 @@ class NeonRoadRally {
       "progress", "status", "reason", "time", "finishTimeMs", "finishTimeSecondsPrecise",
       "previousBestTimeMs", "bestTimeMs", "bestTimeSecondsPrecise", "newPersonalBestTime",
       "personalBestTimeDelta", "paceAheadTime", "paceBehindTime", "manualBoostsUsed",
+      "neonFlowEnabled", "neonFlowTotalEarned", "flowBreaksArmed", "flowBreaksTriggered",
+      "flowBreakArmedUnused", "flowBreakHazardsCleared", "flowBreakHazardsClearedAhead",
+      "flowBreakHazardsClearedBehind", "flowBreakVisibleHazardsAtTrigger",
+      "flowBreakTriggeredWithZeroEffect", "flowBreakTriggeredWithNoForwardHazard",
+      "flowBreakSparksCreated", "flowBreakSparksSpawnedAhead", "flowBreakSparksSpawnedBehind",
+      "flowBreakSparksCollected", "flowBreakSparkCollectableCount", "flowBreakSparkPickupCount",
+      "flowBreakSparkSpeedBefore", "flowBreakSparkSpeedAfter", "flowBreakSparkDisplaySpeedBefore",
+      "flowBreakSparkDisplaySpeedAfter", "flowBreakSparkBoostMultiplier", "flowBreakSparkBoostDuration",
+      "flowBreakSparkNormalBoostActive", "flowBreakSparkStackedWithBoost",
+      "flowBreakForwardReach", "flowBreakFrontBuffer", "flowBreakCollisionPrevented",
+      "flowBreakFrameWorstMs", "flowBreakFrameSamples",
       "boostPadsCollected", "boostPadsReachableSeen", "boostPadsMissedReachable",
       "bestBoostPadChain", "rampsUsed", "rampTargetsCleared", "laneMoves", "scoreSaved",
       "bestScore", "previousBestScore", "newPersonalBest", "entersTopTwenty",
@@ -23672,7 +24760,8 @@ class NeonRoadRally {
 
   useManualBoost() {
     const run = this.run;
-    if (run.paused || run.ended || !run.raceActive || run.manualBoosts <= 0) return;
+    if (run.paused || run.ended || !run.raceActive) return;
+    if (run.manualBoosts <= 0) return;
     run.manualBoosts -= 1;
     run.manualBoostsUsed += 1;
     if (isFuelRunRaceType(run.raceTypeId)) run.boostsUsedInFuelRun = Math.max(0, (run.boostsUsedInFuelRun || 0) + 1);
@@ -23942,6 +25031,7 @@ class NeonRoadRally {
     run.rampTargetsCleared = (run.rampTargetsCleared || 0) + 1;
     run.lastRampTargetStatus = `cleared ${label}`;
     run.rampClearSparkTimer = Math.max(run.rampClearSparkTimer || 0, ARCADE_FEEL.rampClearSparkMs / 1000);
+    this.addNeonFlow("rampTargetClear");
     this.addFloatingScoreText("CLEAR!", {
       color: "#f6fbff",
       size: 18,
@@ -23963,6 +25053,7 @@ class NeonRoadRally {
         target.cleared = true;
         run.rampTargetsCleared = (run.rampTargetsCleared || 0) + 1;
         run.lastRampTargetStatus = target.type ? `cleared ${target.type}` : "cleared ramp target";
+        this.addNeonFlow("rampTargetClear");
       } else {
         run.rampFailedToClearTarget = (run.rampFailedToClearTarget || 0) + 1;
         run.lastRampTargetStatus = target.type ? `landed before ${target.type}` : "landed before target";
@@ -24036,6 +25127,7 @@ class NeonRoadRally {
     run.cleanTimer = 0;
     run.penalties += Math.abs(penalty);
     run.slowdownHits += 1;
+    this.applyNeonFlowSlowdownPenalty();
     run.scoreBreakdown.slowdownPenalties += Math.abs(penalty);
     this.addBaseScore(penalty);
     run.lastCollision = reason;
@@ -24385,6 +25477,39 @@ class NeonRoadRally {
       paceBehindTime: summary.paceBehindTime,
       paceFeedbackActiveTime: run.paceFeedbackActiveTime || 0,
       paceFeedbackSampleCount: run.paceFeedbackSampleCount || 0,
+      neonFlowEnabled: Boolean(summary.neonFlowEnabled),
+      neonFlowTotalEarned: summary.neonFlowTotalEarned || 0,
+      flowBreaksArmed: summary.flowBreaksArmed || 0,
+      flowBreaksTriggered: summary.flowBreaksTriggered || 0,
+      flowBreakArmedUnused: summary.flowBreakArmedUnused || 0,
+      flowBreakHazardsCleared: summary.flowBreakHazardsCleared || 0,
+      flowBreakHazardsClearedAhead: summary.flowBreakHazardsClearedAhead || 0,
+      flowBreakHazardsClearedBehind: summary.flowBreakHazardsClearedBehind || 0,
+      flowBreakHazardsConsidered: summary.flowBreakHazardsConsidered || 0,
+      flowBreakHazardsSkippedOutOfZone: summary.flowBreakHazardsSkippedOutOfZone || 0,
+      flowBreakHazardsSkippedNotClearable: summary.flowBreakHazardsSkippedNotClearable || 0,
+      flowBreakVisibleHazardsAtTrigger: summary.flowBreakVisibleHazardsAtTrigger || 0,
+      flowBreakTriggeredWithZeroEffect: summary.flowBreakTriggeredWithZeroEffect || 0,
+      flowBreakTriggeredWithNoForwardHazard: summary.flowBreakTriggeredWithNoForwardHazard || 0,
+      flowBreakSparksCreated: summary.flowBreakSparksCreated || 0,
+      flowBreakSparksSpawnedAhead: summary.flowBreakSparksSpawnedAhead || 0,
+      flowBreakSparksSpawnedBehind: summary.flowBreakSparksSpawnedBehind || 0,
+      flowBreakSparksCollected: summary.flowBreakSparksCollected || 0,
+      flowBreakSparkCollectableCount: summary.flowBreakSparkCollectableCount || 0,
+      flowBreakSparkPickupCount: summary.flowBreakSparkPickupCount || 0,
+      flowBreakSparkSpeedBefore: summary.flowBreakSparkSpeedBefore ?? null,
+      flowBreakSparkSpeedAfter: summary.flowBreakSparkSpeedAfter ?? null,
+      flowBreakSparkDisplaySpeedBefore: summary.flowBreakSparkDisplaySpeedBefore ?? null,
+      flowBreakSparkDisplaySpeedAfter: summary.flowBreakSparkDisplaySpeedAfter ?? null,
+      flowBreakSparkBoostMultiplier: summary.flowBreakSparkBoostMultiplier || 0,
+      flowBreakSparkBoostDuration: summary.flowBreakSparkBoostDuration || 0,
+      flowBreakSparkNormalBoostActive: Boolean(summary.flowBreakSparkNormalBoostActive),
+      flowBreakSparkStackedWithBoost: Boolean(summary.flowBreakSparkStackedWithBoost),
+      flowBreakForwardReach: summary.flowBreakForwardReach || 0,
+      flowBreakFrontBuffer: summary.flowBreakFrontBuffer || 0,
+      flowBreakCollisionPrevented: summary.flowBreakCollisionPrevented || 0,
+      flowBreakFrameWorstMs: summary.flowBreakFrameWorstMs || 0,
+      flowBreakFrameSamples: summary.flowBreakFrameSamples || 0,
       distanceCompleted: summary.distance,
       finishProgressPercent: summary.progress * 100,
       endReason: summary.reason,
@@ -24844,6 +25969,42 @@ class NeonRoadRally {
       paceBehindTime,
       paceFeedbackActiveTime: run.paceFeedbackActiveTime || 0,
       paceFeedbackSampleCount: run.paceFeedbackSampleCount || 0,
+      neonFlowEnabled: this.isNeonFlowEnabledForRun(run),
+      neonFlow: Math.round(run.neonFlow || 0),
+      neonFlowTotalEarned: Math.round(run.neonFlowTotalEarned || 0),
+      neonFlowEvents: { ...(run.neonFlowEvents || {}) },
+      flowBreaksArmed: Math.max(0, run.flowBreaksArmed || 0),
+      flowBreaksTriggered: Math.max(0, run.flowBreaksTriggered || 0),
+      flowBreakArmedUnused: run.flowBreakArmed ? 1 : 0,
+      flowBreakHazardsCleared: Math.max(0, run.flowBreakHazardsCleared || 0),
+      flowBreakHazardsClearedAhead: Math.max(0, run.flowBreakHazardsClearedAhead || 0),
+      flowBreakHazardsClearedBehind: Math.max(0, run.flowBreakHazardsClearedBehind || 0),
+      flowBreakHazardsConsidered: Math.max(0, run.flowBreakHazardsConsidered || 0),
+      flowBreakHazardsSkippedOutOfZone: Math.max(0, run.flowBreakHazardsSkippedOutOfZone || 0),
+      flowBreakHazardsSkippedNotClearable: Math.max(0, run.flowBreakHazardsSkippedNotClearable || 0),
+      flowBreakVisibleHazardsAtTrigger: Math.max(0, run.flowBreakVisibleHazardsAtTrigger || 0),
+      flowBreakTriggeredWithZeroEffect: Math.max(0, run.flowBreakTriggeredWithZeroEffect || 0),
+      flowBreakTriggeredWithNoForwardHazard: Math.max(0, run.flowBreakTriggeredWithNoForwardHazard || 0),
+      flowBreakSparksCreated: Math.max(0, run.flowBreakSparksCreated || 0),
+      flowBreakSparksSpawnedAhead: Math.max(0, run.flowBreakSparksSpawnedAhead || 0),
+      flowBreakSparksSpawnedBehind: Math.max(0, run.flowBreakSparksSpawnedBehind || 0),
+      flowBreakSparksCollected: Math.max(0, run.flowBreakSparksCollected || 0),
+      flowBreakSparkCollectableCount: Math.max(0, run.flowBreakSparkCollectableCount || 0),
+      flowBreakSparkPickupCount: Math.max(0, run.flowBreakSparkPickupCount || 0),
+      flowBreakSparkSpeedBefore: Number.isFinite(run.flowBreakSparkSpeedBefore) ? run.flowBreakSparkSpeedBefore : null,
+      flowBreakSparkSpeedAfter: Number.isFinite(run.flowBreakSparkSpeedAfter) ? run.flowBreakSparkSpeedAfter : null,
+      flowBreakSparkDisplaySpeedBefore: Number.isFinite(run.flowBreakSparkDisplaySpeedBefore) ? run.flowBreakSparkDisplaySpeedBefore : null,
+      flowBreakSparkDisplaySpeedAfter: Number.isFinite(run.flowBreakSparkDisplaySpeedAfter) ? run.flowBreakSparkDisplaySpeedAfter : null,
+      flowBreakSparkBoostMultiplier: Number.isFinite(run.flowBreakSparkBoostMultiplier) ? run.flowBreakSparkBoostMultiplier : NEON_FLOW_CONFIG.sparkBoostMultiplier,
+      flowBreakSparkBoostDuration: Number.isFinite(run.flowBreakSparkBoostDuration) ? run.flowBreakSparkBoostDuration : NEON_FLOW_CONFIG.sparkBoostDuration,
+      flowBreakSparkNormalBoostActive: Boolean(run.flowBreakSparkNormalBoostActive),
+      flowBreakSparkStackedWithBoost: Boolean(run.flowBreakSparkStackedWithBoost),
+      flowBreakForwardReach: Math.round(run.flowBreakForwardReach || run.flowBreakReach || 0),
+      flowBreakFrontBuffer: Math.round(run.flowBreakFrontBuffer || 0),
+      flowBreakCollisionPrevented: Math.max(0, run.flowBreakCollisionPrevented || 0),
+      flowBreakFrameWorstMs: Number(run.flowBreakFrameWorstMs || 0),
+      flowBreakFrameSamples: Math.max(0, run.flowBreakFrameSamples || 0),
+      flowBreakNearestHazardDistance: Number.isFinite(run.flowBreakNearestHazardDistance) ? run.flowBreakNearestHazardDistance : null,
       averageSpeed,
       maxSpeed: run.maxSpeedObserved || run.currentSpeed || 0,
       averageFrameMs: run.averageFrameMs || 0,
@@ -29406,14 +30567,13 @@ class NeonRoadRally {
 
   formatSpeedClassOptionForTrack(track, speedClass, options = {}) {
     const raceTrack = createRaceTrackForSpeedClass(track, speedClass.id);
-    const startSpeed = Math.round(getTrackCruiseSpeed(raceTrack, 0, speedClass.id));
-    const endSpeed = Math.round(getTrackCruiseSpeed(raceTrack, 1, speedClass.id));
+    const speedRange = formatDisplaySpeedRangeForTrack(raceTrack, speedClass.id);
     const ladderNumber = getSpeedClassLadderNumber(speedClass.id);
     const prefix = ladderNumber ? `${ladderNumber}. ` : "";
     const copy = options.withDescription !== false && speedClass.description
       ? ` - ${speedClass.description}`
       : "";
-    return `${prefix}${speedClass.label} · ${startSpeed}-${endSpeed} MPH · x${speedClass.scoreMultiplier.toFixed(2)}${copy}`;
+    return `${prefix}${speedClass.label} · ${speedRange} · x${speedClass.scoreMultiplier.toFixed(2)}${copy}`;
   }
 
   renderSpeedClassOptionsForTrack(track, selectedSpeedClassId) {
@@ -29438,13 +30598,12 @@ class NeonRoadRally {
       <div class="mode-ladder ${compact ? "is-compact" : ""}" aria-label="Main race mode ladder">
         ${getNormalVisibleSpeedClasses().map((speedClass, index) => {
           const raceTrack = createRaceTrackForSpeedClass(track, speedClass.id);
-          const startSpeed = Math.round(getTrackCruiseSpeed(raceTrack, 0, speedClass.id));
-          const endSpeed = Math.round(getTrackCruiseSpeed(raceTrack, 1, speedClass.id));
+          const speedRange = formatDisplaySpeedRangeForTrack(raceTrack, speedClass.id);
           return `
             <button class="mode-ladder-card ${compact ? "is-compact" : ""} ${speedClass.id === selectedId ? "is-selected" : ""}" type="button" data-action="setModePickerSpeed" data-id="${escapeAttr(speedClass.id)}">
               <span>${index + 1}</span>
               <strong>${escapeHtml(speedClass.label)}</strong>
-              ${compact ? "" : `<em>${startSpeed}-${endSpeed} MPH</em>`}
+              ${compact ? "" : `<em>${escapeHtml(speedRange)}</em>`}
             </button>
           `;
         }).join("")}
@@ -29606,10 +30765,9 @@ class NeonRoadRally {
     document.querySelectorAll(".mode-ladder-card").forEach((card) => {
       const speedClass = getSpeedClassConfig(card.dataset.id);
       const raceTrack = createRaceTrackForSpeedClass(safeTrack, speedClass.id);
-      const startSpeed = Math.round(getTrackCruiseSpeed(raceTrack, 0, speedClass.id));
-      const endSpeed = Math.round(getTrackCruiseSpeed(raceTrack, 1, speedClass.id));
+      const speedRange = formatDisplaySpeedRangeForTrack(raceTrack, speedClass.id);
       const readout = card.querySelector("em");
-      if (readout) readout.textContent = `${startSpeed}-${endSpeed} MPH`;
+      if (readout) readout.textContent = speedRange;
     });
   }
 
@@ -31361,6 +32519,7 @@ class NeonRoadRally {
     getBestMomentLine(summary) {
       if (!summary) return "";
       const roadblocks = Math.max(0, summary.roadblocksCleared || 0);
+      const flowBreakClears = Math.max(0, summary.flowBreakHazardsCleared || 0);
       const bestBoostChain = Math.max(0, summary.bestBoostPadChain || 0);
       const boosts = Math.max(0, summary.boostPadsCollected || 0);
       const rampClears = Math.max(0, summary.rampTargetsCleared || 0);
@@ -31369,6 +32528,7 @@ class NeonRoadRally {
       const jumpDistance = Math.max(0, Math.round(summary.biggestJumpDistance || 0));
       const cleanFinish = normalizeRunStatus(summary.status) === "finished" && (summary.slowdownHits || 0) === 0;
       if (roadblocks > 0) return `Roadblock cleared${roadblocks > 1 ? ` x${roadblocks}` : ""}`;
+      if (flowBreakClears > 0) return `Flow Break converted ${flowBreakClears} hazard${flowBreakClears === 1 ? "" : "s"}`;
       if (bestBoostChain >= 2) return `Best boost chain x${bestBoostChain}`;
       if (rampClears > 0) return jumpDistance > 0 ? `Clear jump ${jumpDistance.toLocaleString()} road units` : `Clear jump x${rampClears}`;
       if (cleanFinish) return "Clean finish";
@@ -31388,6 +32548,10 @@ class NeonRoadRally {
       const bestBoostChain = Math.max(0, summary.bestBoostPadChain || 0);
       const slowdowns = Math.max(0, summary.slowdownHits || 0);
       const rampClears = Math.max(0, summary.rampTargetsCleared || 0);
+      const flowBreaks = Math.max(0, summary.flowBreaksTriggered || 0);
+      const flowBreakClears = Math.max(0, summary.flowBreakHazardsCleared || 0);
+      const sparkCollects = Math.max(0, summary.flowBreakSparksCollected || 0);
+      const flowEarned = Math.max(0, summary.neonFlowTotalEarned || 0);
       const add = (title, detail) => {
         if (items.length < 4) items.push({ title, detail });
       };
@@ -31400,7 +32564,16 @@ class NeonRoadRally {
             : (driftNote === "Risky drift line"
             ? "Good speed, but the cut passed close to traffic."
             : "Drift dash helped your racing line."));
-        add(driftNote, driftDetail);
+          add(driftNote, driftDetail);
+      }
+      if (summary.neonFlowEnabled && flowBreaks > 0) {
+        add("Flow Break triggered", flowBreakClears > 0
+          ? `${flowBreakClears} danger${flowBreakClears === 1 ? "" : "s"} converted into ${sparkCollects} boost spark${sparkCollects === 1 ? "" : "s"}.`
+          : "Flow armed and burst through a danger window.");
+      } else if (summary.neonFlowEnabled && (summary.flowBreakArmedUnused || 0) > 0) {
+        add("Flow Break ready unused", "Flow armed, but no clearable danger entered the break zone before the run ended.");
+      } else if (summary.neonFlowEnabled && flowEarned >= 40) {
+        add("Flow built", "Close calls, boosts, and ramp clears charged the route.");
       }
       if (status === "finished") {
         if (summary.newPersonalBestTime) {
@@ -33539,6 +34712,7 @@ class NeonRoadRally {
           <div class="score-card"><strong>Score Attack Result</strong><span class="is-compact">${formatScore(summary.finalScore)} · ${escapeHtml(leaderboardText)}</span></div>
           <div class="score-card"><strong>Time Attack Result</strong><span class="is-compact">${escapeHtml(resultTimeText)} · ${escapeHtml(paceDeltaText)}</span></div>
           ${summary.driftsStarted || summary.driftDashesCompleted || summary.driftBoostsReleased ? `<div class="score-card"><strong>Drift</strong><span class="is-compact">${Math.max(0, summary.driftDashesCompleted || 0)} dashes · best ${Number(summary.longestDriftDashLanes || 0).toFixed(1)} lanes · hold ${escapeHtml(formatTime(summary.maxDriftHold || summary.maxDriftCharge || summary.longestDrift || 0))}${summary.driftNearMisses ? ` · ${Math.max(0, summary.driftNearMisses || 0)} risky` : ""}</span></div>` : ""}
+          ${summary.neonFlowEnabled ? `<div class="score-card"><strong>Neon Flow</strong><span class="is-compact">${Math.max(0, summary.neonFlowTotalEarned || 0)} flow · ${Math.max(0, summary.flowBreaksArmed || 0)} armed · ${Math.max(0, summary.flowBreaksTriggered || 0)} break${Math.max(0, summary.flowBreaksTriggered || 0) === 1 ? "" : "s"} · ${Math.max(0, summary.flowBreakHazardsCleared || 0)} converted · ${Math.max(0, summary.flowBreakSparksCollected || 0)} spark${Math.max(0, summary.flowBreakSparksCollected || 0) === 1 ? "" : "s"}</span></div>` : ""}
           <div class="score-card"><strong>Competition</strong><span>${escapeHtml(summary.competitionKind || (summary.officialRouteId ? "Official Race" : "Custom Road"))}</span></div>
           ${summary.officialRouteId ? `<div class="score-card"><strong>Official Route</strong><span class="is-compact">${escapeHtml(officialRouteDisplayName)}</span></div>` : ""}
           <div class="score-card"><strong>Track</strong><span>${escapeHtml(summary.trackName)}</span></div>
