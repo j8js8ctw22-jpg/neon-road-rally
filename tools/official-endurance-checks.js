@@ -362,7 +362,7 @@ async function main() {
       assertCopyIncludes(hudCopy, "LAP 2", "Endurance HUD");
       assertCopyIncludes(hudCopy, "SURVIVE", "Endurance HUD");
       assertCopyIncludes(hudCopy, "BOOST 3/3", "Endurance HUD");
-      assertCopyIncludes(hudCopy, "ESC ENDS", "Endurance HUD");
+      assertCopyIncludes(hudCopy, "ESC/OPTIONS ENDS", "Endurance HUD");
 
       const speedProbe = startSpeedProbeRun();
       const speedAtFinish = speedProbe.app.run.speedAtOfficialFinish;

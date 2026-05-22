@@ -821,9 +821,77 @@ async function installVisualSmokeHelpers(page) {
     function menuScreens() {
       const game = app();
       game.showDriverGarageScreen();
+      const runGarageRewardsQa = () => {
+        const details = document.querySelector(".garage-rewards-details");
+        if (!details) throw new Error("Garage rewards details missing");
+        const garagePage = document.querySelector(".garage-page");
+        details.open = true;
+        if (garagePage) garagePage.scrollTop = Math.max(0, document.querySelector("#garageRewards")?.offsetTop || 0);
+        const expectDisclosureOpen = (label) => {
+          if (document.querySelector(".garage-rewards-details")?.open !== true) {
+            throw new Error(`${label} should keep Titles and Badges open`);
+          }
+        };
+        const expectNoGarageReset = (label, expectedDetails = details) => {
+          const currentDetails = document.querySelector(".garage-rewards-details");
+          if (game.screen !== "players" || document.querySelectorAll(".garage-panel").length !== 1 || !currentDetails?.open) {
+            throw new Error(`${label} reset the Garage rewards section`);
+          }
+          return currentDetails === expectedDetails;
+        };
+        const expectGarageBadgeFilter = (filter, label) => {
+          const active = document.querySelector(".badge-filter-button.is-active");
+          if (active?.dataset.filter !== filter) {
+            throw new Error(`${label} expected ${filter} filter, saw ${active?.dataset.filter || "none"}`);
+          }
+        };
+        const clickFilter = (filter, label) => {
+          const beforeDetails = document.querySelector(".garage-rewards-details");
+          const button = document.querySelector(`.badge-filter-button[data-filter="${filter}"]`);
+          if (!button) throw new Error(`Missing ${label} badge filter`);
+          const started = performance.now();
+          button.click();
+          const durationMs = performance.now() - started;
+          const sameDetails = expectNoGarageReset(label, beforeDetails);
+          expectGarageBadgeFilter(filter, label);
+          if (durationMs > 750) throw new Error(`${label} badge filter took ${durationMs.toFixed(1)}ms`);
+          return { durationMs, sameDetails };
+        };
+        const mastery = clickFilter("mastery", "Mastery");
+        const all = clickFilter("all", "All");
+        const switchButton = document.querySelector('.garage-driver-list button[data-action="selectPlayer"]:not([disabled])');
+        if (switchButton) {
+          switchButton.click();
+          expectDisclosureOpen("Switch Driver");
+        }
+        const renameInput = document.querySelector("#driverRenameName");
+        const renameButton = document.querySelector('button[data-action="renameDriver"]');
+        if (renameInput && renameButton) {
+          renameInput.value = `${game.profiles.getCurrentPlayer()?.name || "QA"} PRIME`;
+          renameButton.click();
+          expectDisclosureOpen("Rename Driver");
+        }
+        const carName = document.querySelector("#carName");
+        const saveButton = document.querySelector('button[data-action="saveCar"]');
+        if (carName && saveButton) {
+          carName.value = "QA RIG";
+          saveButton.click();
+          expectDisclosureOpen("Save Style");
+        }
+        return {
+          rewardsOpen: document.querySelector(".garage-rewards-details")?.open === true,
+          activeFilter: document.querySelector(".badge-filter-button.is-active")?.dataset.filter || "",
+          masteryDurationMs: Number(mastery.durationMs.toFixed(2)),
+          allDurationMs: Number(all.durationMs.toFixed(2)),
+          sameDetailsAfterMastery: mastery.sameDetails,
+          sameDetailsAfterAll: all.sameDetails
+        };
+      };
+      const garageRewards = runGarageRewardsQa();
       const garage = {
         screen: game.screen,
-        text: Boolean(document.querySelector(".garage-panel"))
+        text: Boolean(document.querySelector(".garage-panel")),
+        rewards: garageRewards
       };
       game.showLeaderboard("scoreAttack");
       const scoreBoard = {

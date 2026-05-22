@@ -2077,6 +2077,8 @@ const PARTY_SEED_MODE_NEW_ROUND = "newSeedEachRound";
 const PARTY_STARTING_ORDER_MODE_ROSTER = "rosterOrder";
 const PARTY_STARTING_ORDER_MODE_RANDOM_ONCE = "randomOnce";
 const PARTY_STARTING_ORDER_MODE_RANDOM_EVERY_ROUND = "randomEveryRound";
+const PARTY_BONUS_SURVIVAL_OFF = "off";
+const PARTY_BONUS_SURVIVAL_ON = "on";
 const PARTY_ROUND_TYPES = [
   { id: PARTY_ROUND_TYPE_ONE_RUN, label: "One Run Each", totalRounds: 1, scoringLabel: "Best Score" },
   { id: PARTY_ROUND_TYPE_BEST_OF_3, label: "Best of 3", totalRounds: 3, scoringLabel: "Best Score" },
@@ -2091,6 +2093,10 @@ const PARTY_STARTING_ORDER_MODES = [
   { id: PARTY_STARTING_ORDER_MODE_ROSTER, label: "Roster Order", helper: "Use the selected roster order every round." },
   { id: PARTY_STARTING_ORDER_MODE_RANDOM_ONCE, label: "Random Once", helper: "Shuffle once, then keep that order for the whole party." },
   { id: PARTY_STARTING_ORDER_MODE_RANDOM_EVERY_ROUND, label: "Random Every Round", helper: "Shuffle again at the start of each round." }
+];
+const PARTY_BONUS_SURVIVAL_OPTIONS = [
+  { id: PARTY_BONUS_SURVIVAL_OFF, label: "Off", helper: "Classic Party turns end at the finish line." },
+  { id: PARTY_BONUS_SURVIVAL_ON, label: "On", helper: "Classic Party locks the finish, then continues into bonus survival until crash or manual end." }
 ];
 const PARTY_AWARD_MIN_PROGRESS = 0.25;
 const PARTY_AWARD_MIN_STYLE_PROGRESS = 0.25;
@@ -3870,6 +3876,96 @@ const INPUT_CONFIG = {
   inputFlashSeconds: 0.12
 };
 
+const GAMEPAD_CONFIG = {
+  stickDeadzone: 0.38,
+  triggerPressedThreshold: 0.45,
+  laneKeyboardGuardMs: 60,
+  boostKeyboardGuardMs: 80,
+  menuRepeatDelayMs: 280,
+  menuRepeatMs: 115
+};
+
+const MENU_FOCUS_SELECTOR = [
+  "button:not([disabled])",
+  "summary",
+  "select:not([disabled])",
+  "textarea:not([disabled])",
+  "input:not([disabled]):not([type='hidden'])",
+  "a[href]"
+].join(",");
+
+const MENU_FOCUS_CONTAINER_SELECTOR = [
+  ".track-option",
+  ".paint-swatch",
+  ".mode-ladder-card",
+  ".race-type-card",
+  ".official-route-card",
+  ".official-route-row",
+  ".party-driver-row",
+  ".party-order-card",
+  ".badge-filter-button",
+  ".menu-btn",
+  ".menu-button",
+  ".small-button",
+  ".btn",
+  ".arcade-tab",
+  ".chase-board-card"
+].join(",");
+
+const GAMEPAD_BUTTON_LABELS = {
+  0: "Cross/X",
+  1: "Circle",
+  4: "L1",
+  6: "L2",
+  9: "Options/Menu",
+  12: "D-pad Up",
+  13: "D-pad Down",
+  14: "D-pad Left",
+  15: "D-pad Right"
+};
+const GAMEPAD_AXIS_LABELS = {
+  0: "Left stick X",
+  1: "Left stick Y"
+};
+const GAMEPAD_DIAGNOSTIC_FLAGS = [
+  { key: "cross", label: "Cross/X" },
+  { key: "circle", label: "Circle" },
+  { key: "options", label: "Options/Menu" },
+  { key: "driftButton", label: "L1/L2" },
+  { key: "dpad", label: "D-pad" },
+  { key: "leftStick", label: "Left stick" }
+];
+const GAMEPAD_MAPPING_ROWS = [
+  { control: "Cross/X", action: "Boost / select" },
+  { control: "Circle", action: "Back / resume where supported" },
+  { control: "Options/Menu", action: "Pause / end Bonus Survival" },
+  { control: "L1/L2 + left/right", action: "Drift Dash" },
+  { control: "D-pad / left stick", action: "Steering / vertical movement" }
+];
+
+function getGamepadButtonLabel(index) {
+  return GAMEPAD_BUTTON_LABELS[index] || `Button ${index}`;
+}
+
+function formatGamepadButtonDiagnostic(index, value = 1) {
+  const safeIndex = normalizeNonNegativeInteger(index, 0, 99);
+  const amount = clampNumber(value, 0, 1, 0);
+  return `${getGamepadButtonLabel(safeIndex)} (${safeIndex}) ${amount.toFixed(2)}`;
+}
+
+function formatGamepadAxisDiagnostic(index, value = 0) {
+  const safeIndex = normalizeNonNegativeInteger(index, 0, 16);
+  const amount = clampNumber(value, -1, 1, 0);
+  return `${GAMEPAD_AXIS_LABELS[safeIndex] || `Axis ${safeIndex}`} ${amount.toFixed(2)}`;
+}
+
+function createGamepadDetectedInputs() {
+  return GAMEPAD_DIAGNOSTIC_FLAGS.reduce((result, item) => {
+    result[item.key] = false;
+    return result;
+  }, {});
+}
+
 const PACE_FEEDBACK_CONFIG = {
   minProgress: 0.08,
   deadbandSeconds: 0.015
@@ -4622,6 +4718,28 @@ function getPartyStartingOrderHelperText(value) {
   return getPartyStartingOrderConfig(value).helper;
 }
 
+function normalizePartyBonusSurvival(value, fallback = PARTY_BONUS_SURVIVAL_OFF) {
+  const raw = value === true ? PARTY_BONUS_SURVIVAL_ON : (value === false ? PARTY_BONUS_SURVIVAL_OFF : String(value || "").trim());
+  return PARTY_BONUS_SURVIVAL_OPTIONS.some((item) => item.id === raw) ? raw : fallback;
+}
+
+function getPartyBonusSurvivalConfig(value) {
+  const id = normalizePartyBonusSurvival(value);
+  return PARTY_BONUS_SURVIVAL_OPTIONS.find((item) => item.id === id) || PARTY_BONUS_SURVIVAL_OPTIONS[0];
+}
+
+function getPartyBonusSurvivalLabel(value) {
+  return getPartyBonusSurvivalConfig(value).label;
+}
+
+function getPartyBonusSurvivalHelperText(value) {
+  return getPartyBonusSurvivalConfig(value).helper;
+}
+
+function isPartyBonusSurvivalEnabled(value) {
+  return normalizePartyBonusSurvival(value) === PARTY_BONUS_SURVIVAL_ON;
+}
+
 function isPartyCloseRaceMargin(leaderScore, margin) {
   const score = normalizeNonNegativeInteger(leaderScore);
   const gap = normalizeNonNegativeInteger(margin);
@@ -5179,7 +5297,7 @@ function getOfficialEnduranceHudContextParts(run, progress = 0) {
     `LAP ${getOfficialEnduranceLapNumber(run)} ${Math.round(clamp(progress, 0, 1) * 100)}%`,
     `SURVIVE ${formatTime(run.officialEnduranceSurvivalTime || 0)}`,
     `BOOST ${Math.max(0, run.manualBoosts || 0)}/3`,
-    "ESC ENDS"
+    "ESC/OPTIONS ENDS"
   ];
 }
 
@@ -8209,6 +8327,7 @@ class PartySession {
     this.track = getTrackById(options.track?.id || options.trackId || DEFAULT_TRACK_ID);
     this.raceMode = normalizeSpeedClassId(options.raceMode, DEFAULT_SPEED_CLASS_ID);
     this.raceType = normalizePartyRaceType(options.raceType || options.raceTypeId, this.track);
+    this.bonusSurvival = normalizePartyBonusSurvival(options.bonusSurvival ?? options.partyBonusSurvival, PARTY_BONUS_SURVIVAL_OFF);
     this.results = Array.isArray(options.results) ? options.results.slice() : [];
     this.startingOrderMode = normalizePartyStartingOrderMode(options.startingOrderMode, PARTY_STARTING_ORDER_MODE_ROSTER);
     this.orderSeed = sanitizeName(options.orderSeed || `${this.sessionId}|${this.sharedSeed}`, `${this.sessionId}|${this.sharedSeed}`, 160);
@@ -8305,18 +8424,28 @@ class PartySession {
     const previousStandings = this.standings();
     const previousLeader = previousStandings[0]?.completedRuns > 0 ? previousStandings[0] : null;
     const previousPlayerStanding = previousStandings.find((standing) => standing.playerId === player.id) || null;
-    const resultStatus = normalizeRunStatus(summary?.status);
+    const enduranceResult = summary?.officialEnduranceResult || null;
+    const resultStatus = enduranceResult ? "finished" : normalizeRunStatus(summary?.status);
     const resultFinishTimeMs = resultStatus === "finished"
       ? normalizeFinishTimeMs(summary?.finishTimeMs, summary?.finishTimeSecondsPrecise ?? summary?.time)
       : null;
+    const officialFinishScore = enduranceResult
+      ? normalizeNonNegativeInteger(enduranceResult.officialFinishScore ?? summary?.officialFinishScore ?? summary?.finalScore, 0, MAX_DISPLAY_SCORE)
+      : 0;
+    const bonusSurvivalScore = enduranceResult
+      ? normalizeNonNegativeInteger(enduranceResult.postFinishScore || 0, 0, MAX_DISPLAY_SCORE)
+      : 0;
+    const partyScore = enduranceResult
+      ? Math.min(MAX_DISPLAY_SCORE, officialFinishScore + bonusSurvivalScore)
+      : normalizeNonNegativeInteger(summary?.finalScore || 0, 0, MAX_DISPLAY_SCORE);
     const result = {
       resultId: uid(),
       playerId: player.id,
       playerName: sanitizePlayerName(player.name, "PLAYER"),
       carName: sanitizeCarName(player.car?.name, DEFAULT_CAR.name),
-      score: normalizeNonNegativeInteger(summary?.finalScore || 0),
+      score: partyScore,
       status: resultStatus,
-      reason: sanitizeName(summary?.reason, "", DISPLAY_TEXT_MAX_LENGTH),
+      reason: enduranceResult ? "Official Finish + Bonus Survival" : sanitizeName(summary?.reason, "", DISPLAY_TEXT_MAX_LENGTH),
       time: normalizeNonNegativeNumber(summary?.time, 0, 24 * 60 * 60),
       finishTimeMs: resultFinishTimeMs,
       finishTimeSecondsPrecise: resultFinishTimeMs === null ? null : getFinishTimeSecondsPrecise(resultFinishTimeMs),
@@ -8359,6 +8488,25 @@ class PartySession {
       scoreSaved: summary?.scoreSaved !== false,
       leaderboardRank: Number.isFinite(summary?.topTwentyRank) ? summary.topTwentyRank : null,
       medals: Array.isArray(summary?.medals) ? summary.medals.slice(0, 3) : [],
+      neonFlowEnabled: Boolean(summary?.neonFlowEnabled),
+      neonFlowTotalEarned: normalizeNonNegativeInteger(summary?.neonFlowTotalEarned, 0, 99999),
+      flowBreaksArmed: normalizeNonNegativeInteger(summary?.flowBreaksArmed, 0, 999),
+      flowBreaksTriggered: normalizeNonNegativeInteger(summary?.flowBreaksTriggered, 0, 999),
+      flowBreakHazardsCleared: normalizeNonNegativeInteger(summary?.flowBreakHazardsCleared, 0, 9999),
+      flowBreakTriggerHazardType: sanitizeName(summary?.flowBreakTriggerHazardType, "", DISPLAY_TEXT_MAX_LENGTH),
+      flowBreakTriggeredByMajorHazard: Boolean(summary?.flowBreakTriggeredByMajorHazard),
+      flowBreakMinorHazardsCleared: normalizeNonNegativeInteger(summary?.flowBreakMinorHazardsCleared, 0, 9999),
+      flowBreakMajorHazardsCleared: normalizeNonNegativeInteger(summary?.flowBreakMajorHazardsCleared, 0, 9999),
+      flowBreakSparksCreated: normalizeNonNegativeInteger(summary?.flowBreakSparksCreated, 0, 9999),
+      flowBreakSparksCollected: normalizeNonNegativeInteger(summary?.flowBreakSparksCollected, 0, 9999),
+      flowBreakSparkDisplaySpeedBefore: normalizeOptionalFiniteNumber(summary?.flowBreakSparkDisplaySpeedBefore, 0, 999),
+      flowBreakSparkDisplaySpeedAfter: normalizeOptionalFiniteNumber(summary?.flowBreakSparkDisplaySpeedAfter, 0, 999),
+      partyBonusSurvival: Boolean(enduranceResult || summary?.partyBonusSurvivalEnabled),
+      officialFinishScore,
+      bonusSurvivalScore,
+      bonusSurvivalTime: enduranceResult ? normalizeNonNegativeNumber(enduranceResult.survivalTime, 0, 24 * 60 * 60) : 0,
+      bonusSurvivalLap: enduranceResult ? normalizeNonNegativeInteger(enduranceResult.currentLap || enduranceResult.lapsCompleted, 0, 999) : 0,
+      bonusSurvivalEndedBy: enduranceResult ? sanitizeName(enduranceResult.endedBy || enduranceResult.endReason, "", DISPLAY_TEXT_MAX_LENGTH) : "",
       date: new Date().toISOString()
     };
     this.results.push(result);
@@ -8431,6 +8579,12 @@ class PartySession {
         latestLowestFuelReached: latest?.lowestFuelReached || 0,
         latestOutOfFuel: Boolean(latest?.outOfFuel),
         totalGasCansCollected: playerResults.reduce((sum, result) => sum + normalizeNonNegativeInteger(result.gasCansCollected || result.fuelCollected), 0),
+        latestBonusSurvival: Boolean(latest?.partyBonusSurvival),
+        latestBonusSurvivalTime: latest?.bonusSurvivalTime || 0,
+        latestBonusSurvivalScore: latest?.bonusSurvivalScore || 0,
+        totalBonusSurvivalScore: playerResults.reduce((sum, result) => sum + normalizeNonNegativeInteger(result.bonusSurvivalScore || 0), 0),
+        latestFlowBreaksTriggered: latest?.flowBreaksTriggered || 0,
+        latestFlowBreakSparksCollected: latest?.flowBreakSparksCollected || 0,
         raceMode: latest?.raceMode || this.raceMode,
         raceType: latest?.raceType || this.raceType,
         seed: latest?.seed || this.currentSeed,
@@ -8474,7 +8628,8 @@ class PartySession {
       raceType: this.raceType,
       roundType: this.roundType,
       seedMode: this.seedMode,
-      startingOrderMode: this.startingOrderMode
+      startingOrderMode: this.startingOrderMode,
+      bonusSurvival: this.bonusSurvival
     });
   }
 }
@@ -9578,21 +9733,740 @@ class InputManager {
     this.lastLaneInput = "none";
     this.lastLaneInputTime = 0;
     this.lastBoostEdgeTime = 0;
+    this.lastLaneInputSource = "keyboard";
+    this.lastBoostInputSource = "keyboard";
     this.leftRightRepeatIgnoredCount = 0;
     this.boostRepeatIgnoredCount = 0;
+    this.gamepadSupported = typeof navigator !== "undefined" && typeof navigator.getGamepads === "function";
+    this.gamepadActiveIndex = -1;
+    this.gamepadConnected = false;
+    this.gamepadLastId = "";
+    this.gamepadLastMapping = "";
+    this.gamepadLastButton = "none";
+    this.gamepadLastAxis = "none";
+    this.gamepadLastInputTime = 0;
+    this.gamepadDetectedInputs = createGamepadDetectedInputs();
+    this.gamepadLeftHeld = false;
+    this.gamepadRightHeld = false;
+    this.gamepadVerticalInput = 0;
+    this.gamepadDriftHeld = false;
+    this.gamepadPreviousState = this.createEmptyGamepadState();
+    this.menuNavigationActive = false;
+    this.menuRepeatDirection = "";
+    this.menuRepeatStartedAt = 0;
+    this.menuLastRepeatAt = 0;
+    this.menuFocusDecorated = new Set();
+    this.lastPointerTime = 0;
     this.boundKeyDown = this.onKeyDown.bind(this);
     this.boundKeyUp = this.onKeyUp.bind(this);
     this.boundWindowBlur = this.clearGameplayInput.bind(this);
+    this.boundGamepadConnected = this.onGamepadConnected.bind(this);
+    this.boundGamepadDisconnected = this.onGamepadDisconnected.bind(this);
+    this.boundMenuFocusIn = this.onMenuFocusIn.bind(this);
+    this.boundMenuFocusOut = this.onMenuFocusOut.bind(this);
     window.addEventListener("keydown", this.boundKeyDown);
     window.addEventListener("keyup", this.boundKeyUp);
     window.addEventListener("blur", this.boundWindowBlur);
-    window.addEventListener("pointerdown", () => {
+    window.addEventListener("gamepadconnected", this.boundGamepadConnected);
+    window.addEventListener("gamepaddisconnected", this.boundGamepadDisconnected);
+    if (typeof document !== "undefined" && document.addEventListener) {
+      document.addEventListener("focusin", this.boundMenuFocusIn, true);
+      document.addEventListener("focusout", this.boundMenuFocusOut, true);
+    }
+    window.addEventListener("pointerdown", (event) => {
+      this.lastPointerTime = performance.now();
+      this.setMenuNavigationActive(false);
       this.game.audio.activate();
-      this.game.focusControls();
+      if (this.game.screen === "game" || event.target === this.game.canvas) {
+        this.game.focusControls();
+      }
       if (this.game.screen === "title") {
         this.game.audio.playMusic("title");
       }
     }, { passive: true });
+  }
+
+  createEmptyGamepadState() {
+    return {
+      connected: false,
+      index: -1,
+      id: "",
+      mapping: "",
+      axisX: 0,
+      axisY: 0,
+      pressedButtons: [],
+      activeAxes: [],
+      cross: false,
+      circle: false,
+      options: false,
+      l1: false,
+      l2: false,
+      dpad: false,
+      leftStick: false,
+      left: false,
+      right: false,
+      up: false,
+      down: false,
+      boost: false,
+      back: false,
+      pause: false,
+      drift: false,
+      anyInput: false
+    };
+  }
+
+  onGamepadConnected(event) {
+    this.gamepadSupported = true;
+    this.gamepadConnected = true;
+    this.gamepadActiveIndex = Number.isFinite(event?.gamepad?.index) ? event.gamepad.index : this.gamepadActiveIndex;
+    this.gamepadLastId = event?.gamepad?.id || this.gamepadLastId || "Controller";
+    this.gamepadLastMapping = event?.gamepad?.mapping || this.gamepadLastMapping || "";
+    this.refreshControllerStatusDisplay();
+  }
+
+  onGamepadDisconnected(event) {
+    if (Number.isFinite(event?.gamepad?.index) && event.gamepad.index === this.gamepadActiveIndex) {
+      this.gamepadActiveIndex = -1;
+    }
+    this.gamepadConnected = false;
+    this.clearGamepadInputState();
+    this.refreshControllerStatusDisplay();
+  }
+
+  refreshControllerStatusDisplay() {
+    if (!["title", "settings"].includes(this.game.screen)) return;
+    if (typeof document === "undefined" || typeof document.querySelectorAll !== "function") return;
+    const diagnostic = this.getControllerDiagnosticSnapshot();
+    const controllerText = diagnostic.status;
+    const nodes = document.querySelectorAll("[data-controller-status]");
+    nodes.forEach((node) => {
+      node.textContent = controllerText;
+    });
+    const fields = {
+      status: diagnostic.status,
+      detected: diagnostic.detected ? "Yes" : "No",
+      id: diagnostic.id,
+      mapping: diagnostic.mapping,
+      lastButton: diagnostic.lastButton,
+      lastAxis: diagnostic.lastAxis
+    };
+    Object.entries(fields).forEach(([key, value]) => {
+      document.querySelectorAll(`[data-controller-diag="${key}"]`).forEach((node) => {
+        node.textContent = value;
+      });
+    });
+    document.querySelectorAll("[data-controller-diag-flag]").forEach((node) => {
+      const key = node.dataset.controllerDiagFlag;
+      const item = GAMEPAD_DIAGNOSTIC_FLAGS.find((entry) => entry.key === key);
+      const seen = Boolean(diagnostic.detectedInputs[key]);
+      node.classList.toggle("is-detected", seen);
+      node.classList.toggle("is-waiting", !seen);
+      node.textContent = `${item?.label || key}: ${seen ? "Seen" : "Waiting"}`;
+    });
+  }
+
+  getControllerStatusText() {
+    const snapshot = this.getControllerDiagnosticSnapshot();
+    return snapshot.status;
+  }
+
+  getControllerStatusFromFields(supported, detected, mapping) {
+    if (!supported) return "Controller unavailable";
+    if (detected && mapping && mapping !== "standard") return "Controller detected, mapping may vary";
+    if (detected) return "Controller Ready";
+    return "Press any controller button";
+  }
+
+  getControllerDiagnosticSnapshot() {
+    const gamepads = this.getGamepads();
+    const gamepad = this.pickGamepad(gamepads);
+    const detected = Boolean(gamepad?.connected || this.gamepadConnected || this.gamepadActiveIndex >= 0);
+    const mapping = gamepad?.mapping || this.gamepadLastMapping || "";
+    const supported = Boolean(this.gamepadSupported || (typeof navigator !== "undefined" && typeof navigator.getGamepads === "function"));
+    return {
+      supported,
+      detected,
+      id: gamepad?.id || this.gamepadLastId || "none",
+      index: Number.isFinite(gamepad?.index) ? gamepad.index : this.gamepadActiveIndex,
+      mapping: mapping || "none",
+      status: this.getControllerStatusFromFields(supported, detected, mapping),
+      lastButton: this.gamepadLastButton || "none",
+      lastAxis: this.gamepadLastAxis || "none",
+      detectedInputs: { ...this.gamepadDetectedInputs }
+    };
+  }
+
+  getGamepads() {
+    if (typeof navigator === "undefined" || typeof navigator.getGamepads !== "function") return [];
+    try {
+      return Array.from(navigator.getGamepads() || []).filter(Boolean);
+    } catch (error) {
+      return [];
+    }
+  }
+
+  gamepadButtonPressed(gamepad, index, threshold = 0.5) {
+    const button = gamepad?.buttons?.[index];
+    if (!button) return false;
+    if (typeof button === "number") return button >= threshold;
+    return Boolean(button.pressed || Number(button.value || 0) >= threshold);
+  }
+
+  gamepadAxis(gamepad, index) {
+    const value = Number(gamepad?.axes?.[index] || 0);
+    return Number.isFinite(value) ? value : 0;
+  }
+
+  isGamepadActive(gamepad) {
+    if (!gamepad?.connected) return false;
+    const axisActive = Math.abs(this.gamepadAxis(gamepad, 0)) >= GAMEPAD_CONFIG.stickDeadzone
+      || Math.abs(this.gamepadAxis(gamepad, 1)) >= GAMEPAD_CONFIG.stickDeadzone;
+    if (axisActive) return true;
+    return Array.from(gamepad.buttons || []).some((button) => {
+      if (!button) return false;
+      if (typeof button === "number") return button >= 0.5;
+      return Boolean(button.pressed || Number(button.value || 0) >= 0.5);
+    });
+  }
+
+  pickGamepad(gamepads) {
+    if (!Array.isArray(gamepads) || !gamepads.length) return null;
+    if (this.gamepadActiveIndex >= 0) {
+      const active = gamepads.find((pad) => pad?.connected && pad.index === this.gamepadActiveIndex);
+      if (active) return active;
+    }
+    const activePad = gamepads.find((pad) => this.isGamepadActive(pad));
+    if (activePad) return activePad;
+    return gamepads.find((pad) => pad?.connected) || null;
+  }
+
+  readGamepadState() {
+    const gamepad = this.pickGamepad(this.getGamepads());
+    if (!gamepad) return this.createEmptyGamepadState();
+    const axisX = this.gamepadAxis(gamepad, 0);
+    const axisY = this.gamepadAxis(gamepad, 1);
+    const pressedButtons = Array.from(gamepad.buttons || [])
+      .map((button, index) => {
+        const value = typeof button === "number" ? button : Number(button?.value || 0);
+        const pressed = typeof button === "number" ? value >= 0.5 : Boolean(button?.pressed || value >= 0.5);
+        return pressed ? { index, value: clampNumber(value, 0, 1, 1), label: getGamepadButtonLabel(index) } : null;
+      })
+      .filter(Boolean);
+    const activeAxes = Array.from(gamepad.axes || [])
+      .map((axis, index) => {
+        const value = Number(axis || 0);
+        return Number.isFinite(value) && Math.abs(value) >= GAMEPAD_CONFIG.stickDeadzone
+          ? { index, value: clampNumber(value, -1, 1, 0), label: GAMEPAD_AXIS_LABELS[index] || `Axis ${index}` }
+          : null;
+      })
+      .filter(Boolean);
+    const dpadUp = this.gamepadButtonPressed(gamepad, 12);
+    const dpadDown = this.gamepadButtonPressed(gamepad, 13);
+    const dpadLeft = this.gamepadButtonPressed(gamepad, 14);
+    const dpadRight = this.gamepadButtonPressed(gamepad, 15);
+    const left = dpadLeft || axisX <= -GAMEPAD_CONFIG.stickDeadzone;
+    const right = dpadRight || axisX >= GAMEPAD_CONFIG.stickDeadzone;
+    const up = dpadUp || axisY <= -GAMEPAD_CONFIG.stickDeadzone;
+    const down = dpadDown || axisY >= GAMEPAD_CONFIG.stickDeadzone;
+    const cross = this.gamepadButtonPressed(gamepad, 0);
+    const circle = this.gamepadButtonPressed(gamepad, 1);
+    const options = this.gamepadButtonPressed(gamepad, 9);
+    const l1 = this.gamepadButtonPressed(gamepad, 4);
+    const l2 = this.gamepadButtonPressed(gamepad, 6, GAMEPAD_CONFIG.triggerPressedThreshold);
+    const dpad = dpadUp || dpadDown || dpadLeft || dpadRight;
+    const leftStick = Math.abs(axisX) >= GAMEPAD_CONFIG.stickDeadzone || Math.abs(axisY) >= GAMEPAD_CONFIG.stickDeadzone;
+    const boost = cross;
+    const back = circle;
+    const pause = options;
+    const drift = l1 || l2;
+    const anyInput = left || right || up || down || boost || back || pause || drift;
+    return {
+      connected: Boolean(gamepad.connected),
+      index: gamepad.index,
+      id: gamepad.id || "Controller",
+      mapping: gamepad.mapping || "",
+      axisX,
+      axisY,
+      pressedButtons,
+      activeAxes,
+      cross,
+      circle,
+      options,
+      l1,
+      l2,
+      dpad,
+      leftStick,
+      left,
+      right,
+      up,
+      down,
+      boost,
+      back,
+      pause,
+      drift,
+      anyInput
+    };
+  }
+
+  updateGamepadDiagnosticState(state) {
+    if (!state?.connected) return;
+    this.gamepadLastMapping = state.mapping || this.gamepadLastMapping || "";
+    const previousPressed = new Set((this.gamepadPreviousState?.pressedButtons || []).map((button) => button.index));
+    const edgeButton = (state.pressedButtons || []).find((button) => !previousPressed.has(button.index)) || state.pressedButtons?.[0];
+    if (edgeButton) this.gamepadLastButton = formatGamepadButtonDiagnostic(edgeButton.index, edgeButton.value);
+    const activeAxis = state.activeAxes?.[0];
+    if (activeAxis) this.gamepadLastAxis = formatGamepadAxisDiagnostic(activeAxis.index, activeAxis.value);
+    if (state.cross) this.gamepadDetectedInputs.cross = true;
+    if (state.circle) this.gamepadDetectedInputs.circle = true;
+    if (state.options) this.gamepadDetectedInputs.options = true;
+    if (state.l1 || state.l2) this.gamepadDetectedInputs.driftButton = true;
+    if (state.dpad) this.gamepadDetectedInputs.dpad = true;
+    if (state.leftStick) this.gamepadDetectedInputs.leftStick = true;
+  }
+
+  clearGamepadInputState() {
+    this.gamepadLeftHeld = false;
+    this.gamepadRightHeld = false;
+    this.gamepadVerticalInput = 0;
+    this.gamepadDriftHeld = false;
+    this.gamepadPreviousState = this.createEmptyGamepadState();
+    this.resetMenuRepeatState();
+    this.updateVerticalInput();
+    this.updateDriftInput();
+  }
+
+  resetMenuRepeatState() {
+    this.menuRepeatDirection = "";
+    this.menuRepeatStartedAt = 0;
+    this.menuLastRepeatAt = 0;
+  }
+
+  setMenuNavigationActive(active) {
+    this.menuNavigationActive = Boolean(active);
+    this.game?.layer?.classList?.toggle("is-menu-navigation-active", this.menuNavigationActive);
+    document.body?.classList?.toggle("is-menu-navigation-active", this.menuNavigationActive);
+    if (!this.menuNavigationActive) this.clearMenuFocusVisuals();
+    else this.updateMenuFocusVisuals(document.activeElement);
+  }
+
+  onMenuFocusIn(event) {
+    if (this.game.screen === "game" && !this.game.run?.paused) return;
+    if (this.menuNavigationActive) this.updateMenuFocusVisuals(event.target);
+  }
+
+  onMenuFocusOut() {
+    if (!this.menuNavigationActive) return;
+    requestAnimationFrame(() => {
+      if (!this.menuNavigationActive) return;
+      this.updateMenuFocusVisuals(document.activeElement);
+    });
+  }
+
+  clearMenuFocusVisuals() {
+    this.menuFocusDecorated.forEach((element) => {
+      element?.classList?.remove("is-controller-focused", "has-controller-focus");
+    });
+    this.menuFocusDecorated.clear();
+  }
+
+  updateMenuFocusVisuals(target = document.activeElement) {
+    this.clearMenuFocusVisuals();
+    if (!this.menuNavigationActive || !target || target === document.body) return;
+    const root = this.game?.layer || document;
+    if (root !== document && !root.contains(target)) return;
+    const decorated = new Set();
+    const focusElement = this.getMenuFocusHighlightElement(target);
+    if (focusElement?.classList) decorated.add(focusElement);
+    const container = target.closest?.(MENU_FOCUS_CONTAINER_SELECTOR);
+    if (container?.classList) decorated.add(container);
+    if (target.classList) decorated.add(target);
+    decorated.forEach((element) => {
+      element.classList.add(element === target || element === focusElement ? "is-controller-focused" : "has-controller-focus");
+      this.menuFocusDecorated.add(element);
+    });
+  }
+
+  getMenuFocusHighlightElement(element) {
+    if (!element) return null;
+    const tagName = String(element.tagName || "").toLowerCase();
+    const type = String(element.type || "").toLowerCase();
+    if (tagName === "input" && (type === "radio" || type === "checkbox")) {
+      return element.closest?.(".track-option, .paint-swatch") || element;
+    }
+    return element.closest?.(MENU_FOCUS_CONTAINER_SELECTOR) || element;
+  }
+
+  gamepadEdge(state, key) {
+    return Boolean(state?.[key] && !this.gamepadPreviousState?.[key]);
+  }
+
+  canAcceptGamepadLaneEdge(now) {
+    return this.lastLaneInputSource === "gamepad"
+      || !this.lastLaneInputTime
+      || now - this.lastLaneInputTime > GAMEPAD_CONFIG.laneKeyboardGuardMs;
+  }
+
+  canAcceptGamepadBoostEdge(now) {
+    return this.lastBoostInputSource === "gamepad"
+      || !this.lastBoostEdgeTime
+      || now - this.lastBoostEdgeTime > GAMEPAD_CONFIG.boostKeyboardGuardMs;
+  }
+
+  canAcceptKeyboardLaneEdge(now) {
+    return this.lastLaneInputSource === "keyboard"
+      || !this.lastLaneInputTime
+      || now - this.lastLaneInputTime > GAMEPAD_CONFIG.laneKeyboardGuardMs;
+  }
+
+  canAcceptKeyboardBoostEdge(now) {
+    return this.lastBoostInputSource === "keyboard"
+      || !this.lastBoostEdgeTime
+      || now - this.lastBoostEdgeTime > GAMEPAD_CONFIG.boostKeyboardGuardMs;
+  }
+
+  update(dt) {
+    void dt;
+    this.pollGamepad();
+  }
+
+  pollGamepad() {
+    if (!this.gamepadSupported && (typeof navigator === "undefined" || typeof navigator.getGamepads !== "function")) return;
+    this.gamepadSupported = true;
+    const state = this.readGamepadState();
+    if (!state.connected) {
+      const wasConnected = this.gamepadConnected || this.gamepadPreviousState.connected;
+      if (this.gamepadPreviousState.connected) this.clearGamepadInputState();
+      this.gamepadConnected = false;
+      this.gamepadPreviousState = state;
+      if (wasConnected || this.game.screen === "settings") this.refreshControllerStatusDisplay();
+      return;
+    }
+    this.updateGamepadDiagnosticState(state);
+    const shouldRefreshStatus = !this.gamepadConnected || this.gamepadActiveIndex !== state.index || this.game.screen === "settings";
+    this.gamepadConnected = true;
+    this.gamepadActiveIndex = state.index;
+    this.gamepadLastId = state.id;
+    this.gamepadLastMapping = state.mapping || this.gamepadLastMapping || "";
+    if (shouldRefreshStatus) this.refreshControllerStatusDisplay();
+    if (state.anyInput) {
+      this.gamepadLastInputTime = performance.now();
+      this.game.audio.activate();
+      if (this.game.screen === "title") this.game.audio.playMusic("title");
+    }
+    if (this.game.screen === "game") this.handleGamepadGameplay(state);
+    else this.handleGamepadMenu(state);
+    this.gamepadPreviousState = state;
+  }
+
+  handleGamepadGameplay(state) {
+    const now = performance.now();
+    const pauseEdge = this.gamepadEdge(state, "pause");
+    const confirmEdge = this.gamepadEdge(state, "boost");
+    const backEdge = this.gamepadEdge(state, "back");
+    const run = this.game.run;
+    if (pauseEdge) {
+      if (this.game.canEndOfficialEndurance()) this.game.endOfficialEndurance("Driver Ended");
+      else this.game.togglePause();
+      this.game.recordInputEvent("gamepad-menu");
+      return;
+    }
+    if (run?.paused) {
+      if (confirmEdge) this.handleGamepadConfirm();
+      else if (backEdge) this.game.togglePause();
+      else this.handleGamepadMenu(state);
+      return;
+    }
+    if (!this.canProcessGameplayInput()) {
+      this.gamepadVerticalInput = 0;
+      this.gamepadLeftHeld = false;
+      this.gamepadRightHeld = false;
+      this.gamepadDriftHeld = false;
+      this.updateVerticalInput();
+      this.updateDriftInput();
+      return;
+    }
+    const leftEdge = this.gamepadEdge(state, "left");
+    const rightEdge = this.gamepadEdge(state, "right");
+    const boostEdge = this.gamepadEdge(state, "boost");
+    this.gamepadVerticalInput = state.up === state.down ? 0 : (state.up ? -1 : 1);
+    this.gamepadLeftHeld = state.left;
+    this.gamepadRightHeld = state.right;
+    this.gamepadDriftHeld = state.drift;
+    if (leftEdge && !state.drift && this.canAcceptGamepadLaneEdge(now)) {
+      this.requestLaneStep("gamepad-left", -1, "gamepad");
+      this.game.recordInputEvent("gamepad-left");
+    } else if (rightEdge && !state.drift && this.canAcceptGamepadLaneEdge(now)) {
+      this.requestLaneStep("gamepad-right", 1, "gamepad");
+      this.game.recordInputEvent("gamepad-right");
+    }
+    if (boostEdge && this.canAcceptGamepadBoostEdge(now)) {
+      this.lastBoostEdgeTime = now;
+      this.lastBoostInputSource = "gamepad";
+      this.game.recordInputEvent("gamepad-boost");
+      this.game.useManualBoost();
+    }
+    this.updateVerticalInput();
+    this.updateDriftInput();
+  }
+
+  handleGamepadMenu(state) {
+    const direction = this.getMenuDirectionFromGamepadState(state);
+    const now = performance.now();
+    if (direction) {
+      const changedDirection = direction !== this.menuRepeatDirection;
+      if (changedDirection) {
+        this.menuRepeatDirection = direction;
+        this.menuRepeatStartedAt = now;
+        this.menuLastRepeatAt = now;
+        this.moveMenuFocus(direction);
+      } else if (
+        now - this.menuRepeatStartedAt >= GAMEPAD_CONFIG.menuRepeatDelayMs &&
+        now - this.menuLastRepeatAt >= GAMEPAD_CONFIG.menuRepeatMs
+      ) {
+        this.menuLastRepeatAt = now;
+        this.moveMenuFocus(direction);
+      }
+    } else {
+      this.resetMenuRepeatState();
+    }
+    if (this.gamepadEdge(state, "boost")) this.handleGamepadConfirm();
+    if (this.gamepadEdge(state, "back")) this.handleGamepadBack();
+  }
+
+  getMenuDirectionFromGamepadState(state) {
+    if (!state) return "";
+    const horizontal = state.left === state.right ? "" : (state.left ? "left" : "right");
+    const vertical = state.up === state.down ? "" : (state.up ? "up" : "down");
+    if (horizontal && vertical) {
+      const axisX = Math.abs(Number(state.axisX || 0));
+      const axisY = Math.abs(Number(state.axisY || 0));
+      return axisY >= axisX ? vertical : horizontal;
+    }
+    return vertical || horizontal;
+  }
+
+  getMenuFocusableForNode(node) {
+    if (!node || node.disabled) return null;
+    const tagName = String(node.tagName || "").toLowerCase();
+    const type = String(node.type || "").toLowerCase();
+    if (tagName === "input" && (type === "radio" || type === "checkbox")) {
+      const label = node.closest?.(".track-option, .paint-swatch");
+      if (label) {
+        if (!label.hasAttribute("tabindex")) label.tabIndex = -1;
+        label.dataset.menuFocusProxy = "true";
+        return label;
+      }
+    }
+    return node;
+  }
+
+  isMenuElementVisible(element) {
+    if (!element) return false;
+    if (element.disabled) return false;
+    if (element.hidden || element.getAttribute?.("aria-hidden") === "true") return false;
+    if (element.closest?.("[hidden], [aria-hidden='true']")) return false;
+    if (typeof window !== "undefined" && typeof window.getComputedStyle === "function") {
+      const style = window.getComputedStyle(element);
+      if (style.display === "none" || style.visibility === "hidden") return false;
+    }
+    const rect = element.getBoundingClientRect?.();
+    if (!rect) return true;
+    return rect.width > 0 && rect.height > 0;
+  }
+
+  getMenuFocusables() {
+    const root = this.game.layer || document;
+    const seen = new Set();
+    return Array.from(root.querySelectorAll(MENU_FOCUS_SELECTOR))
+      .map((node) => this.getMenuFocusableForNode(node))
+      .filter((element) => {
+        if (!element || seen.has(element) || !this.isMenuElementVisible(element)) return false;
+        seen.add(element);
+        return true;
+      });
+  }
+
+  getPreferredMenuFocus(focusables = this.getMenuFocusables()) {
+    if (!focusables.length) return null;
+    const byAction = (...actions) => focusables.find((element) => actions.includes(element.dataset?.action || ""));
+    const screen = this.game.screen;
+    if (screen === "title") return byAction("start") || focusables[0];
+    if (screen === "preRace") return byAction("startSeededRace") || focusables[0];
+    if (screen === "partySetup") return byAction("partyStartRound") || focusables[0];
+    if (screen === "partyTurn") return byAction("partyStartRun") || focusables[0];
+    if (screen === "game" && this.game.run?.paused) return byAction("resume") || focusables[0];
+    return focusables.find((element) => element.classList?.contains("btn--primary") || element.classList?.contains("primary"))
+      || focusables[0];
+  }
+
+  focusMenuElement(element) {
+    if (!element) return false;
+    this.setMenuNavigationActive(true);
+    if (!element.hasAttribute?.("tabindex") && !["button", "input", "select", "textarea", "summary", "a"].includes(String(element.tagName || "").toLowerCase())) {
+      element.tabIndex = -1;
+    }
+    if (typeof element.focus === "function") {
+      try {
+        element.focus({ preventScroll: true });
+      } catch (error) {
+        element.focus();
+      }
+    }
+    element.scrollIntoView?.({ block: "nearest", inline: "nearest" });
+    this.updateMenuFocusVisuals(element);
+    return true;
+  }
+
+  syncMenuFocusAfterRender() {
+    if (this.game.screen === "game" && !this.game.run?.paused) return;
+    requestAnimationFrame(() => {
+      if (this.game.screen === "game" && !this.game.run?.paused) return;
+      const recentPointer = performance.now() - this.lastPointerTime < 450 && !this.menuNavigationActive;
+      if (recentPointer) {
+        this.clearMenuFocusVisuals();
+        return;
+      }
+      const focusables = this.getMenuFocusables();
+      if (!focusables.length) return;
+      if (focusables.includes(document.activeElement)) {
+        this.setMenuNavigationActive(true);
+        this.updateMenuFocusVisuals(document.activeElement);
+        return;
+      }
+      this.focusMenuElement(this.getPreferredMenuFocus(focusables));
+    });
+  }
+
+  normalizeMenuDirection(direction) {
+    if (direction === "up" || direction === "down" || direction === "left" || direction === "right") return direction;
+    if (direction < 0) return "up";
+    if (direction > 0) return "down";
+    return "";
+  }
+
+  adjustFocusedMenuControl(element, direction) {
+    if (!element || (direction !== "left" && direction !== "right")) return false;
+    const tagName = String(element.tagName || "").toLowerCase();
+    const step = direction === "right" ? 1 : -1;
+    if (tagName === "select") {
+      return false;
+    }
+    if (tagName === "input" && String(element.type || "").toLowerCase() === "range") {
+      const min = Number(element.min || 0);
+      const max = Number(element.max || 100);
+      const rangeStep = Number(element.step || 1) || 1;
+      const next = clampNumber(Number(element.value || 0) + step * rangeStep, min, max, Number(element.value || 0));
+      element.value = String(next);
+      element.dispatchEvent(new Event("input", { bubbles: true }));
+      element.dispatchEvent(new Event("change", { bubbles: true }));
+      this.updateMenuFocusVisuals(element);
+      return true;
+    }
+    return false;
+  }
+
+  getMenuFocusRect(element) {
+    const rect = element?.getBoundingClientRect?.();
+    if (!rect) return null;
+    return {
+      left: rect.left,
+      right: rect.right,
+      top: rect.top,
+      bottom: rect.bottom,
+      width: rect.width,
+      height: rect.height,
+      centerX: rect.left + rect.width / 2,
+      centerY: rect.top + rect.height / 2
+    };
+  }
+
+  findGeometricMenuTarget(focusables, active, direction) {
+    const currentRect = this.getMenuFocusRect(active);
+    if (!currentRect) return null;
+    const entries = focusables
+      .filter((element) => element !== active)
+      .map((element) => ({ element, rect: this.getMenuFocusRect(element) }))
+      .filter((entry) => entry.rect);
+    const vertical = direction === "up" || direction === "down";
+    const sign = direction === "down" || direction === "right" ? 1 : -1;
+    const candidates = entries
+      .map((entry) => {
+        const dx = entry.rect.centerX - currentRect.centerX;
+        const dy = entry.rect.centerY - currentRect.centerY;
+        const primary = vertical ? dy : dx;
+        if (primary * sign <= 1) return null;
+        const cross = Math.abs(vertical ? dx : dy);
+        const rowOrColumnTolerance = Math.max(vertical ? currentRect.width : currentRect.height, vertical ? entry.rect.width : entry.rect.height) * 0.72;
+        const alignedPenalty = cross <= rowOrColumnTolerance ? 0 : cross * 1.8;
+        const score = Math.abs(primary) * 4 + cross + alignedPenalty;
+        return { element: entry.element, score };
+      })
+      .filter(Boolean)
+      .sort((a, b) => a.score - b.score);
+    return candidates[0]?.element || null;
+  }
+
+  moveMenuFocus(directionInput) {
+    if (this.game.screen === "game" && !this.game.run?.paused) return;
+    const direction = this.normalizeMenuDirection(directionInput);
+    if (!direction) return;
+    const focusables = this.getMenuFocusables();
+    if (!focusables.length) return;
+    const active = document.activeElement;
+    let index = focusables.indexOf(active);
+    if (index < 0) {
+      index = focusables.indexOf(this.getPreferredMenuFocus(focusables));
+    }
+    const current = focusables[index] || focusables[0];
+    if (focusables.includes(active) && this.adjustFocusedMenuControl(active, direction)) return;
+    const geometricTarget = focusables.includes(active)
+      ? this.findGeometricMenuTarget(focusables, active, direction)
+      : null;
+    const fallbackStep = direction === "up" || direction === "left" ? -1 : 1;
+    const fallbackIndex = clamp((index < 0 ? 0 : index) + fallbackStep, 0, focusables.length - 1);
+    this.focusMenuElement(geometricTarget || focusables[fallbackIndex] || current);
+  }
+
+  clickFocusedOrPrimary() {
+    const active = document.activeElement;
+    const focusables = this.getMenuFocusables();
+    const activeUsable = active && focusables.includes(active);
+    const target = activeUsable
+      ? active
+      : this.getPreferredMenuFocus(focusables);
+    if (target && typeof target.click === "function") {
+      this.setMenuNavigationActive(true);
+      target.click();
+      return true;
+    }
+    return false;
+  }
+
+  handleGamepadConfirm() {
+    this.game.audio.playSfx("menu");
+    if (this.clickFocusedOrPrimary()) return;
+    if (this.game.screen === "title") {
+      if (this.game.profiles.getCurrentPlayer()) this.game.startRaceFromTitle();
+      else this.game.showPlayerScreen("Add a driver, then start your first run.");
+    } else if (this.game.screen === "preRace") this.game.handleStartSeededRace();
+    else if (this.game.screen === "partyTurn") this.game.startCurrentPartyRun();
+    else if (this.game.screen === "partyStandings") this.game.handlePartyNextPlayer();
+    else if (this.game.screen === "partyFinal") this.game.handlePartyRematch(true);
+    else if (this.game.screen === "score") this.game.handleRestartRun();
+    else if (this.game.screen === "game" && this.game.run?.paused) this.game.togglePause();
+  }
+
+  handleGamepadBack() {
+    this.game.audio.playSfx("menu");
+    if (this.game.screen === "game" && this.game.run?.paused) {
+      this.game.togglePause();
+    } else if (this.game.screen === "howToPlay") {
+      this.game.handleGuideBack();
+    } else if (this.game.screen === "score") {
+      this.game.showTitle();
+    } else if (!["title", "game"].includes(this.game.screen)) {
+      this.game.showTitle();
+    }
   }
 
   onKeyDown(event) {
@@ -9627,7 +10501,8 @@ class InputManager {
       return;
     }
 
-    if (!isEdge && isControlKey) {
+    const isMenuArrow = this.game.screen !== "game" && ["left", "right", "up", "down"].includes(keyId);
+    if (!isEdge && isControlKey && !isMenuArrow) {
       if (keyId === "left" || keyId === "right") this.leftRightRepeatIgnoredCount += 1;
       if (keyId === "boost") this.boostRepeatIgnoredCount += 1;
       return;
@@ -9697,6 +10572,16 @@ class InputManager {
     }
 
     if (this.game.screen === "game") {
+      if (this.game.run?.paused) {
+        if (["left", "right", "up", "down"].includes(keyId)) {
+          this.moveMenuFocus(keyId);
+        } else if (keyId === "enter" || keyId === "boost") {
+          this.handleGamepadConfirm();
+        } else if (keyId === "escape") {
+          this.handleGamepadBack();
+        }
+        return;
+      }
       if (this.shouldSuppressGameplayInput(keyId)) {
         this.suppressedUntilKeyup.add(keyId);
         this.releaseGameplayKey(keyId);
@@ -9717,13 +10602,17 @@ class InputManager {
         this.updateVerticalInput();
       } else if (keyId === "left") {
         if (this.isShiftHeld()) this.updateDriftInput();
-        else this.requestLaneStep("left", -1);
+        else if (this.canAcceptKeyboardLaneEdge(performance.now())) this.requestLaneStep("left", -1);
       } else if (keyId === "right") {
         if (this.isShiftHeld()) this.updateDriftInput();
-        else this.requestLaneStep("right", 1);
+        else if (this.canAcceptKeyboardLaneEdge(performance.now())) this.requestLaneStep("right", 1);
       } else if (keyId === "boost") {
-        this.lastBoostEdgeTime = performance.now();
-        this.game.useManualBoost();
+        const now = performance.now();
+        if (this.canAcceptKeyboardBoostEdge(now)) {
+          this.lastBoostEdgeTime = now;
+          this.lastBoostInputSource = "keyboard";
+          this.game.useManualBoost();
+        }
       }
       if (keyId === "left" || keyId === "right" || keyId === "shift") {
         this.updateDriftInput();
@@ -9731,36 +10620,15 @@ class InputManager {
       return;
     }
 
-    if (this.game.screen === "score") {
-      if (keyId === "enter") {
-        this.game.audio.playSfx("menu");
-        this.game.handleRestartRun();
+    if (this.game.screen !== "game") {
+      if (["left", "right", "up", "down"].includes(keyId)) {
+        this.moveMenuFocus(keyId);
+      } else if (keyId === "enter" || keyId === "boost") {
+        this.handleGamepadConfirm();
       } else if (keyId === "escape") {
-        this.game.audio.playSfx("menu");
-        this.game.showTitle();
+        this.handleGamepadBack();
       }
       return;
-    }
-
-    if (keyId === "enter" && this.game.screen === "title") {
-      this.game.audio.playSfx("menu");
-      if (this.game.profiles.getCurrentPlayer()) this.game.startRaceFromTitle();
-      else this.game.showPlayerScreen("Add a driver, then start your first run.");
-    } else if (keyId === "enter" && this.game.screen === "preRace") {
-      this.game.audio.playSfx("menu");
-      this.game.handleStartSeededRace();
-    } else if (keyId === "enter" && this.game.screen === "partyTurn") {
-      this.game.audio.playSfx("menu");
-      this.game.startCurrentPartyRun();
-    } else if (keyId === "enter" && this.game.screen === "partyStandings") {
-      this.game.audio.playSfx("menu");
-      this.game.handlePartyNextPlayer();
-    } else if (keyId === "enter" && this.game.screen === "partyFinal") {
-      this.game.audio.playSfx("menu");
-      this.game.handlePartyRematch(true);
-    } else if (keyId === "escape" && !["title", "game"].includes(this.game.screen)) {
-      this.game.audio.playSfx("menu");
-      this.game.showTitle();
     }
   }
 
@@ -9780,10 +10648,6 @@ class InputManager {
     if (keyId === "left" || keyId === "right" || keyId === "shift") {
       this.updateDriftInput();
     }
-  }
-
-  update(dt) {
-    void dt;
   }
 
   getKeyId(event) {
@@ -9822,13 +10686,14 @@ class InputManager {
 
   canProcessGameplayInput() {
     const run = this.game.run;
-    return this.game.screen === "game" && run && !run.paused && !run.ended && !run.debugFrozen && run.raceActive;
+    return this.game.screen === "game" && run && !run.paused && !run.ended && !run.debugFrozen && run.raceActive && !run.pendingEndStatus;
   }
 
-  requestLaneStep(keyId, direction) {
+  requestLaneStep(keyId, direction, source = "keyboard") {
     if (this.suppressedUntilKeyup.has(keyId)) return;
     this.lastLaneInput = keyId;
     this.lastLaneInputTime = performance.now();
+    this.lastLaneInputSource = source;
     this.game.requestLaneMove(direction, "press");
   }
 
@@ -9846,6 +10711,10 @@ class InputManager {
     this.activeKeys.clear();
     this.suppressedUntilKeyup.clear();
     this.heldVerticalKeys.clear();
+    this.gamepadLeftHeld = false;
+    this.gamepadRightHeld = false;
+    this.gamepadVerticalInput = 0;
+    this.gamepadDriftHeld = false;
     this.game.setVerticalInput(0);
     this.game.clearDriftInput({ release: false });
   }
@@ -9855,6 +10724,10 @@ class InputManager {
       if (this.activeKeys.has(keyId)) this.suppressedUntilKeyup.add(keyId);
     });
     this.heldVerticalKeys.clear();
+    this.gamepadLeftHeld = false;
+    this.gamepadRightHeld = false;
+    this.gamepadVerticalInput = 0;
+    this.gamepadDriftHeld = false;
     this.game.setVerticalInput(0);
     this.game.clearDriftInput({ release: false });
   }
@@ -9862,17 +10735,22 @@ class InputManager {
   updateVerticalInput() {
     const up = this.heldVerticalKeys.has("up");
     const down = this.heldVerticalKeys.has("down");
-    this.game.setVerticalInput(up === down ? 0 : (up ? -1 : 1));
+    const keyboardDirection = up === down ? 0 : (up ? -1 : 1);
+    const gamepadDirection = clamp(this.gamepadVerticalInput || 0, -1, 1);
+    const direction = keyboardDirection && gamepadDirection && keyboardDirection !== gamepadDirection
+      ? 0
+      : (keyboardDirection || gamepadDirection);
+    this.game.setVerticalInput(direction);
   }
 
   isShiftHeld() {
-    return this.activeKeys.has("shift") && !this.suppressedUntilKeyup.has("shift");
+    return (this.activeKeys.has("shift") && !this.suppressedUntilKeyup.has("shift")) || this.gamepadDriftHeld;
   }
 
   updateDriftInput() {
     const shiftHeld = this.isShiftHeld();
-    const leftHeld = this.activeKeys.has("left") && !this.suppressedUntilKeyup.has("left");
-    const rightHeld = this.activeKeys.has("right") && !this.suppressedUntilKeyup.has("right");
+    const leftHeld = (this.activeKeys.has("left") && !this.suppressedUntilKeyup.has("left")) || this.gamepadLeftHeld;
+    const rightHeld = (this.activeKeys.has("right") && !this.suppressedUntilKeyup.has("right")) || this.gamepadRightHeld;
     const direction = shiftHeld && leftHeld !== rightHeld ? (leftHeld ? -1 : 1) : 0;
     this.game.setDriftInput(direction, shiftHeld);
   }
@@ -9890,10 +10768,18 @@ class InputManager {
       leftRightRepeatIgnoredCount: this.leftRightRepeatIgnoredCount,
       boostRepeatIgnoredCount: this.boostRepeatIgnoredCount,
       lastLaneInput: this.lastLaneInput,
+      lastLaneInputSource: this.lastLaneInputSource,
       lastLaneInputAgeMs: this.lastLaneInputTime ? Math.max(0, now - this.lastLaneInputTime) : null,
       boostEdgeTriggered: this.lastBoostEdgeTime ? now - this.lastBoostEdgeTime <= 180 : false,
       boostEdgeAgeMs: this.lastBoostEdgeTime ? Math.max(0, now - this.lastBoostEdgeTime) : null,
-      verticalHeld: Array.from(this.heldVerticalKeys).join(", ") || "none"
+      verticalHeld: Array.from(this.heldVerticalKeys).join(", ") || "none",
+      gamepad: this.getControllerStatusText(),
+      gamepadIndex: this.gamepadActiveIndex,
+      gamepadMapping: this.gamepadLastMapping || "none",
+      gamepadLastButton: this.gamepadLastButton || "none",
+      gamepadLastAxis: this.gamepadLastAxis || "none",
+      gamepadVertical: this.gamepadVerticalInput,
+      gamepadDriftHeld: this.gamepadDriftHeld
     };
   }
 }
@@ -22289,6 +23175,8 @@ class NeonRoadRally {
       partyRoundType: PARTY_ROUND_TYPE_ONE_RUN,
       partySeedMode: PARTY_SEED_MODE_SAME_ROUND,
       partyStartingOrderMode: PARTY_STARTING_ORDER_MODE_ROSTER,
+      partyBonusSurvivalMode: PARTY_BONUS_SURVIVAL_OFF,
+      partyBonusSurvivalEnabled: false,
       partyTurnOrder: [],
       partyRoundNumber: 0,
       partyRoundIndex: 0,
@@ -22605,8 +23493,10 @@ class NeonRoadRally {
     if (this.screen === "game" && this.run && !this.run.ended && !debugFrozen) {
       this.recordFrameTelemetry(rawDt);
     }
+    if (!debugFrozen && this.input) {
+      this.input.update(dt);
+    }
     if (this.screen === "game" && !this.run.paused && !this.run.ended && !debugFrozen) {
-      if (!this.run.pendingEndStatus) this.input.update(dt);
       this.updateRun(dt);
     } else if (this.screen === "game" && !this.run.paused && this.run.ended && !debugFrozen) {
       this.updateFinishVisualCoast(dt);
@@ -23370,10 +24260,10 @@ class NeonRoadRally {
     if (!run) return false;
     const raceTypeId = normalizeRaceTypeId(run.raceTypeId, DEFAULT_RACE_TYPE_ID);
     const officialClassicRun = Boolean(run.officialRouteId || run.officialFinishLocked);
+    const partyClassicRun = Boolean(run.partyMode && raceTypeId === DEFAULT_RACE_TYPE_ID);
     return Boolean(
       raceTypeId === DEFAULT_RACE_TYPE_ID
-      && officialClassicRun
-      && !run.partyMode
+      && (officialClassicRun || partyClassicRun)
       && !run.challengeMode
       && !isFuelRunRaceType(raceTypeId)
       && !isPursuitRaceType(raceTypeId)
@@ -24163,13 +25053,12 @@ class NeonRoadRally {
   }
 
   canStartOfficialEnduranceAtFinish(run = this.run) {
+    if (!run || run.challengeMode || isOfficialEnduranceRun(run) || run.raceTypeId !== DEFAULT_RACE_TYPE_ID) return false;
+    if (run.partyMode) {
+      return Boolean(run.partyBonusSurvivalEnabled && !isFuelRunRaceType(run.raceTypeId) && !isPursuitRaceType(run.raceTypeId) && !isBoostlineRaceType(run.raceTypeId));
+    }
     return Boolean(
-      run
-      && !run.partyMode
-      && !run.challengeMode
-      && !isOfficialEnduranceRun(run)
-      && run.raceTypeId === DEFAULT_RACE_TYPE_ID
-      && run.officialRouteId
+      run.officialRouteId
       && getOfficialRouteForRun(run.track?.id, run.speedClassId, run.raceTypeId, run.roadSeed, run.officialRouteId)
     );
   }
@@ -24812,6 +25701,8 @@ class NeonRoadRally {
     this.run.partyRoundType = partyMode ? (this.partySession?.roundType || PARTY_ROUND_TYPE_ONE_RUN) : PARTY_ROUND_TYPE_ONE_RUN;
     this.run.partySeedMode = partyMode ? (this.partySession?.seedMode || PARTY_SEED_MODE_SAME_ROUND) : PARTY_SEED_MODE_SAME_ROUND;
     this.run.partyStartingOrderMode = partyMode ? (this.partySession?.startingOrderMode || PARTY_STARTING_ORDER_MODE_ROSTER) : PARTY_STARTING_ORDER_MODE_ROSTER;
+    this.run.partyBonusSurvivalMode = partyMode ? normalizePartyBonusSurvival(this.partySession?.bonusSurvival, PARTY_BONUS_SURVIVAL_OFF) : PARTY_BONUS_SURVIVAL_OFF;
+    this.run.partyBonusSurvivalEnabled = Boolean(partyMode && isPartyBonusSurvivalEnabled(this.run.partyBonusSurvivalMode) && raceType.id === DEFAULT_RACE_TYPE_ID);
     this.run.partyTurnOrder = partyMode ? this.partySession?.getRoundOrderNames() || [] : [];
     this.run.partyRoundNumber = partyMode ? (this.partySession?.roundNumber || 1) : 0;
     this.run.partyRoundIndex = this.run.partyRoundNumber;
@@ -25262,6 +26153,7 @@ class NeonRoadRally {
     const active = document.activeElement;
     const tagName = String(active?.tagName || "").toLowerCase();
     if (tagName === "input" || tagName === "textarea" || tagName === "select" || active?.isContentEditable) return;
+    this.input?.setMenuNavigationActive?.(false);
     if (this.canvas && typeof this.canvas.focus === "function") {
       this.canvas.focus({ preventScroll: true });
     }
@@ -25859,6 +26751,7 @@ class NeonRoadRally {
       && status === "finished"
       && !debugSpeedScaleActive
       && this.canStartOfficialEnduranceAtFinish(run);
+    const deferPartyResultUntilBonusEnd = Boolean(continueOfficialEndurance && run.partyMode);
     run.pendingEndStatus = "";
     run.pendingEndReason = "";
     run.hitPauseTimer = 0;
@@ -26007,7 +26900,7 @@ class NeonRoadRally {
     const isNewPersonalBest = !debugSpeedScaleActive && run.score > previousBestScore;
     const entersTopTwenty = !debugSpeedScaleActive && (boardEntriesBefore.length < LEADERBOARD_MAX_ENTRIES || run.score > topTwentyCutoff);
     const previousTitleBoard = this.profiles.getTitleBoard();
-    const skipScoreRecord = Boolean(options.skipScoreRecord || officialEnduranceFinal);
+    const skipScoreRecord = Boolean(options.skipScoreRecord || officialEnduranceFinal || deferPartyResultUntilBonusEnd);
     const entry = debugSpeedScaleActive || skipScoreRecord ? null : this.profiles.recordScore({
       runId: run.runId,
       playerId: player.id,
@@ -26112,6 +27005,8 @@ class NeonRoadRally {
       partySeedModeLabel: run.partyMode ? getPartySeedModeLabel(run.partySeedMode) : "",
       partyStartingOrderMode: run.partyMode ? run.partyStartingOrderMode : PARTY_STARTING_ORDER_MODE_ROSTER,
       partyStartingOrderLabel: run.partyMode ? getPartyStartingOrderLabel(run.partyStartingOrderMode) : "",
+      partyBonusSurvivalMode: run.partyMode ? run.partyBonusSurvivalMode : PARTY_BONUS_SURVIVAL_OFF,
+      partyBonusSurvivalEnabled: Boolean(run.partyMode && run.partyBonusSurvivalEnabled),
       partyTurnOrder: run.partyMode && Array.isArray(run.partyTurnOrder) ? run.partyTurnOrder.slice(0, PARTY_MAX_PLAYERS) : [],
       partySeed: run.partyMode ? (run.partySeed || run.roadSeed) : "",
       partyTurnIndex: run.partyMode ? run.partyTurnNumber : 0,
@@ -26340,7 +27235,7 @@ class NeonRoadRally {
         }].concat(summary.medals).slice(0, 3);
       }
     }
-    const skipBestTimeRecord = Boolean(options.skipBestTimeRecord || officialEnduranceFinal);
+    const skipBestTimeRecord = Boolean(options.skipBestTimeRecord || officialEnduranceFinal || deferPartyResultUntilBonusEnd);
     const timeUpdate = skipBestTimeRecord ? null : this.profiles.recordBestFinishTime(summary);
     if (summary.officialRouteId && summary.scoreSaved && summary.status === "finished") {
       const officialBestTime = this.getOfficialBestTimeRecord(summary.playerId, summary.officialRouteId, summary.raceTypeId);
@@ -26363,7 +27258,7 @@ class NeonRoadRally {
     summary.totalBadgesAvailable = getVisibleBadgeDefinitions().length;
     summary.titleChanges = skipBadges ? [] : this.profiles.evaluateRunTitles(summary, previousTitleBoard);
     this.lastSummary = summary;
-    if (run.partyMode && this.partySession?.isPartyMode) {
+    if (run.partyMode && this.partySession?.isPartyMode && !deferPartyResultUntilBonusEnd) {
       this.lastSummary.partyResult = this.partySession.addResult(this.lastSummary);
       const partyBadges = this.awardCompletedPartySessionBadges(this.partySession, this.lastSummary);
       if (partyBadges.length) {
@@ -26391,7 +27286,7 @@ class NeonRoadRally {
       this.lastSummary.totalBadgesEarned = this.profiles.getPlayerBadgeProgress(this.lastSummary.playerId).earnedCount;
       this.lastSummary.totalBadgesAvailable = getVisibleBadgeDefinitions().length;
     }
-    if (!options.skipPlaytest && !officialEnduranceFinal) {
+    if (!options.skipPlaytest && !officialEnduranceFinal && !deferPartyResultUntilBonusEnd) {
       this.recordPlaytestRunSummary(this.lastSummary);
     }
 
@@ -28814,7 +29709,7 @@ class NeonRoadRally {
             <h2>Paused</h2>
             <div class="pause-actions">
               <button class="btn btn--primary btn--lg btn--block" data-action="resume">
-                <span>Resume</span><span class="kbd">Esc</span>
+                <span>Resume</span><span class="kbd">Esc / Options</span>
               </button>
               <button class="btn btn--secondary btn--block" data-action="restart">
                 <span>Race Again</span>
@@ -28824,9 +29719,9 @@ class NeonRoadRally {
               </button>
             </div>
             <div class="pause-control-strip" aria-label="Controls">
-              <span><b>Move</b> Arrows</span>
-              <span><b>Boost</b> Space</span>
-              <span><b>Drift</b> ${escapeHtml(controlHint)}</span>
+              <span><b>Move</b> Arrows / Stick</span>
+              <span><b>Boost</b> Space / Cross</span>
+              <span><b>Drift</b> ${escapeHtml(controlHint)} / L1+Stick</span>
               <span><b>Audio</b> M / N</span>
             </div>
           </div>
@@ -28872,12 +29767,12 @@ class NeonRoadRally {
   }
 
   getActivePanelScrollTop() {
-    const panel = this.layer?.querySelector(".panel");
+    const panel = this.layer?.querySelector(".panel, .page");
     return panel ? panel.scrollTop : 0;
   }
 
   setActivePanelScrollTop(value = 0) {
-    const panel = this.layer?.querySelector(".panel");
+    const panel = this.layer?.querySelector(".panel, .page");
     if (!panel) return;
     const nextScrollTop = Number.isFinite(value) ? Math.max(0, value) : 0;
     panel.scrollTop = nextScrollTop;
@@ -29017,10 +29912,12 @@ class NeonRoadRally {
       basics: [
         {
           title: "Basic Controls",
-          chips: ["A/D Lanes", "Shift+A/D Dash", "Space Boost", "Enter"],
+          chips: ["A/D Lanes", "Controller", "Space Boost", "Enter"],
           points: [
             "A/D or Left/Right: tap once to change one lane.",
             "Shift + A/D or Shift + Left/Right: drift dash across lanes.",
+            "Controller: D-pad or left stick moves lanes and forward/back.",
+            "Cross uses manual boost. Hold L1 or L2 plus left/right for Drift Dash. Options pauses.",
             "Release Shift or the drift direction to settle into the lane.",
             "Cut across lanes fast. Great for reaching boosts and dodging traffic.",
             "Mistime it and you can clip traffic.",
@@ -29088,10 +29985,12 @@ class NeonRoadRally {
       party: [
         {
           title: "Party Mode",
-          chips: ["Local", "Pass Keyboard", "Same Road"],
+          chips: ["Local", "Pass Controller", "Same Road"],
           points: [
-            "Party Mode is local pass-the-keyboard competition on one computer.",
+            "Party Mode is local pass-the-controller or pass-the-keyboard competition on one computer.",
             "Players use the same road for fair comparison.",
+            "Classic Party includes Neon Flow and Flow Break.",
+            "Bonus Survival can let Classic Party turns continue after the official finish until crash or manual end.",
             "One Run Each, Best of 3, and Total Score decide the winner by highest score.",
             "Party Fuel: Take turns in Fuel Run and see who can survive longest or score highest."
           ]
@@ -29217,7 +30116,6 @@ class NeonRoadRally {
     this.partySetup = null;
     this.setScreen("title");
     this.audio.updateMusicState({ id: "menu", label: "Menu", sectionId: "menu", intensity: 0, raceTypeId: "menu" });
-    this.audio.stopMusic(0);
     this.audio.playMusic("title", false);
     const player = this.profiles.getCurrentPlayer();
     const hasDriver = Boolean(player);
@@ -29229,6 +30127,7 @@ class NeonRoadRally {
       ? `${badgeProgress.earnedCount}/${badgeProgress.totalCount} badges - ${titleCount}/${TITLE_DEFINITIONS.length} titles`
       : "Create driver";
     const audioStatus = this.audio.masterMuted ? "Audio muted" : "Audio on";
+    const controllerStatus = this.input?.getControllerStatusText ? this.input.getControllerStatusText() : "Press any controller button";
     this.layer.classList.remove("is-empty");
     this.layer.innerHTML = `
       <section class="title-panel nrr show-title-panel">
@@ -29248,7 +30147,7 @@ class NeonRoadRally {
                   <span class="driver-meta">${escapeHtml(playerDetail)}</span>
                 </span>
               </button>
-              <span class="micro title-utility-copy">${escapeHtml(audioStatus)} - ${escapeHtml(selectedSpeedClass.label)} default</span>
+              <span class="micro title-utility-copy">${escapeHtml(audioStatus)} - ${escapeHtml(selectedSpeedClass.label)} default - <span data-controller-status>${escapeHtml(controllerStatus)}</span></span>
             </div>
           </div>
 
@@ -29291,7 +30190,7 @@ class NeonRoadRally {
     `;
     this.bindLayerButtons();
     this.bindTitleAudioControls();
-    this.renderDriverMiniPreviews();
+    this.deferDriverMiniPreviews("title");
   }
 
   renderAudioTestControls() {
@@ -29313,12 +30212,58 @@ class NeonRoadRally {
     `;
   }
 
+  renderControllerDiagnosticPanel() {
+    const diagnostic = this.input?.getControllerDiagnosticSnapshot
+      ? this.input.getControllerDiagnosticSnapshot()
+      : {
+        status: "Press any controller button",
+        detected: false,
+        id: "none",
+        mapping: "none",
+        lastButton: "none",
+        lastAxis: "none",
+        detectedInputs: createGamepadDetectedInputs()
+      };
+    const flagChips = GAMEPAD_DIAGNOSTIC_FLAGS.map((item) => {
+      const seen = Boolean(diagnostic.detectedInputs?.[item.key]);
+      return `<span class="controller-diag-chip ${seen ? "is-detected" : "is-waiting"}" data-controller-diag-flag="${escapeAttr(item.key)}">${escapeHtml(item.label)}: ${seen ? "Seen" : "Waiting"}</span>`;
+    }).join("");
+    const mappingRows = GAMEPAD_MAPPING_ROWS.map((row) => `
+      <span><b>${escapeHtml(row.control)}</b><em>${escapeHtml(row.action)}</em></span>
+    `).join("");
+    return `
+      <div class="settings-tool-row settings-controller-diagnostics">
+        <div class="controller-diag-head">
+          <span class="label label--dim">Controller Diagnostic</span>
+          <strong data-controller-diag="status">${escapeHtml(diagnostic.status)}</strong>
+          <small>Browser gamepad detection may require page focus and one controller button press first.</small>
+        </div>
+        <div class="controller-diag-panel">
+          <div class="controller-diag-meta">
+            <span><b>Detected</b><em data-controller-diag="detected">${diagnostic.detected ? "Yes" : "No"}</em></span>
+            <span><b>Gamepad</b><em data-controller-diag="id">${escapeHtml(diagnostic.id)}</em></span>
+            <span><b>Mapping</b><em data-controller-diag="mapping">${escapeHtml(diagnostic.mapping)}</em></span>
+            <span><b>Last Button</b><em data-controller-diag="lastButton">${escapeHtml(diagnostic.lastButton)}</em></span>
+            <span><b>Last Axis</b><em data-controller-diag="lastAxis">${escapeHtml(diagnostic.lastAxis)}</em></span>
+          </div>
+          <div class="controller-diag-flags">
+            ${flagChips}
+          </div>
+          <div class="controller-map-grid">
+            ${mappingRows}
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
   showSettingsScreen(message = "") {
     this.setScreen("settings");
     this.audio.updateMusicState({ id: "menu", label: "Menu", sectionId: "menu", intensity: 0, raceTypeId: "menu" });
     this.audio.playMusic("title", false);
     const selectedSpeedClass = getSpeedClassConfig(this.profiles.data.speedClassId);
     const debugToolsVisible = this.debugMode && this.isDebugAccessAllowed();
+    const controllerStatus = this.input?.getControllerStatusText ? this.input.getControllerStatusText() : "Press any controller button";
     this.layer.classList.remove("is-empty");
     this.layer.innerHTML = `
       <section class="settings-screen-panel nrr">
@@ -29372,13 +30317,19 @@ class NeonRoadRally {
             <section class="settings-section settings-controls-section">
               <div class="settings-section-heading">
                 <span class="label label--cyan">Controls</span>
-                <strong>Keyboard</strong>
+                <strong>Keyboard + Controller</strong>
+                <small data-controller-status>${escapeHtml(controllerStatus)}</small>
               </div>
               <div class="settings-key-grid">
                 <span><b>A / D</b><em>Change lane</em></span>
                 <span><b>Shift + A/D</b><em>Drift Dash</em></span>
                 <span><b>Space</b><em>Manual boost</em></span>
                 <span><b>Esc</b><em>Pause</em></span>
+                <span><b>D-pad / Left Stick</b><em>Steer / vertical</em></span>
+                <span><b>Cross/X</b><em>Boost / select</em></span>
+                <span><b>Circle</b><em>Back / resume</em></span>
+                <span><b>L1/L2 + Left/Right</b><em>Drift Dash</em></span>
+                <span><b>Options/Menu</b><em>Pause / end bonus</em></span>
                 <span><b>R</b><em>Restart</em></span>
                 <span><b>F</b><em>Fullscreen</em></span>
               </div>
@@ -29405,6 +30356,7 @@ class NeonRoadRally {
                 <strong>${document.fullscreenElement ? "Fullscreen" : "Window"}</strong>
               </div>
               <button class="btn btn--secondary settings-fullscreen-action" data-action="fullscreen">Fullscreen</button>
+              <small class="settings-tv-note">For lowest input lag on TV, use HDMI/USB-C to HDMI and TV Game Mode. AirPlay/casting delay is expected.</small>
             </section>
           </div>
 
@@ -29420,6 +30372,7 @@ class NeonRoadRally {
                 <button class="btn btn--ghost" data-action="showPlaytestReport">Open</button>
                 ${debugToolsVisible ? `<button class="btn btn--ghost" data-action="roadDirectorLab">Road Director Lab</button>` : ""}
               </div>
+              ${this.renderControllerDiagnosticPanel()}
               <div class="settings-tool-row">
                 <div>
                   <span class="label label--dim">Data Tools</span>
@@ -31381,7 +32334,8 @@ class NeonRoadRally {
       sharedSeed: generateReadableRoadSeed(),
       roundType: PARTY_ROUND_TYPE_ONE_RUN,
       seedMode: PARTY_SEED_MODE_SAME_ROUND,
-      startingOrderMode: PARTY_STARTING_ORDER_MODE_RANDOM_ONCE
+      startingOrderMode: PARTY_STARTING_ORDER_MODE_RANDOM_ONCE,
+      bonusSurvival: PARTY_BONUS_SURVIVAL_OFF
     };
   }
 
@@ -31400,6 +32354,7 @@ class NeonRoadRally {
     this.partySetup.roundType = normalizePartyRoundType(this.partySetup.roundType, PARTY_ROUND_TYPE_ONE_RUN);
     this.partySetup.seedMode = normalizePartySeedMode(this.partySetup.seedMode, PARTY_SEED_MODE_SAME_ROUND);
     this.partySetup.startingOrderMode = normalizePartyStartingOrderMode(this.partySetup.startingOrderMode, PARTY_STARTING_ORDER_MODE_ROSTER);
+    this.partySetup.bonusSurvival = normalizePartyBonusSurvival(this.partySetup.bonusSurvival, PARTY_BONUS_SURVIVAL_OFF);
     return this.partySetup;
   }
 
@@ -31451,6 +32406,7 @@ class NeonRoadRally {
     const roundType = document.getElementById("partyRoundType");
     const seedMode = document.getElementById("partySeedMode");
     const startingOrder = document.getElementById("partyStartingOrder");
+    const bonusSurvival = document.getElementById("partyBonusSurvival");
     const seedInput = document.getElementById("partySeedInput");
     const track = this.getSelectedTrackFromInputs("partyTrack", setup.trackId || DEFAULT_TRACK_ID);
     setup.trackId = track.id;
@@ -31460,11 +32416,63 @@ class NeonRoadRally {
     if (roundType) setup.roundType = normalizePartyRoundType(roundType.value, setup.roundType);
     if (seedMode) setup.seedMode = normalizePartySeedMode(seedMode.value, setup.seedMode);
     if (startingOrder) setup.startingOrderMode = normalizePartyStartingOrderMode(startingOrder.value, setup.startingOrderMode);
+    if (bonusSurvival) setup.bonusSurvival = normalizePartyBonusSurvival(bonusSurvival.value, setup.bonusSurvival);
     if (seedInput) setup.sharedSeed = normalizeRoadSeed(seedInput.value, "");
     return setup;
   }
 
-  showPartySetupScreen(message = "") {
+  capturePartySetupUiState(focusTarget = {}) {
+    const manageDetails = typeof document !== "undefined" && document.querySelector
+      ? document.querySelector(".party-manage-details")
+      : null;
+    const optionsDetails = typeof document !== "undefined" && document.querySelector
+      ? document.querySelector(".party-options-panel")
+      : null;
+    return {
+      manageDriversOpen: Boolean(manageDetails?.open),
+      partyOptionsOpen: Boolean(optionsDetails?.open),
+      scrollY: typeof window !== "undefined" && Number.isFinite(window.scrollY) ? window.scrollY : 0,
+      focusAction: focusTarget.action || "",
+      focusId: focusTarget.id || "",
+      focusDir: focusTarget.dir !== undefined ? String(focusTarget.dir) : ""
+    };
+  }
+
+  restorePartySetupUiState(uiState) {
+    if (!uiState || !this.layer?.querySelectorAll) return;
+    const manageDetails = this.layer.querySelector(".party-manage-details");
+    if (manageDetails && uiState.manageDriversOpen) manageDetails.open = true;
+    const optionsDetails = this.layer.querySelector(".party-options-panel");
+    if (optionsDetails && uiState.partyOptionsOpen) optionsDetails.open = true;
+    const buttons = Array.from(this.layer.querySelectorAll("button[data-action]"));
+    const sameButton = buttons.find((button) => (
+      button.dataset.action === uiState.focusAction &&
+      (!uiState.focusId || button.dataset.id === uiState.focusId) &&
+      (!uiState.focusDir || String(button.dataset.dir || "") === uiState.focusDir) &&
+      !button.disabled
+    ));
+    const sameDriverButton = buttons.find((button) => (
+      button.dataset.action === "partyMovePlayer" &&
+      button.dataset.id === uiState.focusId &&
+      !button.disabled
+    ));
+    const sameDriverRow = Array.from(this.layer.querySelectorAll("[data-party-order-id]"))
+      .find((row) => row.dataset.partyOrderId === uiState.focusId);
+    const focusTarget = sameButton || sameDriverButton || sameDriverRow;
+    if (focusTarget?.focus) {
+      try {
+        focusTarget.focus({ preventScroll: true });
+      } catch (error) {
+        focusTarget.focus();
+      }
+      focusTarget.closest?.(".party-order-card")?.scrollIntoView?.({ block: "nearest" });
+    }
+    if (typeof window !== "undefined" && Number.isFinite(uiState.scrollY)) {
+      window.scrollTo(0, uiState.scrollY);
+    }
+  }
+
+  showPartySetupScreen(message = "", uiState = null) {
     this.partySession = null;
     this.setScreen("partySetup");
     this.audio.playMusic("title", false);
@@ -31473,10 +32481,13 @@ class NeonRoadRally {
     const track = getTrackById(setup.trackId);
     setup.raceType = normalizePartyRaceType(setup.raceType, track);
     const partyRaceType = getRaceTypeConfig(setup.raceType);
+    const bonusSurvivalConfig = getPartyBonusSurvivalConfig(setup.bonusSurvival);
     const selectedPlayers = this.getPartySetupSelectedPlayers();
     const selectedIds = new Set(setup.selectedPlayerIds);
     const driverSummary = `${selectedPlayers.length} ${selectedPlayers.length === 1 ? "driver" : "drivers"}`;
     const partyRaceTypes = getPartyRaceTypesForTrack(track, partyRaceType.id);
+    const manageDriversOpen = Boolean(uiState?.manageDriversOpen);
+    const partyOptionsOpen = Boolean(uiState?.partyOptionsOpen);
     const partyRaceTypeToggle = `
       <div class="segmented segmented--cyan party-race-type-toggle" aria-label="Race Type">
         ${partyRaceTypes.map((raceType) => `
@@ -31506,6 +32517,7 @@ class NeonRoadRally {
             <div class="party-start-copy">
               <span class="label">Start</span>
               <strong id="partySetupActionSummary">${escapeHtml(driverSummary)} · ${escapeHtml(partyRaceType.label)} · ${escapeHtml(track.name)} · ${escapeHtml(getSpeedClassLabel(setup.raceMode))}</strong>
+              <small id="partySetupActionSeed">${escapeHtml(getPartyRoundTypeLabel(setup.roundType))} · ${escapeHtml(getPartyStartingOrderLabel(setup.startingOrderMode))} · Bonus ${escapeHtml(getPartyBonusSurvivalLabel(partyRaceType.id === DEFAULT_RACE_TYPE_ID ? setup.bonusSurvival : PARTY_BONUS_SURVIVAL_OFF))} · ${escapeHtml(setup.sharedSeed || "Random road on start")}</small>
             </div>
             <button class="btn btn--primary btn--lg" data-action="partyStartRound" ${selectedPlayers.length < PARTY_MIN_PLAYERS ? "disabled" : ""}>Start Party Race</button>
           </div>
@@ -31524,7 +32536,7 @@ class NeonRoadRally {
                 <button class="btn btn--secondary party-add-driver-button" data-action="partyQuickAddDriver">Add Driver</button>
               </div>
               ${this.renderPartyDriverRows(players, selectedIds, selectedPlayers)}
-              <details class="party-mini-details party-manage-details">
+              <details class="party-mini-details party-manage-details" ${manageDriversOpen ? "open" : ""}>
                 <summary>Manage Drivers</summary>
                 <div class="party-quick-rename">
                   <div class="field">
@@ -31542,7 +32554,7 @@ class NeonRoadRally {
                 </div>
                 <ol class="profile-list party-order-list party-order-compact">
                   ${selectedPlayers.length ? selectedPlayers.map((player, index) => `
-                    <li class="profile-item party-order-card">
+                    <li class="profile-item party-order-card" data-party-order-id="${escapeAttr(player.id)}" tabindex="-1">
                       <strong>${index + 1}. ${escapeHtml(player.name)}</strong>
                       <div class="row">
                         <button class="small-button" data-action="partyMovePlayer" data-id="${escapeAttr(player.id)}" data-dir="-1" ${index === 0 ? "disabled" : ""}>Up</button>
@@ -31580,7 +32592,7 @@ class NeonRoadRally {
                   </select>
                 </div>
               </div>
-              <details class="party-mini-details party-options-panel">
+              <details class="party-mini-details party-options-panel" ${partyOptionsOpen ? "open" : ""}>
                 <summary>Party Options</summary>
                 <div class="party-rules-grid">
                   <div class="field">
@@ -31602,6 +32614,13 @@ class NeonRoadRally {
                     </select>
                   </div>
                   <div class="field">
+                    <label for="partyBonusSurvival">Bonus Survival</label>
+                    <select id="partyBonusSurvival">
+                      ${PARTY_BONUS_SURVIVAL_OPTIONS.map((item) => `<option value="${escapeAttr(item.id)}" ${item.id === bonusSurvivalConfig.id ? "selected" : ""}>${escapeHtml(item.label)}</option>`).join("")}
+                    </select>
+                    <small id="partyBonusSurvivalHint">${escapeHtml(bonusSurvivalConfig.helper)}</small>
+                  </div>
+                  <div class="field">
                     <label for="partySeedInput">Road Code</label>
                     <input id="partySeedInput" type="text" maxlength="${ROAD_SEED_MAX_LENGTH}" value="${escapeAttr(setup.sharedSeed)}" autocomplete="off" spellcheck="false" inputmode="text">
                   </div>
@@ -31619,6 +32638,7 @@ class NeonRoadRally {
     this.bindLayerButtons();
     this.bindPartySetupControls();
     this.renderDriverMiniPreviews();
+    this.restorePartySetupUiState(uiState);
   }
 
   bindPartySetupControls() {
@@ -31629,6 +32649,7 @@ class NeonRoadRally {
     const roundType = document.getElementById("partyRoundType");
     const seedMode = document.getElementById("partySeedMode");
     const startingOrder = document.getElementById("partyStartingOrder");
+    const bonusSurvival = document.getElementById("partyBonusSurvival");
     const newDriverInput = document.getElementById("partyNewDriverName");
     const renameInput = document.getElementById("partyRenameName");
     const trackSummary = document.getElementById("partyTrackSummary");
@@ -31642,6 +32663,7 @@ class NeonRoadRally {
     const seedModeHint = document.getElementById("partySeedModeHint");
     const startingOrderSummary = document.getElementById("partyStartingOrderSummary");
     const startingOrderHint = document.getElementById("partyStartingOrderHint");
+    const bonusSurvivalHint = document.getElementById("partyBonusSurvivalHint");
     const partySetupActionSummary = document.getElementById("partySetupActionSummary");
     const partySetupActionSeed = document.getElementById("partySetupActionSeed");
     const updateSeedDisplay = () => {
@@ -31676,12 +32698,23 @@ class NeonRoadRally {
       }
       if (startingOrderSummary) startingOrderSummary.textContent = getPartyStartingOrderLabel(startingOrder?.value || this.getPartySetup().startingOrderMode);
       if (startingOrderHint) startingOrderHint.textContent = getPartyStartingOrderHelperText(startingOrder?.value || this.getPartySetup().startingOrderMode);
+      if (bonusSurvivalHint) {
+        const bonusMode = selectedRaceType === DEFAULT_RACE_TYPE_ID
+          ? normalizePartyBonusSurvival(bonusSurvival?.value || this.getPartySetup().bonusSurvival)
+          : PARTY_BONUS_SURVIVAL_OFF;
+        bonusSurvivalHint.textContent = selectedRaceType === DEFAULT_RACE_TYPE_ID
+          ? getPartyBonusSurvivalHelperText(bonusMode)
+          : "Fuel Run turns end normally in this pass.";
+      }
       if (partySetupActionSummary) {
         const driverCount = this.getPartySetupSelectedPlayers().length;
         partySetupActionSummary.textContent = `${driverCount} ${driverCount === 1 ? "driver" : "drivers"} · ${raceTypeConfig.label} · ${track.name} · ${getSpeedClassLabel(mode)}`;
       }
       if (partySetupActionSeed) {
-        partySetupActionSeed.textContent = `${getPartyRoundTypeLabel(roundType?.value || this.getPartySetup().roundType)} · ${getPartyStartingOrderLabel(startingOrder?.value || this.getPartySetup().startingOrderMode)} · ${normalized || "Random road on start"}`;
+        const bonusMode = selectedRaceType === DEFAULT_RACE_TYPE_ID
+          ? normalizePartyBonusSurvival(bonusSurvival?.value || this.getPartySetup().bonusSurvival)
+          : PARTY_BONUS_SURVIVAL_OFF;
+        partySetupActionSeed.textContent = `${getPartyRoundTypeLabel(roundType?.value || this.getPartySetup().roundType)} · ${getPartyStartingOrderLabel(startingOrder?.value || this.getPartySetup().startingOrderMode)} · Bonus ${getPartyBonusSurvivalLabel(bonusMode)} · ${normalized || "Random road on start"}`;
       }
     };
     const syncTrackDependentControls = () => {
@@ -31766,6 +32799,12 @@ class NeonRoadRally {
         updateSeedDisplay();
       });
     }
+    if (bonusSurvival) {
+      bonusSurvival.addEventListener("change", () => {
+        this.readPartySetupForm();
+        updateSeedDisplay();
+      });
+    }
     if (newDriverInput) {
       newDriverInput.addEventListener("keydown", (event) => {
         if (event.key === "Enter") {
@@ -31793,76 +32832,83 @@ class NeonRoadRally {
 
   handlePartyTogglePlayer(id) {
     this.readPartySetupForm();
+    const action = this.getPartySetup().selectedPlayerIds.includes(id) ? "partyRemovePlayer" : "partyTogglePlayer";
+    const uiState = this.capturePartySetupUiState({ action, id });
     const setup = this.getPartySetup();
     const index = setup.selectedPlayerIds.indexOf(id);
     if (index >= 0) {
       setup.selectedPlayerIds.splice(index, 1);
-      this.showPartySetupScreen("Player removed from the order.");
+      this.showPartySetupScreen("Player removed from the order.", uiState);
       return;
     }
     if (setup.selectedPlayerIds.length >= PARTY_MAX_PLAYERS) {
-      this.showPartySetupScreen(`Party Mode supports up to ${PARTY_MAX_PLAYERS} players.`);
+      this.showPartySetupScreen(`Party Mode supports up to ${PARTY_MAX_PLAYERS} players.`, uiState);
       return;
     }
     if (this.profiles.getPlayerById(id)) {
       setup.selectedPlayerIds.push(id);
     }
-    this.showPartySetupScreen("Player added to the order.");
+    this.showPartySetupScreen("Player added to the order.", uiState);
   }
 
   handlePartyMovePlayer(id, direction) {
     this.readPartySetupForm();
+    const uiState = this.capturePartySetupUiState({ action: "partyMovePlayer", id, dir: direction });
+    uiState.manageDriversOpen = true;
     const setup = this.getPartySetup();
     const index = setup.selectedPlayerIds.indexOf(id);
     const nextIndex = index + direction;
     if (index < 0 || nextIndex < 0 || nextIndex >= setup.selectedPlayerIds.length) {
-      this.showPartySetupScreen();
+      this.showPartySetupScreen("", uiState);
       return;
     }
     [setup.selectedPlayerIds[index], setup.selectedPlayerIds[nextIndex]] = [setup.selectedPlayerIds[nextIndex], setup.selectedPlayerIds[index]];
-    this.showPartySetupScreen("Player order updated.");
+    this.showPartySetupScreen("Player order updated.", uiState);
   }
 
   handlePartyQuickAddDriver() {
     if (this.screen === "partySetup") this.readPartySetupForm();
+    const uiState = this.capturePartySetupUiState({ action: "partyQuickAddDriver" });
     const input = document.getElementById("partyNewDriverName");
     const fallbackName = `DRIVER ${this.profiles.data.players.length + 1}`;
     const name = sanitizePlayerName(input?.value, fallbackName);
     const player = this.profiles.createPlayer(name);
     if (!player) {
-      this.showPartySetupScreen(`Local driver limit is ${LOCAL_PLAYER_MAX_COUNT}.`);
+      this.showPartySetupScreen(`Local driver limit is ${LOCAL_PLAYER_MAX_COUNT}.`, uiState);
       return;
     }
     const setup = this.getPartySetup();
     if (setup.selectedPlayerIds.length < PARTY_MAX_PLAYERS && !setup.selectedPlayerIds.includes(player.id)) {
       setup.selectedPlayerIds.push(player.id);
     }
-    this.showPartySetupScreen(`${player.name} added to the party roster.`);
+    this.showPartySetupScreen(`${player.name} added to the party roster.`, uiState);
   }
 
   handlePartyInlineRenamePlayer() {
     if (this.screen === "partySetup") this.readPartySetupForm();
+    const uiState = this.capturePartySetupUiState({ action: "partyInlineRenamePlayer" });
     const select = document.getElementById("partyRenamePlayer");
     const input = document.getElementById("partyRenameName");
     const player = this.profiles.getPlayerById(select?.value);
     const rawName = String(input?.value ?? "").trim();
     if (!player) {
-      this.showPartySetupScreen("Choose a driver to rename.");
+      this.showPartySetupScreen("Choose a driver to rename.", uiState);
       return;
     }
     if (!rawName) {
-      this.showPartySetupScreen("Driver name cannot be empty.");
+      this.showPartySetupScreen("Driver name cannot be empty.", uiState);
       return;
     }
     const nextName = sanitizePlayerName(rawName, player.name);
     this.profiles.renamePlayer(player.id, nextName);
-    this.showPartySetupScreen(`${nextName} renamed.`);
+    this.showPartySetupScreen(`${nextName} renamed.`, uiState);
   }
 
   handlePartyRandomSeed() {
     this.readPartySetupForm();
+    const uiState = this.capturePartySetupUiState({ action: "partyRandomSeed" });
     this.getPartySetup().sharedSeed = generateReadableRoadSeed();
-    this.showPartySetupScreen("Random road ready.");
+    this.showPartySetupScreen("Random road ready.", uiState);
   }
 
   handlePartyStartRound() {
@@ -31870,7 +32916,7 @@ class NeonRoadRally {
     const setup = this.readPartySetupForm();
     const selectedPlayers = this.getPartySetupSelectedPlayers();
     if (selectedPlayers.length < PARTY_MIN_PLAYERS) {
-      this.showPartySetupScreen(`Choose at least ${PARTY_MIN_PLAYERS} local players to start Party Mode.`);
+      this.showPartySetupScreen(`Choose at least ${PARTY_MIN_PLAYERS} local players to start Party Mode.`, this.capturePartySetupUiState({ action: "partyStartRound" }));
       return;
     }
     const sharedSeed = this.resolveRoadSeed(setup.sharedSeed);
@@ -31887,7 +32933,8 @@ class NeonRoadRally {
       raceType: setup.raceType,
       roundType: setup.roundType,
       seedMode: setup.seedMode,
-      startingOrderMode: setup.startingOrderMode
+      startingOrderMode: setup.startingOrderMode,
+      bonusSurvival: setup.bonusSurvival
     });
     this.pendingRoadSeed = sharedSeed;
     this.pendingTrackId = track.id;
@@ -31944,6 +32991,8 @@ class NeonRoadRally {
                   <span><strong>Runs</strong><em>${result.completedRuns}/${session.totalRounds}</em></span>
                   ${fuelParty ? `<span><strong>Gas</strong><em>${result.totalGasCansCollected || 0}</em></span>` : ""}
                   ${fuelParty ? `<span><strong>Fuel</strong><em>${result.latestOutOfFuel ? "Out" : Math.max(0, result.latestFuelRemaining || 0)}</em></span>` : ""}
+                  ${!fuelParty && result.latestBonusSurvival ? `<span><strong>Bonus</strong><em>${formatTime(result.latestBonusSurvivalTime || 0)}</em></span>` : ""}
+                  ${!fuelParty && result.latestFlowBreaksTriggered ? `<span><strong>Flow</strong><em>${result.latestFlowBreaksTriggered} break · ${result.latestFlowBreakSparksCollected || 0} spark</em></span>` : ""}
                 </span>
                 ${this.renderMedalChips(result.medals, true)}
               </span>
@@ -32024,6 +33073,8 @@ class NeonRoadRally {
     const standings = session.standings();
     const roundSeed = session.currentSeed;
     const badgePrompt = this.getPartyBadgeTurnPrompt(player, session);
+    const bonusSurvivalActive = session.raceType === DEFAULT_RACE_TYPE_ID && isPartyBonusSurvivalEnabled(session.bonusSurvival);
+    const bonusSurvivalLabel = bonusSurvivalActive ? "On" : "Off";
     this.layer.classList.remove("is-empty");
     this.layer.innerHTML = `
       <section class="panel split party-turn-panel">
@@ -32033,7 +33084,7 @@ class NeonRoadRally {
             <h2>Party Turn</h2>
           </div>
           <div class="party-turn-hero-card">
-            <span>At the keyboard now</span>
+            <span>Pass the controller or keyboard now</span>
             <strong>${escapeHtml(player.name)}</strong>
             <em>Run ${session.completedRuns + 1} of ${session.totalRuns} · ${escapeHtml(getRaceTypeLabel(session.raceType))} · ${escapeHtml(getSpeedClassLabel(session.raceMode))}</em>
           </div>
@@ -32053,9 +33104,10 @@ class NeonRoadRally {
             <div class="score-card"><strong>Round Type</strong><span>${escapeHtml(getPartyRoundTypeLabel(session.roundType))}</span></div>
             <div class="score-card"><strong>Road Rule</strong><span>${escapeHtml(getPartySeedModeLabel(session.seedMode))}</span></div>
             <div class="score-card"><strong>Starting Order</strong><span>${escapeHtml(getPartyStartingOrderLabel(session.startingOrderMode))}</span></div>
+            <div class="score-card"><strong>Bonus Survival</strong><span>${escapeHtml(bonusSurvivalLabel)}</span></div>
           </div>
           ${this.renderPartyTurnOrderPanel(session)}
-          <p class="hint">${isFuelRunRaceType(session.raceType) ? "Fuel Run: collect gas cans and survive to the finish. Run out of fuel and the run ends." : "Press Enter or Start Run when this driver is ready."}</p>
+          <p class="hint">${isFuelRunRaceType(session.raceType) ? "Fuel Run: collect gas cans and survive to the finish. Run out of fuel and the run ends." : `Press Enter, Cross, or Start Run when this driver is ready.${bonusSurvivalActive ? " After the finish, Esc or Options ends Bonus Survival." : ""}`}</p>
           ${badgePrompt ? `<p class="hint party-badge-prompt">${escapeHtml(badgePrompt)}</p>` : ""}
           <p class="status-line">${escapeHtml(message)}</p>
           ${standings.some((result) => result.completedRuns > 0) ? `
@@ -32348,7 +33400,7 @@ class NeonRoadRally {
       ? `${progress.totalCount - progress.earnedCount} left`
       : `${filteredEarned}/${badges.length} shown`;
     return `
-      <div class="badge-profile-panel">
+      <div class="badge-profile-panel" data-garage-badge-panel>
         <div class="badge-profile-header">
           <div>
             <span class="eyebrow">Driver Badges</span>
@@ -32388,6 +33440,21 @@ class NeonRoadRally {
         </div>
       </div>
     `;
+  }
+
+  bindGarageBadgeFilterButtons(scope = this.layer) {
+    if (!scope?.querySelectorAll) return;
+    scope.querySelectorAll('button[data-action="setBadgeFilter"]').forEach((button) => {
+      if (button.dataset.garageBadgeFilterBound === "true") return;
+      button.dataset.garageBadgeFilterBound = "true";
+      button.addEventListener("click", (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        this.audio.activate();
+        this.audio.playSfx("menu");
+        this.handleSetBadgeFilter(button.dataset.filter);
+      });
+    });
   }
 
   renderMedalChips(medals, compact = false) {
@@ -32900,6 +33967,12 @@ class NeonRoadRally {
     const nextPlayer = session.currentPlayer;
     const summary = this.lastSummary;
     const recentResult = summary?.partyResult || null;
+    const bonusResult = summary?.officialEnduranceResult || null;
+    const latestPartyScore = recentResult?.score ?? summary?.finalScore ?? 0;
+    const latestRunLabel = bonusResult ? "Official Finish + Bonus Survival" : getRunStatusLabel(summary?.status, summary?.reason);
+    const latestRunTime = bonusResult?.officialFinishTimeMs !== null && bonusResult?.officialFinishTimeMs !== undefined
+      ? formatFinishTimeMs(bonusResult.officialFinishTimeMs)
+      : formatRunElapsedTime(summary);
     const roundSeed = session.currentSeed;
     const partyCallouts = this.renderPartyCallouts(session, standings, recentResult, final);
     const partyRunFeedback = this.renderPartyRunFeedback(session, standings, summary);
@@ -32936,12 +34009,26 @@ class NeonRoadRally {
             <div>
               <span class="eyebrow">Latest Run</span>
               <strong>${escapeHtml(summary.playerName)}</strong>
-              <span class="meta">${escapeHtml(summary.carName)} · Round ${summary.partyRoundIndex || recentResult?.roundNumber || 1} · ${escapeHtml(summary.partySeed || summary.seed)} · ${escapeHtml(getRunStatusLabel(summary.status, summary.reason))} · ${formatRunElapsedTime(summary)}</span>
+              <span class="meta">${escapeHtml(summary.carName)} · Round ${summary.partyRoundIndex || recentResult?.roundNumber || 1} · ${escapeHtml(summary.partySeed || summary.seed)} · ${escapeHtml(latestRunLabel)} · ${escapeHtml(latestRunTime)}</span>
             </div>
             <div class="party-last-score">
-              <span data-tally-value="${escapeAttr(summary.finalScore)}">${formatScore(summary.finalScore)}</span>
-              ${summary.topTwentyRank ? `<small>Top 20 #${summary.topTwentyRank}</small>` : `<small>${summary.newPersonalBest ? "Personal Best" : "Run Score"}</small>`}
+              <span data-tally-value="${escapeAttr(latestPartyScore)}">${formatScore(latestPartyScore)}</span>
+              ${summary.topTwentyRank ? `<small>Top 20 #${summary.topTwentyRank}</small>` : `<small>${bonusResult ? "Party Score" : (summary.newPersonalBest ? "Personal Best" : "Run Score")}</small>`}
             </div>
+            ${bonusResult ? `
+              <div class="party-stat-grid">
+                <span><strong>Official</strong><em>${formatFinishTimeMs(bonusResult.officialFinishTimeMs)}</em></span>
+                <span><strong>Survival</strong><em>${formatTime(bonusResult.survivalTime || 0)}</em></span>
+                <span><strong>Bonus</strong><em>${formatScore(bonusResult.postFinishScore || 0)}</em></span>
+              </div>
+            ` : ""}
+            ${summary.neonFlowEnabled && (summary.flowBreaksTriggered || summary.flowBreakSparksCollected) ? `
+              <div class="party-stat-grid">
+                <span><strong>Flow Break</strong><em>${Math.max(0, summary.flowBreaksTriggered || 0)}</em></span>
+                <span><strong>Sparks</strong><em>${Math.max(0, summary.flowBreakSparksCollected || 0)}</em></span>
+                <span><strong>Danger Cleared</strong><em>${Math.max(0, summary.flowBreakHazardsCleared || 0)}</em></span>
+              </div>
+            ` : ""}
             ${summary.raceTypeId === FUEL_RUN_RACE_TYPE_ID ? `
               <div class="party-stat-grid">
                 <span><strong>Gas Cans</strong><em>${Math.max(0, summary.gasCansCollected || 0)} / ${Math.max(0, summary.gasCansSpawned || 0)}</em></span>
@@ -33002,7 +34089,8 @@ class NeonRoadRally {
       sharedSeed: this.partySession.sharedSeed,
       roundType: this.partySession.roundType,
       seedMode: this.partySession.seedMode,
-      startingOrderMode: this.partySession.startingOrderMode
+      startingOrderMode: this.partySession.startingOrderMode,
+      bonusSurvival: this.partySession.bonusSurvival
     };
     this.pendingRoadSeed = this.partySession.sharedSeed;
     this.pendingRaceTypeId = this.partySession.raceType;
@@ -33020,7 +34108,8 @@ class NeonRoadRally {
         sharedSeed: session.sharedSeed,
         roundType: session.roundType,
         seedMode: session.seedMode,
-        startingOrderMode: session.startingOrderMode
+        startingOrderMode: session.startingOrderMode,
+        bonusSurvival: session.bonusSurvival
       };
     } else {
       this.getPartySetup();
@@ -33211,6 +34300,17 @@ class NeonRoadRally {
     `;
   }
 
+  captureGarageUiState(focusTarget = "") {
+    const rewardsDetails = typeof document !== "undefined" && document.querySelector
+      ? document.querySelector(".garage-rewards-details")
+      : null;
+    return {
+      rewardsOpen: Boolean(rewardsDetails?.open),
+      preserveScrollTop: this.getActivePanelScrollTop(),
+      focusTarget
+    };
+  }
+
   showDriverGarageScreen(message = "", options = {}) {
     this.setScreen("players");
     const player = this.profiles.getCurrentPlayer();
@@ -33352,7 +34452,7 @@ class NeonRoadRally {
                   <span class="label">Records & Rewards</span>
                   <strong>${player ? "Badges and titles" : "Add a driver"}</strong>
                 </div>
-                <details class="garage-rewards-details">
+                <details class="garage-rewards-details" ${options.rewardsOpen ? "open" : ""}>
                   <summary>Titles and Badges</summary>
                   <div class="garage-rewards-body">
                     ${this.renderPlayerTitlePanel(player)}
@@ -33368,6 +34468,7 @@ class NeonRoadRally {
     `;
     this.bindLayerButtons();
     this.bindGarageControls(options);
+    this.bindGarageBadgeFilterButtons();
     this.renderCarPreview();
     this.renderDriverMiniPreviews();
     this.setActivePanelScrollTop(options.preserveScrollTop ?? 0);
@@ -33521,6 +34622,21 @@ class NeonRoadRally {
         crashFlash: 0
       }, this.carSprites);
     });
+  }
+
+  deferDriverMiniPreviews(expectedScreen = this.screen) {
+    const render = () => {
+      if (!expectedScreen || this.screen === expectedScreen) this.renderDriverMiniPreviews();
+    };
+    if (typeof requestAnimationFrame === "function") {
+      requestAnimationFrame(() => {
+        if (typeof setTimeout === "function") setTimeout(render, 0);
+        else render();
+      });
+      return;
+    }
+    if (typeof setTimeout === "function") setTimeout(render, 0);
+    else render();
   }
 
   syncPaintSwatchSelection() {
@@ -34996,9 +36112,18 @@ class NeonRoadRally {
   bindLayerButtons() {
     const oneShotActions = new Set(["start", "startChallenge", "startSeededRace", "startPracticeRace", "startBoostlinePrototype", "partyStartRound", "partyStartRun"]);
     this.layer.querySelectorAll("button[data-action]").forEach((button) => {
-      button.addEventListener("click", () => {
+      button.addEventListener("click", (event) => {
         this.audio.activate();
         const action = button.dataset.action;
+        if (["partyTogglePlayer", "partyRemovePlayer", "partyMovePlayer", "partyQuickAddDriver", "partyInlineRenamePlayer", "partyRandomSeed"].includes(action)) {
+          event.preventDefault();
+          event.stopPropagation();
+        }
+        if (action === "setBadgeFilter") {
+          event.preventDefault();
+          event.stopPropagation();
+          if (button.dataset.garageBadgeFilterBound === "true") return;
+        }
         if (action !== "testSfx") this.audio.playSfx("menu");
         if (oneShotActions.has(action)) {
           if (button.dataset.busy === "true") return;
@@ -35089,6 +36214,7 @@ class NeonRoadRally {
         else if (action === "clearPlaytestReports") this.handleClearPlaytestReports();
       });
     });
+    this.input?.syncMenuFocusAfterRender?.();
   }
 
   bindTitleAudioControls() {
@@ -35135,51 +36261,54 @@ class NeonRoadRally {
   }
 
   handleCreatePlayer() {
+    const garageUiState = this.screen === "players" ? this.captureGarageUiState("garageAddDriver") : null;
     const input = document.getElementById("newDriverName") || document.getElementById("playerName");
     const fallbackName = `DRIVER ${this.profiles.data.players.length + 1}`;
     const name = sanitizePlayerName(input?.value, fallbackName);
     const player = this.profiles.createPlayer(name);
     if (!player) {
       if (this.screen === "createDriver") this.showCreateDriverScreen(`Local driver limit is ${LOCAL_PLAYER_MAX_COUNT}.`);
-      else this.showDriverGarageScreen(`Local driver limit is ${LOCAL_PLAYER_MAX_COUNT}.`);
+      else this.showDriverGarageScreen(`Local driver limit is ${LOCAL_PLAYER_MAX_COUNT}.`, garageUiState || {});
       return;
     }
     if (this.screen === "createDriver") {
       this.showPreRaceScreen(`${player.name} created. Choose a race, then start.`);
       return;
     }
-    this.showDriverGarageScreen(`${player.name} is ready.`);
+    this.showDriverGarageScreen(`${player.name} is ready.`, garageUiState || {});
   }
 
   handleSelectPlayer(id) {
+    const garageUiState = this.captureGarageUiState("garageDriverList");
     this.profiles.selectPlayer(id);
     const player = this.profiles.getCurrentPlayer();
-    this.showDriverGarageScreen(player ? `${player.name} selected.` : "");
+    this.showDriverGarageScreen(player ? `${player.name} selected.` : "", garageUiState);
   }
 
   handleRenameDriver() {
-    const scrollTop = this.getActivePanelScrollTop();
+    const garageUiState = this.captureGarageUiState("garageRenameDriver");
     const player = this.profiles.getCurrentPlayer();
     const input = document.getElementById("driverRenameName");
     const rawName = String(input?.value ?? "").trim();
     if (!player) {
-      this.showDriverGarageScreen("Add a driver before renaming.");
+      this.showDriverGarageScreen("Add a driver before renaming.", garageUiState);
       return;
     }
     if (!rawName) {
-      this.showDriverGarageScreen("Driver name cannot be empty.", { focusTarget: "garageRenameDriver" });
+      this.showDriverGarageScreen("Driver name cannot be empty.", garageUiState);
       return;
     }
     const nextName = sanitizePlayerName(rawName, player.name);
     this.profiles.renamePlayer(player.id, nextName);
-    this.showDriverGarageScreen(`${nextName} renamed.`, { preserveScrollTop: scrollTop });
+    this.showDriverGarageScreen(`${nextName} renamed.`, garageUiState);
   }
 
   handlePromptRenamePlayer(id, returnScreen = "garage") {
+    const garageUiState = returnScreen === "garage" ? this.captureGarageUiState("garageDriverList") : null;
     const player = this.profiles.getPlayerById(id);
     if (!player) {
       if (returnScreen === "partySetup") this.showPartySetupScreen("Driver not found.");
-      else this.showDriverGarageScreen("Driver not found.");
+      else this.showDriverGarageScreen("Driver not found.", garageUiState || {});
       return;
     }
     const rawName = window.prompt("Rename driver", player.name);
@@ -35187,33 +36316,59 @@ class NeonRoadRally {
     const cleanRawName = String(rawName || "").trim();
     if (!cleanRawName) {
       if (returnScreen === "partySetup") this.showPartySetupScreen("Driver name cannot be empty.");
-      else this.showDriverGarageScreen("Driver name cannot be empty.", { focusTarget: "garageDriverList" });
+      else this.showDriverGarageScreen("Driver name cannot be empty.", garageUiState || { focusTarget: "garageDriverList" });
       return;
     }
     const nextName = sanitizePlayerName(cleanRawName, player.name);
     this.profiles.renamePlayer(player.id, nextName);
     if (returnScreen === "partySetup") this.showPartySetupScreen(`${nextName} renamed.`);
-    else this.showDriverGarageScreen(`${nextName} renamed.`, { focusTarget: "garageDriverList" });
+    else this.showDriverGarageScreen(`${nextName} renamed.`, garageUiState || { focusTarget: "garageDriverList" });
   }
 
   handleSetBadgeFilter(filter) {
-    const scrollTop = this.getActivePanelScrollTop();
-    this.badgeFilter = normalizeBadgeFilter(filter);
-    this.showDriverGarageScreen("", { preserveScrollTop: scrollTop });
+    const nextFilter = normalizeBadgeFilter(filter);
+    const currentFilter = normalizeBadgeFilter(this.badgeFilter);
+    const player = this.profiles.getCurrentPlayer();
+    const panel = this.layer?.querySelector?.("[data-garage-badge-panel]");
+    this.badgeFilter = nextFilter;
+    if (!player || !panel) {
+      this.showDriverGarageScreen("", this.captureGarageUiState("garageRewards"));
+      return;
+    }
+    if (nextFilter === currentFilter) return;
+    const activeElement = document.activeElement;
+    const focusFilter = activeElement?.dataset?.filter || nextFilter;
+    const badgeGrid = panel.querySelector(".badge-grid");
+    const badgeScrollTop = badgeGrid?.scrollTop || 0;
+    panel.outerHTML = this.renderPlayerBadgePanel(player);
+    const nextPanel = this.layer.querySelector("[data-garage-badge-panel]");
+    if (!nextPanel) return;
+    this.bindGarageBadgeFilterButtons(nextPanel);
+    const nextGrid = nextPanel.querySelector(".badge-grid");
+    if (nextGrid) nextGrid.scrollTop = Math.min(badgeScrollTop, nextGrid.scrollHeight);
+    const focusTarget = nextPanel.querySelector(`button[data-action="setBadgeFilter"][data-filter="${escapeAttr(focusFilter)}"]`)
+      || nextPanel.querySelector(`button[data-action="setBadgeFilter"][data-filter="${escapeAttr(nextFilter)}"]`);
+    if (focusTarget?.focus) {
+      try {
+        focusTarget.focus({ preventScroll: true });
+      } catch (error) {
+        focusTarget.focus();
+      }
+    }
   }
 
   handleSaveCar() {
-    const scrollTop = this.getActivePanelScrollTop();
+    const garageUiState = this.captureGarageUiState("garageCarStyle");
     this.profiles.updateCurrentCar(this.readCarForm());
     const player = this.profiles.getCurrentPlayer();
-    this.showDriverGarageScreen(`${player?.name || "Driver"} style saved.`, { preserveScrollTop: scrollTop });
+    this.showDriverGarageScreen(`${player?.name || "Driver"} style saved.`, garageUiState);
   }
 
   handleResetCarStyle() {
-    const scrollTop = this.getActivePanelScrollTop();
+    const garageUiState = this.captureGarageUiState("garageCarStyle");
     const current = this.profiles.getCurrentPlayer();
     if (!current) {
-      this.showDriverGarageScreen("Create or choose a driver before customizing a car.");
+      this.showDriverGarageScreen("Create or choose a driver before customizing a car.", garageUiState);
       return;
     }
     const currentCar = normalizeCarConfig(current.car);
@@ -35225,7 +36380,7 @@ class NeonRoadRally {
       carStyle: { ...DEFAULT_CAR_STYLE }
     });
     const player = this.profiles.getCurrentPlayer();
-    this.showDriverGarageScreen(`${player?.name || "Driver"} visual style reset.`, { preserveScrollTop: scrollTop });
+    this.showDriverGarageScreen(`${player?.name || "Driver"} visual style reset.`, garageUiState);
   }
 
   handleApplyPlaytestPick(id) {

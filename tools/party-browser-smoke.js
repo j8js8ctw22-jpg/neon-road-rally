@@ -113,6 +113,348 @@ async function run() {
     if (!isOpen) await options.locator("summary").click();
   }
 
+  async function installVirtualGamepad() {
+    await page.evaluate(() => {
+      window.__nrrVirtualPad = null;
+      Object.defineProperty(navigator, "getGamepads", {
+        configurable: true,
+        value: () => (window.__nrrVirtualPad ? [window.__nrrVirtualPad] : [])
+      });
+    });
+  }
+
+  async function setVirtualGamepad({ buttons = [], axes = [0, 0] } = {}, frames = 1) {
+    return page.evaluate(({ buttons, axes, frames }) => {
+      const buttonSet = new Set(buttons);
+      window.__nrrVirtualPad = {
+        connected: true,
+        index: 0,
+        id: "DualSense Browser QA",
+        mapping: "standard",
+        axes,
+        buttons: Array.from({ length: 16 }, (_, index) => ({
+          pressed: buttonSet.has(index),
+          value: buttonSet.has(index) ? 1 : 0
+        }))
+      };
+      const started = performance.now();
+      const app = window.neonRoadRally;
+      for (let frame = 0; frame < frames; frame += 1) app.input.update(1 / 60);
+      return performance.now() - started;
+    }, { buttons, axes, frames });
+  }
+
+  async function pressVirtualGamepad(options, frames = 2) {
+    const durationMs = await setVirtualGamepad(options, frames);
+    await setVirtualGamepad({}, 2);
+    return durationMs;
+  }
+
+  async function focusMenuSelector(selector) {
+    await page.evaluate((targetSelector) => {
+      const app = window.neonRoadRally;
+      const target = document.querySelector(targetSelector);
+      if (!target) throw new Error(`Missing focus target: ${targetSelector}`);
+      app.input.focusMenuElement(target);
+    }, selector);
+  }
+
+  async function assertControllerDirectionsDoNotChangeSelect(selector, label) {
+    await focusMenuSelector(selector);
+    const before = await page.locator(selector).inputValue();
+    const visibleFocusBefore = await page.evaluate((targetSelector) => {
+      const target = document.querySelector(targetSelector);
+      return Boolean(target?.classList?.contains("is-controller-focused"));
+    }, selector);
+    await pressVirtualGamepad({ buttons: [15] });
+    await pressVirtualGamepad({ buttons: [14] });
+    const after = await page.locator(selector).inputValue();
+    if (after !== before) {
+      throw new Error(`${label} select changed from ${before} to ${after} on controller left/right`);
+    }
+    return { before, after, visibleFocusBefore };
+  }
+
+  async function runLeaderboardControllerSelectQa() {
+    await installVirtualGamepad();
+    await page.evaluate(() => window.neonRoadRally.showLeaderboard("scoreAttack"));
+    await page.waitForFunction(() => window.neonRoadRally?.screen === "leaderboard", null, { timeout: 5000 });
+    const track = await assertControllerDirectionsDoNotChangeSelect("#leaderboardTrack", "Leaderboard Track");
+    const route = await assertControllerDirectionsDoNotChangeSelect("#leaderboardRoute", "Leaderboard Route");
+    const raceType = await assertControllerDirectionsDoNotChangeSelect("#leaderboardRaceType", "Leaderboard Race Type");
+    await focusMenuSelector("#leaderboardRaceType");
+    await pressVirtualGamepad({ buttons: [0] });
+    const raceTypeAfterCross = await page.locator("#leaderboardRaceType").inputValue();
+    if (raceTypeAfterCross !== raceType.before) {
+      throw new Error(`Leaderboard Race Type changed on Cross activation without selection: ${raceType.before} -> ${raceTypeAfterCross}`);
+    }
+    await page.selectOption("#leaderboardRaceType", "fuelRun");
+    await page.waitForFunction(() => document.querySelector("#leaderboardRaceType")?.value === "fuelRun", null, { timeout: 5000 });
+    const mouseSelectRaceType = await page.locator("#leaderboardRaceType").inputValue();
+    await page.selectOption("#leaderboardRaceType", "classic");
+    await page.waitForFunction(() => document.querySelector("#leaderboardRaceType")?.value === "classic", null, { timeout: 5000 });
+    await page.evaluate(() => {
+      window.__nrrBackToTitleStartedAt = performance.now();
+    });
+    const backInputDurationMs = await pressVirtualGamepad({ buttons: [1] });
+    await page.waitForFunction(() => window.neonRoadRally?.screen === "title", null, { timeout: 5000 });
+    const titleSettledMs = await page.evaluate(() => new Promise((resolve) => {
+      requestAnimationFrame(() => requestAnimationFrame(() => resolve(performance.now() - window.__nrrBackToTitleStartedAt)));
+    }));
+    if (titleSettledMs > 250) {
+      throw new Error(`Back to Title transition took too long: ${titleSettledMs.toFixed(1)}ms`);
+    }
+    return {
+      track,
+      route,
+      raceType,
+      mouseSelectRaceType,
+      backInputDurationMs: Number(backInputDurationMs.toFixed(2)),
+      titleSettledMs: Number(titleSettledMs.toFixed(2))
+    };
+  }
+
+  async function runControllerMenuNavigationQa() {
+    await installVirtualGamepad();
+    await page.evaluate(() => {
+      const app = window.neonRoadRally;
+      app.showTitle();
+    });
+    await page.waitForFunction(() => document.activeElement?.dataset?.action === "start", null, { timeout: 5000 });
+    const titleFocusVisible = await page.evaluate(() => {
+      const active = document.activeElement;
+      return Boolean(active?.classList?.contains("is-controller-focused") && document.querySelector("#screenLayer")?.classList?.contains("is-menu-navigation-active"));
+    });
+    await pressVirtualGamepad({ buttons: [13] });
+    await page.waitForFunction(() => document.activeElement?.dataset?.action === "partyMode", null, { timeout: 5000 });
+    await pressVirtualGamepad({ buttons: [0] });
+    await page.waitForFunction(() => window.neonRoadRally?.screen === "partySetup", null, { timeout: 5000 });
+
+    await page.evaluate(() => {
+      const app = window.neonRoadRally;
+      const setup = app.getPartySetup();
+      setup.selectedPlayerIds = app.profiles.data.players.slice(0, 3).map((player) => player.id);
+      setup.bonusSurvival = "off";
+      app.showPartySetupScreen();
+    });
+    await focusMenuSelector(".party-manage-details > summary");
+    await pressVirtualGamepad({ buttons: [0] });
+    await page.waitForFunction(() => document.querySelector(".party-manage-details")?.open === true, null, { timeout: 5000 });
+    const beforeOrder = await page.$$eval(".party-order-card", (rows) => rows.map((row) => row.dataset.partyOrderId));
+    await focusMenuSelector('.party-order-card [data-action="partyMovePlayer"][data-dir="1"]:not([disabled])');
+    await pressVirtualGamepad({ buttons: [0] });
+    await page.waitForFunction((oldOrder) => {
+      const nextOrder = Array.from(document.querySelectorAll(".party-order-card")).map((row) => row.dataset.partyOrderId);
+      return document.querySelector(".party-manage-details")?.open === true && JSON.stringify(nextOrder) !== JSON.stringify(oldOrder);
+    }, beforeOrder, { timeout: 5000 });
+
+    await focusMenuSelector(".party-options-panel > summary");
+    await pressVirtualGamepad({ buttons: [0] });
+    await page.waitForFunction(() => document.querySelector(".party-options-panel")?.open === true, null, { timeout: 5000 });
+    await page.evaluate(() => {
+      const select = document.querySelector("#partyBonusSurvival");
+      select.value = "off";
+      select.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+    await focusMenuSelector("#partyBonusSurvival");
+    await pressVirtualGamepad({ buttons: [15] });
+    const partyBonusAfterControllerRight = await page.locator("#partyBonusSurvival").inputValue();
+    if (partyBonusAfterControllerRight !== "off") {
+      throw new Error(`Party Bonus Survival select changed on controller right: ${partyBonusAfterControllerRight}`);
+    }
+    await page.selectOption("#partyBonusSurvival", "on");
+    await page.waitForFunction(() => (
+      document.querySelector(".party-options-panel")?.open === true &&
+      document.querySelector("#partyBonusSurvival")?.value === "on"
+    ), null, { timeout: 5000 });
+
+    await page.evaluate(() => window.neonRoadRally.showDriverGarageScreen());
+    await focusMenuSelector(".garage-rewards-details > summary");
+    await pressVirtualGamepad({ buttons: [0] });
+    await page.waitForFunction(() => document.querySelector(".garage-rewards-details")?.open === true, null, { timeout: 5000 });
+    await focusMenuSelector('.badge-filter-button[data-filter="mastery"]');
+    const masteryDurationMs = await pressVirtualGamepad({ buttons: [0] });
+    await page.waitForFunction(() => (
+      document.querySelector(".garage-rewards-details")?.open === true &&
+      document.querySelector(".badge-filter-button.is-active")?.dataset?.filter === "mastery"
+    ), null, { timeout: 5000 });
+    await focusMenuSelector('.badge-filter-button[data-filter="all"]');
+    const allDurationMs = await pressVirtualGamepad({ buttons: [0] });
+    await page.waitForFunction(() => (
+      document.querySelector(".garage-rewards-details")?.open === true &&
+      document.querySelector(".badge-filter-button.is-active")?.dataset?.filter === "all"
+    ), null, { timeout: 5000 });
+
+    await page.evaluate(() => window.neonRoadRally.showSettingsScreen());
+    await focusMenuSelector(".settings-tools-details > summary");
+    await pressVirtualGamepad({ buttons: [0] });
+    await page.waitForFunction(() => (
+      document.querySelector(".settings-tools-details")?.open === true &&
+      Boolean(document.querySelector(".settings-controller-diagnostics"))
+    ), null, { timeout: 5000 });
+    await page.evaluate(() => window.neonRoadRally.showTitle());
+
+    return {
+      titleFocusVisible,
+      partyScreenReached: true,
+      manageStayedOpen: true,
+      partyOptionsStayedOpen: true,
+      garageRewardsStayedOpen: true,
+      garageMasteryDurationMs: Number(masteryDurationMs.toFixed(2)),
+      garageAllDurationMs: Number(allDurationMs.toFixed(2)),
+      settingsControllerDiagnosticReached: true
+    };
+  }
+
+  async function runPartyManageDriverReorderQa() {
+    await page.evaluate(() => {
+      const app = window.neonRoadRally;
+      const setup = app.getPartySetup();
+      setup.selectedPlayerIds = app.profiles.data.players.slice(0, 3).map((player) => player.id);
+      setup.startingOrderMode = "rosterOrder";
+      app.showPartySetupScreen();
+    });
+    await expectText("3/8");
+
+    const disclosureSelector = (label) => {
+      if (label === "Manage Drivers") return ".party-manage-details";
+      if (label === "Party Options") return ".party-options-panel";
+      throw new Error(`Unknown Party setup disclosure: ${label}`);
+    };
+    const openDisclosure = async (label) => {
+      const details = page.locator(disclosureSelector(label)).first();
+      if (!await details.evaluate((node) => node.open)) {
+        await details.locator("summary").click();
+      }
+      await expectDisclosureOpen(label);
+    };
+    const expectDisclosureOpen = async (label) => {
+      const selector = disclosureSelector(label);
+      const open = await page.locator(selector).first().evaluate((node) => node.open);
+      if (!open) throw new Error(`${label} should remain open`);
+    };
+    const expectNoPartySetupReset = async () => {
+      const report = await page.evaluate(() => ({
+        screen: window.neonRoadRally?.screen || "",
+        setupScreens: document.querySelectorAll(".party-setup-screen").length,
+        startActions: document.querySelectorAll(".party-start-action").length,
+        manageOpen: document.querySelector(".party-manage-details")?.open === true,
+        optionsOpen: document.querySelector(".party-options-panel")?.open === true
+      }));
+      if (report.screen !== "partySetup" || report.setupScreens !== 1 || report.startActions !== 1 || !report.manageOpen || !report.optionsOpen) {
+        throw new Error(`Party setup should stay in place with both panels open: ${JSON.stringify(report)}`);
+      }
+    };
+    const orderIds = async () => page.$$eval(".party-order-card", (rows) => rows.map((row) => row.dataset.partyOrderId));
+    const orderNames = async () => page.$$eval(".party-order-card strong", (nodes) => nodes.map((node) => node.textContent.replace(/^\d+\.\s*/, "").trim()));
+    const expectPartyRosterOrder = async (expectedIds) => {
+      await page.waitForFunction((expected) => {
+        const rows = Array.from(document.querySelectorAll(".party-order-card")).map((row) => row.dataset.partyOrderId);
+        return JSON.stringify(rows) === JSON.stringify(expected);
+      }, expectedIds, { timeout: 5000 });
+      await expectNoPartySetupReset();
+      return orderNames();
+    };
+
+    await openDisclosure("Manage Drivers");
+    await openDisclosure("Party Options");
+    const initialIds = await orderIds();
+    if (initialIds.length !== 3) throw new Error(`Manage Drivers reorder QA expected 3 selected drivers: ${JSON.stringify(initialIds)}`);
+
+    const clickMove = async (id, dir, expectedIds) => {
+      await page.locator(`.party-order-card[data-party-order-id="${id}"] [data-action="partyMovePlayer"][data-dir="${dir}"]`).click();
+      await expectPartyRosterOrder(expectedIds);
+    };
+
+    await clickMove(initialIds[0], "1", [initialIds[1], initialIds[0], initialIds[2]]);
+    await clickMove(initialIds[0], "1", [initialIds[1], initialIds[2], initialIds[0]]);
+    await clickMove(initialIds[0], "-1", [initialIds[1], initialIds[0], initialIds[2]]);
+
+    const afterRepeatedMoves = await orderIds();
+    const afterRepeatedMoveNames = await orderNames();
+    const focusReport = await page.evaluate((driverId) => {
+      const active = document.activeElement;
+      return {
+        manageOpen: document.querySelector(".party-manage-details")?.open === true,
+        activeDriverId: active?.dataset?.partyOrderId || active?.closest?.("[data-party-order-id]")?.dataset?.partyOrderId || "",
+        activeAction: active?.dataset?.action || ""
+      };
+    }, initialIds[0]);
+    if (!focusReport.manageOpen || focusReport.activeDriverId !== initialIds[0]) {
+      throw new Error(`Manage Drivers should stay open with focus near the moved row: ${JSON.stringify(focusReport)}`);
+    }
+
+    await page.locator(`.party-order-card[data-party-order-id="${initialIds[2]}"] [data-action="partyRemovePlayer"]`).click();
+    await expectPartyRosterOrder([initialIds[1], initialIds[0]]);
+    await page.locator("#partyNewDriverName").fill("Mira");
+    await page.locator(".party-add-driver-button").click();
+    await page.waitForFunction(() => {
+      const rows = Array.from(document.querySelectorAll(".party-order-card")).map((row) => row.textContent || "");
+      return rows.length === 3 && rows.some((text) => /Mira/.test(text));
+    }, null, { timeout: 5000 });
+    await expectNoPartySetupReset();
+
+    const afterAddIds = await orderIds();
+    const afterAddNames = await page.evaluate((ids) => ids.map((id) => window.neonRoadRally.profiles.getPlayerById(id)?.name || ""), afterAddIds);
+    const beforeSeed = await page.locator("#partySeedInput").inputValue();
+    await page.locator('[data-action="partyRandomSeed"]').click();
+    await page.waitForFunction((oldSeed) => document.querySelector("#partySeedInput")?.value !== oldSeed, beforeSeed, { timeout: 5000 });
+    await expectNoPartySetupReset();
+
+    await setPartyOption("#partyBonusSurvival", "on", "On");
+    await expectNoPartySetupReset();
+    await setPartyOption("#partyBonusSurvival", "off", "Off");
+    await expectNoPartySetupReset();
+    await setPartyOption("#partySeedMode", "newSeedEachRound");
+    await expectNoPartySetupReset();
+    await setPartyOption("#partySeedMode", "sameSeedForRound");
+    await expectNoPartySetupReset();
+    await page.locator('[data-track-card="redline-run"]').click();
+    await page.waitForFunction(() => document.querySelector('input[name="partyTrack"][value="redline-run"]')?.checked === true, null, { timeout: 5000 });
+    await expectNoPartySetupReset();
+    await page.locator('.mode-ladder-card[data-id="redline"]').click();
+    await page.waitForFunction(() => document.querySelector("#partyRaceMode")?.value === "redline", null, { timeout: 5000 });
+    await expectNoPartySetupReset();
+    await page.locator('[data-race-type-choice="party"][data-value="fuelRun"]').click();
+    await page.waitForFunction(() => document.querySelector("#partyRaceType")?.value === "fuelRun", null, { timeout: 5000 });
+    await expectNoPartySetupReset();
+    await page.locator('[data-race-type-choice="party"][data-value="classic"]').click();
+    await page.waitForFunction(() => document.querySelector("#partyRaceType")?.value === "classic", null, { timeout: 5000 });
+    await expectNoPartySetupReset();
+
+    await page.selectOption("#partyStartingOrder", "rosterOrder");
+    await expectNoPartySetupReset();
+    await page.getByRole("button", { name: /Start Party Race/i }).first().click();
+    await page.waitForFunction(() => window.neonRoadRally?.screen === "partyTurn", null, { timeout: 5000 });
+    const turnOrderNames = await page.$$eval(".party-turn-order-list li span", (nodes) => nodes.map((node) => node.textContent.trim()));
+    const expectedTurnOrderNames = await page.evaluate((ids) => ids.map((id) => window.neonRoadRally.profiles.getPlayerById(id)?.name || ""), afterAddIds);
+    if (JSON.stringify(turnOrderNames) !== JSON.stringify(expectedTurnOrderNames)) {
+      throw new Error(`Party Race should use reordered roster: ${JSON.stringify({ turnOrderNames, expectedTurnOrderNames })}`);
+    }
+
+    await page.getByRole("button", { name: /Change Setup/i }).click();
+    await page.waitForFunction(() => window.neonRoadRally?.screen === "partySetup", null, { timeout: 5000 });
+    const afterReturnOpen = await page.locator(".party-manage-details").first().evaluate((node) => node.open);
+    await page.evaluate(() => {
+      const app = window.neonRoadRally;
+      app.profiles.data.players = app.profiles.data.players.slice(0, 3);
+      app.profiles.data.currentPlayerId = app.profiles.data.players[0]?.id || null;
+      const setup = app.getPartySetup();
+      setup.selectedPlayerIds = app.profiles.data.players.slice(0, 3).map((player) => player.id);
+      app.showPartySetupScreen();
+    });
+
+    return {
+      initialNames: await page.evaluate((ids) => ids.map((id) => window.neonRoadRally.profiles.getPlayerById(id)?.name || ""), initialIds),
+      afterRepeatedMovesNames: afterRepeatedMoveNames,
+      afterAddNames,
+      turnOrderNames,
+      manageStayedOpen: focusReport.manageOpen,
+      partyOptionsStayedOpen: true,
+      afterReturnOpen
+    };
+  }
+
   async function assertPartyTrackSelection() {
     const cards = await page.$$eval('input[name="partyTrack"]', (nodes) => nodes.map((node) => ({
       id: node.value,
@@ -143,8 +485,12 @@ async function run() {
     }
   }
 
-  async function finishCurrentPartyRun(fields = {}) {
-    await page.getByRole("button", { name: /^Start Run$/ }).click();
+  async function finishCurrentPartyRun(fields = {}, options = {}) {
+    if (options.startVia === "keyboard") {
+      await page.keyboard.press("Enter");
+    } else {
+      await page.getByRole("button", { name: /^Start Run$/ }).click();
+    }
     await page.waitForFunction(() => window.neonRoadRally?.screen === "game", null, { timeout: 5000 });
     await page.evaluate((runFields) => {
       const app = window.neonRoadRally;
@@ -183,6 +529,97 @@ async function run() {
     return final;
   }
 
+  async function runPartyBonusSurvivalQa() {
+    const report = await page.evaluate(() => {
+      const app = window.neonRoadRally;
+      const originalSetTimeout = window.setTimeout;
+      window.setTimeout = () => 0;
+      try {
+        const players = app.profiles.data.players.slice(0, 3);
+        const startPartyRun = (bonusSurvival) => {
+          app.partySession = new PartySession({
+            players,
+            sharedSeed: "ROAD-11111",
+            raceType: "classic",
+            bonusSurvival,
+            startingOrderMode: PARTY_STARTING_ORDER_MODE_ROSTER
+          });
+          app.startCurrentPartyRun({ force: true });
+          const run = app.run;
+          run.countdownTimer = 0;
+          run.raceActive = true;
+          run.elapsed = 42;
+          run.distance = run.track.distanceToFinish;
+          run.baseScore = 90000;
+          run.score = 90000;
+          run.manualBoosts = 3;
+          run.manualBoostsUsed = 0;
+          run.currentSpeed = Math.max(run.currentSpeed || 0, 3600);
+          return run;
+        };
+
+        startPartyRun("off");
+        app.handleFinishLineCrossing();
+        const off = {
+          ended: Boolean(app.run.ended),
+          officialEnduranceActive: Boolean(app.run.officialEnduranceActive),
+          results: app.partySession.results.length,
+          resultReason: app.partySession.results[0]?.reason || "",
+          resultScore: app.partySession.results[0]?.score || 0
+        };
+
+        startPartyRun("on");
+        app.handleFinishLineCrossing();
+        const afterFinish = {
+          ended: Boolean(app.run.ended),
+          officialEnduranceActive: Boolean(app.run.officialEnduranceActive),
+          officialFinishLocked: Boolean(app.run.officialFinishLocked),
+          results: app.partySession.results.length,
+          canEnd: app.canEndOfficialEndurance()
+        };
+
+        app.run.elapsed += 18;
+        app.run.score += 7000;
+        app.run.distance = Math.min(app.run.track.distanceToFinish - 1, 42000);
+        app.updateOfficialEnduranceStats();
+        app.endOfficialEndurance("Driver Ended");
+        const result = app.partySession.results[0] || {};
+        const final = {
+          results: app.partySession.results.length,
+          status: result.status || "",
+          reason: result.reason || "",
+          score: result.score || 0,
+          officialFinishScore: result.officialFinishScore || 0,
+          bonusSurvivalScore: result.bonusSurvivalScore || 0,
+          bonusSurvivalTime: result.bonusSurvivalTime || 0,
+          partyBonusSurvival: Boolean(result.partyBonusSurvival),
+          summaryHasEndurance: Boolean(app.lastSummary?.officialEnduranceResult)
+        };
+
+        app.partySession = null;
+        app.partySetup = app.createDefaultPartySetup();
+        app.partySetup.selectedPlayerIds = app.profiles.data.players.slice(0, 3).map((player) => player.id);
+        app.showPartySetupScreen();
+        return { off, afterFinish, final };
+      } finally {
+        window.setTimeout = originalSetTimeout;
+      }
+    });
+    if (!report.off.ended || report.off.officialEnduranceActive || report.off.results !== 1) {
+      throw new Error(`Party Bonus Survival off should finish normally: ${JSON.stringify(report.off)}`);
+    }
+    if (report.afterFinish.ended || !report.afterFinish.officialEnduranceActive || !report.afterFinish.officialFinishLocked || report.afterFinish.results !== 0 || !report.afterFinish.canEnd) {
+      throw new Error(`Party Bonus Survival on should defer Party result and continue survival: ${JSON.stringify(report.afterFinish)}`);
+    }
+    if (report.final.results !== 1 || report.final.status !== "finished" || report.final.reason !== "Official Finish + Bonus Survival" || !report.final.partyBonusSurvival || !(report.final.bonusSurvivalScore > 0) || !report.final.summaryHasEndurance) {
+      throw new Error(`Party Bonus Survival final result should combine official finish and bonus survival: ${JSON.stringify(report.final)}`);
+    }
+    return report;
+  }
+
+  const controllerMenuNavigationQa = await runControllerMenuNavigationQa();
+  const leaderboardControllerSelectQa = await runLeaderboardControllerSelectQa();
+
   await clickText("Party Race");
   await expectText("Party Mode");
   await page.evaluate(() => {
@@ -192,6 +629,8 @@ async function run() {
     app.showPartySetupScreen();
   });
   await expectText("3/8");
+  const partyBonusSurvivalQa = await runPartyBonusSurvivalQa();
+  const partyManageReorderQa = await runPartyManageDriverReorderQa();
   const partySetupUi = await page.evaluate(() => {
     const text = document.body.innerText || "";
     const start = document.querySelector(".party-start-action")?.getBoundingClientRect();
@@ -294,6 +733,8 @@ async function run() {
   await expectText("3/8");
   await setPartyOption("#partyRaceType", "classic", "Classic");
   await openPartyOptions();
+  await setPartyOption("#partyBonusSurvival", "on", "On");
+  await setPartyOption("#partyBonusSurvival", "off", "Off");
   await setPartyOption("#partyStartingOrder", "rosterOrder");
   await setPartyOption("#partyStartingOrder", "randomOnce");
   await setPartyOption("#partyStartingOrder", "randomEveryRound");
@@ -301,7 +742,7 @@ async function run() {
   await page.getByRole("button", { name: /Start Party Race/i }).first().click();
   await page.waitForFunction(() => window.neonRoadRally?.screen === "partyTurn", null, { timeout: 5000 });
   await expectText("Starting Order");
-  await expectText("At the keyboard now");
+  await expectText("Pass the controller or keyboard now");
   await expectText("Player 1 of 3");
 
   const classicRuns = [
@@ -316,8 +757,10 @@ async function run() {
     { score: 190000, laneMoves: 4, boostPadsCollected: 2 }
   ];
   let sawRoundShuffle = false;
-  for (const runFields of classicRuns) {
-    await finishCurrentPartyRun(runFields);
+  let keyboardPartyStartQa = false;
+  for (const [index, runFields] of classicRuns.entries()) {
+    await finishCurrentPartyRun(runFields, { startVia: index === 0 ? "keyboard" : "button" });
+    if (index === 0) keyboardPartyStartQa = true;
     sawRoundShuffle = sawRoundShuffle || await page.getByText(/order shuffled/i).count().then((count) => count > 0);
     const final = await advancePartyIfNeeded();
     if (final) break;
@@ -382,9 +825,28 @@ async function run() {
 
   await clickText("Settings");
   await page.waitForFunction(() => window.neonRoadRally?.screen === "settings", null, { timeout: 5000 });
+  let settingsControllerQa = null;
   const settingsToolsSummary = page.locator(".settings-tools-details > summary");
   if (await settingsToolsSummary.count()) {
-    await settingsToolsSummary.click();
+    const toolsOpen = await page.locator(".settings-tools-details").first().evaluate((node) => node.open);
+    if (!toolsOpen) await settingsToolsSummary.click();
+    const settingsQa = await page.evaluate(() => {
+      const tools = document.querySelector(".settings-tools-details");
+      if (tools) tools.open = true;
+      const bodyText = document.body.innerText.replace(/\s+/g, " ");
+      const lowerText = bodyText.toLowerCase();
+      return {
+        tvNote: /HDMI\/USB-C to HDMI/.test(bodyText) && /TV Game Mode/.test(bodyText) && /AirPlay\/casting delay is expected/.test(bodyText),
+        controllerDiagnostic: Boolean(document.querySelector(".settings-controller-diagnostics")),
+        controllerStatus: document.querySelector("[data-controller-status]")?.textContent || "",
+        controllerFocusNote: /button press first/.test(bodyText),
+        mappingRows: ["cross/x", "circle", "options/menu", "l1/l2 + left/right", "d-pad / left stick"].every((text) => lowerText.includes(text))
+      };
+    });
+    if (!settingsQa.tvNote || !settingsQa.controllerDiagnostic || !settingsQa.controllerFocusNote || !settingsQa.mappingRows) {
+      throw new Error(`Settings should include compact controller diagnostics, mapping, and TV setup copy: ${JSON.stringify(settingsQa)}`);
+    }
+    settingsControllerQa = settingsQa;
     await clickAction("showPlaytestReport");
   } else {
     await clickText("Playtest Tools");
@@ -401,7 +863,7 @@ async function run() {
   await browser.close();
 
   if (consoleIssues.length) throw new Error(`Console issues: ${consoleIssues.join(" | ")}`);
-  console.log(JSON.stringify({ ok: true, sawRoundShuffle, ...result }, null, 2));
+  console.log(JSON.stringify({ ok: true, sawRoundShuffle, keyboardPartyStartQa, settingsControllerQa, controllerMenuNavigationQa, leaderboardControllerSelectQa, partyBonusSurvivalQa, partyManageReorderQa, ...result }, null, 2));
 }
 
 run().catch((error) => {

@@ -688,13 +688,46 @@ async function run() {
     assert.strictEqual(fuel.flowEnabled, false, "Fuel Run should not enable Flow Break");
     assert.strictEqual(fuel.armed, false, "Fuel Run should not arm Flow Break");
 
-    const party = await page.evaluate(() => {
+    const partyClassicArmed = await page.evaluate(() => {
       window.__flowBreakQa.reset({ partyMode: true });
       window.__flowBreakQa.armFromFlow();
       return window.__flowBreakQa.snapshot();
     });
-    assert.strictEqual(party.flowEnabled, false, "Party should not enable Flow Break");
-    assert.strictEqual(party.armed, false, "Party should not arm Flow Break");
+    assert.strictEqual(partyClassicArmed.flowEnabled, true, "Party Classic should enable Flow Break");
+    assert.strictEqual(partyClassicArmed.armed, true, "Party Classic should arm Flow Break from earned Flow");
+
+    const partyClassicConeOnly = await page.evaluate(() => {
+      window.__flowBreakQa.reset({ partyMode: true });
+      window.__flowBreakQa.armFromFlow();
+      const coneId = window.__flowBreakQa.add("cone", 2, 2200);
+      const snapshot = window.__flowBreakQa.tick();
+      return { coneId, snapshot };
+    });
+    assert.strictEqual(partyClassicConeOnly.snapshot.triggered, 0, "Party Classic Flow Break should not trigger from cone-only danger");
+    assert.strictEqual(partyClassicConeOnly.snapshot.armed, true, "Party Classic cone-only danger should leave Flow Break armed");
+    assert(!findObstacle(partyClassicConeOnly.snapshot, partyClassicConeOnly.coneId).flowBreakCleared, "Party Classic cone-only hazard should not clear without a major trigger");
+
+    const partyClassicMajor = await page.evaluate(() => {
+      window.__flowBreakQa.reset({ partyMode: true });
+      window.__flowBreakQa.armFromFlow();
+      const slowId = window.__flowBreakQa.add("slowCar", 2, 2200);
+      const coneId = window.__flowBreakQa.add("cone", 2, 2260);
+      const snapshot = window.__flowBreakQa.tick();
+      return { slowId, coneId, snapshot };
+    });
+    assert.strictEqual(partyClassicMajor.snapshot.triggered, 1, "Party Classic Flow Break should trigger from a forward major hazard");
+    assert.strictEqual(partyClassicMajor.snapshot.triggeredByMajorHazard, true, "Party Classic trigger should be marked major-hazard driven");
+    assert(findObstacle(partyClassicMajor.snapshot, partyClassicMajor.slowId).flowBreakCleared, "Party Classic major hazard should clear");
+    assert(findObstacle(partyClassicMajor.snapshot, partyClassicMajor.coneId).flowBreakCleared, "Party Classic minor hazard may clear after a major trigger");
+    assert(partyClassicMajor.snapshot.sparksCreated >= 1, "Party Classic Flow Break should create forward sparks");
+
+    const partyFuel = await page.evaluate(() => {
+      window.__flowBreakQa.reset({ raceTypeId: "fuelRun", partyMode: true });
+      window.__flowBreakQa.armFromFlow();
+      return window.__flowBreakQa.snapshot();
+    });
+    assert.strictEqual(partyFuel.flowEnabled, false, "Party Fuel Run should not enable Flow Break");
+    assert.strictEqual(partyFuel.armed, false, "Party Fuel Run should not arm Flow Break");
 
     const pageText = await page.textContent("body");
     const manualPulseCopyPattern = new RegExp([`PRESS ${"E"}`, `LANE ${"PULSE"}`, `${"PULSE"} READY`, `E ${"PULSE"}`].join("|"), "i");
@@ -744,7 +777,10 @@ async function run() {
       barrier,
       collision,
       fuel,
-      party,
+      partyClassicArmed,
+      partyClassicConeOnly,
+      partyClassicMajor,
+      partyFuel,
       realRouteSample,
       consoleIssues
     }, null, 2));
