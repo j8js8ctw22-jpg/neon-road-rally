@@ -1269,11 +1269,11 @@ const LAUNCH_PACING_CONFIG = {
   },
   turbo: {
     spawnLeadSeconds: 3.25,
-    spacingMultiplier: 1.74,
-    randomSecondsMultiplier: 1.85,
-    pressureBudgetMultiplier: 0.62,
+    spacingMultiplier: 1.68,
+    randomSecondsMultiplier: 1.78,
+    pressureBudgetMultiplier: 0.64,
     pressureBudgetAllowance: 1.05,
-    forceMeaningfulMultiplier: 1.8,
+    forceMeaningfulMultiplier: 1.7,
     centerChallengeStartProgress: 0.18,
     softCenterStartProgress: 0.22,
     minorScaleMultiplier: 0.2,
@@ -1282,11 +1282,11 @@ const LAUNCH_PACING_CONFIG = {
   },
   overdrive: {
     spawnLeadSeconds: 3.05,
-    spacingMultiplier: 2,
-    randomSecondsMultiplier: 2.1,
-    pressureBudgetMultiplier: 0.56,
+    spacingMultiplier: 1.94,
+    randomSecondsMultiplier: 2.04,
+    pressureBudgetMultiplier: 0.58,
     pressureBudgetAllowance: 1.03,
-    forceMeaningfulMultiplier: 2,
+    forceMeaningfulMultiplier: 1.9,
     centerChallengeStartProgress: 0.19,
     softCenterStartProgress: 0.23,
     minorScaleMultiplier: 0.16,
@@ -1295,11 +1295,11 @@ const LAUNCH_PACING_CONFIG = {
   },
   redline: {
     spawnLeadSeconds: 2.95,
-    spacingMultiplier: 2.24,
-    randomSecondsMultiplier: 2.35,
-    pressureBudgetMultiplier: 0.52,
+    spacingMultiplier: 2.1,
+    randomSecondsMultiplier: 2.2,
+    pressureBudgetMultiplier: 0.56,
     pressureBudgetAllowance: 1.02,
-    forceMeaningfulMultiplier: 2.15,
+    forceMeaningfulMultiplier: 2,
     centerChallengeStartProgress: 0.2,
     softCenterStartProgress: 0.24,
     minorScaleMultiplier: 0.12,
@@ -2123,7 +2123,7 @@ const ROAD_DIRECTOR_INTENT_WAVE_WEIGHTS = {
     recoveryGap: 0.12
   }
 };
-const FOUR_LANE_PRESSURE_COOLDOWN = 9000;
+const FOUR_LANE_PRESSURE_COOLDOWN = 7600;
 const DEFAULT_SPEED_CLASS_ID = "arcade";
 const DEFAULT_RACE_TYPE_ID = "classic";
 const FUEL_RUN_RACE_TYPE_ID = "fuelRun";
@@ -2617,9 +2617,9 @@ const TRACKS = [
         rookie: { cadenceScale: 1.14, spacingScale: 1.1, recoveryScale: 1.2 },
         arcade: { cadenceScale: 0.96, spacingScale: 0.96, recoveryScale: 1.16 },
         pro: { cadenceScale: 1.02, spacingScale: 1.02, recoveryScale: 1.12 },
-        turbo: { cadenceScale: 1.02, spacingScale: 1.05, recoveryScale: 1.08 },
-        overdrive: { cadenceScale: 1.04, spacingScale: 1.1, recoveryScale: 1.14 },
-        redline: { cadenceScale: 1.08, spacingScale: 1.16, recoveryScale: 1.22 }
+        turbo: { cadenceScale: 0.98, spacingScale: 0.98, recoveryScale: 1 },
+        overdrive: { cadenceScale: 0.98, spacingScale: 1.02, recoveryScale: 1.02 },
+        redline: { cadenceScale: 0.98, spacingScale: 1.04, recoveryScale: 1.04 }
       },
       waveWeightMultipliers: {
         singleBlocker: 0.72,
@@ -2758,11 +2758,11 @@ const TRACKS = [
         label: "Lane Read",
         startProgress: 0.12,
         endProgress: 0.38,
-        pressureMultiplier: 0.78,
+        pressureMultiplier: 0.82,
         visualIntensity: 1,
-        cadenceMultiplier: 1.18,
-        recoveryGapMultiplier: 1.24,
-        forceMeaningfulMultiplier: 1.12,
+        cadenceMultiplier: 1.16,
+        recoveryGapMultiplier: 1.16,
+        forceMeaningfulMultiplier: 1.05,
         extraWaveWeights: {
           boostTemptation: 0.42,
           speedGateChain: 0.4,
@@ -2780,11 +2780,11 @@ const TRACKS = [
           boostTemptation: 1.72,
           nearMissCorridor: 0.78,
           fourLaneSpike: 0,
-          recoveryGap: 1.8,
-          redlineSlalom: 0.78,
+          recoveryGap: 1.55,
+          redlineSlalom: 0.92,
           speedGateChain: 1.65,
-          expressConvoy: 0.62,
-          neonChicane: 0.26,
+          expressConvoy: 0.7,
+          neonChicane: 0.3,
           rampOverpass: 0.75,
           needleThread: 0.24,
           pursuitPressureLanes: 1.42,
@@ -2800,9 +2800,9 @@ const TRACKS = [
         endProgress: 0.62,
         pressureMultiplier: 1.16,
         visualIntensity: 1.15,
-        cadenceMultiplier: 1,
-        recoveryGapMultiplier: 0.9,
-        forceMeaningfulMultiplier: 0.84,
+        cadenceMultiplier: 0.88,
+        recoveryGapMultiplier: 0.72,
+        forceMeaningfulMultiplier: 0.72,
         extraWaveWeights: {
           expressConvoy: 1.15,
           needleThread: 1.1,
@@ -2822,8 +2822,8 @@ const TRACKS = [
           rampEscape: 0.2,
           boostTemptation: 0.35,
           nearMissCorridor: 1.78,
-          fourLaneSpike: 0.38,
-          recoveryGap: 0.32,
+          fourLaneSpike: 0.65,
+          recoveryGap: 0.24,
           redlineSlalom: 1.65,
           speedGateChain: 0.25,
           expressConvoy: 1.8,
@@ -2843,9 +2843,9 @@ const TRACKS = [
         endProgress: 0.74,
         pressureMultiplier: 0.58,
         visualIntensity: 1.02,
-        cadenceMultiplier: 1.26,
-        recoveryGapMultiplier: 1.38,
-        forceMeaningfulMultiplier: 1.16,
+        cadenceMultiplier: 1.16,
+        recoveryGapMultiplier: 1.18,
+        forceMeaningfulMultiplier: 1.02,
         extraWaveWeights: {
           recoveryGap: 2,
           boostTemptation: 0.42,
@@ -2863,7 +2863,7 @@ const TRACKS = [
           boostTemptation: 2.65,
           nearMissCorridor: 0.08,
           fourLaneSpike: 0,
-          recoveryGap: 3.2,
+          recoveryGap: 2.4,
           redlineSlalom: 0.08,
           speedGateChain: 1.7,
           expressConvoy: 0.16,
@@ -2883,9 +2883,9 @@ const TRACKS = [
         endProgress: 1,
         pressureMultiplier: 1.18,
         visualIntensity: 1.34,
-        cadenceMultiplier: 1,
-        recoveryGapMultiplier: 0.92,
-        forceMeaningfulMultiplier: 0.82,
+        cadenceMultiplier: 0.88,
+        recoveryGapMultiplier: 0.72,
+        forceMeaningfulMultiplier: 0.7,
         extraWaveWeights: {
           needleThread: 1.1,
           redlineSlalom: 1,
@@ -2904,9 +2904,9 @@ const TRACKS = [
           deerCrossing: 0,
           rampEscape: 0.42,
           boostTemptation: 0.85,
-          nearMissCorridor: 1.78,
-          fourLaneSpike: 0.45,
-          recoveryGap: 0.9,
+          nearMissCorridor: 1.95,
+          fourLaneSpike: 0.75,
+          recoveryGap: 0.52,
           redlineSlalom: 1.55,
           speedGateChain: 0.7,
           expressConvoy: 1.5,
@@ -3879,7 +3879,22 @@ const ENDURANCE_ESCALATION_CONFIG = {
   secondsPerStep: 12,
   stepMultiplier: 0.02,
   completedLapMultiplier: 0.045,
-  maxSpeedMultiplier: 1.34
+  maxSpeedMultiplier: 1.34,
+  pressureLapBonus: 0.18,
+  pressureTimeBonusCap: 0.18,
+  pressureTimeBonusSeconds: 90,
+  cadenceLapReduction: 0.075,
+  cadenceTimeReductionCap: 0.1,
+  cadenceTimeReductionSeconds: 120,
+  minCadenceMultiplier: 0.72,
+  recoveryLapReduction: 0.12,
+  recoveryTimeReductionCap: 0.14,
+  recoveryTimeReductionSeconds: 120,
+  minRecoveryMultiplier: 0.58,
+  forceMeaningfulLapReduction: 0.1,
+  forceMeaningfulTimeReductionCap: 0.12,
+  forceMeaningfulTimeReductionSeconds: 120,
+  minForceMeaningfulMultiplier: 0.64
 };
 
 const DRIFT_TUNING = {
@@ -4145,9 +4160,9 @@ const ROAD_DIRECTOR = {
     rookie: { early: 2.75, mid: 2.2, late: 1.75, randomEarly: 0.36, randomLate: 0.15, spacingScale: 1.02, recoveryScale: 1.05, centerSafe: 8, laneStill: 4.4, forceMeaningful: 3.55 },
     arcade: { early: 1.55, mid: 1.18, late: 0.9, randomEarly: 0.14, randomLate: 0.06, spacingScale: 0.7, recoveryScale: 0.52, centerSafe: 3.6, centerHold: 2.65, laneStill: 2.1, forceMeaningful: 1.75 },
     pro: { early: 1.34, mid: 1.08, late: 0.84, randomEarly: 0.11, randomLate: 0.05, spacingScale: 0.68, recoveryScale: 0.5, centerSafe: 2.25, centerHold: 1.9, laneStill: 1.4, forceMeaningful: 1.34 },
-    turbo: { early: 1.52, mid: 1.22, late: 0.98, randomEarly: 0.13, randomLate: 0.06, spacingScale: 0.78, recoveryScale: 0.62, centerSafe: 2.1, centerHold: 1.75, laneStill: 1.25, forceMeaningful: 1.55 },
-    overdrive: { early: 1.68, mid: 1.34, late: 1.08, randomEarly: 0.14, randomLate: 0.06, spacingScale: 0.86, recoveryScale: 0.72, centerSafe: 1.95, centerHold: 1.62, laneStill: 1.12, forceMeaningful: 1.7 },
-    redline: { early: 1.82, mid: 1.46, late: 1.18, randomEarly: 0.15, randomLate: 0.07, spacingScale: 0.92, recoveryScale: 0.82, centerSafe: 1.85, centerHold: 1.48, laneStill: 1, forceMeaningful: 1.85 }
+    turbo: { early: 1.45, mid: 1.16, late: 0.94, randomEarly: 0.12, randomLate: 0.055, spacingScale: 0.72, recoveryScale: 0.56, centerSafe: 2.1, centerHold: 1.75, laneStill: 1.18, forceMeaningful: 1.42 },
+    overdrive: { early: 1.54, mid: 1.22, late: 0.98, randomEarly: 0.125, randomLate: 0.055, spacingScale: 0.76, recoveryScale: 0.62, centerSafe: 1.95, centerHold: 1.62, laneStill: 1.04, forceMeaningful: 1.48 },
+    redline: { early: 1.58, mid: 1.24, late: 1, randomEarly: 0.13, randomLate: 0.06, spacingScale: 0.78, recoveryScale: 0.64, centerSafe: 1.85, centerHold: 1.48, laneStill: 0.96, forceMeaningful: 1.5 }
   },
   centerChallengeMinSeconds: {
     sunday: 8,
@@ -5353,7 +5368,62 @@ function getOfficialEnduranceBaselineSpeedFloor(run, enduranceSpeedMultiplier = 
 
 function getOfficialEndurancePressureMultiplier(run) {
   if (!isOfficialEnduranceRun(run)) return 1;
-  return clamp(1 + (getOfficialEnduranceLapNumber(run) - 1) * 0.12, 1, 1.56);
+  const completedLaps = Math.max(0, getOfficialEnduranceLapNumber(run) - 1);
+  const timeBonus = Math.min(
+    ENDURANCE_ESCALATION_CONFIG.pressureTimeBonusCap,
+    (getOfficialEnduranceEscalationSeconds(run) / ENDURANCE_ESCALATION_CONFIG.pressureTimeBonusSeconds)
+      * ENDURANCE_ESCALATION_CONFIG.pressureTimeBonusCap
+  );
+  return clamp(
+    1 + completedLaps * ENDURANCE_ESCALATION_CONFIG.pressureLapBonus + timeBonus,
+    1,
+    1.86
+  );
+}
+
+function getOfficialEnduranceDirectorCadenceMultiplier(run) {
+  if (!isOfficialEnduranceRun(run)) return 1;
+  const completedLaps = Math.max(0, getOfficialEnduranceLapNumber(run) - 1);
+  const timeReduction = Math.min(
+    ENDURANCE_ESCALATION_CONFIG.cadenceTimeReductionCap,
+    (getOfficialEnduranceEscalationSeconds(run) / ENDURANCE_ESCALATION_CONFIG.cadenceTimeReductionSeconds)
+      * ENDURANCE_ESCALATION_CONFIG.cadenceTimeReductionCap
+  );
+  return clamp(
+    1 - completedLaps * ENDURANCE_ESCALATION_CONFIG.cadenceLapReduction - timeReduction,
+    ENDURANCE_ESCALATION_CONFIG.minCadenceMultiplier,
+    1
+  );
+}
+
+function getOfficialEnduranceDirectorRecoveryMultiplier(run) {
+  if (!isOfficialEnduranceRun(run)) return 1;
+  const completedLaps = Math.max(0, getOfficialEnduranceLapNumber(run) - 1);
+  const timeReduction = Math.min(
+    ENDURANCE_ESCALATION_CONFIG.recoveryTimeReductionCap,
+    (getOfficialEnduranceEscalationSeconds(run) / ENDURANCE_ESCALATION_CONFIG.recoveryTimeReductionSeconds)
+      * ENDURANCE_ESCALATION_CONFIG.recoveryTimeReductionCap
+  );
+  return clamp(
+    1 - completedLaps * ENDURANCE_ESCALATION_CONFIG.recoveryLapReduction - timeReduction,
+    ENDURANCE_ESCALATION_CONFIG.minRecoveryMultiplier,
+    1
+  );
+}
+
+function getOfficialEnduranceForceMeaningfulMultiplier(run) {
+  if (!isOfficialEnduranceRun(run)) return 1;
+  const completedLaps = Math.max(0, getOfficialEnduranceLapNumber(run) - 1);
+  const timeReduction = Math.min(
+    ENDURANCE_ESCALATION_CONFIG.forceMeaningfulTimeReductionCap,
+    (getOfficialEnduranceEscalationSeconds(run) / ENDURANCE_ESCALATION_CONFIG.forceMeaningfulTimeReductionSeconds)
+      * ENDURANCE_ESCALATION_CONFIG.forceMeaningfulTimeReductionCap
+  );
+  return clamp(
+    1 - completedLaps * ENDURANCE_ESCALATION_CONFIG.forceMeaningfulLapReduction - timeReduction,
+    ENDURANCE_ESCALATION_CONFIG.minForceMeaningfulMultiplier,
+    1
+  );
 }
 
 function getOfficialEnduranceHudContextParts(run, progress = 0) {
@@ -11236,7 +11306,8 @@ class RoadDirector {
       && centerSafeSeconds >= centerChallengeMinSeconds * 0.92;
     const forceMeaningful = meaningfulGapSeconds >= (cadence.forceMeaningful ?? 3)
       * getSectionNumber(section, "forceMeaningfulMultiplier", 1, 0.45, 1.8)
-      * (launchPacing?.forceMeaningfulMultiplier ?? 1);
+      * (launchPacing?.forceMeaningfulMultiplier ?? 1)
+      * getOfficialEnduranceForceMeaningfulMultiplier(run);
     const activityRunDistance = seedLocked && this.manager.getSafetyRunDistance
       ? this.manager.getSafetyRunDistance(distance)
       : (this.manager.game.run?.distance || 0);
@@ -11722,6 +11793,20 @@ class RoadDirector {
         if (type === "singleBlocker") weight *= 0.08;
         if (type === "doubleGate") weight *= 0.2;
         if (type === "recoveryGap") weight *= 0.11;
+      }
+
+      if (context.officialEnduranceActive) {
+        const completedLaps = Math.max(0, (context.officialEnduranceLap || 1) - 1);
+        const lapPressure = clamp(completedLaps, 0, 3);
+        if (type === "recoveryGap") weight *= clamp(1 - lapPressure * 0.18, 0.42, 1);
+        if (type === "singleBlocker") weight *= clamp(1 - lapPressure * 0.08, 0.68, 1);
+        if (["doubleGate", "centerBlock", "officialFastLineFork", "officialFinalPushSplit"].includes(type)) {
+          weight *= 1 + lapPressure * 0.12;
+        }
+        if (["offsetPair", "leftRightSweep", "nearMissCorridor", "redlineSlalom", "expressConvoy", "neonChicane", "needleThread"].includes(type)) {
+          weight *= 1 + lapPressure * 0.18;
+        }
+        if (type === "fourLaneSpike") weight *= 1 + lapPressure * 0.24;
       }
 
       if (context.section?.id === "launch" && context.speedClassId === "turbo") {
@@ -12730,6 +12815,7 @@ class RoadDirector {
 
   getSpacingMultiplier(result) {
     if (!result) return 1;
+    const run = this.manager.game.run || {};
     const cadence = getTrackDirectorCadence(this.manager.getSpeedClassId(), this.manager.track);
     const turboFuelSpacing = this.manager.getSpeedClassId() === "turbo"
       && this.manager.getRaceTypeId() === FUEL_RUN_RACE_TYPE_ID
@@ -12739,6 +12825,10 @@ class RoadDirector {
     const sectionCadence = getSectionNumber(result.section, "cadenceMultiplier", 1, 0.5, 1.5);
     const sectionRecovery = result.type === "recoveryGap"
       ? getSectionNumber(result.section, "recoveryGapMultiplier", 1, 0.45, 1.6)
+      : 1;
+    const enduranceCadenceScale = getOfficialEnduranceDirectorCadenceMultiplier(run);
+    const enduranceRecoveryScale = result.type === "recoveryGap"
+      ? getOfficialEnduranceDirectorRecoveryMultiplier(run)
       : 1;
     const launchPacing = this.getLaunchPacingConfig(this.manager.getSpeedClassId(), result.section);
     const multipliers = {
@@ -12782,21 +12872,26 @@ class RoadDirector {
       * sectionCadence
       * sectionRecovery
       * (launchPacing?.spacingMultiplier ?? 1)
-      * turboFuelSpacing;
+      * turboFuelSpacing
+      * enduranceCadenceScale
+      * enduranceRecoveryScale;
   }
 
   getRandomSecondsScale(result) {
     if (!result) return 1;
+    const run = this.manager.game.run || {};
     const cadence = getTrackDirectorCadence(this.manager.getSpeedClassId(), this.manager.track);
     const speedClassId = this.manager.getSpeedClassId();
     const sectionRandom = getSectionNumber(result.section, "cadenceMultiplier", 1, 0.5, 1.5);
     const launchPacing = this.getLaunchPacingConfig(speedClassId, result.section);
     const launchRandom = launchPacing?.randomSecondsMultiplier ?? 1;
-    if (result.type === "recoveryGap") return 0.28 * (cadence.recoveryScale ?? 1) * sectionRandom * launchRandom;
-    if (speedClassId === "turbo") return (result.hard ? 0.24 : 0.34) * sectionRandom * launchRandom;
-    if (speedClassId === "pro") return (result.hard ? 0.32 : 0.44) * sectionRandom * launchRandom;
-    if (result.hard) return 0.38 * sectionRandom * launchRandom;
-    return 0.52 * sectionRandom * launchRandom;
+    const enduranceCadenceScale = getOfficialEnduranceDirectorCadenceMultiplier(run);
+    const enduranceRecoveryScale = getOfficialEnduranceDirectorRecoveryMultiplier(run);
+    if (result.type === "recoveryGap") return 0.28 * (cadence.recoveryScale ?? 1) * sectionRandom * launchRandom * enduranceRecoveryScale;
+    if (speedClassId === "turbo") return (result.hard ? 0.24 : 0.34) * sectionRandom * launchRandom * enduranceCadenceScale;
+    if (speedClassId === "pro") return (result.hard ? 0.32 : 0.44) * sectionRandom * launchRandom * enduranceCadenceScale;
+    if (result.hard) return 0.38 * sectionRandom * launchRandom * enduranceCadenceScale;
+    return 0.52 * sectionRandom * launchRandom * enduranceCadenceScale;
   }
 
   getDebugInfo() {
@@ -13176,23 +13271,23 @@ class RoadDirector {
   pickPressureLane(context, centerChance = 0.25, excluded = []) {
     const blocked = Array.isArray(excluded) ? excluded : [excluded];
     const playerLaneIsCenter = context.playerLane === TRACK_DIRECTOR.centerLane;
-    const isTurbo = context.speedClassId === "turbo";
+    const isHighSpeed = ["turbo", "overdrive", "redline"].includes(context.speedClassId);
     const isPro = context.speedClassId === "pro";
     if (context.needsMovementChallenge && !blocked.includes(context.playerLane)) {
       const playerLaneChance = playerLaneIsCenter
-        ? (context.centerNeedsChallenge ? (isTurbo ? 0.9 : 0.74) : (isTurbo ? 0.48 : 0.28))
-        : (isTurbo ? 0.84 : (isPro ? 0.78 : 0.74));
+        ? (context.centerNeedsChallenge ? (isHighSpeed ? 0.9 : 0.74) : (isHighSpeed ? 0.5 : 0.28))
+        : (isHighSpeed ? 0.84 : (isPro ? 0.78 : 0.74));
       if ((!playerLaneIsCenter || context.centerNeedsChallenge || context.allowSoftCenterPressure) && this.random() < playerLaneChance) {
         return context.playerLane;
       }
     }
     if (!blocked.includes(TRACK_DIRECTOR.centerLane)) {
-      const centerNeedChance = isTurbo ? 0.94 : (isPro ? 0.88 : 0.84);
-      const softMultiplier = isTurbo ? 1.45 : (isPro ? 1.18 : 1);
+      const centerNeedChance = isHighSpeed ? 0.94 : (isPro ? 0.88 : 0.84);
+      const softMultiplier = isHighSpeed ? 1.45 : (isPro ? 1.18 : 1);
       if (context.centerNeedsChallenge && this.random() < centerNeedChance) return TRACK_DIRECTOR.centerLane;
       if (context.allowSoftCenterPressure && this.random() < centerChance * context.centerSoftPressure * softMultiplier) return TRACK_DIRECTOR.centerLane;
     }
-    const playerLanePressureChance = isTurbo ? 0.46 : (isPro ? 0.36 : 0.3);
+    const playerLanePressureChance = isHighSpeed ? 0.46 : (isPro ? 0.36 : 0.3);
     if (!blocked.includes(context.playerLane) && context.progress > 0.24 && this.random() < playerLanePressureChance) {
       return context.playerLane;
     }
@@ -13216,7 +13311,7 @@ class RoadDirector {
         return this.avoidRecentRouteLane(centerLane, context, excluded);
       }
     }
-    const highModeCenterPressure = ["pro", "turbo"].includes(context.speedClassId)
+    const highModeCenterPressure = ["pro", "turbo", "overdrive", "redline"].includes(context.speedClassId)
       && (context.allowSoftCenterPressure || context.progress > 0.22);
     return this.avoidRecentRouteLane(
       this.pickSafeLane(context, Boolean(options.preferSide) || context.centerNeedsChallenge || highModeCenterPressure, excluded),
@@ -13231,7 +13326,7 @@ class RoadDirector {
     if (repeats < 2 || this.random() > 0.62) return lane;
     const blocked = Array.isArray(excluded) ? excluded : [excluded];
     let alternatives = this.lanesExcept(blocked).filter((candidate) => candidate !== lane);
-    if (context.centerNeedsChallenge || context.speedClassId === "turbo") {
+    if (context.centerNeedsChallenge || ["turbo", "overdrive", "redline"].includes(context.speedClassId)) {
       const sideAlternatives = alternatives.filter((candidate) => candidate !== TRACK_DIRECTOR.centerLane);
       if (sideAlternatives.length) alternatives = sideAlternatives;
     }
@@ -13253,7 +13348,7 @@ class RoadDirector {
       }
     }
     if (ordered.includes(centerLane)) {
-      const highModeCenterChance = context.speedClassId === "turbo" && context.progress > 0.16
+      const highModeCenterChance = ["turbo", "overdrive", "redline"].includes(context.speedClassId) && context.progress > 0.16
         ? 0.48
         : (context.speedClassId === "pro" && context.progress > 0.22 ? 0.36 : 0);
       if (highModeCenterChance > 0 && this.random() < highModeCenterChance) {
@@ -13327,13 +13422,14 @@ class RoadDirector {
       : this.chooseBlockerType(context, 0.12);
     this.spawn(type, lane, distance, result);
     if (context.section?.id === "launch") return;
-    const extraChance = context.speedClassId === "turbo" ? 0.96 : (context.speedClassId === "pro" ? 0.72 : (context.speedClassId === "arcade" ? 0.38 : 0));
-    const extraMinProgress = context.speedClassId === "turbo" ? 0.05 : (context.speedClassId === "pro" ? 0.14 : 0.22);
+    const highSpeedMode = ["turbo", "overdrive", "redline"].includes(context.speedClassId);
+    const extraChance = highSpeedMode ? 0.96 : (context.speedClassId === "pro" ? 0.72 : (context.speedClassId === "arcade" ? 0.38 : 0));
+    const extraMinProgress = highSpeedMode ? 0.05 : (context.speedClassId === "pro" ? 0.14 : 0.22);
     if (context.progress > extraMinProgress && extraChance > 0 && this.canAddPressure(result, "cone", context) && this.shouldSpawnMinorHazard(context, extraChance, result)) {
       const sideLane = this.pickPressureLane(context, 0.32, [lane]);
       this.spawn(this.chooseMinorHazard(context), sideLane, distance + this.staggerDistance(context, 0.12, 120, 230), result);
-      const thirdChance = context.speedClassId === "turbo" ? 0.8 : (context.speedClassId === "pro" ? 0.38 : 0);
-      const thirdMinProgress = context.speedClassId === "turbo" ? 0.18 : 0.42;
+      const thirdChance = highSpeedMode ? 0.8 : (context.speedClassId === "pro" ? 0.38 : 0);
+      const thirdMinProgress = highSpeedMode ? 0.18 : 0.42;
       if (context.progress > thirdMinProgress && thirdChance > 0 && this.canAddPressure(result, "slowCar", context, 0.2) && this.random() < thirdChance) {
         const thirdLane = this.pickPressureLane(context, 0.38, [lane, sideLane]);
         this.spawn("slowCar", thirdLane, distance + this.staggerDistance(context, 0.22, 250, 410), result);
@@ -13348,10 +13444,11 @@ class RoadDirector {
     this.spawn(this.chooseBlockerType(context, 0.12), lanes[0], distance, result);
     this.spawn(this.random() < 0.78 ? "slowCar" : this.chooseBlockerType(context, 0.08), lanes[1], distance + this.staggerDistance(context, 0.07, 70, 145), result);
     if (context.section?.id === "launch") return;
+    const highSpeedMode = ["turbo", "overdrive", "redline"].includes(context.speedClassId);
     const thirdChance = context.speedClassId === "arcade" ? 0.5 : (context.speedClassId === "pro" ? 0.86 : 0.98);
-    const thirdMinProgress = context.speedClassId === "turbo" ? 0.04 : (context.speedClassId === "pro" ? 0.16 : 0.3);
+    const thirdMinProgress = highSpeedMode ? 0.04 : (context.speedClassId === "pro" ? 0.16 : 0.3);
     const addThird = context.progress > thirdMinProgress
-      && (context.speedClassId === "arcade" || context.speedClassId === "pro" || context.speedClassId === "turbo")
+      && (context.speedClassId === "arcade" || context.speedClassId === "pro" || highSpeedMode)
       && this.canAddPressure(result, "cone", context)
       && this.shouldSpawnMinorHazard(context, thirdChance, result);
     if (addThird) {
@@ -13372,8 +13469,9 @@ class RoadDirector {
       : this.chooseBlockerType(context, 0.12);
     this.spawn(secondType, secondLane, distance + stagger, result);
     if (context.section?.id === "launch") return;
+    const highSpeedMode = ["turbo", "overdrive", "redline"].includes(context.speedClassId);
     const thirdChance = context.speedClassId === "rookie" ? 0.18 : (context.speedClassId === "arcade" ? 0.66 : (context.speedClassId === "pro" ? 0.88 : 0.99));
-    const thirdMinProgress = context.speedClassId === "turbo" ? 0.06 : (context.speedClassId === "pro" ? 0.16 : 0.28);
+    const thirdMinProgress = highSpeedMode ? 0.06 : (context.speedClassId === "pro" ? 0.16 : 0.28);
     if (context.progress > thirdMinProgress && context.speedClassId !== "sunday" && this.canAddPressure(result, "cone", context) && this.random() < thirdChance) {
       const thirdLane = randomChoice(shuffle(this.lanesExcept([safeLane, firstLane, secondLane]), () => this.random()), () => this.random());
       const thirdType = this.shouldSpawnMinorHazard(context, 0.28, result) ? this.chooseMinorHazard(context) : "slowCar";
@@ -13388,9 +13486,10 @@ class RoadDirector {
     const type = context.progress < 0.3 ? (this.random() < 0.45 ? this.getTrackMinorFallback("cone", context) : "slowCar") : this.chooseBlockerType(context, 0.2);
     this.spawn(type, TRACK_DIRECTOR.centerLane, distance, result);
     const launchOpening = context.section?.id === "launch";
-    if (launchOpening && context.speedClassId === "turbo" && context.progress < 0.1) return;
+    const highSpeedMode = ["turbo", "overdrive", "redline"].includes(context.speedClassId);
+    if (launchOpening && highSpeedMode && context.progress < 0.1) return;
     const sidePressureChance = context.speedClassId === "sunday" ? 0.44 : (context.speedClassId === "rookie" ? 0.72 : 1);
-    const sideMinProgress = context.speedClassId === "turbo" ? 0 : (context.speedClassId === "pro" ? 0.05 : 0.12);
+    const sideMinProgress = highSpeedMode ? 0 : (context.speedClassId === "pro" ? 0.05 : 0.12);
     if (context.progress > sideMinProgress && this.random() < sidePressureChance && this.canAddPressure(result, "cone", context)) {
       const sideLane = this.pickPressureLane(context, 0, [TRACK_DIRECTOR.centerLane]);
       const sideType = this.shouldSpawnMinorHazard(context, 0.42, result) ? this.chooseMinorHazard(context) : "slowCar";
@@ -13399,7 +13498,7 @@ class RoadDirector {
         if (launchOpening) return;
         const thirdChance = context.speedClassId === "arcade" ? 0.58 : (context.speedClassId === "pro" ? 0.94 : 0.99);
         const thirdMinProgress = context.speedClassId === "arcade" ? 0.3 : (context.speedClassId === "pro" ? 0.12 : 0.04);
-        if (context.progress > thirdMinProgress && ["arcade", "pro", "turbo"].includes(context.speedClassId) && this.canAddPressure(result, "slowCar", context) && this.random() < thirdChance) {
+        if (context.progress > thirdMinProgress && (["arcade", "pro"].includes(context.speedClassId) || highSpeedMode) && this.canAddPressure(result, "slowCar", context) && this.random() < thirdChance) {
           const thirdLane = this.pickPressureLane(context, 0, [TRACK_DIRECTOR.centerLane, sideLane]);
           this.spawn("slowCar", thirdLane, distance + this.staggerDistance(context, 0.22, 250, 420), result);
         }
@@ -13418,11 +13517,11 @@ class RoadDirector {
     const highPressureMode = ["pro", "turbo", "overdrive", "redline"].includes(context.speedClassId);
     let count = context.speedClassId === "sunday"
       ? (context.band.id === "final" ? 3 : 2)
-      : (context.band.id === "final" && (context.speedClassId === "pro" || context.speedClassId === "turbo") ? 4 : 3);
+      : (context.band.id === "final" && (context.speedClassId === "pro" || highPressureMode) ? 4 : 3);
     if (pressureSection && highPressureMode && context.progress > 0.42) {
       count = Math.max(count, 4);
     }
-    if (!context.centerNeedsChallenge && !context.allowSoftCenterPressure && context.speedClassId !== "turbo" && !(pressureSection && highPressureMode)) {
+    if (!context.centerNeedsChallenge && !context.allowSoftCenterPressure && !highPressureMode && !(pressureSection && highPressureMode)) {
       count = Math.min(count, 2);
     }
     const step = clamp(context.cruiseSpeed * 0.17, 150, 285);
