@@ -3526,6 +3526,8 @@ button:disabled {
 }
 
 .party-setup-screen .party-start-copy {
+  display: grid;
+  gap: 3px;
   min-width: 0;
 }
 
@@ -3543,6 +3545,52 @@ button:disabled {
 
 .party-setup-screen .party-start-action .btn {
   min-width: 210px;
+}
+
+.party-start-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.party-start-buttons .btn {
+  flex: 1 1 210px;
+}
+
+.official-record-chase-entry-copy {
+  color: var(--cyan);
+}
+
+.official-record-chase-start {
+  border-color: rgba(40, 246, 255, 0.42);
+  box-shadow: inset 3px 0 0 var(--cyan);
+}
+
+.official-record-chase-note {
+  display: grid;
+  gap: 3px;
+  border: 1px solid rgba(40, 246, 255, 0.3);
+  border-radius: 8px;
+  padding: 10px 12px;
+  background: rgba(5, 8, 20, 0.58);
+}
+
+.official-record-chase-note strong {
+  color: var(--yellow);
+  font-size: 0.76rem;
+  text-transform: uppercase;
+}
+
+.official-record-chase-note span {
+  color: var(--muted);
+  font-size: 0.84rem;
+  line-height: 1.3;
+}
+
+.official-record-chase-setup .official-route-board {
+  max-height: min(360px, 44vh);
+  overflow: auto;
 }
 
 .party-setup-screen .party-setup-main {
@@ -3850,7 +3898,8 @@ button:disabled {
   }
 
   .party-setup-screen .party-title-actions,
-  .party-setup-screen .party-start-action .btn {
+  .party-setup-screen .party-start-action .btn,
+  .party-start-buttons {
     justify-content: stretch;
     width: 100%;
   }
@@ -7264,6 +7313,141 @@ button:disabled {
 
 .next-player-hint {
   margin: -4px 0 0;
+}
+
+.official-record-chase-results {
+  display: grid;
+  gap: 14px;
+}
+
+.official-record-chase-hero {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: minmax(0, 1fr) minmax(220px, 0.34fr);
+  align-items: stretch;
+  border: 1px solid rgba(40, 246, 255, 0.42);
+  border-radius: 8px;
+  padding: clamp(14px, 2.2vw, 22px);
+  background:
+    linear-gradient(135deg, rgba(40, 246, 255, 0.14), rgba(255, 228, 94, 0.1)),
+    rgba(5, 8, 20, 0.78);
+}
+
+.official-record-chase-hero.is-final {
+  border-color: rgba(255, 228, 94, 0.58);
+  background:
+    linear-gradient(135deg, rgba(255, 228, 94, 0.16), rgba(68, 255, 153, 0.09)),
+    rgba(5, 8, 20, 0.82);
+}
+
+.official-record-chase-main-result {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.official-record-chase-main-result h2 {
+  color: var(--text);
+  font-family: var(--font-display);
+  font-size: clamp(2.4rem, 6vw, 4.8rem);
+  line-height: 0.9;
+  overflow-wrap: anywhere;
+  text-transform: uppercase;
+}
+
+.official-record-chase-primary-stats {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(3, minmax(140px, 1fr));
+}
+
+.official-record-chase-primary-stats span,
+.official-record-chase-next-card,
+.official-record-chase-podium-card {
+  display: grid;
+  gap: 4px;
+  border: 1px solid rgba(40, 246, 255, 0.22);
+  border-radius: 7px;
+  padding: 9px 10px;
+  background: rgba(5, 8, 20, 0.58);
+}
+
+.official-record-chase-primary-stats strong,
+.official-record-chase-next-card span,
+.official-record-chase-podium-card span {
+  color: var(--yellow);
+  font-size: 0.68rem;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.official-record-chase-primary-stats em,
+.official-record-chase-next-card strong,
+.official-record-chase-podium-card em {
+  color: var(--text);
+  font-style: normal;
+  font-weight: 900;
+  line-height: 1.15;
+  overflow-wrap: anywhere;
+}
+
+.official-record-chase-next-card {
+  align-content: center;
+  border-color: rgba(255, 228, 94, 0.42);
+}
+
+.official-record-chase-next-card strong {
+  font-size: clamp(1.2rem, 3vw, 2rem);
+  text-transform: uppercase;
+}
+
+.official-record-chase-next-card .btn {
+  margin-top: 8px;
+}
+
+.official-record-chase-standings .leaderboard-rank {
+  min-width: 48px;
+}
+
+.official-record-chase-podium {
+  display: grid;
+  gap: 10px;
+}
+
+.official-record-chase-podium-grid {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.official-record-chase-podium-card {
+  border-color: rgba(255, 228, 94, 0.34);
+}
+
+.official-record-chase-podium-card strong {
+  color: var(--text);
+  font-size: 1.18rem;
+  text-transform: uppercase;
+  overflow-wrap: anywhere;
+}
+
+.official-record-chase-podium-card small {
+  color: var(--muted);
+  font-size: 0.78rem;
+  line-height: 1.25;
+}
+
+.official-record-chase-podium-card.rank-1 {
+  border-color: var(--yellow);
+  background: rgba(255, 228, 94, 0.1);
+}
+
+@media (max-width: 900px) {
+  .official-record-chase-hero,
+  .official-record-chase-primary-stats,
+  .official-record-chase-podium-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 .pause-overlay {

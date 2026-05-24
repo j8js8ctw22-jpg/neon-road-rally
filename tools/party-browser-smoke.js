@@ -489,7 +489,7 @@ async function run() {
     if (options.startVia === "keyboard") {
       await page.keyboard.press("Enter");
     } else {
-      await page.getByRole("button", { name: /^Start Run$/ }).click();
+      await page.getByRole("button", { name: /^Start (Official )?Run$/ }).click();
     }
     await page.waitForFunction(() => window.neonRoadRally?.screen === "game", null, { timeout: 5000 });
     await page.evaluate((runFields) => {
@@ -617,8 +617,214 @@ async function run() {
     return report;
   }
 
+  async function runOfficialRecordChaseQa() {
+    await installVirtualGamepad();
+    await page.evaluate(() => {
+      const app = window.neonRoadRally;
+      app.partySession = null;
+      app.partySetup = app.createDefaultPartySetup();
+      app.partySetup.selectedPlayerIds = app.profiles.data.players.slice(0, 3).map((player) => player.id);
+      app.preRaceLaunchContext = "official";
+      app.showPreRaceScreen();
+    });
+    await page.waitForFunction(() => window.neonRoadRally?.screen === "preRace", null, { timeout: 5000 });
+    await page.locator('[data-action="officialRecordChaseSetup"]').first().click();
+    await page.waitForFunction(() => window.neonRoadRally?.screen === "officialRecordChaseSetup", null, { timeout: 5000 });
+    const officialSetupEntry = await page.evaluate(() => ({
+      screen: window.neonRoadRally.screen,
+      copy: document.body.innerText.includes("Everyone runs the same official route. Records still count.")
+    }));
+    if (officialSetupEntry.screen !== "officialRecordChaseSetup" || !officialSetupEntry.copy) {
+      throw new Error(`Official Race setup should enter Official Record Chase with clear copy: ${JSON.stringify(officialSetupEntry)}`);
+    }
+
+    await page.evaluate(() => {
+      const app = window.neonRoadRally;
+      app.partySession = null;
+      app.partySetup = app.createDefaultPartySetup();
+      app.partySetup.selectedPlayerIds = app.profiles.data.players.slice(0, 3).map((player) => player.id);
+      app.showPartySetupScreen();
+    });
+    await page.locator('.party-start-action [data-action="officialRecordChaseSetup"]').click();
+    await page.waitForFunction(() => window.neonRoadRally?.screen === "officialRecordChaseSetup", null, { timeout: 5000 });
+    const setupReport = await page.evaluate(() => {
+      const app = window.neonRoadRally;
+      const route = getOfficialRouteById(app.pendingOfficialRouteId);
+      return {
+        screen: app.screen,
+        selectedDrivers: app.getPartySetupSelectedPlayers().map((player) => player.name),
+        routeId: route?.id || "",
+        routeName: route ? getOfficialRouteDisplayName(route) : "",
+        setupText: document.body.innerText
+      };
+    });
+    if (setupReport.screen !== "officialRecordChaseSetup" || setupReport.selectedDrivers.length !== 3 || !setupReport.routeId) {
+      throw new Error(`Party setup should enter Official Record Chase with selected drivers and route: ${JSON.stringify(setupReport)}`);
+    }
+    if (!/Everyone runs the same official route\. Records still count\./.test(setupReport.setupText)) {
+      throw new Error(`Official Record Chase setup copy missing: ${setupReport.setupText.slice(0, 1000)}`);
+    }
+
+    await focusMenuSelector('[data-action="officialRecordChaseStart"]');
+    await pressVirtualGamepad({ buttons: [0] });
+    await page.waitForFunction(() => window.neonRoadRally?.screen === "partyTurn", null, { timeout: 5000 });
+    const lockedSetup = await page.evaluate(() => {
+      const app = window.neonRoadRally;
+      const session = app.partySession;
+      const route = getOfficialRouteById(session?.officialRouteId || "");
+      return {
+        officialRecordChase: Boolean(session?.officialRecordChase),
+        routeId: route?.id || "",
+        routeName: route ? getOfficialRouteDisplayName(route) : "",
+        sharedSeed: session?.sharedSeed || "",
+        routeSeed: route?.seed || "",
+        trackId: session?.track?.id || "",
+        routeTrackId: route?.trackId || "",
+        speedClass: session?.raceMode || "",
+        routeSpeedClass: route?.speedClassId || "",
+        currentPlayer: session?.currentPlayer?.name || "",
+        turnText: document.body.innerText
+      };
+    });
+    if (!lockedSetup.officialRecordChase || lockedSetup.sharedSeed !== lockedSetup.routeSeed || lockedSetup.trackId !== lockedSetup.routeTrackId || lockedSetup.speedClass !== lockedSetup.routeSpeedClass) {
+      throw new Error(`Official Record Chase should lock official setup before first turn: ${JSON.stringify(lockedSetup)}`);
+    }
+    if (!/Records still count/.test(lockedSetup.turnText) || !lockedSetup.turnText.includes(lockedSetup.routeName)) {
+      throw new Error(`Official Record Chase turn should keep route and records copy visible: ${lockedSetup.turnText.slice(0, 1000)}`);
+    }
+
+    const runFields = [
+      { time: 41.25, score: 168000, nearMisses: 4, boostPadsCollected: 2 },
+      { time: 43.5, score: 185000, rampsUsed: 2, boostPadsCollected: 3 },
+      { time: 40.75, score: 176000, slowdownHits: 0, manualBoostsUsed: 1 }
+    ];
+    const perTurn = [];
+    for (let index = 0; index < runFields.length; index += 1) {
+      const beforeRun = await page.evaluate(() => {
+        const app = window.neonRoadRally;
+        const session = app.partySession;
+        return {
+          screen: app.screen,
+          currentPlayer: session?.currentPlayer?.name || "",
+          routeId: session?.officialRouteId || "",
+          routeSeed: session?.officialSeed || session?.sharedSeed || ""
+        };
+      });
+      await finishCurrentPartyRun(runFields[index], { startVia: index === 0 ? "keyboard" : "button" });
+      const afterRun = await page.evaluate(() => {
+        const app = window.neonRoadRally;
+        const summary = app.lastSummary || {};
+        const session = app.partySession;
+        const standings = session?.standings?.() || [];
+        const heroText = document.querySelector(".official-record-chase-hero")?.innerText || "";
+        const nextButtonText = document.querySelector('[data-action="partyNextPlayer"]')?.textContent || "";
+        return {
+          screen: app.screen,
+          summaryPlayer: summary.playerName || "",
+          partyMode: Boolean(summary.partyMode),
+          officialRecordChase: Boolean(summary.officialRecordChase),
+          officialRouteId: summary.officialRouteId || "",
+          sessionRouteId: session?.officialRouteId || "",
+          routeSeed: session?.officialSeed || session?.sharedSeed || "",
+          summarySeed: summary.seed || "",
+          timeAttackPlacement: summary.timeAttackPlacement || "",
+          scoreAttackPlacement: summary.scoreAttackPlacement || "",
+          scoreSaved: Boolean(summary.scoreSaved),
+          standingCount: standings.length,
+          completedRuns: session?.completedRuns || 0,
+          currentLeader: standings[0]?.playerName || "",
+          currentStanding: standings.find((row) => row.playerId === summary.playerId)?.rank || 0,
+          heroText,
+          nextButtonText
+        };
+      });
+      if (!afterRun.partyMode || !afterRun.officialRecordChase || afterRun.officialRouteId !== afterRun.sessionRouteId || afterRun.summarySeed !== afterRun.routeSeed || !afterRun.scoreSaved) {
+        throw new Error(`Official Record Chase run should save as official party wrapper only: ${JSON.stringify(afterRun)}`);
+      }
+      if (!/Official Rank \/ PB|Leader Gap|Official Score/i.test(afterRun.heroText)) {
+        throw new Error(`Official Record Chase first viewport missing rank/gap/official result: ${afterRun.heroText.slice(0, 1000)}`);
+      }
+      if (index < runFields.length - 1 && !/^Next Driver:/i.test(afterRun.nextButtonText)) {
+        throw new Error(`Official Record Chase result should show next driver action: ${JSON.stringify(afterRun)}`);
+      }
+      perTurn.push({ beforeRun, afterRun });
+      if (index < runFields.length - 1) {
+        await focusMenuSelector('[data-action="partyNextPlayer"]');
+        await pressVirtualGamepad({ buttons: [0] });
+        await page.waitForFunction(() => window.neonRoadRally?.screen === "partyTurn", null, { timeout: 5000 });
+      }
+    }
+
+    await page.waitForFunction(() => window.neonRoadRally?.screen === "partyFinal", null, { timeout: 5000 });
+    const finalReport = await page.evaluate(() => {
+      const app = window.neonRoadRally;
+      const session = app.partySession;
+      const route = getOfficialRouteById(session?.officialRouteId || "");
+      const standings = session?.standings?.() || [];
+      const timeRows = route ? app.getTimeAttackLeaderboardRows({
+        trackId: route.trackId,
+        raceTypeId: session.raceType,
+        speedClassId: route.speedClassId
+      }, { legacy: false, limit: 999 }).filter((entry) => entry.officialRouteId === route.id) : [];
+      const scoreRows = route ? app.getOfficialScoreAttackRows(route.id, { raceTypeId: session.raceType, limit: 999 }) : [];
+      const selectedIds = new Set((session?.selectedPlayers || []).map((player) => player.id));
+      const normalPartyEntry = route ? normalizeLeaderboardEntry({
+        playerId: "normal-party",
+        playerName: "Normal Party",
+        trackId: route.trackId,
+        trackName: getTrackById(route.trackId).name,
+        seed: route.seed,
+        raceMode: route.speedClassId,
+        raceType: session.raceType,
+        score: 999,
+        status: "finished",
+        time: 99,
+        finishTimeMs: 99000,
+        partyMode: true,
+        officialRouteId: route.id
+      }) : null;
+      return {
+        screen: app.screen,
+        routeId: route?.id || "",
+        standings: standings.map((row) => ({
+          playerName: row.playerName,
+          rank: row.rank,
+          bestOfficialTimeMs: row.bestOfficialTimeMs,
+          bestScore: row.bestScore,
+          highlights: row.officialHighlights
+        })),
+        timePlayers: timeRows.filter((entry) => selectedIds.has(entry.playerId)).map((entry) => entry.playerName),
+        scorePlayers: scoreRows.filter((entry) => selectedIds.has(entry.playerId)).map((entry) => entry.playerName),
+        normalPartyOfficialRouteId: normalPartyEntry?.officialRouteId || "",
+        finalText: document.body.innerText
+      };
+    });
+    if (finalReport.screen !== "partyFinal" || finalReport.standings.length !== 3 || finalReport.standings[0].bestOfficialTimeMs !== 40750) {
+      throw new Error(`Official Record Chase final standings should rank the fastest official time first: ${JSON.stringify(finalReport)}`);
+    }
+    if (new Set(finalReport.timePlayers).size !== 3 || new Set(finalReport.scorePlayers).size !== 3) {
+      throw new Error(`Official Record Chase should write each driver to normal official boards: ${JSON.stringify(finalReport)}`);
+    }
+    if (finalReport.normalPartyOfficialRouteId) {
+      throw new Error(`Normal party/custom run should not normalize into official boards: ${JSON.stringify(finalReport)}`);
+    }
+    if (!/Winner:|1st|2nd|3rd|Best score|Official Top 20|Beat time PB/i.test(finalReport.finalText)) {
+      throw new Error(`Official Record Chase final screen should make winner and official highlights obvious: ${finalReport.finalText.slice(0, 1400)}`);
+    }
+
+    await page.evaluate(() => {
+      const app = window.neonRoadRally;
+      app.partySession = null;
+      app.partySetup = app.createDefaultPartySetup();
+      app.partySetup.selectedPlayerIds = app.profiles.data.players.slice(0, 3).map((player) => player.id);
+      app.showTitle();
+    });
+    return { setupReport, lockedSetup, perTurn, finalReport };
+  }
+
   const controllerMenuNavigationQa = await runControllerMenuNavigationQa();
   const leaderboardControllerSelectQa = await runLeaderboardControllerSelectQa();
+  const officialRecordChaseQa = await runOfficialRecordChaseQa();
 
   await clickText("Party Race");
   await expectText("Party Mode");
@@ -863,7 +1069,7 @@ async function run() {
   await browser.close();
 
   if (consoleIssues.length) throw new Error(`Console issues: ${consoleIssues.join(" | ")}`);
-  console.log(JSON.stringify({ ok: true, sawRoundShuffle, keyboardPartyStartQa, settingsControllerQa, controllerMenuNavigationQa, leaderboardControllerSelectQa, partyBonusSurvivalQa, partyManageReorderQa, ...result }, null, 2));
+  console.log(JSON.stringify({ ok: true, sawRoundShuffle, keyboardPartyStartQa, settingsControllerQa, controllerMenuNavigationQa, leaderboardControllerSelectQa, officialRecordChaseQa, partyBonusSurvivalQa, partyManageReorderQa, ...result }, null, 2));
 }
 
 run().catch((error) => {

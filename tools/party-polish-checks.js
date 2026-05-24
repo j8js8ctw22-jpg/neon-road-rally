@@ -180,6 +180,90 @@ vm.runInContext(`
   const rematch = bonusSession.createRematch("ROAD-22222");
   assert.strictEqual(rematch.bonusSurvival, PARTY_BONUS_SURVIVAL_ON, "Party rematch should preserve Bonus Survival option");
 
+  const officialRoute = getDefaultOfficialRouteForTrack(DEFAULT_TRACK_ID);
+  assert(officialRoute, "Official Record Chase QA needs a default official route");
+  const officialChase = new PartySession({
+    players,
+    officialRecordChase: true,
+    officialRouteId: officialRoute.id,
+    raceType: DEFAULT_RACE_TYPE_ID,
+    startingOrderMode: PARTY_STARTING_ORDER_MODE_ROSTER
+  });
+  assert.strictEqual(officialChase.officialRecordChase, true, "Official Record Chase session should be marked");
+  assert.strictEqual(officialChase.sharedSeed, officialRoute.seed, "Official Record Chase should lock the official route seed");
+  assert.strictEqual(officialChase.track.id, officialRoute.trackId, "Official Record Chase should lock the official track");
+  assert.strictEqual(officialChase.raceMode, officialRoute.speedClassId, "Official Record Chase should lock the official speed class");
+  assert.strictEqual(officialChase.roundType, PARTY_ROUND_TYPE_ONE_RUN, "First pass should use one attempt per driver");
+  assert.strictEqual(officialChase.bonusSurvival, PARTY_BONUS_SURVIVAL_OFF, "Official Record Chase should not inherit Party Bonus Survival");
+  officialChase.addResult(summary(90000, {
+    seed: officialRoute.seed,
+    trackId: officialRoute.trackId,
+    trackName: getTrackById(officialRoute.trackId).name,
+    speedClass: officialRoute.speedClassId,
+    officialRouteId: officialRoute.id,
+    officialRouteName: officialRoute.name,
+    officialSeed: officialRoute.seed,
+    finishTimeMs: 42000,
+    time: 42,
+    timeAttackPlacement: "Official Top 20 #1",
+    scoreAttackPlacement: "Official Top 20 #1",
+    newPersonalBestTime: true,
+    newPersonalBest: true,
+    topTwentyRank: 1
+  }));
+  officialChase.addResult(summary(110000, {
+    seed: officialRoute.seed,
+    trackId: officialRoute.trackId,
+    trackName: getTrackById(officialRoute.trackId).name,
+    speedClass: officialRoute.speedClassId,
+    officialRouteId: officialRoute.id,
+    officialRouteName: officialRoute.name,
+    officialSeed: officialRoute.seed,
+    finishTimeMs: 46000,
+    time: 46,
+    timeAttackPlacement: "Official Top 20 #2",
+    scoreAttackPlacement: "Official Top 20 #2",
+    topTwentyRank: 2
+  }));
+  const officialStandings = officialChase.standings();
+  assert.strictEqual(officialStandings[0].playerId, "p1", "Official Record Chase should rank fastest official finish first");
+  assert.strictEqual(officialStandings[1].leaderMarginMs, 4000, "Official Record Chase should track time gap to leader");
+  assert(officialStandings[0].officialHighlights.includes("Beat time PB"), "Official Record Chase standings should preserve PB highlights");
+  assert(officialStandings[0].officialHighlights.includes("Official Top 20 #1"), "Official Record Chase standings should preserve Official Top 20 highlights");
+  const officialPartyEntry = normalizeLeaderboardEntry({
+    playerId: "p1",
+    playerName: "Lucas",
+    trackId: officialRoute.trackId,
+    trackName: getTrackById(officialRoute.trackId).name,
+    seed: officialRoute.seed,
+    raceMode: officialRoute.speedClassId,
+    raceType: DEFAULT_RACE_TYPE_ID,
+    score: 90000,
+    status: "finished",
+    time: 42,
+    finishTimeMs: 42000,
+    partyMode: true,
+    officialRecordChase: true,
+    officialRouteId: officialRoute.id
+  });
+  assert.strictEqual(officialPartyEntry.officialRouteId, officialRoute.id, "Official Record Chase party runs should remain official leaderboard entries");
+  const normalPartyEntry = normalizeLeaderboardEntry({
+    playerId: "p1",
+    playerName: "Lucas",
+    trackId: officialRoute.trackId,
+    trackName: getTrackById(officialRoute.trackId).name,
+    seed: officialRoute.seed,
+    raceMode: officialRoute.speedClassId,
+    raceType: DEFAULT_RACE_TYPE_ID,
+    score: 90000,
+    status: "finished",
+    time: 42,
+    finishTimeMs: 42000,
+    partyMode: true,
+    officialRouteId: officialRoute.id
+  });
+  assert.strictEqual(normalPartyEntry.officialRouteId, "", "Normal Party runs should not contaminate official boards");
+
   let pad = null;
   navigator.getGamepads = () => (pad ? [pad] : []);
   const laneMoveAttempts = [];
@@ -192,7 +276,7 @@ vm.runInContext(`
   let enduranceEnds = 0;
   const fakeGame = {
     screen: "game",
-    run: { paused: false, ended: false, debugFrozen: false, raceActive: true, pendingEndStatus: "", targetLane: 2 },
+    run: { paused: false, ended: false, debugFrozen: false, raceActive: true, pendingEndStatus: "", targetLane: TRACK_DIRECTOR.centerLane },
     officialEnduranceCanEnd: false,
     audio: { activate() {}, playMusic() {}, playSfx() {} },
     layer: { querySelectorAll: () => [] },
@@ -232,13 +316,13 @@ vm.runInContext(`
     for (let frame = 0; frame < frames; frame += 1) input.update(1 / 60);
   };
 
-  fakeGame.run.targetLane = 2;
+  fakeGame.run.targetLane = TRACK_DIRECTOR.centerLane;
   pressPad({ buttons: [15] }, 3);
-  assert.strictEqual(fakeGame.run.targetLane, 3, "D-pad right should move one lane only while held");
+  assert.strictEqual(fakeGame.run.targetLane, TRACK_DIRECTOR.centerLane + 1, "D-pad right should move one lane only while held");
   assert.strictEqual(laneMoveSuccesses.length, 1, "Held D-pad right should not repeat lane changes");
   releasePad();
   pressPad({ buttons: [14] });
-  assert.strictEqual(fakeGame.run.targetLane, 2, "D-pad left should move one lane after release");
+  assert.strictEqual(fakeGame.run.targetLane, TRACK_DIRECTOR.centerLane, "D-pad left should move one lane after release");
   releasePad();
   fakeGame.run.targetLane = 0;
   const beforeLeftEdgeSuccesses = laneMoveSuccesses.length;
@@ -253,12 +337,28 @@ vm.runInContext(`
   assert.strictEqual(laneMoveSuccesses.length, beforeRightEdgeSuccesses, "Right edge input should not create a successful lane move");
   releasePad();
 
-  fakeGame.run.targetLane = 2;
+  fakeGame.run.targetLane = 0;
+  const controllerSweepSuccesses = laneMoveSuccesses.length;
+  for (let lane = 1; lane < LANES; lane += 1) {
+    pressPad({ buttons: [15] });
+    assert.strictEqual(fakeGame.run.targetLane, lane, "D-pad right should reach lane " + lane);
+    releasePad();
+  }
+  assert.strictEqual(fakeGame.run.targetLane, LANES - 1, "D-pad right should reach the seventh lane");
+  assert.strictEqual(laneMoveSuccesses.length - controllerSweepSuccesses, LANES - 1, "D-pad sweep should move one lane per press across seven lanes");
+  for (let lane = LANES - 2; lane >= 0; lane -= 1) {
+    pressPad({ buttons: [14] });
+    assert.strictEqual(fakeGame.run.targetLane, lane, "D-pad left should reach lane " + lane);
+    releasePad();
+  }
+  assert.strictEqual(fakeGame.run.targetLane, 0, "D-pad left should return to the first lane");
+
+  fakeGame.run.targetLane = TRACK_DIRECTOR.centerLane;
   pressPad({ axes: [0.75, 0] });
-  assert.strictEqual(fakeGame.run.targetLane, 3, "Left stick right should steer right");
+  assert.strictEqual(fakeGame.run.targetLane, TRACK_DIRECTOR.centerLane + 1, "Left stick right should steer right");
   releasePad();
   pressPad({ axes: [-0.75, 0] });
-  assert.strictEqual(fakeGame.run.targetLane, 2, "Left stick left should steer left after release");
+  assert.strictEqual(fakeGame.run.targetLane, TRACK_DIRECTOR.centerLane, "Left stick left should steer left after release");
   releasePad();
   pressPad({ buttons: [12] });
   assert(verticalInputs.includes(-1), "D-pad up should feed vertical movement");
@@ -317,6 +417,24 @@ vm.runInContext(`
   input.onKeyDown(keyEvent("ArrowLeft", "ArrowLeft"));
   input.onKeyUp(keyEvent("ArrowLeft", "ArrowLeft"));
   assert(laneMoveSuccesses.some((entry) => entry.direction === -1), "Keyboard lane input should still work with gamepad support installed");
+  fakeGame.run.targetLane = 0;
+  const keyboardStartSuccesses = laneMoveSuccesses.length;
+  for (let lane = 1; lane < LANES; lane += 1) {
+    input.onKeyDown(keyEvent("ArrowRight", "ArrowRight"));
+    input.onKeyUp(keyEvent("ArrowRight", "ArrowRight"));
+    assert.strictEqual(fakeGame.run.targetLane, lane, "Keyboard right should reach lane " + lane);
+  }
+  assert.strictEqual(fakeGame.run.targetLane, LANES - 1, "Keyboard right should reach the seventh lane");
+  assert.strictEqual(laneMoveSuccesses.length - keyboardStartSuccesses, LANES - 1, "Keyboard right should move one lane per press across seven lanes");
+  input.onKeyDown(keyEvent("ArrowRight", "ArrowRight"));
+  input.onKeyUp(keyEvent("ArrowRight", "ArrowRight"));
+  assert.strictEqual(fakeGame.run.targetLane, LANES - 1, "Keyboard right should clamp at lane 7");
+  for (let lane = LANES - 2; lane >= 0; lane -= 1) {
+    input.onKeyDown(keyEvent("ArrowLeft", "ArrowLeft"));
+    input.onKeyUp(keyEvent("ArrowLeft", "ArrowLeft"));
+    assert.strictEqual(fakeGame.run.targetLane, lane, "Keyboard left should reach lane " + lane);
+  }
+  assert.strictEqual(fakeGame.run.targetLane, 0, "Keyboard left should clamp at lane 1");
   input.onKeyDown(keyEvent(" ", "Space"));
   input.onKeyUp(keyEvent(" ", "Space"));
   assert.strictEqual(boosts, 2, "Keyboard boost should still work with gamepad support installed");
@@ -348,9 +466,10 @@ vm.runInContext(`
   const p2Stats = normalizePlayerBadgeStats(manager.getPlayerById("p2").badgeStats);
   assert(p2Stats.partyAwardsWon > 0, "Award progress should persist on the driver profile");
   assert(p2Stats.partyGasGrabberAwards === 1, "Fuel-only Gas Grabber should update its Fuel Run party counter");
-  window.__partyPolishQaReport = {
-    partyBonusSurvival: true,
-    controllerStandardMapping: {
+	  window.__partyPolishQaReport = {
+	    partyBonusSurvival: true,
+	    officialRecordChase: true,
+	    controllerStandardMapping: {
       dpadAndStick: true,
       crossBoostAndSelect: true,
       circleResume: true,
