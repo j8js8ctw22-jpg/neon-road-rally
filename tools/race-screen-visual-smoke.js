@@ -1342,6 +1342,10 @@ async function installVisualSmokeHelpers(page) {
       const garage = {
         screen: game.screen,
         text: Boolean(document.querySelector(".garage-panel")),
+        profile: Boolean(document.querySelector(".garage-profile-hero")),
+        records: Boolean(document.querySelector("#garageRecords")),
+        unlocks: Boolean(document.querySelector("#garageRewards")),
+        profileCopy: ["Driver Profile", "Records & Rivals", "Unlocks & Rewards"].every((label) => (document.body.innerText || "").toLowerCase().includes(label.toLowerCase())),
         rewards: garageRewards
       };
       game.showLeaderboard("scoreAttack");
@@ -1929,7 +1933,7 @@ async function run() {
     assert(["partyStandings", "partyFinal"].includes(report.scoreScreens.partyFuel.screen), "Party Fuel result screen was not reached", report.scoreScreens.partyFuel);
 
     const menu = await page.evaluate(() => window.__nrrVisualSmoke.menuScreens());
-    assert(menu.garage.screen === "players" && menu.garage.text, "Garage screen smoke failed", menu.garage);
+    assert(menu.garage.screen === "players" && menu.garage.text && menu.garage.profile && menu.garage.records && menu.garage.unlocks && menu.garage.profileCopy, "Garage screen smoke failed", menu.garage);
     assert(menu.scoreBoard.screen === "leaderboard" && menu.scoreBoard.scoreAttack, "Score Attack board smoke failed", menu.scoreBoard);
     assert(menu.timeBoard.screen === "leaderboard" && menu.timeBoard.timeAttack, "Time Attack board smoke failed", menu.timeBoard);
     assert(menu.report.screen === "playtestReport" && menu.report.playtestReport, "Playtest Report smoke failed", menu.report);

@@ -297,6 +297,23 @@ async function run() {
     ), null, { timeout: 5000 });
 
     await page.evaluate(() => window.neonRoadRally.showDriverGarageScreen());
+    await page.waitForFunction(() => (
+      Boolean(document.querySelector(".garage-profile-hero")) &&
+      Boolean(document.querySelector("#garageRecords")) &&
+      Boolean(document.querySelector("#garageRewards"))
+    ), null, { timeout: 5000 });
+    const garageCopy = await page.evaluate(() => document.body.innerText.replace(/\s+/g, " "));
+    const garageTerms = ["Driver Profile", "Records & Rivals", "Official Time Attack", "Official Score Attack", "Playground Time", "Playground Score", "Unlocks & Rewards"];
+    const lowerGarageCopy = garageCopy.toLowerCase();
+    if (!garageTerms.every((term) => lowerGarageCopy.includes(term.toLowerCase()))) {
+      throw new Error(`Garage should expose Driver Profile, records, and unlocks copy: ${garageCopy.slice(0, 1200)}`);
+    }
+    await focusMenuSelector('[data-action="focusGarageSection"][data-target="garageRecords"]');
+    await pressVirtualGamepad({ buttons: [0] });
+    await page.waitForFunction(() => document.activeElement?.id === "garageRecords", null, { timeout: 5000 });
+    await focusMenuSelector('[data-action="focusGarageSection"][data-target="garageRewards"]');
+    await pressVirtualGamepad({ buttons: [0] });
+    await page.waitForFunction(() => document.activeElement?.id === "garageRewards", null, { timeout: 5000 });
     await focusMenuSelector(".garage-rewards-details > summary");
     await pressVirtualGamepad({ buttons: [0] });
     await page.waitForFunction(() => document.querySelector(".garage-rewards-details")?.open === true, null, { timeout: 5000 });
@@ -328,10 +345,169 @@ async function run() {
       manageStayedOpen: true,
       partyOptionsStayedOpen: true,
       garageRewardsStayedOpen: true,
+      garageSectionsReachable: true,
       garageMasteryDurationMs: Number(masteryDurationMs.toFixed(2)),
       garageAllDurationMs: Number(allDurationMs.toFixed(2)),
       settingsControllerDiagnosticReached: true
     };
+  }
+
+  async function runGarageProfileQa() {
+    const setup = await page.evaluate(() => {
+      const app = window.neonRoadRally;
+      const originalIds = app.profiles.data.players.slice(0, 3).map((player) => player.id);
+      app.profiles.data.players = app.profiles.data.players.slice(0, 3);
+      app.profiles.data.currentPlayerId = originalIds[0] || null;
+      app.profiles.data.leaderboard = [];
+      app.profiles.data.playgroundRecords = [];
+      const [lucas, jonah] = app.profiles.data.players;
+      const route = getDefaultOfficialRouteForTrack(DEFAULT_TRACK_ID);
+      const track = getTrackById(route.trackId);
+      const baseOfficial = {
+        carName: "QA CAR",
+        trackId: route.trackId,
+        trackName: track.name,
+        seed: route.seed,
+        speedClass: route.speedClassId,
+        raceMode: route.speedClassId,
+        raceType: DEFAULT_RACE_TYPE_ID,
+        pacingRulesVersion: getActivePacingRulesVersion(DEFAULT_RACE_TYPE_ID),
+        officialRouteId: route.id,
+        officialRouteName: route.name,
+        officialSeed: route.seed,
+        competitionKind: getCompetitionKindLabel(route),
+        status: "finished",
+        slowdownHits: 0,
+        cleanRun: true
+      };
+      app.profiles.recordScore({
+        ...baseOfficial,
+        runId: "garage-lucas-official-1",
+        playerId: lucas.id,
+        playerName: lucas.name,
+        score: 240000,
+        time: 39.8,
+        finishTimeMs: 39800,
+        finishTimeSecondsPrecise: 39.8
+      });
+      app.profiles.recordScore({
+        ...baseOfficial,
+        runId: "garage-jonah-official-2",
+        playerId: jonah.id,
+        playerName: jonah.name,
+        score: 210000,
+        time: 42.2,
+        finishTimeMs: 42200,
+        finishTimeSecondsPrecise: 42.2
+      });
+      app.profiles.recordPlaygroundRecord({
+        runId: "garage-lucas-playground-finish",
+        playerId: lucas.id,
+        playerName: lucas.name,
+        carName: "QA CAR",
+        trackId: "redline-run",
+        trackName: getTrackById("redline-run").name,
+        seed: "GARAGE-PLAYGROUND-ROAD",
+        roadName: "Garage Playground Road",
+        sourceLabel: "Playground",
+        speedClass: "turbo",
+        raceMode: "turbo",
+        raceType: DEFAULT_RACE_TYPE_ID,
+        score: 175000,
+        status: "finished",
+        time: 48.5,
+        finishTimeMs: 48500,
+        finishTimeSecondsPrecise: 48.5,
+        progressPercent: 100
+      });
+      app.profiles.selectPlayer(lucas.id);
+      app.showDriverGarageScreen();
+      return {
+        originalIds,
+        lucasName: lucas.name,
+        jonahName: jonah.name,
+        routeName: route.name
+      };
+    });
+
+    await page.waitForFunction((name) => (
+      document.querySelector(".garage-profile-main h2")?.textContent.trim() === name &&
+      Boolean(document.querySelector("#garageRecords")) &&
+      Boolean(document.querySelector("#garageRewards"))
+    ), setup.lucasName, { timeout: 5000 });
+    const initial = await page.evaluate(() => {
+      const text = document.body.innerText.replace(/\s+/g, " ");
+      const lowerText = text.toLowerCase();
+      return {
+        profileName: document.querySelector(".garage-profile-main h2")?.textContent.trim() || "",
+        hasProfile: Boolean(document.querySelector(".garage-profile-hero")),
+        hasRecords: Boolean(document.querySelector("#garageRecords")),
+        hasUnlocks: Boolean(document.querySelector("#garageRewards")),
+        routeChampion: lowerText.includes("route champion"),
+        officialTime: lowerText.includes("official time attack"),
+        officialScore: lowerText.includes("official score attack"),
+        playgroundTime: lowerText.includes("playground time"),
+        playgroundScore: lowerText.includes("playground score"),
+        localFun: lowerText.includes("local/fun"),
+        comingSoon: ["Paint", "Glow", "Drift Sound", "Boost Sound", "Champion Aura"].every((label) => lowerText.includes(label.toLowerCase())) && lowerText.includes("coming soon")
+      };
+    });
+    if (!initial.hasProfile || !initial.hasRecords || !initial.hasUnlocks || !initial.routeChampion || !initial.officialTime || !initial.officialScore || !initial.playgroundTime || !initial.playgroundScore || !initial.localFun || !initial.comingSoon) {
+      throw new Error(`Garage profile should show driver, records, official/playground separation, and unlock preview: ${JSON.stringify(initial)}`);
+    }
+
+    await page.locator('.garage-driver-list button[data-action="selectPlayer"]:not([disabled])').first().click();
+    await page.waitForFunction((name) => document.querySelector(".garage-profile-main h2")?.textContent.trim() !== name, setup.lucasName, { timeout: 5000 });
+    const switched = await page.evaluate(() => {
+      const text = document.body.innerText.replace(/\s+/g, " ");
+      const lowerText = text.toLowerCase();
+      return {
+        profileName: document.querySelector(".garage-profile-main h2")?.textContent.trim() || "",
+        recordsVisible: Boolean(document.querySelector("#garageRecords")),
+        noGarageCrash: window.neonRoadRally?.screen === "players",
+        recordCopy: ["Official Time Attack", "Official Score Attack", "Playground Time", "Playground Score"].every((label) => lowerText.includes(label.toLowerCase()))
+      };
+    });
+    if (!switched.noGarageCrash || !switched.recordsVisible || !switched.recordCopy || switched.profileName === setup.lucasName) {
+      throw new Error(`Garage driver switch should update profile and keep records visible: ${JSON.stringify(switched)}`);
+    }
+
+    await page.fill("#newDriverName", "Mira Garage");
+    await page.locator('button[data-action="createPlayer"]').click();
+    await page.waitForFunction(() => document.querySelector(".garage-profile-main h2")?.textContent.trim() === "Mira Garage", null, { timeout: 5000 });
+    await page.fill("#driverRenameName", "Mira Prime");
+    await page.locator('button[data-action="renameDriver"]').click();
+    await page.waitForFunction(() => document.querySelector(".garage-profile-main h2")?.textContent.trim() === "Mira Prime", null, { timeout: 5000 });
+
+    const detailsOpen = await page.locator(".garage-rewards-details").first().evaluate((node) => node.open);
+    if (!detailsOpen) await page.locator(".garage-rewards-details > summary").first().click();
+    await page.locator('.badge-filter-button[data-filter="mastery"]').click();
+    await page.waitForFunction(() => (
+      document.querySelector(".garage-rewards-details")?.open === true &&
+      document.querySelector(".badge-filter-button.is-active")?.dataset?.filter === "mastery"
+    ), null, { timeout: 5000 });
+    await page.locator('.badge-filter-button[data-filter="all"]').click();
+    await page.waitForFunction(() => (
+      document.querySelector(".garage-rewards-details")?.open === true &&
+      document.querySelector(".badge-filter-button.is-active")?.dataset?.filter === "all"
+    ), null, { timeout: 5000 });
+
+    const cleanup = await page.evaluate((originalIds) => {
+      const app = window.neonRoadRally;
+      app.profiles.data.players = app.profiles.data.players.filter((player) => originalIds.includes(player.id));
+      app.profiles.data.currentPlayerId = originalIds[0] || null;
+      app.profiles.save();
+      app.showTitle();
+      return {
+        playerCount: app.profiles.data.players.length,
+        currentPlayerId: app.profiles.data.currentPlayerId
+      };
+    }, setup.originalIds);
+    if (cleanup.playerCount !== setup.originalIds.length || cleanup.currentPlayerId !== setup.originalIds[0]) {
+      throw new Error(`Garage profile QA cleanup should restore original drivers: ${JSON.stringify(cleanup)}`);
+    }
+
+    return { initial, switched, cleanup };
   }
 
   async function runPartyManageDriverReorderQa() {
@@ -1157,6 +1333,7 @@ async function run() {
   const leaderboardControllerSelectQa = await runLeaderboardControllerSelectQa();
   const officialRecordChaseQa = await runOfficialRecordChaseQa();
   const couchResultsAndPlaygroundRecordsQa = await runCouchResultsAndPlaygroundRecordsQa();
+  const garageProfileQa = await runGarageProfileQa();
 
   await clickText("Party Race");
   await expectText("Party Mode");
@@ -1460,6 +1637,7 @@ async function run() {
     leaderboardControllerSelectQa,
     officialRecordChaseQa,
     couchResultsAndPlaygroundRecordsQa,
+    garageProfileQa,
     partyBonusSurvivalQa,
     partyManageReorderQa,
     ...result
