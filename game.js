@@ -3970,6 +3970,23 @@ const GAMEPAD_CONFIG = {
   menuRepeatDelayMs: 280,
   menuRepeatMs: 115
 };
+const CONTROLLER_PRESET_STANDARD = "standard";
+const CONTROLLER_PRESET_SHOULDER_RACER = "shoulderRacer";
+const DEFAULT_CONTROLLER_PRESET_ID = CONTROLLER_PRESET_STANDARD;
+const CONTROLLER_PRESETS = [
+  {
+    id: CONTROLLER_PRESET_STANDARD,
+    label: "Standard",
+    shortLabel: "Standard",
+    description: "D-pad or left stick steers. Hold L1/L2 plus left/right for Drift Dash."
+  },
+  {
+    id: CONTROLLER_PRESET_SHOULDER_RACER,
+    label: "Shoulder Racer",
+    shortLabel: "Shoulder Racer",
+    description: "L1/R1 tap lanes. L2/R2 Drift Dash. D-pad and stick still steer."
+  }
+];
 
 const MENU_FOCUS_SELECTOR = [
   "button:not([disabled])",
@@ -4002,7 +4019,9 @@ const GAMEPAD_BUTTON_LABELS = {
   0: "Cross/X",
   1: "Circle",
   4: "L1",
+  5: "R1",
   6: "L2",
+  7: "R2",
   9: "Options/Menu",
   12: "D-pad Up",
   13: "D-pad Down",
@@ -4017,17 +4036,30 @@ const GAMEPAD_DIAGNOSTIC_FLAGS = [
   { key: "cross", label: "Cross/X" },
   { key: "circle", label: "Circle" },
   { key: "options", label: "Options/Menu" },
-  { key: "driftButton", label: "L1/L2" },
+  { key: "l1", label: "L1" },
+  { key: "r1", label: "R1" },
+  { key: "l2", label: "L2" },
+  { key: "r2", label: "R2" },
   { key: "dpad", label: "D-pad" },
   { key: "leftStick", label: "Left stick" }
 ];
-const GAMEPAD_MAPPING_ROWS = [
-  { control: "Cross/X", action: "Boost / select" },
-  { control: "Circle", action: "Back / resume where supported" },
-  { control: "Options/Menu", action: "Pause / end Bonus Survival" },
-  { control: "L1/L2 + left/right", action: "Drift Dash" },
-  { control: "D-pad / left stick", action: "Steering / vertical movement" }
-];
+const GAMEPAD_MAPPING_ROWS_BY_PRESET = {
+  [CONTROLLER_PRESET_STANDARD]: [
+    { control: "Cross/X", action: "Boost / select" },
+    { control: "Circle", action: "Back / resume where supported" },
+    { control: "Options/Menu", action: "Pause / end Bonus Survival" },
+    { control: "L1/L2 + left/right", action: "Drift Dash" },
+    { control: "D-pad / left stick", action: "Steering / vertical movement" }
+  ],
+  [CONTROLLER_PRESET_SHOULDER_RACER]: [
+    { control: "Cross/X", action: "Boost / select" },
+    { control: "Circle", action: "Back / resume where supported" },
+    { control: "Options/Menu", action: "Pause / end Bonus Survival" },
+    { control: "L1 / R1", action: "Lane left / lane right" },
+    { control: "L2 / R2", action: "Drift Dash left / right" },
+    { control: "D-pad / left stick", action: "Steering / vertical movement" }
+  ]
+};
 
 function getGamepadButtonLabel(index) {
   return GAMEPAD_BUTTON_LABELS[index] || `Button ${index}`;
@@ -4567,6 +4599,25 @@ function getSpeedClassRank(value) {
   const id = normalizeSpeedClassId(value, DEFAULT_SPEED_CLASS_ID);
   const index = SPEED_CLASS_ORDER.indexOf(id);
   return index >= 0 ? index : SPEED_CLASS_ORDER.indexOf(DEFAULT_SPEED_CLASS_ID);
+}
+
+function normalizeControllerPresetId(value, fallback = DEFAULT_CONTROLLER_PRESET_ID) {
+  const raw = String(value || "").trim();
+  if (CONTROLLER_PRESETS.some((preset) => preset.id === raw)) return raw;
+  const compact = raw.toLowerCase().replace(/[^a-z0-9]+/g, "");
+  if (compact === "shoulderracer" || compact === "shoulders") return CONTROLLER_PRESET_SHOULDER_RACER;
+  if (compact === "standard" || compact === "default") return CONTROLLER_PRESET_STANDARD;
+  return CONTROLLER_PRESETS.some((preset) => preset.id === fallback) ? fallback : DEFAULT_CONTROLLER_PRESET_ID;
+}
+
+function getControllerPresetDefinition(value) {
+  const id = normalizeControllerPresetId(value, DEFAULT_CONTROLLER_PRESET_ID);
+  return CONTROLLER_PRESETS.find((preset) => preset.id === id) || CONTROLLER_PRESETS[0];
+}
+
+function getGamepadMappingRowsForPreset(value) {
+  const id = normalizeControllerPresetId(value, DEFAULT_CONTROLLER_PRESET_ID);
+  return GAMEPAD_MAPPING_ROWS_BY_PRESET[id] || GAMEPAD_MAPPING_ROWS_BY_PRESET[DEFAULT_CONTROLLER_PRESET_ID];
 }
 
 function isSpeedClassAtLeast(value, minimum) {
@@ -7955,6 +8006,7 @@ class PlayerProfileManager {
       players: [],
       currentPlayerId: null,
       speedClassId: DEFAULT_SPEED_CLASS_ID,
+      controllerPresetId: DEFAULT_CONTROLLER_PRESET_ID,
       leaderboard: [],
       playgroundRecords: [],
       enduranceLeaderboard: [],
@@ -8031,6 +8083,7 @@ class PlayerProfileManager {
       players,
       currentPlayerId,
       speedClassId: normalizeSpeedClassId(parsed.speedClassId, fallback.speedClassId),
+      controllerPresetId: normalizeControllerPresetId(parsed.controllerPresetId || parsed.gamepadPresetId || parsed.controllerPreset, fallback.controllerPresetId),
       leaderboard,
       playgroundRecords,
       enduranceLeaderboard,
@@ -8158,6 +8211,11 @@ class PlayerProfileManager {
 
   updateSpeedClass(speedClassId) {
     this.data.speedClassId = normalizeSpeedClassId(speedClassId, DEFAULT_SPEED_CLASS_ID);
+    this.save();
+  }
+
+  updateControllerPreset(controllerPresetId) {
+    this.data.controllerPresetId = normalizeControllerPresetId(controllerPresetId, DEFAULT_CONTROLLER_PRESET_ID);
     this.save();
   }
 
@@ -10198,17 +10256,24 @@ class InputManager {
       circle: false,
       options: false,
       l1: false,
+      r1: false,
       l2: false,
+      r2: false,
       dpad: false,
       leftStick: false,
       left: false,
       right: false,
+      laneLeft: false,
+      laneRight: false,
+      driftLeft: false,
+      driftRight: false,
       up: false,
       down: false,
       boost: false,
       back: false,
       pause: false,
       drift: false,
+      controllerPresetId: DEFAULT_CONTROLLER_PRESET_ID,
       anyInput: false
     };
   }
@@ -10245,6 +10310,7 @@ class InputManager {
       detected: diagnostic.detected ? "Yes" : "No",
       id: diagnostic.id,
       mapping: diagnostic.mapping,
+      preset: diagnostic.presetLabel,
       lastButton: diagnostic.lastButton,
       lastAxis: diagnostic.lastAxis
     };
@@ -10268,6 +10334,14 @@ class InputManager {
     return snapshot.status;
   }
 
+  getControllerPresetId() {
+    return normalizeControllerPresetId(this.game?.profiles?.data?.controllerPresetId, DEFAULT_CONTROLLER_PRESET_ID);
+  }
+
+  getControllerPresetDefinition() {
+    return getControllerPresetDefinition(this.getControllerPresetId());
+  }
+
   getControllerStatusFromFields(supported, detected, mapping) {
     if (!supported) return "Controller unavailable";
     if (detected && mapping && mapping !== "standard") return "Controller detected, mapping may vary";
@@ -10287,6 +10361,8 @@ class InputManager {
       id: gamepad?.id || this.gamepadLastId || "none",
       index: Number.isFinite(gamepad?.index) ? gamepad.index : this.gamepadActiveIndex,
       mapping: mapping || "none",
+      presetId: this.getControllerPresetId(),
+      presetLabel: this.getControllerPresetDefinition().label,
       status: this.getControllerStatusFromFields(supported, detected, mapping),
       lastButton: this.gamepadLastButton || "none",
       lastAxis: this.gamepadLastAxis || "none",
@@ -10370,14 +10446,23 @@ class InputManager {
     const circle = this.gamepadButtonPressed(gamepad, 1);
     const options = this.gamepadButtonPressed(gamepad, 9);
     const l1 = this.gamepadButtonPressed(gamepad, 4);
+    const r1 = this.gamepadButtonPressed(gamepad, 5);
     const l2 = this.gamepadButtonPressed(gamepad, 6, GAMEPAD_CONFIG.triggerPressedThreshold);
+    const r2 = this.gamepadButtonPressed(gamepad, 7, GAMEPAD_CONFIG.triggerPressedThreshold);
     const dpad = dpadUp || dpadDown || dpadLeft || dpadRight;
     const leftStick = Math.abs(axisX) >= GAMEPAD_CONFIG.stickDeadzone || Math.abs(axisY) >= GAMEPAD_CONFIG.stickDeadzone;
+    const controllerPresetId = this.getControllerPresetId();
+    const shoulderRacer = controllerPresetId === CONTROLLER_PRESET_SHOULDER_RACER;
+    const modifierDrift = l1 || l2;
+    const laneLeft = shoulderRacer ? (left || l1) : left;
+    const laneRight = shoulderRacer ? (right || r1) : right;
+    const driftLeft = shoulderRacer ? l2 : (modifierDrift && left);
+    const driftRight = shoulderRacer ? r2 : (modifierDrift && right);
     const boost = cross;
     const back = circle;
     const pause = options;
-    const drift = l1 || l2;
-    const anyInput = left || right || up || down || boost || back || pause || drift;
+    const drift = shoulderRacer ? (l2 || r2) : modifierDrift;
+    const anyInput = left || right || up || down || boost || back || pause || l1 || r1 || l2 || r2;
     return {
       connected: Boolean(gamepad.connected),
       index: gamepad.index,
@@ -10391,17 +10476,24 @@ class InputManager {
       circle,
       options,
       l1,
+      r1,
       l2,
+      r2,
       dpad,
       leftStick,
       left,
       right,
+      laneLeft,
+      laneRight,
+      driftLeft,
+      driftRight,
       up,
       down,
       boost,
       back,
       pause,
       drift,
+      controllerPresetId,
       anyInput
     };
   }
@@ -10417,7 +10509,11 @@ class InputManager {
     if (state.cross) this.gamepadDetectedInputs.cross = true;
     if (state.circle) this.gamepadDetectedInputs.circle = true;
     if (state.options) this.gamepadDetectedInputs.options = true;
-    if (state.l1 || state.l2) this.gamepadDetectedInputs.driftButton = true;
+    if (state.l1) this.gamepadDetectedInputs.l1 = true;
+    if (state.r1) this.gamepadDetectedInputs.r1 = true;
+    if (state.l2) this.gamepadDetectedInputs.l2 = true;
+    if (state.r2) this.gamepadDetectedInputs.r2 = true;
+    if (state.l1 || state.l2 || state.r1 || state.r2) this.gamepadDetectedInputs.driftButton = true;
     if (state.dpad) this.gamepadDetectedInputs.dpad = true;
     if (state.leftStick) this.gamepadDetectedInputs.leftStick = true;
   }
@@ -10583,12 +10679,12 @@ class InputManager {
       this.updateDriftInput();
       return;
     }
-    const leftEdge = this.gamepadEdge(state, "left");
-    const rightEdge = this.gamepadEdge(state, "right");
+    const leftEdge = this.gamepadEdge(state, "laneLeft");
+    const rightEdge = this.gamepadEdge(state, "laneRight");
     const boostEdge = this.gamepadEdge(state, "boost");
     this.gamepadVerticalInput = state.up === state.down ? 0 : (state.up ? -1 : 1);
-    this.gamepadLeftHeld = state.left;
-    this.gamepadRightHeld = state.right;
+    this.gamepadLeftHeld = state.driftLeft;
+    this.gamepadRightHeld = state.driftRight;
     this.gamepadDriftHeld = state.drift;
     if (leftEdge && !state.drift && this.canAcceptGamepadLaneEdge(now)) {
       this.requestLaneStep("gamepad-left", -1, "gamepad");
@@ -11174,6 +11270,7 @@ class InputManager {
       boostEdgeAgeMs: this.lastBoostEdgeTime ? Math.max(0, now - this.lastBoostEdgeTime) : null,
       verticalHeld: Array.from(this.heldVerticalKeys).join(", ") || "none",
       gamepad: this.getControllerStatusText(),
+      gamepadPreset: this.getControllerPresetDefinition().label,
       gamepadIndex: this.gamepadActiveIndex,
       gamepadMapping: this.gamepadLastMapping || "none",
       gamepadLastButton: this.gamepadLastButton || "none",
@@ -23519,6 +23616,26 @@ class NeonRoadRally {
     return isDebugAccessAllowed();
   }
 
+  getControllerPresetId() {
+    return normalizeControllerPresetId(this.profiles?.data?.controllerPresetId, DEFAULT_CONTROLLER_PRESET_ID);
+  }
+
+  getControllerPresetDefinition() {
+    return getControllerPresetDefinition(this.getControllerPresetId());
+  }
+
+  getControllerMoveHintText() {
+    return this.getControllerPresetId() === CONTROLLER_PRESET_SHOULDER_RACER
+      ? "Stick / D-pad / L1/R1"
+      : "Stick / D-pad";
+  }
+
+  getControllerDriftHintText() {
+    return this.getControllerPresetId() === CONTROLLER_PRESET_SHOULDER_RACER
+      ? "L2/R2"
+      : "L1/L2 + left/right";
+  }
+
   createEmptyRun() {
     const player = this.profiles.getCurrentPlayer() || {
       name: "PLAYER 1",
@@ -30422,6 +30539,8 @@ class NeonRoadRally {
       this.audio.stopMusic(0.15);
       const run = this.run;
       const controlHint = this.renderer?.getRaceControlHintText ? this.renderer.getRaceControlHintText() : "SHIFT+A/D DRIFT DASH";
+      const controllerMoveHint = this.getControllerMoveHintText();
+      const controllerDriftHint = this.getControllerDriftHintText();
       const routeLabel = run.officialRouteName || run.track?.name || "Current Route";
       const raceLabel = isOfficialEnduranceRun(run)
         ? "Bonus Survival"
@@ -30444,9 +30563,9 @@ class NeonRoadRally {
               </button>
             </div>
             <div class="pause-control-strip" aria-label="Controls">
-              <span><b>Move</b> Arrows / Stick</span>
+              <span><b>Move</b> Arrows / ${escapeHtml(controllerMoveHint)}</span>
               <span><b>Boost</b> Space / Cross</span>
-              <span><b>Drift</b> ${escapeHtml(controlHint)} / L1+Stick</span>
+              <span><b>Drift</b> ${escapeHtml(controlHint)} / ${escapeHtml(controllerDriftHint)}</span>
               <span><b>Audio</b> M / N</span>
             </div>
           </div>
@@ -30633,6 +30752,10 @@ class NeonRoadRally {
   }
 
   getHowToPlaySections() {
+    const controllerPreset = this.getControllerPresetDefinition();
+    const controllerLine = controllerPreset.id === CONTROLLER_PRESET_SHOULDER_RACER
+      ? "Controller Shoulder Racer: D-pad or left stick still moves lanes; L1/R1 tap lanes; L2/R2 Drift Dash; Cross boosts/selects; Circle backs/resumes; Options pauses."
+      : "Controller Standard: D-pad or left stick moves lanes; Cross boosts/selects; Circle backs/resumes; Options pauses; hold L1/L2 plus left/right for Drift Dash.";
     return {
       basics: [
         {
@@ -30641,8 +30764,7 @@ class NeonRoadRally {
           points: [
             "A/D or Left/Right: tap once to change one lane.",
             "Shift + A/D or Shift + Left/Right: drift dash across lanes.",
-            "Controller: D-pad or left stick moves lanes and forward/back.",
-            "Cross uses manual boost. Hold L1 or L2 plus left/right for Drift Dash. Options pauses.",
+            controllerLine,
             "Release Shift or the drift direction to settle into the lane.",
             "Cut across lanes fast. Great for reaching boosts and dodging traffic.",
             "Mistime it and you can clip traffic.",
@@ -30947,13 +31069,15 @@ class NeonRoadRally {
         mapping: "none",
         lastButton: "none",
         lastAxis: "none",
+        presetId: DEFAULT_CONTROLLER_PRESET_ID,
+        presetLabel: getControllerPresetDefinition(DEFAULT_CONTROLLER_PRESET_ID).label,
         detectedInputs: createGamepadDetectedInputs()
       };
     const flagChips = GAMEPAD_DIAGNOSTIC_FLAGS.map((item) => {
       const seen = Boolean(diagnostic.detectedInputs?.[item.key]);
       return `<span class="controller-diag-chip ${seen ? "is-detected" : "is-waiting"}" data-controller-diag-flag="${escapeAttr(item.key)}">${escapeHtml(item.label)}: ${seen ? "Seen" : "Waiting"}</span>`;
     }).join("");
-    const mappingRows = GAMEPAD_MAPPING_ROWS.map((row) => `
+    const mappingRows = getGamepadMappingRowsForPreset(diagnostic.presetId).map((row) => `
       <span><b>${escapeHtml(row.control)}</b><em>${escapeHtml(row.action)}</em></span>
     `).join("");
     return `
@@ -30966,6 +31090,7 @@ class NeonRoadRally {
         <div class="controller-diag-panel">
           <div class="controller-diag-meta">
             <span><b>Detected</b><em data-controller-diag="detected">${diagnostic.detected ? "Yes" : "No"}</em></span>
+            <span><b>Preset</b><em data-controller-diag="preset">${escapeHtml(diagnostic.presetLabel)}</em></span>
             <span><b>Gamepad</b><em data-controller-diag="id">${escapeHtml(diagnostic.id)}</em></span>
             <span><b>Mapping</b><em data-controller-diag="mapping">${escapeHtml(diagnostic.mapping)}</em></span>
             <span><b>Last Button</b><em data-controller-diag="lastButton">${escapeHtml(diagnostic.lastButton)}</em></span>
@@ -30987,6 +31112,7 @@ class NeonRoadRally {
     this.audio.updateMusicState({ id: "menu", label: "Menu", sectionId: "menu", intensity: 0, raceTypeId: "menu" });
     this.audio.playMusic("title", false);
     const selectedSpeedClass = getSpeedClassConfig(this.profiles.data.speedClassId);
+    const controllerPreset = this.getControllerPresetDefinition();
     const debugToolsVisible = this.debugMode && this.isDebugAccessAllowed();
     const controllerStatus = this.input?.getControllerStatusText ? this.input.getControllerStatusText() : "Press any controller button";
     this.layer.classList.remove("is-empty");
@@ -31045,15 +31171,30 @@ class NeonRoadRally {
                 <strong>Keyboard + Controller</strong>
                 <small data-controller-status>${escapeHtml(controllerStatus)}</small>
               </div>
+              <div class="settings-controller-preset">
+                <div class="settings-controller-preset-head">
+                  <span class="label label--dim">Controller Preset</span>
+                  <strong>${escapeHtml(controllerPreset.label)}</strong>
+                </div>
+                <div class="speed-pill controller-preset-pill" aria-label="Controller preset">
+                  ${CONTROLLER_PRESETS.map((preset) => `
+                    <button data-action="setControllerPreset" data-id="${escapeAttr(preset.id)}" aria-pressed="${preset.id === controllerPreset.id ? "true" : "false"}">
+                      ${escapeHtml(preset.shortLabel)}
+                    </button>
+                  `).join("")}
+                </div>
+                <small class="settings-controller-note">${escapeHtml(controllerPreset.description)}</small>
+              </div>
               <div class="settings-key-grid">
                 <span><b>A / D</b><em>Change lane</em></span>
                 <span><b>Shift + A/D</b><em>Drift Dash</em></span>
                 <span><b>Space</b><em>Manual boost</em></span>
                 <span><b>Esc</b><em>Pause</em></span>
                 <span><b>D-pad / Left Stick</b><em>Steer / vertical</em></span>
+                <span><b>${controllerPreset.id === CONTROLLER_PRESET_SHOULDER_RACER ? "L1 / R1" : "L1 / L2"}</b><em>${controllerPreset.id === CONTROLLER_PRESET_SHOULDER_RACER ? "Lane left/right" : "Drift modifier"}</em></span>
+                <span><b>${controllerPreset.id === CONTROLLER_PRESET_SHOULDER_RACER ? "L2 / R2" : "R1 / R2"}</b><em>${controllerPreset.id === CONTROLLER_PRESET_SHOULDER_RACER ? "Drift Dash left/right" : "Diagnostic only"}</em></span>
                 <span><b>Cross/X</b><em>Boost / select</em></span>
                 <span><b>Circle</b><em>Back / resume</em></span>
-                <span><b>L1/L2 + Left/Right</b><em>Drift Dash</em></span>
                 <span><b>Options/Menu</b><em>Pause / end bonus</em></span>
                 <span><b>R</b><em>Restart</em></span>
                 <span><b>F</b><em>Fullscreen</em></span>
@@ -37656,6 +37797,7 @@ class NeonRoadRally {
         }
         else if (action === "fullscreen") this.toggleFullscreen();
         else if (action === "setSpeedClass") this.handleSetSpeedClass(button.dataset.id);
+        else if (action === "setControllerPreset") this.handleSetControllerPreset(button.dataset.id);
         else if (action === "setModePickerSpeed") this.handleModePickerSpeed(button.dataset.id);
         else if (action === "focusGarageSection") this.focusGarageSection(button.dataset.target);
         else if (action === "randomSeed") this.handleRandomSeed();
@@ -37912,6 +38054,14 @@ class NeonRoadRally {
     } else {
       this.showTitle();
     }
+  }
+
+  handleSetControllerPreset(id) {
+    const nextPresetId = normalizeControllerPresetId(id, DEFAULT_CONTROLLER_PRESET_ID);
+    this.profiles.updateControllerPreset(nextPresetId);
+    this.input?.clearGamepadInputState?.();
+    const preset = getControllerPresetDefinition(nextPresetId);
+    this.showSettingsScreen(`Controller preset set to ${preset.label}.`);
   }
 
   handleModePickerSpeed(id) {

@@ -1366,14 +1366,38 @@ async function run() {
         tvNote: /HDMI\/USB-C to HDMI/.test(bodyText) && /TV Game Mode/.test(bodyText) && /AirPlay\/casting delay is expected/.test(bodyText),
         controllerDiagnostic: Boolean(document.querySelector(".settings-controller-diagnostics")),
         controllerStatus: document.querySelector("[data-controller-status]")?.textContent || "",
+        controllerPreset: window.neonRoadRally?.profiles?.data?.controllerPresetId || "",
+        controllerPresetCopy: ["controller preset", "standard", "shoulder racer"].every((text) => lowerText.includes(text)),
+        controllerPresetDiagnostic: lowerText.includes("preset standard"),
         controllerFocusNote: /button press first/.test(bodyText),
         mappingRows: ["cross/x", "circle", "options/menu", "l1/l2 + left/right", "d-pad / left stick"].every((text) => lowerText.includes(text))
       };
     });
-    if (!settingsQa.tvNote || !settingsQa.controllerDiagnostic || !settingsQa.controllerFocusNote || !settingsQa.mappingRows) {
+    if (!settingsQa.tvNote || !settingsQa.controllerDiagnostic || !settingsQa.controllerPresetCopy || !settingsQa.controllerPresetDiagnostic || !settingsQa.controllerFocusNote || !settingsQa.mappingRows || settingsQa.controllerPreset !== "standard") {
       throw new Error(`Settings should include compact controller diagnostics, mapping, and TV setup copy: ${JSON.stringify(settingsQa)}`);
     }
-    settingsControllerQa = settingsQa;
+    await page.locator('button[data-action="setControllerPreset"][data-id="shoulderRacer"]').click();
+    await page.waitForFunction(() => window.neonRoadRally?.profiles?.data?.controllerPresetId === "shoulderRacer", null, { timeout: 3000 });
+    const shoulderToolsOpen = await page.locator(".settings-tools-details").first().evaluate((node) => node.open);
+    if (!shoulderToolsOpen) await page.locator(".settings-tools-details > summary").first().click();
+    const shoulderQa = await page.evaluate(() => {
+      const bodyText = document.body.innerText.replace(/\s+/g, " ");
+      const lowerText = bodyText.toLowerCase();
+      return {
+        controllerPreset: window.neonRoadRally?.profiles?.data?.controllerPresetId || "",
+        activeCopy: ["shoulder racer", "l1/r1 tap lanes", "l2/r2 drift dash"].every((text) => lowerText.includes(text)),
+        diagnosticPreset: lowerText.includes("preset shoulder racer"),
+        mappingRows: ["l1 / r1", "lane left / lane right", "l2 / r2", "drift dash left / right", "cross/x", "circle", "options/menu"].every((text) => lowerText.includes(text))
+      };
+    });
+    if (shoulderQa.controllerPreset !== "shoulderRacer" || !shoulderQa.activeCopy || !shoulderQa.diagnosticPreset || !shoulderQa.mappingRows) {
+      throw new Error(`Settings should persist and explain Shoulder Racer mapping: ${JSON.stringify(shoulderQa)}`);
+    }
+    await page.locator('button[data-action="setControllerPreset"][data-id="standard"]').click();
+    await page.waitForFunction(() => window.neonRoadRally?.profiles?.data?.controllerPresetId === "standard", null, { timeout: 3000 });
+    settingsControllerQa = { ...settingsQa, shoulderRacer: shoulderQa };
+    const toolsOpenAfterPreset = await page.locator(".settings-tools-details").first().evaluate((node) => node.open);
+    if (!toolsOpenAfterPreset) await page.locator(".settings-tools-details > summary").first().click();
     await clickAction("showPlaytestReport");
   } else {
     await clickText("Playtest Tools");

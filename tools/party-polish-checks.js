@@ -349,6 +349,7 @@ vm.runInContext(`
   const fakeGame = {
     screen: "game",
     run: { paused: false, ended: false, debugFrozen: false, raceActive: true, pendingEndStatus: "", targetLane: TRACK_DIRECTOR.centerLane },
+    profiles: { data: { controllerPresetId: DEFAULT_CONTROLLER_PRESET_ID } },
     officialEnduranceCanEnd: false,
     audio: { activate() {}, playMusic() {}, playSfx() {} },
     layer: { querySelectorAll: () => [] },
@@ -387,8 +388,14 @@ vm.runInContext(`
     pad = makePad(options);
     for (let frame = 0; frame < frames; frame += 1) input.update(1 / 60);
   };
+  const setControllerPreset = (id) => {
+    releasePad();
+    fakeGame.profiles.data.controllerPresetId = normalizeControllerPresetId(id, DEFAULT_CONTROLLER_PRESET_ID);
+    input.clearGamepadInputState();
+  };
 
   fakeGame.run.targetLane = TRACK_DIRECTOR.centerLane;
+  assert.strictEqual(input.getControllerPresetDefinition().id, CONTROLLER_PRESET_STANDARD, "Controller preset should default to Standard");
   pressPad({ buttons: [15] }, 3);
   assert.strictEqual(fakeGame.run.targetLane, TRACK_DIRECTOR.centerLane + 1, "D-pad right should move one lane only while held");
   assert.strictEqual(laneMoveSuccesses.length, 1, "Held D-pad right should not repeat lane changes");
@@ -450,6 +457,14 @@ vm.runInContext(`
   pressPad({ buttons: [15, 6] });
   assert(driftInputs.some((entry) => entry.direction === 1 && entry.held), "L2 plus right should feed Drift Dash right");
   releasePad();
+  const beforeStandardR1Successes = laneMoveSuccesses.length;
+  pressPad({ buttons: [5] }, 2);
+  assert.strictEqual(laneMoveSuccesses.length, beforeStandardR1Successes, "Standard preset R1 should not lane-tap");
+  releasePad();
+  const beforeStandardR2Drifts = driftInputs.length;
+  pressPad({ buttons: [7] }, 2);
+  assert(!driftInputs.slice(beforeStandardR2Drifts).some((entry) => entry.direction !== 0 && entry.held), "Standard preset R2 alone should not start Drift Dash");
+  releasePad();
 
   pressPad({ buttons: [0] }, 2);
   assert.strictEqual(boosts, 1, "Cross/X should trigger one manual boost edge");
@@ -478,6 +493,51 @@ vm.runInContext(`
   releasePad();
   fakeGame.officialEnduranceCanEnd = false;
   fakeGame.run.paused = false;
+
+  setControllerPreset(CONTROLLER_PRESET_SHOULDER_RACER);
+  assert.strictEqual(input.getControllerPresetDefinition().id, CONTROLLER_PRESET_SHOULDER_RACER, "Controller preset should switch to Shoulder Racer");
+  fakeGame.screen = "game";
+  fakeGame.run.targetLane = TRACK_DIRECTOR.centerLane;
+  const shoulderLaneStartSuccesses = laneMoveSuccesses.length;
+  pressPad({ buttons: [4] }, 3);
+  assert.strictEqual(fakeGame.run.targetLane, TRACK_DIRECTOR.centerLane - 1, "Shoulder Racer L1 should move one lane left");
+  assert.strictEqual(laneMoveSuccesses.length - shoulderLaneStartSuccesses, 1, "Holding L1 should not repeat lane changes");
+  releasePad();
+  pressPad({ buttons: [5] }, 3);
+  assert.strictEqual(fakeGame.run.targetLane, TRACK_DIRECTOR.centerLane, "Shoulder Racer R1 should move one lane right");
+  assert.strictEqual(laneMoveSuccesses.length - shoulderLaneStartSuccesses, 2, "Holding R1 should not repeat lane changes");
+  releasePad();
+  const shoulderDriftStart = driftInputs.length;
+  pressPad({ buttons: [6] }, 2);
+  assert(driftInputs.slice(shoulderDriftStart).some((entry) => entry.direction === -1 && entry.held), "Shoulder Racer L2 should start left Drift Dash");
+  releasePad();
+  assert.strictEqual(driftInputs.at(-1).direction, 0, "Releasing Shoulder Racer L2 should release Drift Dash");
+  pressPad({ buttons: [7] }, 2);
+  assert(driftInputs.some((entry) => entry.direction === 1 && entry.held), "Shoulder Racer R2 should start right Drift Dash");
+  releasePad();
+  assert.strictEqual(driftInputs.at(-1).direction, 0, "Releasing Shoulder Racer R2 should release Drift Dash");
+  const boostsBeforeShoulder = boosts;
+  pressPad({ buttons: [0] }, 2);
+  assert.strictEqual(boosts, boostsBeforeShoulder + 1, "Cross/X should still boost in Shoulder Racer");
+  releasePad();
+  fakeGame.screen = "partyTurn";
+  const startsBeforeShoulder = starts;
+  pressPad({ buttons: [0] });
+  assert.strictEqual(starts, startsBeforeShoulder + 1, "Cross/X should still select/start from Party Turn in Shoulder Racer");
+  releasePad();
+  fakeGame.screen = "game";
+  fakeGame.run.paused = true;
+  pressPad({ buttons: [1] });
+  assert.strictEqual(fakeGame.run.paused, false, "Circle should still resume paused gameplay in Shoulder Racer");
+  releasePad();
+  fakeGame.run.paused = false;
+  const pausesBeforeShoulder = pauses;
+  pressPad({ buttons: [9] });
+  assert.strictEqual(pauses, pausesBeforeShoulder + 1, "Options/Menu should still pause gameplay in Shoulder Racer");
+  assert.strictEqual(fakeGame.run.paused, true, "Options/Menu should leave the Shoulder Racer run paused");
+  releasePad();
+  fakeGame.run.paused = false;
+
   pad = null;
   const keyEvent = (key, code = key) => ({
     key,
@@ -507,9 +567,10 @@ vm.runInContext(`
     assert.strictEqual(fakeGame.run.targetLane, lane, "Keyboard left should reach lane " + lane);
   }
   assert.strictEqual(fakeGame.run.targetLane, 0, "Keyboard left should clamp at lane 1");
+  const boostsBeforeKeyboard = boosts;
   input.onKeyDown(keyEvent(" ", "Space"));
   input.onKeyUp(keyEvent(" ", "Space"));
-  assert.strictEqual(boosts, 2, "Keyboard boost should still work with gamepad support installed");
+  assert.strictEqual(boosts, boostsBeforeKeyboard + 1, "Keyboard boost should still work with gamepad support installed");
   assert.strictEqual(input.gamepadLastMapping, "standard", "Standard mapping should be captured for diagnostics");
   assert(input.gamepadLastButton.includes("Options/Menu"), "Diagnostics should keep the last pressed controller button");
   assert(input.gamepadLastAxis.includes("Left stick"), "Diagnostics should keep the last active stick axis");
@@ -518,12 +579,15 @@ vm.runInContext(`
       cross: input.gamepadDetectedInputs.cross,
       circle: input.gamepadDetectedInputs.circle,
       options: input.gamepadDetectedInputs.options,
-      driftButton: input.gamepadDetectedInputs.driftButton,
+      l1: input.gamepadDetectedInputs.l1,
+      r1: input.gamepadDetectedInputs.r1,
+      l2: input.gamepadDetectedInputs.l2,
+      r2: input.gamepadDetectedInputs.r2,
       dpad: input.gamepadDetectedInputs.dpad,
       leftStick: input.gamepadDetectedInputs.leftStick
     },
-    { cross: true, circle: true, options: true, driftButton: true, dpad: true, leftStick: true },
-    "Controller diagnostics should record all standard PS5 test inputs"
+    { cross: true, circle: true, options: true, l1: true, r1: true, l2: true, r2: true, dpad: true, leftStick: true },
+    "Controller diagnostics should record all standard PS5 shoulder and face inputs"
   );
 
   const manager = new PlayerProfileManager("party-polish-test");
@@ -552,6 +616,14 @@ vm.runInContext(`
       keyboardStillWorks: true,
       heldRepeatGuard: true,
       laneEdgesClamp: true
+    },
+    controllerShoulderRacerMapping: {
+      l1LaneLeft: true,
+      r1LaneRight: true,
+      heldRepeatGuard: true,
+      l2DriftLeft: true,
+      r2DriftRight: true,
+      crossCircleOptions: true
     }
   };
 })();
