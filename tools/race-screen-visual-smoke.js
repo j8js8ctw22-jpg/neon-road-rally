@@ -1373,6 +1373,39 @@ async function installVisualSmokeHelpers(page) {
       return { garage, scoreBoard, timeBoard, report, settings };
     }
 
+    function audioRoutingAudit() {
+      const game = app();
+      const expectedRaceMusic = {
+        "sunset-highway": "audio/sunset-highway.mp3",
+        "redline-run": "audio/redline-run.mp3",
+        "blackout-run": "audio/blackout-run-headlight-mile.mp3",
+        "midnight-ridge": "audio/midnight-ridge-mooncut-pass.mp3",
+        "prism-highway": "audio/prism-highway-glasslight-fever.mp3"
+      };
+      const rows = Object.entries(expectedRaceMusic).map(([trackId, expectedPath]) => {
+        const track = getTrackById(trackId);
+        game.audio.setRaceMusicTrack(track);
+        const raceEntry = game.audio?.tracks?.race || {};
+        return {
+          trackId,
+          trackName: track?.name || "",
+          expectedPath,
+          configuredPath: getTrackMusicPath(track),
+          configuredFallback: getTrackMusicFallbackPath(track),
+          activePath: raceEntry.path || "",
+          activeFallback: raceEntry.fallbackPath || ""
+        };
+      });
+      game.audio.setRaceMusicTrack(getTrackById("sunset-highway"));
+      return {
+        title: {
+          expectedPath: "audio/title-theme.mp3",
+          activePath: game.audio?.tracks?.title?.path || ""
+        },
+        race: rows
+      };
+    }
+
     ensurePlayers();
     window.__nrrVisualSmoke = {
       primeRun,
@@ -1397,7 +1430,8 @@ async function installVisualSmokeHelpers(page) {
       testBlackoutSpeedReadability,
       testBlackoutIdentity,
       testPrismIdentity,
-      menuScreens
+      menuScreens,
+      audioRoutingAudit
     };
   });
 }
@@ -1939,6 +1973,14 @@ async function run() {
     assert(menu.report.screen === "playtestReport" && menu.report.playtestReport, "Playtest Report smoke failed", menu.report);
     assert(menu.settings.screen === "settings" && menu.settings.audioControls && menu.settings.audioTest, "Settings audio controls smoke failed", menu.settings);
     report.observed.menuAndReports = menu;
+
+    const audioRouting = await page.evaluate(() => window.__nrrVisualSmoke.audioRoutingAudit());
+    assert(audioRouting.title.activePath === audioRouting.title.expectedPath, "Title music should route to title-theme.mp3", audioRouting.title);
+    audioRouting.race.forEach((row) => {
+      assert(row.configuredPath === row.expectedPath, `${row.trackName} configured music should match expected mp3`, row);
+      assert(row.activePath === row.expectedPath, `${row.trackName} active race music should match expected mp3`, row);
+    });
+    report.observed.audioRouting = audioRouting;
 
     assert(consoleIssues.length === 0, "Console warnings/errors observed", { consoleIssues });
     const objectScreenMotionTracePath = path.join(OUT_DIR, "object-screen-motion-trace.json");

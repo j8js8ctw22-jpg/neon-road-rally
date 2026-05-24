@@ -2952,16 +2952,18 @@ function cloneTrackSections(sections = []) {
 
 function createNormalTrackVariant(config) {
   const base = TRACKS[0];
+  const musicPath = config.music || base.music;
+  const musicFallback = config.musicFallback || base.musicFallback || base.music;
   return {
     ...base,
     id: config.id,
     name: config.name,
     description: config.description,
     cardIdentity: config.cardIdentity,
-    music: base.music,
-    musicFallback: base.musicFallback,
-    musicOptional: true,
-    musicStatus: "Uses shared rally music until a dedicated track theme is added.",
+    music: musicPath,
+    musicFallback,
+    musicOptional: config.musicOptional ?? Boolean(config.music && config.music !== musicFallback),
+    musicStatus: config.musicStatus || "Uses shared rally music until a dedicated track theme is added.",
     recommendedModes: config.recommendedModes,
     fuelRunSupport: true,
     pursuitSupport: false,
@@ -2986,6 +2988,9 @@ TRACKS.push(
     name: "Midnight Ridge",
     description: "Cold late-night mountain racing with cliff-road edges, switchback pressure, sparse lights, and distant town glow.",
     cardIdentity: "Technical-feeling mountain ridge visuals with dark cliffs, guardrail glints, switchback pressure, and readable lane work.",
+    music: "audio/midnight-ridge-mooncut-pass.mp3",
+    musicFallback: "audio/sunset-highway.mp3",
+    musicStatus: "Uses Midnight Ridge music; falls back safely if missing.",
     recommendedModes: ["Classic", "Fuel Run", "Party Mode", "Turbo / Overdrive"],
     themeTags: ["mountain", "night", "technical", "drift dash"],
     visualTheme: {
@@ -3027,6 +3032,9 @@ TRACKS.push(
     name: "Blackout Run",
     description: "Nearly unlit precision racing where headlights, reflective paint, and sparse glints define the road.",
     cardIdentity: "Near-total darkness defined by reflective lane dashes, road studs, edge glints, and traffic lights cutting through black road.",
+    music: "audio/blackout-run-headlight-mile.mp3",
+    musicFallback: "audio/sunset-highway.mp3",
+    musicStatus: "Uses Blackout Run music; falls back safely if missing.",
     recommendedModes: ["Classic", "Fuel Run", "Party Mode", "Turbo / Overdrive"],
     themeTags: ["dark", "headlights", "precision", "minimal"],
     visualTheme: {
@@ -3071,6 +3079,9 @@ TRACKS.push(
     name: "Prism Highway",
     description: "A bright neon showpiece with magenta, cyan, violet, electric blue, and rainbow road ribbons.",
     cardIdentity: "Vivid rainbow road panels and prismatic lane ribbons with clean contrast for cars, pickups, boosts, and ramps.",
+    music: "audio/prism-highway-glasslight-fever.mp3",
+    musicFallback: "audio/sunset-highway.mp3",
+    musicStatus: "Uses Prism Highway music; falls back safely if missing.",
     recommendedModes: ["Classic", "Fuel Run", "Party Mode", "Turbo / Redline"],
     themeTags: ["rainbow", "neon", "arcade", "showpiece"],
     visualTheme: {
@@ -9379,8 +9390,8 @@ class AudioManager {
       musicLandingAccent: 360
     };
     this.tracks = {
-      title: { path: "audio/title-theme.mp3", audio: null, loaded: "untested" },
-      race: { path: "audio/sunset-highway.mp3", audio: null, loaded: "untested" }
+      title: { path: "audio/title-theme.mp3", fallbackPath: "", audio: null, loaded: "untested" },
+      race: { path: "audio/sunset-highway.mp3", fallbackPath: "audio/sunset-highway.mp3", audio: null, loaded: "untested" }
     };
     const tone = (layers, duration = 0.18) => ({ audio: null, loaded: "generated", tone: { duration, layers } });
     this.sfx = {
@@ -9506,20 +9517,28 @@ class AudioManager {
     });
   }
 
-  configureMusicEntry(key, path) {
+  configureMusicEntry(key, path, fallbackPath = "") {
     const entry = this.tracks[key];
-    if (!entry || entry.path === path) return entry;
-    if (entry.audio) {
+    if (!entry) return entry;
+    const normalizedPath = String(path || "");
+    const normalizedFallback = String(fallbackPath || "");
+    const samePath = entry.path === normalizedPath;
+    const sameFallback = String(entry.fallbackPath || "") === normalizedFallback;
+    if (samePath && sameFallback) return entry;
+    if (!samePath && entry.audio) {
       try {
         entry.audio.pause();
       } catch (error) {
         // Ignore stale audio cleanup failures.
       }
     }
-    entry.path = path;
-    entry.audio = null;
-    entry.loaded = "untested";
-    if (this.musicKey === key) this.musicKey = null;
+    entry.path = normalizedPath;
+    entry.fallbackPath = normalizedFallback;
+    if (!samePath) {
+      entry.audio = null;
+      entry.loaded = "untested";
+      if (this.musicKey === key) this.musicKey = null;
+    }
     return entry;
   }
 
@@ -9546,25 +9565,28 @@ class AudioManager {
     const requestedPath = getTrackMusicPath(safeTrack);
     const fallbackPath = getTrackMusicFallbackPath(safeTrack) || getTrackMusicPath(TRACKS[0]);
     const optional = Boolean(safeTrack.musicOptional && requestedPath && requestedPath !== fallbackPath);
-    const requestedAvailable = optional
-      ? this.optionalMusicAvailability[requestedPath] === true
-      : Boolean(requestedPath);
-    const path = requestedAvailable ? requestedPath : fallbackPath;
+    const requestedUnavailable = optional && this.optionalMusicAvailability[requestedPath] === false;
+    const path = requestedUnavailable ? fallbackPath : (requestedPath || fallbackPath);
     this.raceTrackId = safeTrack.id || DEFAULT_TRACK_ID;
-    this.configureMusicEntry("race", path || getTrackMusicPath(TRACKS[0]));
+    this.configureMusicEntry("race", path || getTrackMusicPath(TRACKS[0]), fallbackPath);
     if (optional && !Object.prototype.hasOwnProperty.call(this.optionalMusicAvailability, requestedPath)) {
       this.probeOptionalMusic(requestedPath).then((available) => {
-        if (available && this.raceTrackId === safeTrack.id && this.tracks.race?.path !== requestedPath) {
-          this.configureMusicEntry("race", requestedPath);
+        if (this.raceTrackId !== safeTrack.id) return;
+        if (available && this.tracks.race?.path !== requestedPath) {
+          this.configureMusicEntry("race", requestedPath, fallbackPath);
+        } else if (!available && fallbackPath && this.tracks.race?.path === requestedPath) {
+          this.configureMusicEntry("race", fallbackPath, fallbackPath);
         }
       });
     }
   }
 
-  playMusic(key, restart = false) {
+  playMusic(key, restart = false, options = {}) {
     if (!this.userActivated || this.isMusicSilenced()) return;
     const entry = this.tracks[key];
     if (!entry) return;
+    const pathAtPlayStart = entry.path;
+    const fallbackPath = entry.fallbackPath || "";
     const audio = this.createAudio(entry, true);
     if (this.musicKey && this.musicKey !== key) {
       this.stopMusic(0);
@@ -9582,7 +9604,15 @@ class AudioManager {
     const promise = audio.play();
     if (promise && typeof promise.catch === "function") {
       promise.catch((error) => {
-        entry.loaded = error?.name === "NotAllowedError" ? "blocked" : "missing";
+        const blocked = error?.name === "NotAllowedError";
+        entry.loaded = blocked ? "blocked" : "missing";
+        if (!blocked && options.allowFallback !== false && fallbackPath && fallbackPath !== pathAtPlayStart) {
+          this.optionalMusicAvailability[pathAtPlayStart] = false;
+          this.configureMusicEntry(key, fallbackPath, fallbackPath);
+          if (this.musicKey === key) this.musicKey = null;
+          this.playMusic(key, restart, { allowFallback: false });
+          return;
+        }
         if (this.musicKey === key) this.musicKey = null;
       });
     }
