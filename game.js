@@ -4403,6 +4403,57 @@ const CAR_BOOST_TRAIL_OPTIONS = [
   { id: "blue", label: "Blue", hex: "#3777ff" }
 ];
 
+const NEON_CASH_MAX_BALANCE = 999999;
+const NEON_CASH_AWARD_CAP = 220;
+const NEON_CASH_CONFIG = {
+  participation: 35,
+  progressMax: 60,
+  finish: 55,
+  cleanDriving: 25,
+  nearMissEach: 5,
+  nearMissCap: 30,
+  boostEach: 6,
+  boostCap: 24,
+  rampEach: 8,
+  rampCap: 24,
+  driftEach: 8,
+  driftCap: 24,
+  officialRecordChase: 15
+};
+
+const GARAGE_COSMETIC_SAVE_VERSION = 1;
+const GARAGE_COSMETIC_CATEGORIES = {
+  paintFinish: "Paint Finish",
+  underglow: "Underglow",
+  trailStyle: "Trail Style",
+  boostGlow: "Boost Glow"
+};
+const GARAGE_COSMETIC_CATALOG = [
+  { id: "paint_standard", category: "paintFinish", name: "Standard Paint", price: 0, free: true, description: "Factory finish.", effect: "standard" },
+  { id: "paint_pearl", category: "paintFinish", name: "Pearl Finish", price: 180, description: "Soft showroom shimmer.", effect: "pearl" },
+  { id: "paint_chrome", category: "paintFinish", name: "Chrome Sheen", price: 260, description: "Bright edge highlights.", effect: "chrome" },
+  { id: "underglow_none", category: "underglow", name: "No Underglow", price: 0, free: true, description: "Clean standard look.", color: "" },
+  { id: "underglow_cyan", category: "underglow", name: "Cyan Underglow", price: 160, description: "Cool road glow.", color: "#28f6ff" },
+  { id: "underglow_magenta", category: "underglow", name: "Magenta Underglow", price: 160, description: "Pink neon road glow.", color: "#ff3fd1" },
+  { id: "underglow_gold", category: "underglow", name: "Gold Underglow", price: 180, description: "Winner-line glow.", color: "#ffe45e" },
+  { id: "trail_classic", category: "trailStyle", name: "Classic Trail", price: 0, free: true, description: "Standard boost trail.", effect: "classic" },
+  { id: "trail_spark", category: "trailStyle", name: "Spark Trail", price: 220, description: "Tiny neon sparks on boost.", effect: "spark" },
+  { id: "trail_ribbon", category: "trailStyle", name: "Ribbon Trail", price: 260, description: "Wide smooth boost ribbon.", effect: "ribbon" },
+  { id: "boost_standard", category: "boostGlow", name: "Standard Boost", price: 0, free: true, description: "Default boost glow.", effect: "standard" },
+  { id: "boost_halo", category: "boostGlow", name: "Boost Halo", price: 220, description: "Extra ring while boosting.", effect: "halo" },
+  { id: "boost_starburst", category: "boostGlow", name: "Starburst Boost", price: 300, description: "Sharp boost burst shine.", effect: "starburst" }
+];
+const GARAGE_COSMETIC_BY_ID = Object.fromEntries(GARAGE_COSMETIC_CATALOG.map((item) => [item.id, item]));
+const DEFAULT_COSMETIC_EQUIPPED = {
+  paintFinish: "paint_standard",
+  underglow: "underglow_none",
+  trailStyle: "trail_classic",
+  boostGlow: "boost_standard"
+};
+const FREE_COSMETIC_ITEM_IDS = GARAGE_COSMETIC_CATALOG
+  .filter((item) => item.free || item.price <= 0)
+  .map((item) => item.id);
+
 const DEFAULT_CAR = {
   name: "Neon Runner",
   bodyColor: "#ff3fd1",
@@ -4410,7 +4461,8 @@ const DEFAULT_CAR = {
   windowColor: "#9ff7ff",
   bodyStyle: "wedge",
   useSprite: true,
-  carStyle: { ...DEFAULT_CAR_STYLE }
+  carStyle: { ...DEFAULT_CAR_STYLE },
+  cosmeticStyle: { ...DEFAULT_COSMETIC_EQUIPPED }
 };
 
 const TRAFFIC_SPRITE_ASSETS = {
@@ -5726,6 +5778,155 @@ function normalizeDateString(value, fallback = "") {
   return Number.isFinite(time) ? new Date(time).toISOString() : fallback;
 }
 
+function normalizeNeonCashBalance(value) {
+  return normalizeNonNegativeInteger(value, 0, NEON_CASH_MAX_BALANCE);
+}
+
+function formatNeonCash(value) {
+  return `${normalizeNeonCashBalance(value).toLocaleString()} Neon Cash`;
+}
+
+function getGarageCosmeticItem(id) {
+  return GARAGE_COSMETIC_BY_ID[normalizeStorageId(id, "")] || null;
+}
+
+function getGarageCosmeticItemsForCategory(category) {
+  const cleanCategory = normalizeStorageId(category, "");
+  return GARAGE_COSMETIC_CATALOG.filter((item) => item.category === cleanCategory);
+}
+
+function normalizeCosmeticOwnedEntry(value, item) {
+  const source = value && typeof value === "object" ? value : {};
+  return {
+    ownedAt: normalizeDateString(source.ownedAt || source.date || source.timestamp, ""),
+    free: Boolean(item?.free)
+  };
+}
+
+function createDefaultPlayerCosmetics() {
+  const owned = {};
+  FREE_COSMETIC_ITEM_IDS.forEach((id) => {
+    const item = getGarageCosmeticItem(id);
+    if (item) owned[id] = normalizeCosmeticOwnedEntry({ free: true }, item);
+  });
+  return {
+    version: GARAGE_COSMETIC_SAVE_VERSION,
+    owned,
+    equipped: { ...DEFAULT_COSMETIC_EQUIPPED }
+  };
+}
+
+function normalizeCosmeticItemId(value, category, fallbackId, owned = null) {
+  const item = getGarageCosmeticItem(value);
+  const fallback = getGarageCosmeticItem(fallbackId) || getGarageCosmeticItemsForCategory(category)[0] || null;
+  const ownedMap = owned && typeof owned === "object" ? owned : null;
+  const allowed = item && item.category === category && (!ownedMap || Boolean(ownedMap[item.id]));
+  if (allowed) return item.id;
+  return fallback?.id || fallbackId;
+}
+
+function normalizeEquippedCosmeticStyle(value = {}, owned = null, fallback = DEFAULT_COSMETIC_EQUIPPED) {
+  const source = value && typeof value === "object" ? value : {};
+  const fallbackStyle = {
+    ...DEFAULT_COSMETIC_EQUIPPED,
+    ...(fallback && typeof fallback === "object" ? fallback : {})
+  };
+  return {
+    paintFinish: normalizeCosmeticItemId(source.paintFinish, "paintFinish", fallbackStyle.paintFinish, owned),
+    underglow: normalizeCosmeticItemId(source.underglow, "underglow", fallbackStyle.underglow, owned),
+    trailStyle: normalizeCosmeticItemId(source.trailStyle, "trailStyle", fallbackStyle.trailStyle, owned),
+    boostGlow: normalizeCosmeticItemId(source.boostGlow, "boostGlow", fallbackStyle.boostGlow, owned)
+  };
+}
+
+function normalizePlayerCosmetics(value) {
+  const defaults = createDefaultPlayerCosmetics();
+  const source = value && typeof value === "object" ? value : {};
+  const owned = { ...defaults.owned };
+  const ownedSource = source.owned || source.unlocked || source.items;
+  if (Array.isArray(ownedSource)) {
+    ownedSource.forEach((rawId) => {
+      const item = getGarageCosmeticItem(typeof rawId === "object" ? rawId?.id : rawId);
+      if (item) owned[item.id] = normalizeCosmeticOwnedEntry(rawId, item);
+    });
+  } else if (ownedSource && typeof ownedSource === "object") {
+    Object.entries(ownedSource).forEach(([rawId, rawEntry]) => {
+      const item = getGarageCosmeticItem(rawId);
+      if (item && rawEntry !== false) owned[item.id] = normalizeCosmeticOwnedEntry(rawEntry, item);
+    });
+  }
+  const equippedSource = source.equipped && typeof source.equipped === "object" ? source.equipped : source;
+  return {
+    version: GARAGE_COSMETIC_SAVE_VERSION,
+    owned,
+    equipped: normalizeEquippedCosmeticStyle(equippedSource, owned)
+  };
+}
+
+function cosmeticIsOwned(cosmetics, itemId) {
+  const item = getGarageCosmeticItem(itemId);
+  if (!item) return false;
+  const normalized = normalizePlayerCosmetics(cosmetics);
+  return Boolean(normalized.owned[item.id]);
+}
+
+function applyPlayerCosmeticsToCarConfig(carConfig, cosmetics) {
+  const normalizedCosmetics = normalizePlayerCosmetics(cosmetics);
+  return {
+    ...normalizeCarConfig(carConfig || DEFAULT_CAR),
+    cosmeticStyle: normalizeEquippedCosmeticStyle(normalizedCosmetics.equipped, normalizedCosmetics.owned)
+  };
+}
+
+function getCarCosmeticStyle(carConfig) {
+  return normalizeEquippedCosmeticStyle(carConfig?.cosmeticStyle || DEFAULT_COSMETIC_EQUIPPED);
+}
+
+function getCarCosmeticCatalogItem(carConfig, category) {
+  const style = getCarCosmeticStyle(carConfig);
+  return getGarageCosmeticItem(style[category]) || getGarageCosmeticItem(DEFAULT_COSMETIC_EQUIPPED[category]);
+}
+
+function calculateNeonCashAward(summary) {
+  const status = normalizeRunStatus(summary?.status);
+  const progress = status === "finished"
+    ? 1
+    : clampNumber(
+      Number.isFinite(Number(summary?.progress))
+        ? Number(summary.progress)
+        : ((summary?.distance || 0) / Math.max(1, summary?.trackDistance || 1)),
+      0,
+      1,
+      0
+    );
+  const breakdown = [];
+  const add = (label, rawAmount) => {
+    const amount = normalizeNonNegativeInteger(rawAmount, 0, NEON_CASH_AWARD_CAP);
+    if (amount <= 0) return;
+    breakdown.push({ label, amount });
+  };
+  add("Participation", NEON_CASH_CONFIG.participation);
+  add("Progress", Math.round(progress * NEON_CASH_CONFIG.progressMax));
+  if (status === "finished") add("Finish bonus", NEON_CASH_CONFIG.finish);
+  if (status === "finished" && normalizeNonNegativeInteger(summary?.slowdownHits, 0, 999) === 0) {
+    add("Clean driving", NEON_CASH_CONFIG.cleanDriving);
+  }
+  add("Near misses", Math.min(NEON_CASH_CONFIG.nearMissCap, normalizeNonNegativeInteger(summary?.nearMisses, 0, 999) * NEON_CASH_CONFIG.nearMissEach));
+  add("Boost pads", Math.min(NEON_CASH_CONFIG.boostCap, normalizeNonNegativeInteger(summary?.boostPadsCollected, 0, 999) * NEON_CASH_CONFIG.boostEach));
+  add("Ramp clears", Math.min(NEON_CASH_CONFIG.rampCap, normalizeNonNegativeInteger(summary?.rampsUsed || summary?.rampTargetsCleared, 0, 999) * NEON_CASH_CONFIG.rampEach));
+  add("Drift Dash", Math.min(NEON_CASH_CONFIG.driftCap, normalizeNonNegativeInteger(summary?.driftDashesCompleted, 0, 999) * NEON_CASH_CONFIG.driftEach));
+  if (summary?.officialRecordChase) add("Record Chase turn", NEON_CASH_CONFIG.officialRecordChase);
+  const rawAmount = breakdown.reduce((sum, item) => sum + item.amount, 0);
+  const amount = Math.min(NEON_CASH_AWARD_CAP, rawAmount);
+  return {
+    amount,
+    rawAmount,
+    capped: rawAmount > amount,
+    progressPercent: Math.round(progress * 100),
+    breakdown
+  };
+}
+
 function getBadgeDefinition(id) {
   return BADGE_DEFINITION_BY_ID[String(id || "")] || null;
 }
@@ -6196,6 +6397,7 @@ function normalizeCarConfig(value, fallback = DEFAULT_CAR) {
   const fallbackCar = { ...DEFAULT_CAR, ...(fallback && typeof fallback === "object" ? fallback : {}) };
   const style = CAR_BODY_STYLES.some((item) => item.id === source.bodyStyle) ? source.bodyStyle : fallbackCar.bodyStyle;
   const carStyle = normalizeCarStyle(source.carStyle, fallbackCar.carStyle || DEFAULT_CAR_STYLE);
+  const cosmeticStyle = normalizeEquippedCosmeticStyle(source.cosmeticStyle, null, fallbackCar.cosmeticStyle || DEFAULT_COSMETIC_EQUIPPED);
   return {
     name: sanitizeCarName(source.name, fallbackCar.name),
     bodyColor: normalizeHexColor(source.bodyColor, fallbackCar.bodyColor),
@@ -6203,7 +6405,8 @@ function normalizeCarConfig(value, fallback = DEFAULT_CAR) {
     windowColor: normalizeHexColor(source.windowColor, fallbackCar.windowColor),
     bodyStyle: style,
     useSprite: source.useSprite !== false,
-    carStyle
+    carStyle,
+    cosmeticStyle
   };
 }
 
@@ -8051,6 +8254,8 @@ class PlayerProfileManager {
           id,
           name: sanitizePlayerName(player?.name, `DRIVER ${index + 1}`),
           car: normalizeCarConfig(player?.car),
+          neonCash: normalizeNeonCashBalance(player?.neonCash ?? player?.cash ?? player?.garageCash),
+          cosmetics: normalizePlayerCosmetics(player?.cosmetics || player?.garageCosmetics || player?.unlocks),
           bestScore: normalizeNonNegativeInteger(player?.bestScore),
           bestTimes: normalizeBestTimeRecords(player?.bestTimes || player?.personalBestTimes),
           badges: normalizePlayerBadges(player?.badges),
@@ -8166,6 +8371,8 @@ class PlayerProfileManager {
       id: uid(),
       name: sanitizePlayerName(name, `DRIVER ${this.data.players.length + 1}`),
       car: normalizeCarConfig(DEFAULT_CAR),
+      neonCash: 0,
+      cosmetics: createDefaultPlayerCosmetics(),
       bestScore: 0,
       bestTimes: {},
       badges: createDefaultBadgeSave(),
@@ -8204,6 +8411,79 @@ class PlayerProfileManager {
     player.car = normalizeCarConfig(carConfig);
     this.save();
     return true;
+  }
+
+  ensurePlayerGarageEconomy(playerOrId) {
+    const player = typeof playerOrId === "string" ? this.getPlayerById(playerOrId) : playerOrId;
+    if (!player) return null;
+    player.neonCash = normalizeNeonCashBalance(player.neonCash);
+    player.cosmetics = normalizePlayerCosmetics(player.cosmetics);
+    return player;
+  }
+
+  awardNeonCashForRun(summary) {
+    const player = this.ensurePlayerGarageEconomy(summary?.playerId);
+    if (!player) return null;
+    const award = calculateNeonCashAward(summary);
+    if (!award.amount) return {
+      ...award,
+      balanceBefore: player.neonCash,
+      balanceAfter: player.neonCash
+    };
+    const balanceBefore = player.neonCash;
+    player.neonCash = normalizeNeonCashBalance(balanceBefore + award.amount);
+    this.save();
+    return {
+      ...award,
+      balanceBefore,
+      balanceAfter: player.neonCash
+    };
+  }
+
+  purchaseCosmeticForCurrentPlayer(itemId) {
+    const player = this.ensurePlayerGarageEconomy(this.getCurrentPlayer());
+    const item = getGarageCosmeticItem(itemId);
+    if (!player) return { ok: false, message: "Add a driver before buying cosmetics." };
+    if (!item) return { ok: false, message: "Cosmetic not found." };
+    const alreadyOwned = Boolean(player.cosmetics.owned[item.id]);
+    if (!alreadyOwned) {
+      const price = normalizeNonNegativeInteger(item.price, 0, NEON_CASH_MAX_BALANCE);
+      if (player.neonCash < price) {
+        return {
+          ok: false,
+          message: `${item.name} costs ${formatNeonCash(price)}. Earn more in-game Neon Cash by racing.`
+        };
+      }
+      player.neonCash = normalizeNeonCashBalance(player.neonCash - price);
+      player.cosmetics.owned[item.id] = normalizeCosmeticOwnedEntry({ ownedAt: new Date().toISOString() }, item);
+    }
+    player.cosmetics.equipped[item.category] = item.id;
+    player.car = applyPlayerCosmeticsToCarConfig(player.car, player.cosmetics);
+    this.save();
+    return {
+      ok: true,
+      item,
+      ownedAlready: alreadyOwned,
+      message: `${alreadyOwned ? "Equipped" : "Bought and equipped"} ${item.name}. Cosmetic only.`
+    };
+  }
+
+  equipCosmeticForCurrentPlayer(itemId) {
+    const player = this.ensurePlayerGarageEconomy(this.getCurrentPlayer());
+    const item = getGarageCosmeticItem(itemId);
+    if (!player) return { ok: false, message: "Add a driver before equipping cosmetics." };
+    if (!item) return { ok: false, message: "Cosmetic not found." };
+    if (!player.cosmetics.owned[item.id]) {
+      return { ok: false, message: `${item.name} is locked. Buy it with earned in-game Neon Cash first.` };
+    }
+    player.cosmetics.equipped[item.category] = item.id;
+    player.car = applyPlayerCosmeticsToCarConfig(player.car, player.cosmetics);
+    this.save();
+    return {
+      ok: true,
+      item,
+      message: `Equipped ${item.name}. Cosmetic only.`
+    };
   }
 
   updateAudioSettings(settings) {
@@ -8710,10 +8990,13 @@ class PlaytestReportStore {
 }
 
 function snapshotPartyPlayer(player) {
+  const cosmetics = normalizePlayerCosmetics(player?.cosmetics);
   return {
     id: normalizeStorageId(player.id, uid()),
     name: sanitizePlayerName(player.name, "PLAYER"),
-    car: normalizeCarConfig(player.car),
+    car: applyPlayerCosmeticsToCarConfig(player.car, cosmetics),
+    neonCash: normalizeNeonCashBalance(player?.neonCash),
+    cosmetics,
     bestScore: normalizeNonNegativeInteger(player.bestScore)
   };
 }
@@ -22599,6 +22882,110 @@ function drawSpriteCentered(ctx, image, centerX, centerY, targetWidth) {
   return box;
 }
 
+function drawCosmeticUnderglow(ctx, w, h, carConfig, state) {
+  const item = getCarCosmeticCatalogItem(carConfig, "underglow");
+  const color = item?.color || "";
+  if (!color) return;
+  const airborneLift = Math.max(0, state?.airborneLift || 0);
+  const liftFade = state?.airborne ? clamp(1 - airborneLift / 90, 0.28, 0.72) : 1;
+  ctx.save();
+  ctx.globalCompositeOperation = "lighter";
+  ctx.globalAlpha = 0.28 * liftFade;
+  ctx.shadowBlur = 18;
+  ctx.shadowColor = color;
+  ctx.fillStyle = rgbaFromHex(color, 0.48);
+  ctx.beginPath();
+  ctx.ellipse(0, h * 0.35, w * 0.56, h * 0.13, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.globalAlpha = 0.18 * liftFade;
+  ctx.beginPath();
+  ctx.ellipse(0, h * 0.42, w * 0.78, h * 0.18, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+}
+
+function drawCosmeticPaintFinish(ctx, w, h, carConfig) {
+  const item = getCarCosmeticCatalogItem(carConfig, "paintFinish");
+  if (!item || item.effect === "standard") return;
+  ctx.save();
+  ctx.globalCompositeOperation = "lighter";
+  if (item.effect === "pearl") {
+    ctx.globalAlpha = 0.18;
+    ctx.strokeStyle = "#f6fbff";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.ellipse(0, -h * 0.1, w * 0.42, h * 0.52, 0, Math.PI * 1.08, Math.PI * 1.58);
+    ctx.stroke();
+  } else if (item.effect === "chrome") {
+    ctx.globalAlpha = 0.22;
+    ctx.fillStyle = "rgba(246, 251, 255, 0.72)";
+    ctx.fillRect(-w * 0.28, -h * 0.39, w * 0.1, h * 0.78);
+    ctx.fillRect(w * 0.2, -h * 0.3, w * 0.08, h * 0.58);
+  }
+  ctx.restore();
+}
+
+function drawCosmeticBoostHalo(ctx, w, h, carConfig, boostTrail, intensity = 1) {
+  const item = getCarCosmeticCatalogItem(carConfig, "boostGlow");
+  if (!item || item.effect === "standard") return;
+  const strength = clampNumber(intensity, 0.45, 1.55, 1);
+  ctx.save();
+  ctx.globalCompositeOperation = "lighter";
+  ctx.strokeStyle = item.effect === "starburst" ? "#f6fbff" : boostTrail;
+  ctx.shadowColor = boostTrail;
+  ctx.shadowBlur = item.effect === "starburst" ? 26 : 20;
+  ctx.globalAlpha = item.effect === "starburst" ? 0.26 + strength * 0.12 : 0.2 + strength * 0.14;
+  ctx.lineWidth = item.effect === "starburst" ? 2.4 : 3.2;
+  ctx.beginPath();
+  ctx.ellipse(0, -h * 0.03, w * 0.72, h * 0.68, 0, 0, Math.PI * 2);
+  ctx.stroke();
+  if (item.effect === "starburst") {
+    for (let i = 0; i < 8; i += 1) {
+      const angle = (Math.PI * 2 * i) / 8;
+      const innerX = Math.cos(angle) * w * 0.42;
+      const innerY = Math.sin(angle) * h * 0.36;
+      const outerX = Math.cos(angle) * w * 0.7;
+      const outerY = Math.sin(angle) * h * 0.6;
+      ctx.beginPath();
+      ctx.moveTo(innerX, innerY);
+      ctx.lineTo(outerX, outerY);
+      ctx.stroke();
+    }
+  }
+  ctx.restore();
+}
+
+function drawCosmeticTrailExtras(ctx, w, h, carConfig, boostTrail, intensity = 1) {
+  const item = getCarCosmeticCatalogItem(carConfig, "trailStyle");
+  if (!item || item.effect === "classic") return;
+  const strength = clampNumber(intensity, 0.45, 1.55, 1);
+  ctx.save();
+  ctx.globalCompositeOperation = "lighter";
+  ctx.shadowColor = boostTrail;
+  ctx.shadowBlur = item.effect === "ribbon" ? 22 : 12;
+  if (item.effect === "ribbon") {
+    ctx.globalAlpha = 0.24 + strength * 0.12;
+    ctx.strokeStyle = rgbaFromHex(boostTrail, 0.72);
+    ctx.lineWidth = Math.max(3, w * 0.055);
+    ctx.beginPath();
+    ctx.moveTo(-w * 0.32, h * 0.5);
+    ctx.bezierCurveTo(-w * 0.42, h * 0.86, -w * 0.28, h * 1.05, -w * 0.12, h * (1.08 + strength * 0.12));
+    ctx.moveTo(w * 0.32, h * 0.5);
+    ctx.bezierCurveTo(w * 0.42, h * 0.86, w * 0.28, h * 1.05, w * 0.12, h * (1.08 + strength * 0.12));
+    ctx.stroke();
+  } else if (item.effect === "spark") {
+    ctx.fillStyle = "#f6fbff";
+    ctx.globalAlpha = 0.36 + strength * 0.14;
+    for (let i = 0; i < 5; i += 1) {
+      const side = i % 2 === 0 ? -1 : 1;
+      const x = side * w * (0.18 + i * 0.045);
+      const y = h * (0.62 + i * 0.1) + Math.random() * h * 0.08;
+      ctx.fillRect(x, y, 2 + strength, 2 + strength);
+    }
+  }
+  ctx.restore();
+}
+
 function drawPlayerCar(ctx, x, y, carConfig, state, spriteManager = null) {
   if (carConfig.useSprite !== false && spriteManager) {
     const sprite = spriteManager.getSprite(getCarStyleId(carConfig), carConfig);
@@ -22640,6 +23027,8 @@ function drawSpritePlayerCar(ctx, x, y, carConfig, state, sprite) {
     ctx.scale(1 + landingPulse * 0.035, 1 - landingPulse * 0.045);
   }
 
+  drawCosmeticUnderglow(ctx, spriteBox.w, spriteBox.h, carConfig, state);
+
   if (state.boosting) {
     ctx.save();
     ctx.globalCompositeOperation = "lighter";
@@ -22653,6 +23042,8 @@ function drawSpritePlayerCar(ctx, x, y, carConfig, state, sprite) {
     ctx.stroke();
     ctx.restore();
     drawSpriteBoostTrail(ctx, spriteBox.w, spriteBox.h, boostTrail, boostTrailStrength);
+    drawCosmeticTrailExtras(ctx, spriteBox.w, spriteBox.h, carConfig, boostTrail, boostTrailStrength);
+    drawCosmeticBoostHalo(ctx, spriteBox.w, spriteBox.h, carConfig, boostTrail, boostTrailStrength);
   }
 
   if (state.laneChanging) {
@@ -22671,6 +23062,7 @@ function drawSpritePlayerCar(ctx, x, y, carConfig, state, sprite) {
   ctx.restore();
 
   drawSpriteCentered(ctx, sprite, 0, 0, targetWidth);
+  drawCosmeticPaintFinish(ctx, spriteBox.w, spriteBox.h, carConfig);
 
   if (state.verticalInput > 0) {
     ctx.save();
@@ -22746,6 +23138,8 @@ function drawCanvasPlayerCar(ctx, x, y, carConfig, state) {
     ctx.scale(1 + landingPulse * 0.035, 1 - landingPulse * 0.045);
   }
 
+  drawCosmeticUnderglow(ctx, w, h, carConfig, state);
+
   if (state.boosting) {
     ctx.save();
     ctx.globalCompositeOperation = "lighter";
@@ -22784,6 +23178,8 @@ function drawCanvasPlayerCar(ctx, x, y, carConfig, state) {
     ctx.closePath();
     ctx.fill();
     ctx.restore();
+    drawCosmeticTrailExtras(ctx, w, h, carConfig, boostTrail, boostTrailStrength);
+    drawCosmeticBoostHalo(ctx, w, h, carConfig, boostTrail, boostTrailStrength);
   }
 
   if (state.laneChanging) {
@@ -22832,6 +23228,7 @@ function drawCanvasPlayerCar(ctx, x, y, carConfig, state) {
     ], w, h);
   }
   ctx.shadowBlur = 0;
+  drawCosmeticPaintFinish(ctx, w, h, carConfig);
 
   ctx.fillStyle = shade(body, -34);
   if (style === "formula") {
@@ -26475,7 +26872,7 @@ class NeonRoadRally {
     const challenge = options.challenge ? getChallengeById(options.challenge.id || options.challenge) : getChallengeById(options.challengeId);
     const partyMode = Boolean(options.partyMode) && !challenge;
     const officialRecordChase = Boolean(options.officialRecordChase || (partyMode && this.partySession?.officialRecordChase));
-    const player = options.player ? snapshotPartyPlayer(options.player) : this.profiles.ensureDefaultPlayer();
+    const player = options.player ? snapshotPartyPlayer(options.player) : this.profiles.ensurePlayerGarageEconomy(this.profiles.ensureDefaultPlayer());
     const speedClass = getSpeedClassConfig(challenge ? challenge.raceMode : (options.speedClassId ?? this.profiles.data.speedClassId));
     const baseTrack = challenge ? getTrackById(challenge.trackId) : getTrackById(options.track?.id || options.trackId || this.pendingTrackId || DEFAULT_TRACK_ID);
     const requestedRaceTypeId = challenge
@@ -26492,9 +26889,12 @@ class NeonRoadRally {
     }
     this.run = this.createEmptyRun();
     this.lastSummary = null;
+    const playerCosmetics = normalizePlayerCosmetics(player?.cosmetics);
     this.run.player = {
       ...player,
-      car: normalizeCarConfig(player.car)
+      neonCash: normalizeNeonCashBalance(player?.neonCash),
+      cosmetics: playerCosmetics,
+      car: applyPlayerCosmeticsToCarConfig(player.car, playerCosmetics)
     };
     this.run.track = track;
     this.run.pacingRulesVersion = getActivePacingRulesVersion(raceType.id);
@@ -28124,6 +28524,11 @@ class NeonRoadRally {
     summary.totalBadgesEarned = this.profiles.getPlayerBadgeProgress(summary.playerId).earnedCount;
     summary.totalBadgesAvailable = getVisibleBadgeDefinitions().length;
     summary.titleChanges = skipBadges ? [] : this.profiles.evaluateRunTitles(summary, previousTitleBoard);
+    const skipEconomyAward = Boolean(options.skipEconomy || debugSpeedScaleActive || officialEnduranceFinal || deferPartyResultUntilBonusEnd);
+    summary.neonCashAward = skipEconomyAward ? null : this.profiles.awardNeonCashForRun(summary);
+    if (summary.player && summary.neonCashAward) {
+      summary.player.neonCash = summary.neonCashAward.balanceAfter;
+    }
     this.lastSummary = summary;
     if (run.partyMode && this.partySession?.isPartyMode && !deferPartyResultUntilBonusEnd) {
       this.lastSummary.partyResult = this.partySession.addResult(this.lastSummary);
@@ -34473,6 +34878,46 @@ class NeonRoadRally {
     return summary.newPersonalBestTime ? "Personal best time" : "Saved time";
   }
 
+  renderNeonCashResultChip(summary, options = {}) {
+    const award = summary?.neonCashAward;
+    const amount = normalizeNonNegativeInteger(award?.amount, 0, NEON_CASH_AWARD_CAP);
+    if (!amount) return "";
+    const compact = Boolean(options.compact);
+    if (compact) {
+      return `
+        <span class="neon-cash-result-chip is-compact">
+          <strong>+${amount.toLocaleString()} Neon Cash</strong>
+          <small>Cosmetic only</small>
+        </span>
+      `;
+    }
+    return `
+      <span class="neon-cash-result-chip">
+        <strong>+${amount.toLocaleString()} Neon Cash</strong>
+        <small>Earned in-game · cosmetic only</small>
+      </span>
+    `;
+  }
+
+  renderNeonCashBreakdown(summary) {
+    const award = summary?.neonCashAward;
+    const amount = normalizeNonNegativeInteger(award?.amount, 0, NEON_CASH_AWARD_CAP);
+    if (!amount) return "";
+    const breakdown = Array.isArray(award.breakdown) ? award.breakdown : [];
+    return `
+      <h2>Neon Cash</h2>
+      <p class="hint">Neon Cash is earned in-game and cosmetic only. It does not affect official records, score math, speed, hitboxes, or Party standings.</p>
+      <div class="score-grid score-info-grid is-secondary neon-cash-breakdown-grid">
+        <div class="score-card"><strong>Award</strong><span>+${amount.toLocaleString()} Neon Cash</span></div>
+        <div class="score-card"><strong>Balance</strong><span class="is-compact">${formatNeonCash(award.balanceBefore)} -> ${formatNeonCash(award.balanceAfter)}</span></div>
+        ${breakdown.map((item) => `
+          <div class="score-card"><strong>${escapeHtml(item.label)}</strong><span>+${normalizeNonNegativeInteger(item.amount, 0, NEON_CASH_AWARD_CAP).toLocaleString()}</span></div>
+        `).join("")}
+        ${award.capped ? `<div class="score-card"><strong>Run Cap</strong><span>${NEON_CASH_AWARD_CAP.toLocaleString()} max per run</span></div>` : ""}
+      </div>
+    `;
+  }
+
   renderResultRewardStrip(summary) {
     const badges = Array.isArray(summary?.newlyEarnedBadges) ? summary.newlyEarnedBadges : [];
     const masteryBadges = badges.filter((badge) => badge.category === "mastery");
@@ -34481,6 +34926,14 @@ class NeonRoadRally {
       .concat((Array.isArray(titleChanges.claimed) ? titleChanges.claimed : []).map((title) => ({ ...title, state: "claimed" })))
       .concat((Array.isArray(titleChanges.defended) ? titleChanges.defended : []).map((title) => ({ ...title, state: "defended" })));
     const chips = [];
+    const cashAmount = normalizeNonNegativeInteger(summary?.neonCashAward?.amount, 0, NEON_CASH_AWARD_CAP);
+    if (cashAmount) {
+      chips.push({
+        label: "Neon Cash",
+        value: `+${cashAmount.toLocaleString()}`,
+        detail: "Earned in-game · cosmetic only"
+      });
+    }
     const driftBadges = badges.filter(isDriftBadgeDefinition);
     const badgePreview = [];
     const addBadgePreview = (badge) => {
@@ -34912,6 +35365,7 @@ class NeonRoadRally {
         <div class="official-record-chase-next-card">
           <span>${final ? "Official Record Chase Complete" : "Pass Controller"}</span>
           <strong>${escapeHtml(nextActionText)}</strong>
+          ${!final ? this.renderNeonCashResultChip(summary, { compact: true }) : ""}
           ${!final && nextPlayer ? `<button class="btn btn--primary btn--lg" data-action="partyNextPlayer">${escapeHtml(nextActionText)}</button>` : ""}
           ${final ? `<button class="btn btn--primary btn--lg" data-action="partyRematchSameSeed">Rematch Same Official Route</button>` : ""}
         </div>
@@ -35433,6 +35887,7 @@ class NeonRoadRally {
               ${summary.topTwentyRank ? `<small>Top 20 #${summary.topTwentyRank}</small>` : `<small>${bonusResult ? "Party Score" : (summary.newPersonalBest ? "Personal Best" : "Run Score")}</small>`}
             </div>
             ${playgroundChip}
+            ${this.renderNeonCashResultChip(summary, { compact: true })}
             ${bonusResult ? `
               <div class="party-stat-grid">
                 <span><strong>Official</strong><em>${formatFinishTimeMs(bonusResult.officialFinishTimeMs)}</em></span>
@@ -35873,6 +36328,7 @@ class NeonRoadRally {
     if (!player) {
       return `
         <div class="garage-profile-stat-grid">
+          <div class="garage-profile-stat-card is-neon-cash"><span>Neon Cash</span><strong>0</strong><small>Earned in-game · cosmetic only</small></div>
           <div class="garage-profile-stat-card"><span>Official Time Attack</span><strong>0 #1</strong><small>No official records</small></div>
           <div class="garage-profile-stat-card"><span>Official Score Attack</span><strong>0 #1</strong><small>No official records</small></div>
           <div class="garage-profile-stat-card"><span>Playground Records</span><strong>0</strong><small>Local/fun records</small></div>
@@ -35885,8 +36341,14 @@ class NeonRoadRally {
     const playgroundCount = summary.playgroundScore.entries;
     const totalFinishes = this.getGarageTotalFinishes(player);
     const favoriteTrack = this.getGarageFavoriteTrackLabel(player);
+    const cashBalance = normalizeNeonCashBalance(player.neonCash);
     return `
       <div class="garage-profile-stat-grid" aria-label="Driver profile summary">
+        <div class="garage-profile-stat-card is-neon-cash">
+          <span>Neon Cash</span>
+          <strong>${cashBalance.toLocaleString()}</strong>
+          <small>Earned in-game · cosmetic only</small>
+        </div>
         <div class="garage-profile-stat-card">
           <span>Official Time Attack</span>
           <strong>${summary.officialTime.wins} #1</strong>
@@ -35974,7 +36436,7 @@ class NeonRoadRally {
     const badgeProgress = this.profiles.getPlayerBadgeProgress(player);
     const titles = this.profiles.getPlayerTitles(player);
     const championCount = summary.officialTime.wins + summary.officialScore.wins;
-    const futureRewards = ["Paint", "Glow", "Drift Sound", "Boost Sound", "Champion Aura"];
+    const futureRewards = ["Drift Sound", "Boost Sound", "Champion Aura"];
     return `
       <div class="garage-unlocks-preview">
         <div class="garage-unlock-status-grid">
@@ -36006,6 +36468,60 @@ class NeonRoadRally {
     `;
   }
 
+  renderGarageShop(player) {
+    const cosmetics = normalizePlayerCosmetics(player?.cosmetics);
+    const balance = normalizeNeonCashBalance(player?.neonCash);
+    const categoryOrder = ["paintFinish", "underglow", "trailStyle", "boostGlow"];
+    const renderItem = (item) => {
+      const owned = Boolean(cosmetics.owned[item.id]);
+      const equipped = cosmetics.equipped[item.category] === item.id;
+      const price = normalizeNonNegativeInteger(item.price, 0, NEON_CASH_MAX_BALANCE);
+      const priceText = price ? (owned ? "Owned" : formatNeonCash(price)) : (owned ? "Free · Owned" : "Free");
+      const canBuy = Boolean(player && !owned && balance >= price);
+      const actionMarkup = !player
+        ? `<button class="btn btn--ghost btn--sm" disabled>Add Driver</button>`
+        : equipped
+        ? `<button class="btn btn--secondary btn--sm" disabled>Equipped</button>`
+        : owned
+        ? `<button class="btn btn--secondary btn--sm" data-action="equipCosmetic" data-id="${escapeAttr(item.id)}">Equip</button>`
+        : `<button class="btn btn--primary btn--sm" data-action="buyCosmetic" data-id="${escapeAttr(item.id)}" ${canBuy ? "" : "disabled"}>Buy + Equip</button>`;
+      const swatchStyle = item.color
+        ? ` style="--cosmetic-color:${escapeAttr(item.color)}"`
+        : "";
+      return `
+        <article class="garage-shop-card ${equipped ? "is-equipped" : (owned ? "is-owned" : "is-locked")}">
+          <span class="garage-shop-swatch ${item.color ? "has-color" : ""}"${swatchStyle}></span>
+          <div>
+            <strong>${escapeHtml(item.name)}</strong>
+            <small>${escapeHtml(item.description || "Cosmetic only.")}</small>
+            <em>${escapeHtml(priceText)}</em>
+          </div>
+          ${actionMarkup}
+        </article>
+      `;
+    };
+    return `
+      <div class="garage-shop-panel">
+        <div class="garage-shop-balance">
+          <span>Neon Cash</span>
+          <strong>${formatNeonCash(balance)}</strong>
+          <small>Earned in-game. Cosmetic only. Official records stay fair.</small>
+        </div>
+        ${categoryOrder.map((category) => `
+          <div class="garage-shop-category">
+            <div class="garage-shop-category-head">
+              <span>${escapeHtml(GARAGE_COSMETIC_CATEGORIES[category])}</span>
+              <small>${escapeHtml(getGarageCosmeticItem(cosmetics.equipped[category])?.name || "Standard")}</small>
+            </div>
+            <div class="garage-shop-grid">
+              ${getGarageCosmeticItemsForCategory(category).map(renderItem).join("")}
+            </div>
+          </div>
+        `).join("")}
+      </div>
+    `;
+  }
+
   captureGarageUiState(focusTarget = "") {
     const rewardsDetails = typeof document !== "undefined" && document.querySelector
       ? document.querySelector(".garage-rewards-details")
@@ -36019,12 +36535,12 @@ class NeonRoadRally {
 
   showDriverGarageScreen(message = "", options = {}) {
     this.setScreen("players");
-    const player = this.profiles.getCurrentPlayer();
+    const player = this.profiles.ensurePlayerGarageEconomy(this.profiles.getCurrentPlayer());
     if (!player) {
       this.audio.playMusic("title", false);
     }
     const players = this.profiles.data.players;
-    const car = normalizeCarConfig(player?.car || DEFAULT_CAR);
+    const car = applyPlayerCosmeticsToCarConfig(player?.car || DEFAULT_CAR, player?.cosmetics);
     const carStyle = normalizeCarStyle(car.carStyle);
     const nickname = getOptionalCarNickname(car);
     const driverTitle = player ? escapeHtml(player.name) : "Add Driver";
@@ -36032,7 +36548,7 @@ class NeonRoadRally {
     const recordSummary = this.getGarageDriverRecordSummary(player);
     const routeChampionCount = (recordSummary.officialTime.wins || 0) + (recordSummary.officialScore.wins || 0);
     const driverMeta = player
-      ? `${badgeProgress.earnedCount}/${badgeProgress.totalCount} badges · ${this.profiles.getPlayerTitles(player).length}/${TITLE_DEFINITIONS.length} titles · ${getCarBodyStyleLabel(car.bodyStyle)}`
+      ? `${formatNeonCash(player.neonCash)} · ${badgeProgress.earnedCount}/${badgeProgress.totalCount} badges · ${this.profiles.getPlayerTitles(player).length}/${TITLE_DEFINITIONS.length} titles · ${getCarBodyStyleLabel(car.bodyStyle)}`
       : "No active driver";
     const headerAction = player
       ? `<button class="btn btn--primary garage-race-action" data-action="start">Race</button>`
@@ -36074,6 +36590,7 @@ class NeonRoadRally {
                     <button class="btn btn--ghost" data-action="focusGarageSection" data-target="garageAddDriver">Add Driver</button>
                     <button class="btn btn--ghost" data-action="focusGarageSection" data-target="garageRenameDriver" ${player ? "" : "disabled"}>Rename</button>
                     <button class="btn btn--ghost" data-action="focusGarageSection" data-target="garageRecords" ${player ? "" : "disabled"}>Records & Rivals</button>
+                    <button class="btn btn--ghost" data-action="focusGarageSection" data-target="garageShop" ${player ? "" : "disabled"}>Garage Shop</button>
                     <button class="btn btn--ghost" data-action="focusGarageSection" data-target="garageRewards" ${player ? "" : "disabled"}>Unlocks</button>
                   </div>
                 </div>
@@ -36090,6 +36607,14 @@ class NeonRoadRally {
                   <strong>${player ? "Selected driver highlights" : "Add a driver"}</strong>
                 </div>
                 ${this.renderGarageRecordsSummary(player, recordSummary)}
+              </section>
+
+              <section class="garage-section garage-shop-section" id="garageShop" tabindex="-1">
+                <div class="garage-section-heading">
+                  <span class="label label--cyan">Garage Shop</span>
+                  <strong>${player ? "Neon Cash cosmetics" : "Add a driver"}</strong>
+                </div>
+                ${this.renderGarageShop(player)}
               </section>
 
               <section class="garage-section garage-look-section" id="garageCarStyle">
@@ -36319,7 +36844,7 @@ class NeonRoadRally {
   renderDriverMiniPreviews() {
     document.querySelectorAll("canvas[data-driver-car-preview]").forEach((canvas) => {
       const player = this.profiles.getPlayerById(canvas.dataset.driverCarPreview);
-      const car = normalizeCarConfig(player?.car || DEFAULT_CAR);
+      const car = applyPlayerCosmeticsToCarConfig(player?.car || DEFAULT_CAR, player?.cosmetics);
       const ctx = canvas.getContext("2d");
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       const gradient = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
@@ -36421,7 +36946,7 @@ class NeonRoadRally {
     ctx.fillText(`lane ${laneWidth.toFixed(0)}px`, laneX, 14);
 
     const player = this.profiles.getCurrentPlayer();
-    const car = player?.car || DEFAULT_CAR;
+    const car = applyPlayerCosmeticsToCarConfig(player?.car || DEFAULT_CAR, player?.cosmetics);
     const rows = [
       { type: "player", label: "player", y: 76 },
       { type: "slowCar", label: "slow", y: 158 },
@@ -36501,7 +37026,7 @@ class NeonRoadRally {
       accentColor: this.readPaintRadio("carAccentColor", CAR_ACCENT_COLOR_OPTIONS, DEFAULT_CAR_STYLE.accentColor),
       boostTrail: this.readPaintRadio("carBoostTrail", CAR_BOOST_TRAIL_OPTIONS, DEFAULT_CAR_STYLE.boostTrail)
     });
-    return {
+    const baseCar = {
       name: sanitizeCarName(document.getElementById("carName")?.value, DEFAULT_CAR.name),
       bodyColor: getCanvasBodyColorForCarStyle(carStyle),
       stripeColor: getCanvasStripeColorForCarStyle(carStyle),
@@ -36510,6 +37035,7 @@ class NeonRoadRally {
       useSprite: document.getElementById("useSprite")?.checked !== false,
       carStyle
     };
+    return applyPlayerCosmeticsToCarConfig(baseCar, this.profiles.getCurrentPlayer()?.cosmetics);
   }
 
   normalizeLeaderboardView(value) {
@@ -37884,6 +38410,10 @@ class NeonRoadRally {
       ? "stat-value stat-value--green"
       : "stat-value stat-value--cyan";
     const chipItems = [];
+    const neonCashAmount = normalizeNonNegativeInteger(summary.neonCashAward?.amount, 0, NEON_CASH_AWARD_CAP);
+    if (neonCashAmount) {
+      chipItems.push({ label: `+${neonCashAmount.toLocaleString()} Neon Cash`, tone: "green" });
+    }
     if (enduranceResult) {
       chipItems.push({ label: "Official Race Locked", tone: "green" });
       chipItems.push({ label: secondaryMetricPlacement, tone: "cyan" });
@@ -37978,6 +38508,7 @@ class NeonRoadRally {
           <summary>Details</summary>
           <h2>Score Breakdown</h2>
           ${this.renderScoreBreakdown(summary)}
+          ${this.renderNeonCashBreakdown(summary)}
           ${this.renderMedalChips(summary.medals)}
           ${this.renderTitleCallouts(summary) || this.renderNewBadgeCallouts(summary) || this.renderChallengeCallouts(summary) ? `<div class="score-callout-row">${this.renderTitleCallouts(summary)}${this.renderNewBadgeCallouts(summary)}${this.renderChallengeCallouts(summary)}</div>` : ""}
           ${this.renderBadgeEarnedPanel(summary)}
@@ -38200,6 +38731,8 @@ class NeonRoadRally {
         else if (action === "setBadgeFilter") this.handleSetBadgeFilter(button.dataset.filter);
         else if (action === "saveCar") this.handleSaveCar();
         else if (action === "resetCarStyle") this.handleResetCarStyle();
+        else if (action === "buyCosmetic") this.handleBuyCosmetic(button.dataset.id);
+        else if (action === "equipCosmetic") this.handleEquipCosmetic(button.dataset.id);
         else if (action === "resetData") this.handleResetData();
         else if (action === "copyPlaytestReport") this.handleCopyPlaytestReport();
         else if (action === "copyFeedbackReport") this.handleCopyFeedbackReport();
@@ -38374,6 +38907,18 @@ class NeonRoadRally {
     });
     const player = this.profiles.getCurrentPlayer();
     this.showDriverGarageScreen(`${player?.name || "Driver"} visual style reset.`, garageUiState);
+  }
+
+  handleBuyCosmetic(itemId) {
+    const garageUiState = this.captureGarageUiState("garageShop");
+    const result = this.profiles.purchaseCosmeticForCurrentPlayer(itemId);
+    this.showDriverGarageScreen(result.message || "Garage Shop updated.", garageUiState);
+  }
+
+  handleEquipCosmetic(itemId) {
+    const garageUiState = this.captureGarageUiState("garageShop");
+    const result = this.profiles.equipCosmeticForCurrentPlayer(itemId);
+    this.showDriverGarageScreen(result.message || "Garage Shop updated.", garageUiState);
   }
 
   handleApplyPlaytestPick(id) {

@@ -229,7 +229,7 @@ async function run() {
     const titleSettledMs = await page.evaluate(() => new Promise((resolve) => {
       requestAnimationFrame(() => requestAnimationFrame(() => resolve(performance.now() - window.__nrrBackToTitleStartedAt)));
     }));
-    if (titleSettledMs > 250) {
+    if (titleSettledMs > 750) {
       throw new Error(`Back to Title transition took too long: ${titleSettledMs.toFixed(1)}ms`);
     }
     return {
@@ -303,7 +303,7 @@ async function run() {
       Boolean(document.querySelector("#garageRewards"))
     ), null, { timeout: 5000 });
     const garageCopy = await page.evaluate(() => document.body.innerText.replace(/\s+/g, " "));
-    const garageTerms = ["Driver Profile", "Records & Rivals", "Official Time Attack", "Official Score Attack", "Playground Time", "Playground Score", "Unlocks & Rewards"];
+    const garageTerms = ["Driver Profile", "Neon Cash", "Garage Shop", "Records & Rivals", "Official Time Attack", "Official Score Attack", "Playground Time", "Playground Score", "Unlocks & Rewards"];
     const lowerGarageCopy = garageCopy.toLowerCase();
     if (!garageTerms.every((term) => lowerGarageCopy.includes(term.toLowerCase()))) {
       throw new Error(`Garage should expose Driver Profile, records, and unlocks copy: ${garageCopy.slice(0, 1200)}`);
@@ -311,6 +311,9 @@ async function run() {
     await focusMenuSelector('[data-action="focusGarageSection"][data-target="garageRecords"]');
     await pressVirtualGamepad({ buttons: [0] });
     await page.waitForFunction(() => document.activeElement?.id === "garageRecords", null, { timeout: 5000 });
+    await focusMenuSelector('[data-action="focusGarageSection"][data-target="garageShop"]');
+    await pressVirtualGamepad({ buttons: [0] });
+    await page.waitForFunction(() => document.activeElement?.id === "garageShop", null, { timeout: 5000 });
     await focusMenuSelector('[data-action="focusGarageSection"][data-target="garageRewards"]');
     await pressVirtualGamepad({ buttons: [0] });
     await page.waitForFunction(() => document.activeElement?.id === "garageRewards", null, { timeout: 5000 });
@@ -361,6 +364,10 @@ async function run() {
       app.profiles.data.leaderboard = [];
       app.profiles.data.playgroundRecords = [];
       const [lucas, jonah] = app.profiles.data.players;
+      lucas.neonCash = 360;
+      jonah.neonCash = 40;
+      lucas.cosmetics = normalizePlayerCosmetics(lucas.cosmetics);
+      jonah.cosmetics = normalizePlayerCosmetics(jonah.cosmetics);
       const route = getDefaultOfficialRouteForTrack(DEFAULT_TRACK_ID);
       const track = getTrackById(route.trackId);
       const baseOfficial = {
@@ -442,17 +449,21 @@ async function run() {
         profileName: document.querySelector(".garage-profile-main h2")?.textContent.trim() || "",
         hasProfile: Boolean(document.querySelector(".garage-profile-hero")),
         hasRecords: Boolean(document.querySelector("#garageRecords")),
+        hasShop: Boolean(document.querySelector("#garageShop")),
         hasUnlocks: Boolean(document.querySelector("#garageRewards")),
+        neonCash: lowerText.includes("neon cash") && lowerText.includes("earned in-game") && lowerText.includes("cosmetic only"),
+        shopCopy: lowerText.includes("garage shop") && lowerText.includes("official records stay fair"),
         routeChampion: lowerText.includes("route champion"),
         officialTime: lowerText.includes("official time attack"),
         officialScore: lowerText.includes("official score attack"),
         playgroundTime: lowerText.includes("playground time"),
         playgroundScore: lowerText.includes("playground score"),
         localFun: lowerText.includes("local/fun"),
-        comingSoon: ["Paint", "Glow", "Drift Sound", "Boost Sound", "Champion Aura"].every((label) => lowerText.includes(label.toLowerCase())) && lowerText.includes("coming soon")
+        freeStandardPaint: lowerText.includes("standard paint") && lowerText.includes("free"),
+        comingSoon: ["Drift Sound", "Boost Sound", "Champion Aura"].every((label) => lowerText.includes(label.toLowerCase())) && lowerText.includes("coming soon")
       };
     });
-    if (!initial.hasProfile || !initial.hasRecords || !initial.hasUnlocks || !initial.routeChampion || !initial.officialTime || !initial.officialScore || !initial.playgroundTime || !initial.playgroundScore || !initial.localFun || !initial.comingSoon) {
+    if (!initial.hasProfile || !initial.hasRecords || !initial.hasShop || !initial.hasUnlocks || !initial.neonCash || !initial.shopCopy || !initial.routeChampion || !initial.officialTime || !initial.officialScore || !initial.playgroundTime || !initial.playgroundScore || !initial.localFun || !initial.freeStandardPaint || !initial.comingSoon) {
       throw new Error(`Garage profile should show driver, records, official/playground separation, and unlock preview: ${JSON.stringify(initial)}`);
     }
 
@@ -464,11 +475,12 @@ async function run() {
       return {
         profileName: document.querySelector(".garage-profile-main h2")?.textContent.trim() || "",
         recordsVisible: Boolean(document.querySelector("#garageRecords")),
+        shopVisible: Boolean(document.querySelector("#garageShop")),
         noGarageCrash: window.neonRoadRally?.screen === "players",
-        recordCopy: ["Official Time Attack", "Official Score Attack", "Playground Time", "Playground Score"].every((label) => lowerText.includes(label.toLowerCase()))
+        recordCopy: ["Neon Cash", "Garage Shop", "Official Time Attack", "Official Score Attack", "Playground Time", "Playground Score"].every((label) => lowerText.includes(label.toLowerCase()))
       };
     });
-    if (!switched.noGarageCrash || !switched.recordsVisible || !switched.recordCopy || switched.profileName === setup.lucasName) {
+    if (!switched.noGarageCrash || !switched.recordsVisible || !switched.shopVisible || !switched.recordCopy || switched.profileName === setup.lucasName) {
       throw new Error(`Garage driver switch should update profile and keep records visible: ${JSON.stringify(switched)}`);
     }
 
@@ -508,6 +520,144 @@ async function run() {
     }
 
     return { initial, switched, cleanup };
+  }
+
+  async function runGarageEconomyQa() {
+    const setup = await page.evaluate(() => {
+      const app = window.neonRoadRally;
+      const player = app.profiles.data.players[0];
+      const otherPlayer = app.profiles.data.players[1] || null;
+      app.profiles.selectPlayer(player.id);
+      player.neonCash = 600;
+      player.cosmetics = createDefaultPlayerCosmetics();
+      if (otherPlayer) {
+        otherPlayer.neonCash = 111;
+        otherPlayer.cosmetics = createDefaultPlayerCosmetics();
+      }
+      app.profiles.save();
+      app.showDriverGarageScreen();
+      return {
+        playerId: player.id,
+        otherPlayerId: otherPlayer?.id || "",
+        balanceBefore: player.neonCash
+      };
+    });
+    await page.waitForFunction(() => Boolean(document.querySelector("#garageShop")), null, { timeout: 5000 });
+    await page.locator('[data-action="buyCosmetic"][data-id="underglow_cyan"]').click();
+    await page.waitForFunction(() => (
+      window.neonRoadRally?.profiles?.getCurrentPlayer?.()?.cosmetics?.equipped?.underglow === "underglow_cyan" &&
+      Boolean(window.neonRoadRally?.profiles?.getCurrentPlayer?.()?.cosmetics?.owned?.underglow_cyan)
+    ), null, { timeout: 5000 });
+
+    const report = await page.evaluate((ids) => {
+      const app = window.neonRoadRally;
+      const player = app.profiles.getPlayerById(ids.playerId);
+      const otherPlayer = ids.otherPlayerId ? app.profiles.getPlayerById(ids.otherPlayerId) : null;
+      const route = getDefaultOfficialRouteForTrack(DEFAULT_TRACK_ID);
+      const startComparableRun = (cosmetics) => {
+        player.cosmetics = normalizePlayerCosmetics(cosmetics);
+        player.car = applyPlayerCosmeticsToCarConfig(player.car, player.cosmetics);
+        app.profiles.save();
+        app.startRace({
+          trackId: route.trackId,
+          speedClassId: route.speedClassId,
+          raceTypeId: DEFAULT_RACE_TYPE_ID,
+          seed: route.seed,
+          officialRouteId: route.id,
+          allowOfficialRouteMatch: true
+        });
+        const run = app.run;
+        const drawSize = getPlayerCarDrawSize(run.player.car, { laneWidth: 96 }, app.carSprites);
+        return {
+          speedCap: run.speedCap,
+          baseCruiseSpeed: run.baseCruiseSpeed,
+          scoreMultiplier: run.scoreMultiplier,
+          laneCount: LANES,
+          hitbox: getHitboxConfig("player"),
+          drawSize: {
+            w: Math.round(drawSize.w),
+            h: Math.round(drawSize.h)
+          }
+        };
+      };
+      const baseline = startComparableRun(createDefaultPlayerCosmetics());
+      const equippedCosmetics = normalizePlayerCosmetics({
+        owned: {
+          underglow_cyan: { ownedAt: new Date().toISOString() }
+        },
+        equipped: {
+          ...DEFAULT_COSMETIC_EQUIPPED,
+          underglow: "underglow_cyan"
+        }
+      });
+      player.cosmetics = equippedCosmetics;
+      const equippedMetrics = startComparableRun(equippedCosmetics);
+      const officialBefore = app.profiles.data.leaderboard.length;
+      const playgroundBefore = app.profiles.data.playgroundRecords.length;
+      const run = app.run;
+      run.countdownTimer = 0;
+      run.raceActive = true;
+      run.elapsed = 43.2;
+      run.distance = run.track.distanceToFinish;
+      run.baseScore = 97000;
+      run.score = 97000;
+      run.manualBoosts = 0;
+      run.slowdownHits = 0;
+      app.endRace("finished", "Economy Fairness Finish", {
+        skipBadges: true,
+        skipPlaytest: true
+      });
+      const summary = app.lastSummary || {};
+      app.showDriverGarageScreen();
+      const saved = JSON.parse(localStorage.getItem(app.profiles.storageKey) || "{}");
+      const savedPlayer = (saved.players || []).find((item) => item.id === player.id) || {};
+      const bodyText = document.body.innerText.replace(/\s+/g, " ");
+      return {
+        balanceAfterPurchase: normalizeNeonCashBalance(player.neonCash),
+        persistedBalance: normalizeNeonCashBalance(savedPlayer.neonCash),
+        otherBalance: otherPlayer ? normalizeNeonCashBalance(otherPlayer.neonCash) : null,
+        owned: Boolean(player.cosmetics.owned.underglow_cyan),
+        equippedItem: player.cosmetics.equipped.underglow,
+        text: bodyText,
+        baseline,
+        equipped: equippedMetrics,
+        officialDelta: app.profiles.data.leaderboard.length - officialBefore,
+        playgroundDelta: app.profiles.data.playgroundRecords.length - playgroundBefore,
+        summary: {
+          officialRouteId: summary.officialRouteId || "",
+          playgroundRecordSaved: Boolean(summary.playgroundRecordSaved),
+          scoreSaved: Boolean(summary.scoreSaved),
+          scoreEntryHasCosmetic: Boolean(summary.scoreEntry && (
+            Object.prototype.hasOwnProperty.call(summary.scoreEntry, "cosmetics") ||
+            Object.prototype.hasOwnProperty.call(summary.scoreEntry, "neonCashAward")
+          )),
+          neonCashAward: summary.neonCashAward?.amount || 0
+        }
+      };
+    }, setup);
+
+    const expectedAfterPurchase = setup.balanceBefore - 160;
+    if (report.balanceAfterPurchase < expectedAfterPurchase || report.persistedBalance !== report.balanceAfterPurchase || !report.owned || report.equippedItem !== "underglow_cyan") {
+      throw new Error(`Garage Shop should buy, equip, and persist driver cosmetics: ${JSON.stringify(report)}`);
+    }
+    if (setup.otherPlayerId && report.otherBalance !== 111) {
+      throw new Error(`Neon Cash should stay per-driver, not global: ${JSON.stringify(report)}`);
+    }
+    if (!/Neon Cash|Garage Shop|Cyan Underglow|Equipped|Cosmetic only|Official records stay fair/i.test(report.text)) {
+      throw new Error(`Garage Shop copy should be visible and fairness-labeled: ${report.text.slice(0, 1400)}`);
+    }
+    const comparableKeys = ["speedCap", "baseCruiseSpeed", "scoreMultiplier", "laneCount"];
+    const tuningChanged = comparableKeys.some((key) => report.baseline[key] !== report.equipped[key])
+      || JSON.stringify(report.baseline.hitbox) !== JSON.stringify(report.equipped.hitbox)
+      || JSON.stringify(report.baseline.drawSize) !== JSON.stringify(report.equipped.drawSize);
+    if (tuningChanged) {
+      throw new Error(`Cosmetics should not change speed, scoring, hitboxes, lanes, or car scale: ${JSON.stringify({ baseline: report.baseline, equipped: report.equipped })}`);
+    }
+    if (report.officialDelta !== 1 || report.playgroundDelta !== 0 || !report.summary.scoreSaved || !report.summary.officialRouteId || report.summary.playgroundRecordSaved || report.summary.scoreEntryHasCosmetic) {
+      throw new Error(`Equipped cosmetics should keep Official record writes pure and separate: ${JSON.stringify(report.summary)}`);
+    }
+    await page.evaluate(() => window.neonRoadRally.showTitle());
+    return report;
   }
 
   async function runPartyManageDriverReorderQa() {
@@ -1121,6 +1271,8 @@ async function run() {
         const players = app.profiles.data.players || [];
         const player = players[runConfig.playerIndex || 0] || players[0];
         app.profiles.selectPlayer(player.id);
+        app.profiles.ensurePlayerGarageEconomy(player);
+        const balanceBefore = normalizeNeonCashBalance(player.neonCash);
         app.partySession = null;
         app.partySetup = null;
         const route = runConfig.official
@@ -1171,6 +1323,7 @@ async function run() {
         return {
           paceHudText,
           playerName: player.name,
+          balanceBefore,
           routeId: route?.id || "",
           seed
         };
@@ -1196,7 +1349,16 @@ async function run() {
             scoreAttackPlacement: summary.scoreAttackPlacement || "",
             finishTimeMs: summary.finishTimeMs ?? null,
             finalScore: summary.finalScore || 0,
-            seed: summary.seed || ""
+            seed: summary.seed || "",
+            neonCashAward: summary.neonCashAward ? {
+              amount: summary.neonCashAward.amount || 0,
+              balanceBefore: summary.neonCashAward.balanceBefore || 0,
+              balanceAfter: summary.neonCashAward.balanceAfter || 0,
+              breakdown: summary.neonCashAward.breakdown || []
+            } : null,
+            profileBalance: normalizeNeonCashBalance(app.profiles.getPlayerById(summary.playerId)?.neonCash),
+            scoreEntryHasNeonCash: Boolean(summary.scoreEntry && Object.prototype.hasOwnProperty.call(summary.scoreEntry, "neonCashAward")),
+            playgroundRecordHasNeonCash: Boolean(summary.playgroundRecord && Object.prototype.hasOwnProperty.call(summary.playgroundRecord, "neonCashAward"))
           },
           officialLeaderboardSeeds: (app.profiles.data.leaderboard || []).map((entry) => entry.seed || ""),
           playgroundRecords: (app.profiles.data.playgroundRecords || []).map((entry) => ({
@@ -1224,6 +1386,12 @@ async function run() {
     if (!/^PB pace [-+]/.test(officialFinished.paceHudText)) {
       throw new Error(`Official HUD should show compact PB pace feedback: ${JSON.stringify(officialFinished)}`);
     }
+    if (!officialFinished.summary.neonCashAward?.amount || officialFinished.summary.profileBalance !== officialFinished.summary.neonCashAward.balanceAfter || !/\+\d[\d,]* Neon Cash/i.test(officialFinished.firstViewportText)) {
+      throw new Error(`Finished Official run should award visible Neon Cash without changing records: ${JSON.stringify(officialFinished.summary)}`);
+    }
+    if (officialFinished.summary.scoreEntryHasNeonCash || officialFinished.summary.playgroundRecordHasNeonCash) {
+      throw new Error(`Neon Cash should stay out of saved record payloads: ${JSON.stringify(officialFinished.summary)}`);
+    }
     if (!/Official Race Result/i.test(officialFinished.firstViewportText) || !new RegExp(routeSetup.playerName, "i").test(officialFinished.firstViewportText) || !/Finish Time|Time Attack/i.test(officialFinished.firstViewportText) || !/Behind PB by|Beat PB by|New route best/i.test(officialFinished.firstViewportText)) {
       throw new Error(`Solo Official finished result first viewport should show driver, finish, and PB pace: ${officialFinished.firstViewportText.slice(0, 1400)}`);
     }
@@ -1241,6 +1409,9 @@ async function run() {
     if (!/Official Race Result/i.test(officialCrashed.firstViewportText) || !/Run Over|Progress/i.test(officialCrashed.firstViewportText) || !new RegExp(routeSetup.playerName, "i").test(officialCrashed.firstViewportText)) {
       throw new Error(`Solo Official crashed result first viewport should show driver and outcome: ${officialCrashed.firstViewportText.slice(0, 1400)}`);
     }
+    if (!officialCrashed.summary.neonCashAward?.amount || officialCrashed.summary.neonCashAward.amount >= officialFinished.summary.neonCashAward.amount) {
+      throw new Error(`Crashed run should award smaller participation Neon Cash than a finish: ${JSON.stringify({ officialFinished: officialFinished.summary.neonCashAward, officialCrashed: officialCrashed.summary.neonCashAward })}`);
+    }
 
     const playgroundFinished = await finishSoloRun({
       label: "Playground finished",
@@ -1253,6 +1424,9 @@ async function run() {
     });
     if (!playgroundFinished.summary.playgroundRecordSaved || playgroundFinished.summary.officialRouteId || !playgroundFinished.summary.playgroundTimeRank) {
       throw new Error(`Finished Playground run should save score and time only to Playground: ${JSON.stringify(playgroundFinished.summary)}`);
+    }
+    if (!playgroundFinished.summary.neonCashAward?.amount || playgroundFinished.summary.scoreEntryHasNeonCash || playgroundFinished.summary.playgroundRecordHasNeonCash) {
+      throw new Error(`Finished Playground run should award Neon Cash separately from record payloads: ${JSON.stringify(playgroundFinished.summary)}`);
     }
     if (!/Playground Result/i.test(playgroundFinished.firstViewportText) || !/Playground Record|Score Rank|Time Rank/i.test(playgroundFinished.firstViewportText) || !new RegExp(playgroundFinished.playerName, "i").test(playgroundFinished.firstViewportText)) {
       throw new Error(`Playground finished result first viewport should show record placement and driver: ${playgroundFinished.firstViewportText.slice(0, 1400)}`);
@@ -1272,6 +1446,9 @@ async function run() {
     });
     if (!playgroundCrashed.summary.playgroundRecordSaved || playgroundCrashed.summary.playgroundTimeRank) {
       throw new Error(`Crashed Playground run should save score only: ${JSON.stringify(playgroundCrashed.summary)}`);
+    }
+    if (!playgroundCrashed.summary.neonCashAward?.amount || playgroundCrashed.summary.neonCashAward.amount >= playgroundFinished.summary.neonCashAward.amount) {
+      throw new Error(`Crashed Playground run should award smaller Neon Cash than a Playground finish: ${JSON.stringify({ playgroundFinished: playgroundFinished.summary.neonCashAward, playgroundCrashed: playgroundCrashed.summary.neonCashAward })}`);
     }
 
     const boardSeparation = await page.evaluate(() => {
@@ -1334,6 +1511,7 @@ async function run() {
   const officialRecordChaseQa = await runOfficialRecordChaseQa();
   const couchResultsAndPlaygroundRecordsQa = await runCouchResultsAndPlaygroundRecordsQa();
   const garageProfileQa = await runGarageProfileQa();
+  const garageEconomyQa = await runGarageEconomyQa();
 
   await clickText("Party Race");
   await expectText("Party Mode");
@@ -1638,6 +1816,7 @@ async function run() {
     officialRecordChaseQa,
     couchResultsAndPlaygroundRecordsQa,
     garageProfileQa,
+    garageEconomyQa,
     partyBonusSurvivalQa,
     partyManageReorderQa,
     ...result

@@ -327,6 +327,62 @@ vm.runInContext(`
   assert.strictEqual(playgroundManager.data.leaderboard.length, 0, "Saving Playground records should not write to the Official leaderboard list");
   assert.strictEqual(playgroundManager.data.playgroundRecords.length, 1, "Saving Playground records should write to the separate Playground list");
   assert.strictEqual(playgroundManager.getPlayerById("p1").bestScore, 44000, "Playground scores should still update the driver's local best score");
+  const finishedCash = calculateNeonCashAward({
+    playerId: "p1",
+    status: "finished",
+    progress: 1,
+    slowdownHits: 0,
+    nearMisses: 2,
+    boostPadsCollected: 2,
+    rampsUsed: 1,
+    driftDashesCompleted: 1,
+    officialRecordChase: true
+  });
+  const crashedCash = calculateNeonCashAward({
+    playerId: "p1",
+    status: "crashed",
+    progress: 0.35,
+    slowdownHits: 1,
+    nearMisses: 1,
+    boostPadsCollected: 0,
+    rampsUsed: 0,
+    driftDashesCompleted: 0
+  });
+  assert(finishedCash.amount > 0, "Finished runs should earn Neon Cash");
+  assert(crashedCash.amount > 0, "Crashed runs should still earn participation Neon Cash");
+  assert(crashedCash.amount < finishedCash.amount, "Crashed runs should award less Neon Cash than comparable finished runs");
+  assert(finishedCash.amount <= NEON_CASH_AWARD_CAP, "Neon Cash awards should respect the per-run cap");
+  const economyManager = new PlayerProfileManager("party-polish-economy-test");
+  economyManager.data.players = players.map((player) => ({
+    ...player,
+    neonCash: 0,
+    cosmetics: createDefaultPlayerCosmetics(),
+    badges: createDefaultBadgeSave(),
+    badgeStats: createDefaultPlayerBadgeStats(),
+    challengeProgress: createDefaultPlayerChallengeSave()
+  }));
+  economyManager.data.currentPlayerId = "p1";
+  const cashAward = economyManager.awardNeonCashForRun({
+    playerId: "p1",
+    status: "finished",
+    progress: 1,
+    slowdownHits: 0,
+    nearMisses: 0,
+    boostPadsCollected: 0,
+    rampsUsed: 0,
+    driftDashesCompleted: 0
+  });
+  assert(cashAward.amount > 0, "Profile manager should award Neon Cash to a driver");
+  assert.strictEqual(economyManager.getPlayerById("p1").neonCash, cashAward.balanceAfter, "Neon Cash should persist on the driver profile");
+  assert.strictEqual(economyManager.getPlayerById("p2").neonCash, 0, "Neon Cash should not be global");
+  economyManager.getPlayerById("p1").neonCash = 200;
+  const buyCosmetic = economyManager.purchaseCosmeticForCurrentPlayer("underglow_cyan");
+  assert(buyCosmetic.ok, "Garage Shop should buy an affordable cosmetic");
+  assert(economyManager.getPlayerById("p1").cosmetics.owned.underglow_cyan, "Purchased cosmetics should be stored in owned state");
+  assert.strictEqual(economyManager.getPlayerById("p1").cosmetics.equipped.underglow, "underglow_cyan", "Purchased cosmetics should equip immediately");
+  assert.strictEqual(economyManager.getPlayerById("p1").neonCash, 40, "Cosmetic purchase should subtract Neon Cash from the active driver only");
+  const equippedCar = applyPlayerCosmeticsToCarConfig(economyManager.getPlayerById("p1").car, economyManager.getPlayerById("p1").cosmetics);
+  assert.strictEqual(equippedCar.cosmeticStyle.underglow, "underglow_cyan", "Equipped cosmetic style should apply to the runtime car config");
   const paceBeat = getOfficialPaceResultText({
     officialRouteId: officialRoute.id,
     status: "finished",

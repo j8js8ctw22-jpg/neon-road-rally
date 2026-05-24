@@ -4364,6 +4364,10 @@ button:disabled {
   white-space: nowrap;
 }
 
+.garage-profile-stat-card.is-neon-cash strong {
+  color: var(--green);
+}
+
 .garage-profile-stat-card small,
 .garage-record-highlight span,
 .garage-record-highlight small,
@@ -4513,6 +4517,121 @@ button:disabled {
   text-overflow: ellipsis;
   text-transform: uppercase;
   white-space: nowrap;
+}
+
+.garage-shop-panel,
+.garage-shop-category {
+  display: grid;
+  gap: var(--s-3);
+  min-width: 0;
+}
+
+.garage-shop-balance {
+  display: grid;
+  gap: 4px;
+  border: 1px solid rgba(68, 255, 153, 0.34);
+  border-radius: 8px;
+  padding: var(--s-3);
+  background:
+    linear-gradient(135deg, rgba(68, 255, 153, 0.1), rgba(40, 246, 255, 0.08)),
+    rgba(5, 8, 20, 0.64);
+}
+
+.garage-shop-balance span,
+.garage-shop-category-head span {
+  color: var(--ink-mute);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.garage-shop-balance strong {
+  color: var(--green);
+  font-size: 30px;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.garage-shop-balance small,
+.garage-shop-category-head small,
+.garage-shop-card small,
+.garage-shop-card em {
+  color: var(--ink-mute);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.garage-shop-category-head {
+  display: flex;
+  gap: var(--s-2);
+  align-items: baseline;
+  justify-content: space-between;
+  min-width: 0;
+}
+
+.garage-shop-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: var(--s-2);
+}
+
+.garage-shop-card {
+  display: grid;
+  grid-template-columns: 30px minmax(0, 1fr) auto;
+  gap: var(--s-2);
+  align-items: center;
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: var(--s-2);
+  background: rgba(255, 255, 255, 0.026);
+}
+
+.garage-shop-card.is-equipped {
+  border-color: rgba(68, 255, 153, 0.54);
+  background: rgba(68, 255, 153, 0.08);
+}
+
+.garage-shop-card.is-locked {
+  opacity: 0.86;
+}
+
+.garage-shop-card strong {
+  display: block;
+  overflow: hidden;
+  color: var(--ink);
+  font-size: 13px;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.garage-shop-card em {
+  display: block;
+  color: var(--yellow);
+  font-style: normal;
+  font-weight: 800;
+}
+
+.garage-shop-swatch {
+  width: 26px;
+  height: 26px;
+  border: 1px solid var(--line-2);
+  border-radius: 50%;
+  background:
+    linear-gradient(135deg, rgba(246, 251, 255, 0.32), rgba(40, 246, 255, 0.12)),
+    rgba(5, 8, 20, 0.9);
+  box-shadow: 0 0 0 2px rgba(5, 8, 20, 0.8);
+}
+
+.garage-shop-swatch.has-color {
+  background:
+    radial-gradient(circle at 32% 28%, rgba(246, 251, 255, 0.74), transparent 28%),
+    var(--cosmetic-color);
+  box-shadow: 0 0 14px var(--cosmetic-color);
 }
 
 .garage-quick-actions,
@@ -6134,6 +6253,38 @@ button:disabled {
 .result-reward-chip small {
   color: var(--muted);
   font-size: 0.73rem;
+}
+
+.neon-cash-result-chip {
+  display: inline-grid;
+  gap: 2px;
+  align-content: center;
+  border: 1px solid rgba(68, 255, 153, 0.48);
+  border-radius: 7px;
+  padding: 8px 10px;
+  background:
+    linear-gradient(135deg, rgba(68, 255, 153, 0.16), rgba(40, 246, 255, 0.08)),
+    rgba(5, 8, 20, 0.78);
+  color: var(--green);
+}
+
+.neon-cash-result-chip strong {
+  color: var(--green);
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.neon-cash-result-chip small {
+  color: var(--muted);
+  font-size: 0.72rem;
+  text-transform: uppercase;
+}
+
+.neon-cash-result-chip.is-compact {
+  justify-self: start;
+  padding: 6px 8px;
 }
 
 .result-improvement-panel {
