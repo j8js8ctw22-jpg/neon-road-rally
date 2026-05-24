@@ -5041,12 +5041,15 @@ button:disabled {
   min-height: 30px;
   padding: 6px 12px;
   color: var(--ink-dim);
+  white-space: normal;
 }
 
 .leaderboard-screen-panel .leaderboard-board-tabs .arcade-tab strong {
   font-family: var(--font-mono);
   font-size: 11px;
   letter-spacing: 0.08em;
+  line-height: 1.15;
+  text-align: center;
   text-transform: uppercase;
 }
 
@@ -7521,7 +7524,7 @@ button:disabled {
 .official-record-chase-podium-grid {
   display: grid;
   gap: 10px;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
 }
 
 .official-record-chase-podium-card {

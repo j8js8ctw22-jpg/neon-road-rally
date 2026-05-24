@@ -716,8 +716,8 @@ async function assertLeaderboards(page) {
   assertIncludes(text, "Time Attack");
   assertIncludes(text, "Survival");
   assertIncludes(text, "Endurance Score");
-  assertIncludes(text, "Playground Score");
-  assertIncludes(text, "Playground Time");
+  assertIncludes(text, "Playground Records Score");
+  assertIncludes(text, "Playground Records Time");
   assertNoNormalUiDebugTerms(text, "Score Attack board");
   const arcadePrimitives = await page.$eval(".leaderboard-chase-panel", (panel) => ({
     pageShell: panel.classList.contains("arcade-page-shell"),
@@ -734,9 +734,9 @@ async function assertLeaderboards(page) {
   }));
   assert(Object.values(arcadePrimitives).every(Boolean), "Leaderboard should use reusable arcade UI primitives", arcadePrimitives);
   const boardTabs = await page.$$eval(".arcade-segmented-tabs .arcade-tab", (nodes) => nodes.map((node) => node.textContent.trim()));
-  assert(JSON.stringify(boardTabs) === JSON.stringify(["Time Attack", "Score Attack", "Survival", "Endurance Score", "Playground Score", "Playground Time"]), "Chase board tabs should be compact labels", { boardTabs });
+  assert(JSON.stringify(boardTabs) === JSON.stringify(["Official Time Attack", "Official Score Attack", "Official Survival", "Official Endurance Score", "Playground Records Score", "Playground Records Time"]), "Chase board tabs should clearly separate Official and Playground boards", { boardTabs });
   const boardTabMaxHeight = await page.$$eval(".arcade-segmented-tabs .arcade-tab", (nodes) => Math.max(...nodes.map((node) => node.getBoundingClientRect().height)));
-  assert(boardTabMaxHeight <= 42, "Chase board tabs should stay slim", { boardTabMaxHeight });
+  assert(boardTabMaxHeight <= 58, "Chase board tabs should stay readable without becoming tall controls", { boardTabMaxHeight });
   const filterShape = await page.$eval(".arcade-filter-bar", (node) => {
     const routeSelect = node.querySelector("#leaderboardRoute");
     const routeSelectStyle = routeSelect ? window.getComputedStyle(routeSelect) : null;
@@ -878,7 +878,7 @@ async function assertLeaderboards(page) {
   await page.waitForFunction(() => window.neonRoadRally?.leaderboardView === "timeAttack" && window.neonRoadRally?.leaderboardOfficialRouteId === "sunset-neon-palm-sprint", null, { timeout: 5000 });
   text = await bodyText(page);
   assertIncludes(text, "Time Attack");
-  assertIncludes(text, "Fastest finish");
+  assertIncludes(text, "Official fastest finish");
   assertIncludes(text, "Neon Palm Sprint");
   assertIncludes(text, "42.123s");
   assertNoNormalUiDebugTerms(text, "Time Attack board");
@@ -899,7 +899,7 @@ async function assertLeaderboards(page) {
   }));
   await page.waitForFunction(() => window.neonRoadRally?.leaderboardView === "playgroundTime", null, { timeout: 5000 });
   text = await bodyText(page);
-  assertIncludes(text, "Playground Time");
+  assertIncludes(text, "Playground Records Time");
   assertIncludes(text, "CUSTOM-OFFICIAL-SMOKE");
   assertIncludes(text, "48.321s");
 
@@ -907,7 +907,7 @@ async function assertLeaderboards(page) {
   await page.waitForFunction(() => window.neonRoadRally?.leaderboardView === "enduranceSurvival", null, { timeout: 5000 });
   text = await bodyText(page);
   assertIncludes(text, "Survival");
-  assertIncludes(text, "Longest survival");
+  assertIncludes(text, "Official longest survival");
   assertNoNormalUiDebugTerms(text, "Survival board");
   const survivalRowText = await page.locator(".leaderboard-list .leaderboard-item").first().innerText();
   assertIncludes(survivalRowText, "Lap 4");
@@ -919,7 +919,7 @@ async function assertLeaderboards(page) {
   await page.waitForFunction(() => window.neonRoadRally?.leaderboardView === "enduranceScore", null, { timeout: 5000 });
   text = await bodyText(page);
   assertIncludes(text, "Endurance Score");
-  assertIncludes(text, "Best bonus score");
+  assertIncludes(text, "Official best bonus score");
   assertNoNormalUiDebugTerms(text, "Endurance Score board");
   const enduranceScoreRowText = await page.locator(".leaderboard-list .leaderboard-item").first().innerText();
   assertIncludes(enduranceScoreRowText, "Lap 4");

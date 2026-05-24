@@ -741,7 +741,12 @@ async function run() {
           routeSeed: session?.officialSeed || session?.sharedSeed || ""
         };
       });
-      await finishCurrentPartyRun(runFields[index], { startVia: index === 0 ? "keyboard" : "button" });
+      if (index > 0) await focusMenuSelector('[data-action="partyStartRun"]');
+      await finishCurrentPartyRun(runFields[index], { startVia: "keyboard" });
+      const expectedPrimaryAction = index < runFields.length - 1 ? "partyNextPlayer" : "partyRematchSameSeed";
+      await page.waitForFunction((action) => document.activeElement?.dataset?.action === action, expectedPrimaryAction, { timeout: 5000 });
+      const firstViewportText = await getFirstViewportText();
+      assertNoFirstViewportDebugTerms(firstViewportText, `Official Record Chase result ${index + 1}`);
       const afterRun = await page.evaluate(() => {
         const app = window.neonRoadRally;
         const summary = app.lastSummary || {};
@@ -749,6 +754,7 @@ async function run() {
         const standings = session?.standings?.() || [];
         const heroText = document.querySelector(".official-record-chase-hero")?.innerText || "";
         const nextButtonText = document.querySelector('[data-action="partyNextPlayer"]')?.textContent || "";
+        const primaryAction = document.activeElement?.dataset?.action || "";
         return {
           screen: app.screen,
           summaryPlayer: summary.playerName || "",
@@ -766,14 +772,33 @@ async function run() {
           currentLeader: standings[0]?.playerName || "",
           currentStanding: standings.find((row) => row.playerId === summary.playerId)?.rank || 0,
           heroText,
-          nextButtonText
+          nextButtonText,
+          primaryAction
         };
       });
       if (!afterRun.partyMode || !afterRun.officialRecordChase || afterRun.officialRouteId !== afterRun.sessionRouteId || afterRun.summarySeed !== afterRun.routeSeed || !afterRun.scoreSaved) {
         throw new Error(`Official Record Chase run should save as official party wrapper only: ${JSON.stringify(afterRun)}`);
       }
-      if (!/Official Rank \/ PB|Leader Gap|Official Score/i.test(afterRun.heroText)) {
-        throw new Error(`Official Record Chase first viewport missing rank/gap/official result: ${afterRun.heroText.slice(0, 1000)}`);
+      const requiredHeroCopy = [
+        "Official Record Chase",
+        "Official Route:",
+        "Run Result",
+        "Record Chase Rank",
+        "Leader / Gap",
+        "Official Time Attack",
+        "Official Score Attack",
+        "PB / Route Record"
+      ];
+      const lowerHeroText = afterRun.heroText.toLowerCase();
+      const missingHeroCopy = requiredHeroCopy.filter((copy) => !lowerHeroText.includes(copy.toLowerCase()));
+      if (missingHeroCopy.length || !/Current Driver|Winner/i.test(afterRun.heroText)) {
+        throw new Error(`Official Record Chase first viewport missing ${missingHeroCopy.join(", ") || "current driver/winner"}: ${afterRun.heroText.slice(0, 1000)}`);
+      }
+      if (!/No PB yet|Beat PB|Behind PB|New route best|No finish against PB|No previous time yet|Official Top 20/i.test(afterRun.heroText)) {
+        throw new Error(`Official Record Chase first viewport should show PB or route-record language: ${afterRun.heroText.slice(0, 1000)}`);
+      }
+      if (afterRun.primaryAction !== expectedPrimaryAction) {
+        throw new Error(`Official Record Chase primary action focus should land on ${expectedPrimaryAction}: ${JSON.stringify(afterRun)}`);
       }
       if (index < runFields.length - 1 && !/^Next Driver:/i.test(afterRun.nextButtonText)) {
         throw new Error(`Official Record Chase result should show next driver action: ${JSON.stringify(afterRun)}`);
@@ -828,6 +853,8 @@ async function run() {
           scorePlayers: scoreRows.filter((entry) => selectedIds.has(entry.playerId)).map((entry) => entry.playerName),
           playgroundRecordCount: app.profiles.data.playgroundRecords?.length || 0,
           normalPartyOfficialRouteId: normalPartyEntry?.officialRouteId || "",
+          heroText: document.querySelector(".official-record-chase-hero")?.innerText || "",
+          primaryAction: document.activeElement?.dataset?.action || "",
           finalText: document.body.innerText
         };
       });
@@ -843,10 +870,20 @@ async function run() {
     if (finalReport.normalPartyOfficialRouteId) {
       throw new Error(`Normal party/custom run should not normalize into official boards: ${JSON.stringify(finalReport)}`);
     }
-    if (!/Winner:|1st|2nd|3rd|Best score|Official Top 20|Beat time PB/i.test(finalReport.finalText)) {
+    if (finalReport.primaryAction !== "partyRematchSameSeed") {
+      throw new Error(`Official Record Chase final screen should focus the primary final action: ${JSON.stringify(finalReport)}`);
+    }
+    if (!/Official Record Chase Final Standings|Winner:|1st|2nd|3rd|Gap|Best official score|Official Time Attack|Official Score Attack|Official Top 20|Beat time PB/i.test(finalReport.finalText)) {
       throw new Error(`Official Record Chase final screen should make winner and official highlights obvious: ${finalReport.finalText.slice(0, 1400)}`);
     }
 
+    await focusMenuSelector('.official-record-chase-actions [data-action="title"]');
+    await pressVirtualGamepad({ buttons: [0] });
+    await page.waitForFunction(() => window.neonRoadRally?.screen === "title", null, { timeout: 5000 });
+    const backToTitleReport = await page.evaluate(() => ({
+      screen: window.neonRoadRally?.screen || "",
+      titleText: document.body.innerText
+    }));
     await page.evaluate(() => {
       const app = window.neonRoadRally;
       app.partySession = null;
@@ -854,7 +891,7 @@ async function run() {
       app.partySetup.selectedPlayerIds = app.profiles.data.players.slice(0, 3).map((player) => player.id);
       app.showTitle();
     });
-    return { setupReport, lockedSetup, perTurn, finalReport };
+    return { setupReport, lockedSetup, perTurn, finalReport, backToTitleReport };
   }
 
   async function runCouchResultsAndPlaygroundRecordsQa() {
@@ -1102,13 +1139,13 @@ async function run() {
       text: document.body.innerText,
       selectedTab: document.querySelector('[data-action="setLeaderboardView"].is-selected')?.textContent.replace(/\s+/g, " ").trim() || ""
     }));
-    if (!/Playground Records|Local fun records|Not official|Playground Score|Playground Time/i.test(playgroundLeaderboard.text) || !/Playground Score/i.test(playgroundLeaderboard.selectedTab)) {
+    if (!/Playground Records|Local\/fun records|Not official|Playground Records Score|Playground Records Time/i.test(playgroundLeaderboard.text) || !/Playground Records Score/i.test(playgroundLeaderboard.selectedTab)) {
       throw new Error(`Leaderboards should expose Playground Records separately: ${playgroundLeaderboard.text.slice(0, 1400)}`);
     }
     await page.locator('[data-action="setLeaderboardView"][data-view="playgroundTime"]').click();
     await page.waitForFunction(() => document.querySelector('[data-action="setLeaderboardView"][data-view="playgroundTime"]')?.classList.contains("is-selected"), null, { timeout: 5000 });
     const playgroundTimeText = await page.evaluate(() => document.body.innerText);
-    if (!/Playground Time|Fastest finished Playground runs|Not official/i.test(playgroundTimeText)) {
+    if (!/Playground Records Time|Fastest finished Playground runs|Not official|Local\/fun/i.test(playgroundTimeText)) {
       throw new Error(`Playground Time board should be a separate leaderboard category: ${playgroundTimeText.slice(0, 1400)}`);
     }
 
