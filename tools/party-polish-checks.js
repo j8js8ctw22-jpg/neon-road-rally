@@ -264,6 +264,78 @@ vm.runInContext(`
   });
   assert.strictEqual(normalPartyEntry.officialRouteId, "", "Normal Party runs should not contaminate official boards");
 
+  const playgroundFinished = normalizePlaygroundRecordEntry({
+    runId: "playground-finish",
+    playerId: "p1",
+    playerName: "Lucas",
+    trackId: DEFAULT_TRACK_ID,
+    trackName: "Sunset Highway",
+    seed: "FAMILY-ROAD-1",
+    raceMode: "arcade",
+    raceType: DEFAULT_RACE_TYPE_ID,
+    score: 44000,
+    status: "finished",
+    time: 51.25,
+    finishTimeMs: 51250,
+    date: "2026-05-23T10:00:00.000Z"
+  });
+  assert(playgroundFinished, "Finished Custom Road should normalize as a Playground record");
+  assert.strictEqual(playgroundFinished.officialRouteId, undefined, "Playground records should not carry official route ids");
+  assert.strictEqual(playgroundFinished.finishTimeMs, 51250, "Finished Playground records should keep finish time");
+  const playgroundCrash = normalizePlaygroundRecordEntry({
+    runId: "playground-crash",
+    playerId: "p2",
+    playerName: "Jonah",
+    trackId: DEFAULT_TRACK_ID,
+    seed: "FAMILY-ROAD-1",
+    raceMode: "arcade",
+    raceType: DEFAULT_RACE_TYPE_ID,
+    score: 38000,
+    status: "crashed",
+    progress: 0.64,
+    date: "2026-05-23T10:02:00.000Z"
+  });
+  assert(playgroundCrash, "Crashed Custom Road should normalize as a Playground score record");
+  assert.strictEqual(playgroundCrash.finishTimeMs, null, "Crashed Playground records should not create a time record");
+  assert.strictEqual(Math.round(playgroundCrash.progressPercent), 64, "Crashed Playground records should keep progress percent");
+  assert.strictEqual(normalizePlaygroundRecordEntry(officialPartyEntry), null, "Official Record Chase runs should not create Playground records");
+  const cappedPlayground = normalizePlaygroundRecordList(Array.from({ length: 25 }, (_, index) => ({
+    runId: "playground-cap-" + index,
+    playerId: "p1",
+    playerName: "Lucas",
+    trackId: DEFAULT_TRACK_ID,
+    seed: "CAP-" + index,
+    raceMode: "arcade",
+    raceType: DEFAULT_RACE_TYPE_ID,
+    score: 1000 + index,
+    status: "crashed",
+    progress: 0.5,
+    date: "2026-05-23T10:" + String(index).padStart(2, "0") + ":00.000Z"
+  })));
+  assert.strictEqual(cappedPlayground.length, LEADERBOARD_MAX_ENTRIES, "Playground score board should cap each setup to Top 20");
+  assert(cappedPlayground.every((entry) => entry.score >= 1005), "Playground score cap should keep the best scores");
+  const playgroundManager = new PlayerProfileManager("party-polish-playground-test");
+  playgroundManager.data.players = players.map((player) => ({
+    ...player,
+    badges: createDefaultBadgeSave(),
+    badgeStats: createDefaultPlayerBadgeStats(),
+    challengeProgress: createDefaultPlayerChallengeSave()
+  }));
+  playgroundManager.data.currentPlayerId = "p1";
+  const savedPlayground = playgroundManager.recordPlaygroundRecord(playgroundFinished);
+  assert(savedPlayground, "PlayerProfileManager should save Playground records");
+  assert.strictEqual(playgroundManager.data.leaderboard.length, 0, "Saving Playground records should not write to the Official leaderboard list");
+  assert.strictEqual(playgroundManager.data.playgroundRecords.length, 1, "Saving Playground records should write to the separate Playground list");
+  assert.strictEqual(playgroundManager.getPlayerById("p1").bestScore, 44000, "Playground scores should still update the driver's local best score");
+  const paceBeat = getOfficialPaceResultText({
+    officialRouteId: officialRoute.id,
+    status: "finished",
+    finishTimeMs: 41080,
+    previousBestTimeMs: 42000,
+    personalBestTimeDelta: -0.92
+  });
+  assert.strictEqual(paceBeat, "Beat PB by 0.920s", "Official pace result should clearly summarize a PB beat");
+
   let pad = null;
   navigator.getGamepads = () => (pad ? [pad] : []);
   const laneMoveAttempts = [];
@@ -469,6 +541,7 @@ vm.runInContext(`
 	  window.__partyPolishQaReport = {
 	    partyBonusSurvival: true,
 	    officialRecordChase: true,
+	    playgroundRecords: true,
 	    controllerStandardMapping: {
       dpadAndStick: true,
       crossBoostAndSelect: true,

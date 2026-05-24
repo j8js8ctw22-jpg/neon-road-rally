@@ -651,11 +651,22 @@ async function runCustomScenario(page, options = {}) {
   await clickAction(page, "startSeededRace");
   const telemetry = await finishCurrentRace(page, 98100, 48.321);
   const text = await bodyText(page);
-  assertIncludes(text, "Custom Road Result");
+  assertIncludes(text, "Playground Result");
+  assertIncludes(text, "Playground Record");
   assertIncludes(text, "Custom Road");
   assertIncludes(text, seed);
   assertNoNormalUiDebugTerms(text, "Custom Road result");
   assert(!text.includes("Official Race Result"), "Custom result should not present as Official Race");
+  const boardSeparation = await page.evaluate((customSeed) => {
+    const app = window.neonRoadRally;
+    return {
+      officialHasCustomSeed: (app.profiles.data.leaderboard || []).some((entry) => entry.seed === customSeed),
+      playgroundHasCustomSeed: (app.profiles.data.playgroundRecords || []).some((entry) => entry.seed === customSeed),
+      playgroundOfficialLeak: (app.profiles.data.playgroundRecords || []).some((entry) => Boolean(entry.officialRouteId))
+    };
+  }, seed);
+  assert(boardSeparation.playgroundHasCustomSeed, "Custom Road result should save to Playground records", boardSeparation);
+  assert(!boardSeparation.officialHasCustomSeed && !boardSeparation.playgroundOfficialLeak, "Custom Road should not contaminate Official boards", boardSeparation);
   if (options.returnToSetup) {
     await clickAction(page, "preRace");
     await page.waitForFunction(() => window.neonRoadRally?.screen === "preRace", null, { timeout: 5000 });
@@ -705,6 +716,8 @@ async function assertLeaderboards(page) {
   assertIncludes(text, "Time Attack");
   assertIncludes(text, "Survival");
   assertIncludes(text, "Endurance Score");
+  assertIncludes(text, "Playground Score");
+  assertIncludes(text, "Playground Time");
   assertNoNormalUiDebugTerms(text, "Score Attack board");
   const arcadePrimitives = await page.$eval(".leaderboard-chase-panel", (panel) => ({
     pageShell: panel.classList.contains("arcade-page-shell"),
@@ -721,7 +734,7 @@ async function assertLeaderboards(page) {
   }));
   assert(Object.values(arcadePrimitives).every(Boolean), "Leaderboard should use reusable arcade UI primitives", arcadePrimitives);
   const boardTabs = await page.$$eval(".arcade-segmented-tabs .arcade-tab", (nodes) => nodes.map((node) => node.textContent.trim()));
-  assert(JSON.stringify(boardTabs) === JSON.stringify(["Time Attack", "Score Attack", "Survival", "Endurance Score"]), "Chase board tabs should be compact labels", { boardTabs });
+  assert(JSON.stringify(boardTabs) === JSON.stringify(["Time Attack", "Score Attack", "Survival", "Endurance Score", "Playground Score", "Playground Time"]), "Chase board tabs should be compact labels", { boardTabs });
   const boardTabMaxHeight = await page.$$eval(".arcade-segmented-tabs .arcade-tab", (nodes) => Math.max(...nodes.map((node) => node.getBoundingClientRect().height)));
   assert(boardTabMaxHeight <= 42, "Chase board tabs should stay slim", { boardTabMaxHeight });
   const filterShape = await page.$eval(".arcade-filter-bar", (node) => {
@@ -844,12 +857,25 @@ async function assertLeaderboards(page) {
     raceTypeId: "classic"
   }));
   await page.waitForFunction(() => window.neonRoadRally?.screen === "leaderboard", null, { timeout: 5000 });
-  await page.locator(".leaderboard-extra-details summary").click();
+  const officialExtraDetailsCount = await page.locator(".leaderboard-extra-details summary").count();
+  assert(officialExtraDetailsCount === 0, "Official Score Attack should not mix custom Playground records into extra details", { officialExtraDetailsCount });
+  await page.evaluate(() => window.neonRoadRally?.showLeaderboard("playgroundScore", {
+    trackId: "midnight-ridge",
+    raceTypeId: "classic",
+    speedClassId: "turbo",
+    officialRouteId: ""
+  }));
+  await page.waitForFunction(() => window.neonRoadRally?.leaderboardView === "playgroundScore", null, { timeout: 5000 });
   text = await bodyText(page);
-  assertIncludes(text, "Practice Scores");
+  assertIncludes(text, "Playground Records");
+  assertIncludes(text, "CUSTOM-MIDNIGHT-RIDGE");
+  assertIncludes(text, "Not official");
 
-  await clickAction(page, "setLeaderboardView", '[data-view="timeAttack"]');
-  await page.waitForFunction(() => window.neonRoadRally?.leaderboardView === "timeAttack", null, { timeout: 5000 });
+  await page.evaluate(() => window.neonRoadRally?.showLeaderboard("timeAttack", {
+    officialRouteId: "sunset-neon-palm-sprint",
+    raceTypeId: "classic"
+  }));
+  await page.waitForFunction(() => window.neonRoadRally?.leaderboardView === "timeAttack" && window.neonRoadRally?.leaderboardOfficialRouteId === "sunset-neon-palm-sprint", null, { timeout: 5000 });
   text = await bodyText(page);
   assertIncludes(text, "Time Attack");
   assertIncludes(text, "Fastest finish");
@@ -863,9 +889,18 @@ async function assertLeaderboards(page) {
   assert(!/Official Race/i.test(timeRowText), "Time Attack row should not repeat Official Race", { timeRowText });
   const lowerTimeText = text.toLowerCase();
   assert(!lowerTimeText.includes("sunset-palm-sprint-turbo"), "Main Time Attack board should hide raw official seeds");
-  await page.locator(".leaderboard-extra-details summary").click();
+  const timeExtraDetailsCount = await page.locator(".leaderboard-extra-details summary").count();
+  assert(timeExtraDetailsCount === 0, "Official Time Attack should not mix custom Playground times into extra details", { timeExtraDetailsCount });
+  await page.evaluate(() => window.neonRoadRally?.showLeaderboard("playgroundTime", {
+    trackId: "sunset-highway",
+    raceTypeId: "classic",
+    speedClassId: "turbo",
+    officialRouteId: ""
+  }));
+  await page.waitForFunction(() => window.neonRoadRally?.leaderboardView === "playgroundTime", null, { timeout: 5000 });
   text = await bodyText(page);
-  assertIncludes(text, "Practice Times");
+  assertIncludes(text, "Playground Time");
+  assertIncludes(text, "CUSTOM-OFFICIAL-SMOKE");
   assertIncludes(text, "48.321s");
 
   await clickAction(page, "setLeaderboardView", '[data-view="enduranceSurvival"]');

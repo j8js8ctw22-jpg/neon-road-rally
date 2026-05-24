@@ -100,6 +100,34 @@ async function run() {
     });
   }
 
+  function assertNoFirstViewportDebugTerms(text, label) {
+    const lower = String(text || "").toLowerCase();
+    [
+      "signature",
+      "route hash",
+      "runprogress",
+      "officialfullroute",
+      "telemetry",
+      "raw pacing",
+      "pacing version",
+      "debug"
+    ].forEach((term) => {
+      if (lower.includes(term)) throw new Error(`${label} first viewport should not expose ${term}: ${String(text).slice(0, 1000)}`);
+    });
+  }
+
+  async function getFirstViewportText() {
+    return page.evaluate(() => [
+      ".result-header",
+      ".result-payoff",
+      ".playground-record-card",
+      ".result-quiet-actions",
+      ".party-drama-header",
+      ".party-last-run-card",
+      ".official-record-chase-hero"
+    ].map((selector) => document.querySelector(selector)?.innerText || "").filter(Boolean).join("\n"));
+  }
+
   async function setPartyOption(selector, value, expectedText) {
     await page.selectOption(selector, value);
     const selectedValue = await page.locator(selector).inputValue();
@@ -498,7 +526,9 @@ async function run() {
       run.countdownTimer = 0;
       run.raceActive = true;
       run.elapsed = runFields.time ?? 45;
-      run.distance = run.track.distanceToFinish;
+      const status = runFields.status || "finished";
+      const progress = Number.isFinite(runFields.progress) ? Math.max(0, Math.min(1, runFields.progress)) : 0.62;
+      run.distance = status === "finished" ? run.track.distanceToFinish : run.track.distanceToFinish * progress;
       run.baseScore = runFields.baseScore ?? runFields.score ?? 50000;
       run.score = runFields.score ?? run.baseScore;
       run.manualBoostsUsed = runFields.manualBoostsUsed ?? 0;
@@ -515,7 +545,7 @@ async function run() {
         run.fuel = runFields.fuelRemaining ?? 25;
         run.lowestFuelReached = runFields.lowestFuelReached ?? run.fuel;
       }
-      app.endRace(runFields.status || "finished", runFields.reason || "Smoke Finish");
+      app.endRace(status, runFields.reason || "Smoke Finish");
     }, fields);
     await page.waitForFunction(() => ["partyStandings", "partyFinal"].includes(window.neonRoadRally?.screen), null, { timeout: 8000 });
   }
@@ -618,6 +648,7 @@ async function run() {
   }
 
   async function runOfficialRecordChaseQa() {
+    const startingPlaygroundCount = await page.evaluate(() => window.neonRoadRally?.profiles?.data?.playgroundRecords?.length || 0);
     await installVirtualGamepad();
     await page.evaluate(() => {
       const app = window.neonRoadRally;
@@ -793,17 +824,21 @@ async function run() {
           bestScore: row.bestScore,
           highlights: row.officialHighlights
         })),
-        timePlayers: timeRows.filter((entry) => selectedIds.has(entry.playerId)).map((entry) => entry.playerName),
-        scorePlayers: scoreRows.filter((entry) => selectedIds.has(entry.playerId)).map((entry) => entry.playerName),
-        normalPartyOfficialRouteId: normalPartyEntry?.officialRouteId || "",
-        finalText: document.body.innerText
-      };
-    });
+          timePlayers: timeRows.filter((entry) => selectedIds.has(entry.playerId)).map((entry) => entry.playerName),
+          scorePlayers: scoreRows.filter((entry) => selectedIds.has(entry.playerId)).map((entry) => entry.playerName),
+          playgroundRecordCount: app.profiles.data.playgroundRecords?.length || 0,
+          normalPartyOfficialRouteId: normalPartyEntry?.officialRouteId || "",
+          finalText: document.body.innerText
+        };
+      });
     if (finalReport.screen !== "partyFinal" || finalReport.standings.length !== 3 || finalReport.standings[0].bestOfficialTimeMs !== 40750) {
       throw new Error(`Official Record Chase final standings should rank the fastest official time first: ${JSON.stringify(finalReport)}`);
     }
     if (new Set(finalReport.timePlayers).size !== 3 || new Set(finalReport.scorePlayers).size !== 3) {
       throw new Error(`Official Record Chase should write each driver to normal official boards: ${JSON.stringify(finalReport)}`);
+    }
+    if (finalReport.playgroundRecordCount !== startingPlaygroundCount) {
+      throw new Error(`Official Record Chase should not write Playground records: ${JSON.stringify(finalReport)}`);
     }
     if (finalReport.normalPartyOfficialRouteId) {
       throw new Error(`Normal party/custom run should not normalize into official boards: ${JSON.stringify(finalReport)}`);
@@ -822,9 +857,269 @@ async function run() {
     return { setupReport, lockedSetup, perTurn, finalReport };
   }
 
+  async function runCouchResultsAndPlaygroundRecordsQa() {
+    const routeSetup = await page.evaluate(() => {
+      const app = window.neonRoadRally;
+      app.partySession = null;
+      app.partySetup = null;
+      app.profiles.data.leaderboard = [];
+      app.profiles.data.bestTimes = [];
+      app.profiles.data.playgroundRecords = [];
+      app.profiles.selectPlayer(app.profiles.data.players[0].id);
+      const player = app.profiles.getCurrentPlayer();
+      const route = getDefaultOfficialRouteForTrack(DEFAULT_TRACK_ID);
+      app.profiles.recordScore({
+        runId: "official-pb-pace-smoke",
+        playerId: player.id,
+        playerName: player.name,
+        carName: player.car.name,
+        trackId: route.trackId,
+        trackName: getTrackById(route.trackId).name,
+        seed: route.seed,
+        speedClass: route.speedClassId,
+        raceMode: route.speedClassId,
+        raceType: DEFAULT_RACE_TYPE_ID,
+        pacingRulesVersion: getActivePacingRulesVersion(DEFAULT_RACE_TYPE_ID),
+        officialRouteId: route.id,
+        officialRouteName: route.name,
+        officialSeed: route.seed,
+        competitionKind: getCompetitionKindLabel(route),
+        score: 100000,
+        status: "finished",
+        time: 41,
+        finishTimeMs: 41000,
+        finishTimeSecondsPrecise: 41,
+        slowdownHits: 0,
+        cleanRun: true
+      });
+      app.showTitle();
+      return {
+        routeId: route.id,
+        routeSeed: route.seed,
+        trackId: route.trackId,
+        speedClassId: route.speedClassId,
+        playerName: player.name
+      };
+    });
+
+    async function finishSoloRun(config) {
+      const startReport = await page.evaluate((runConfig) => {
+        const app = window.neonRoadRally;
+        const players = app.profiles.data.players || [];
+        const player = players[runConfig.playerIndex || 0] || players[0];
+        app.profiles.selectPlayer(player.id);
+        app.partySession = null;
+        app.partySetup = null;
+        const route = runConfig.official
+          ? (getOfficialRouteById(runConfig.officialRouteId) || getDefaultOfficialRouteForTrack(runConfig.trackId || DEFAULT_TRACK_ID))
+          : null;
+        const trackId = route?.trackId || runConfig.trackId || DEFAULT_TRACK_ID;
+        const speedClassId = route?.speedClassId || runConfig.speedClassId || DEFAULT_SPEED_CLASS_ID;
+        const raceTypeId = runConfig.raceTypeId || DEFAULT_RACE_TYPE_ID;
+        const seed = route?.seed || runConfig.seed || "PLAYGROUND-SMOKE-ROAD";
+        app.pendingTrackId = trackId;
+        app.pendingRaceTypeId = raceTypeId;
+        app.pendingRoadSeed = seed;
+        app.pendingOfficialRouteId = route?.id || "";
+        app.startRace({
+          trackId,
+          speedClassId,
+          raceTypeId,
+          seed,
+          officialRouteId: route?.id || "",
+          customRoad: !route,
+          allowOfficialRouteMatch: Boolean(route)
+        });
+        const run = app.run;
+        run.countdownTimer = 0;
+        run.raceActive = true;
+        let paceHudText = run.paceHudText || "";
+        if (runConfig.samplePace) {
+          run.distance = run.track.distanceToFinish * (runConfig.sampleProgress || 0.5);
+          run.elapsed = runConfig.sampleElapsed || 20;
+          app.updatePaceFeedback();
+          paceHudText = run.paceHudText || "";
+        }
+        const status = runConfig.status || "finished";
+        const progress = Number.isFinite(runConfig.progress) ? Math.max(0, Math.min(1, runConfig.progress)) : 0.58;
+        run.elapsed = runConfig.time ?? 45;
+        run.distance = status === "finished" ? run.track.distanceToFinish : run.track.distanceToFinish * progress;
+        run.baseScore = runConfig.score ?? 50000;
+        run.score = runConfig.score ?? run.baseScore;
+        run.manualBoostsUsed = 3;
+        run.manualBoosts = 0;
+        run.boostPadsCollected = runConfig.boostPadsCollected || 0;
+        run.nearMisses = runConfig.nearMisses || 0;
+        run.slowdownHits = runConfig.slowdownHits || 0;
+        app.endRace(status, runConfig.reason || "Smoke Finish", {
+          skipBadges: true,
+          skipPlaytest: true
+        });
+        return {
+          paceHudText,
+          playerName: player.name,
+          routeId: route?.id || "",
+          seed
+        };
+      }, config);
+      await page.waitForFunction(() => window.neonRoadRally?.screen === "score", null, { timeout: 8000 });
+      const firstViewportText = await getFirstViewportText();
+      assertNoFirstViewportDebugTerms(firstViewportText, config.label || "Result");
+      const report = await page.evaluate(() => {
+        const app = window.neonRoadRally;
+        const summary = app.lastSummary || {};
+        return {
+          screen: app.screen,
+          summary: {
+            playerName: summary.playerName || "",
+            officialRouteId: summary.officialRouteId || "",
+            status: summary.status || "",
+            scoreSaved: Boolean(summary.scoreSaved),
+            playgroundRecordSaved: Boolean(summary.playgroundRecordSaved),
+            playgroundScoreRank: summary.playgroundScoreRank || null,
+            playgroundTimeRank: summary.playgroundTimeRank || null,
+            paceResultText: summary.paceResultText || "",
+            timeAttackPlacement: summary.timeAttackPlacement || "",
+            scoreAttackPlacement: summary.scoreAttackPlacement || "",
+            finishTimeMs: summary.finishTimeMs ?? null,
+            finalScore: summary.finalScore || 0,
+            seed: summary.seed || ""
+          },
+          officialLeaderboardSeeds: (app.profiles.data.leaderboard || []).map((entry) => entry.seed || ""),
+          playgroundRecords: (app.profiles.data.playgroundRecords || []).map((entry) => ({
+            seed: entry.seed || "",
+            status: entry.status || "",
+            finishTimeMs: entry.finishTimeMs ?? null,
+            score: entry.score || 0,
+            playerName: entry.playerName || ""
+          }))
+        };
+      });
+      return { ...startReport, ...report, firstViewportText };
+    }
+
+    const officialFinished = await finishSoloRun({
+      label: "Solo Official finished",
+      official: true,
+      officialRouteId: routeSetup.routeId,
+      time: 42.25,
+      score: 125000,
+      samplePace: true,
+      sampleProgress: 0.6,
+      sampleElapsed: 24
+    });
+    if (!/^PB pace [-+]/.test(officialFinished.paceHudText)) {
+      throw new Error(`Official HUD should show compact PB pace feedback: ${JSON.stringify(officialFinished)}`);
+    }
+    if (!/Official Race Result/i.test(officialFinished.firstViewportText) || !new RegExp(routeSetup.playerName, "i").test(officialFinished.firstViewportText) || !/Finish Time|Time Attack/i.test(officialFinished.firstViewportText) || !/Behind PB by|Beat PB by|New route best/i.test(officialFinished.firstViewportText)) {
+      throw new Error(`Solo Official finished result first viewport should show driver, finish, and PB pace: ${officialFinished.firstViewportText.slice(0, 1400)}`);
+    }
+
+    const officialCrashed = await finishSoloRun({
+      label: "Solo Official crashed",
+      official: true,
+      officialRouteId: routeSetup.routeId,
+      status: "crashed",
+      reason: "Smoke Wall",
+      progress: 0.42,
+      time: 24.4,
+      score: 62000
+    });
+    if (!/Official Race Result/i.test(officialCrashed.firstViewportText) || !/Run Over|Progress/i.test(officialCrashed.firstViewportText) || !new RegExp(routeSetup.playerName, "i").test(officialCrashed.firstViewportText)) {
+      throw new Error(`Solo Official crashed result first viewport should show driver and outcome: ${officialCrashed.firstViewportText.slice(0, 1400)}`);
+    }
+
+    const playgroundFinished = await finishSoloRun({
+      label: "Playground finished",
+      official: false,
+      playerIndex: 1,
+      seed: "PLAYGROUND-FINISH-SMOKE",
+      time: 49.5,
+      score: 132000,
+      boostPadsCollected: 2
+    });
+    if (!playgroundFinished.summary.playgroundRecordSaved || playgroundFinished.summary.officialRouteId || !playgroundFinished.summary.playgroundTimeRank) {
+      throw new Error(`Finished Playground run should save score and time only to Playground: ${JSON.stringify(playgroundFinished.summary)}`);
+    }
+    if (!/Playground Result/i.test(playgroundFinished.firstViewportText) || !/Playground Record|Score Rank|Time Rank/i.test(playgroundFinished.firstViewportText) || !new RegExp(playgroundFinished.playerName, "i").test(playgroundFinished.firstViewportText)) {
+      throw new Error(`Playground finished result first viewport should show record placement and driver: ${playgroundFinished.firstViewportText.slice(0, 1400)}`);
+    }
+
+    const playgroundCrashed = await finishSoloRun({
+      label: "Playground crashed",
+      official: false,
+      playerIndex: 2,
+      seed: "PLAYGROUND-CRASH-SMOKE",
+      status: "crashed",
+      reason: "Smoke Wall",
+      progress: 0.47,
+      time: 28,
+      score: 88000,
+      nearMisses: 2
+    });
+    if (!playgroundCrashed.summary.playgroundRecordSaved || playgroundCrashed.summary.playgroundTimeRank) {
+      throw new Error(`Crashed Playground run should save score only: ${JSON.stringify(playgroundCrashed.summary)}`);
+    }
+
+    const boardSeparation = await page.evaluate(() => {
+      const app = window.neonRoadRally;
+      const filter = {
+        trackId: DEFAULT_TRACK_ID,
+        raceTypeId: DEFAULT_RACE_TYPE_ID,
+        speedClassId: DEFAULT_SPEED_CLASS_ID
+      };
+      const scoreRows = app.getPlaygroundRecordRows(filter, LEADERBOARD_VIEW_PLAYGROUND_SCORE, { limit: 999 });
+      const timeRows = app.getPlaygroundRecordRows(filter, LEADERBOARD_VIEW_PLAYGROUND_TIME, { limit: 999 });
+      const officialSeeds = (app.profiles.data.leaderboard || []).map((entry) => entry.seed || "");
+      return {
+        scoreSeeds: scoreRows.map((entry) => entry.seed),
+        timeSeeds: timeRows.map((entry) => entry.seed),
+        officialSeeds,
+        officialHasPlaygroundSeed: officialSeeds.some((seed) => /^PLAYGROUND-/.test(seed || "")),
+        playgroundHasOfficialRoute: (app.profiles.data.playgroundRecords || []).some((entry) => Boolean(entry.officialRouteId))
+      };
+    });
+    if (!boardSeparation.scoreSeeds.includes("PLAYGROUND-FINISH-SMOKE") || !boardSeparation.scoreSeeds.includes("PLAYGROUND-CRASH-SMOKE")) {
+      throw new Error(`Playground score board should include finished and crashed custom runs: ${JSON.stringify(boardSeparation)}`);
+    }
+    if (!boardSeparation.timeSeeds.includes("PLAYGROUND-FINISH-SMOKE") || boardSeparation.timeSeeds.includes("PLAYGROUND-CRASH-SMOKE")) {
+      throw new Error(`Playground time board should include finished custom runs only: ${JSON.stringify(boardSeparation)}`);
+    }
+    if (boardSeparation.officialHasPlaygroundSeed || boardSeparation.playgroundHasOfficialRoute) {
+      throw new Error(`Playground and Official boards should stay separate: ${JSON.stringify(boardSeparation)}`);
+    }
+
+    await page.evaluate(() => {
+      window.neonRoadRally.showLeaderboard(LEADERBOARD_VIEW_PLAYGROUND_SCORE, {
+        trackId: DEFAULT_TRACK_ID,
+        raceTypeId: DEFAULT_RACE_TYPE_ID,
+        speedClassId: DEFAULT_SPEED_CLASS_ID,
+        officialRouteId: ""
+      });
+    });
+    await page.waitForFunction(() => window.neonRoadRally?.screen === "leaderboard", null, { timeout: 5000 });
+    const playgroundLeaderboard = await page.evaluate(() => ({
+      text: document.body.innerText,
+      selectedTab: document.querySelector('[data-action="setLeaderboardView"].is-selected')?.textContent.replace(/\s+/g, " ").trim() || ""
+    }));
+    if (!/Playground Records|Local fun records|Not official|Playground Score|Playground Time/i.test(playgroundLeaderboard.text) || !/Playground Score/i.test(playgroundLeaderboard.selectedTab)) {
+      throw new Error(`Leaderboards should expose Playground Records separately: ${playgroundLeaderboard.text.slice(0, 1400)}`);
+    }
+    await page.locator('[data-action="setLeaderboardView"][data-view="playgroundTime"]').click();
+    await page.waitForFunction(() => document.querySelector('[data-action="setLeaderboardView"][data-view="playgroundTime"]')?.classList.contains("is-selected"), null, { timeout: 5000 });
+    const playgroundTimeText = await page.evaluate(() => document.body.innerText);
+    if (!/Playground Time|Fastest finished Playground runs|Not official/i.test(playgroundTimeText)) {
+      throw new Error(`Playground Time board should be a separate leaderboard category: ${playgroundTimeText.slice(0, 1400)}`);
+    }
+
+    await page.evaluate(() => window.neonRoadRally.showTitle());
+    return { routeSetup, officialFinished, officialCrashed, playgroundFinished, playgroundCrashed, boardSeparation };
+  }
+
   const controllerMenuNavigationQa = await runControllerMenuNavigationQa();
   const leaderboardControllerSelectQa = await runLeaderboardControllerSelectQa();
   const officialRecordChaseQa = await runOfficialRecordChaseQa();
+  const couchResultsAndPlaygroundRecordsQa = await runCouchResultsAndPlaygroundRecordsQa();
 
   await clickText("Party Race");
   await expectText("Party Mode");
@@ -952,7 +1247,7 @@ async function run() {
   await expectText("Player 1 of 3");
 
   const classicRuns = [
-    { score: 140000, nearMisses: 4, manualBoostsUsed: 2, laneMoves: 5 },
+    { score: 140000, status: "crashed", reason: "Smoke Wall", progress: 0.58, nearMisses: 4, manualBoostsUsed: 2, laneMoves: 5 },
     { score: 180000, rampsUsed: 3, slowdownHits: 0 },
     { score: 120000, boostPadsCollected: 3, laneMoves: 2 },
     { score: 210000, nearMisses: 6, manualBoostsUsed: 1 },
@@ -967,6 +1262,32 @@ async function run() {
   for (const [index, runFields] of classicRuns.entries()) {
     await finishCurrentPartyRun(runFields, { startVia: index === 0 ? "keyboard" : "button" });
     if (index === 0) keyboardPartyStartQa = true;
+    if (index === 0) {
+      const partyCustomCrashReport = await page.evaluate(() => {
+        const app = window.neonRoadRally;
+        const summary = app.lastSummary || {};
+        const firstViewport = [
+          document.querySelector(".party-drama-header")?.innerText || "",
+          document.querySelector(".party-last-run-card")?.innerText || "",
+          document.querySelector(".party-action-row")?.innerText || ""
+        ].join("\n");
+        return {
+          screen: app.screen,
+          playerName: summary.playerName || "",
+          status: summary.status || "",
+          playgroundRecordSaved: Boolean(summary.playgroundRecordSaved),
+          playgroundTimeRank: summary.playgroundTimeRank || null,
+          firstViewport
+        };
+      });
+      assertNoFirstViewportDebugTerms(partyCustomCrashReport.firstViewport, "Party custom crashed result");
+      if (partyCustomCrashReport.screen !== "partyStandings" || partyCustomCrashReport.status !== "crashed" || !partyCustomCrashReport.playgroundRecordSaved || partyCustomCrashReport.playgroundTimeRank) {
+        throw new Error(`Party custom crash should show standings and save Playground score only: ${JSON.stringify(partyCustomCrashReport)}`);
+      }
+      if (!/Current Party Race|Latest Run|Playground Record|Next Player/i.test(partyCustomCrashReport.firstViewport)) {
+        throw new Error(`Party custom crash first viewport should prioritize standings, latest player, Playground chip, and next action: ${partyCustomCrashReport.firstViewport.slice(0, 1400)}`);
+      }
+    }
     sawRoundShuffle = sawRoundShuffle || await page.getByText(/order shuffled/i).count().then((count) => count > 0);
     const final = await advancePartyIfNeeded();
     if (final) break;
@@ -1069,7 +1390,19 @@ async function run() {
   await browser.close();
 
   if (consoleIssues.length) throw new Error(`Console issues: ${consoleIssues.join(" | ")}`);
-  console.log(JSON.stringify({ ok: true, sawRoundShuffle, keyboardPartyStartQa, settingsControllerQa, controllerMenuNavigationQa, leaderboardControllerSelectQa, officialRecordChaseQa, partyBonusSurvivalQa, partyManageReorderQa, ...result }, null, 2));
+  console.log(JSON.stringify({
+    ok: true,
+    sawRoundShuffle,
+    keyboardPartyStartQa,
+    settingsControllerQa,
+    controllerMenuNavigationQa,
+    leaderboardControllerSelectQa,
+    officialRecordChaseQa,
+    couchResultsAndPlaygroundRecordsQa,
+    partyBonusSurvivalQa,
+    partyManageReorderQa,
+    ...result
+  }, null, 2));
 }
 
 run().catch((error) => {
