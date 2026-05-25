@@ -4005,6 +4005,7 @@ const MENU_FOCUS_SELECTOR = [
   "select:not([disabled])",
   "textarea:not([disabled])",
   "input:not([disabled]):not([type='hidden'])",
+  ".garage-shop-card[tabindex]",
   "a[href]"
 ].join(",");
 
@@ -4018,6 +4019,7 @@ const MENU_FOCUS_CONTAINER_SELECTOR = [
   ".party-driver-row",
   ".party-order-card",
   ".badge-filter-button",
+  ".garage-shop-card",
   ".menu-btn",
   ".menu-button",
   ".small-button",
@@ -5875,6 +5877,38 @@ function applyPlayerCosmeticsToCarConfig(carConfig, cosmetics) {
   return {
     ...normalizeCarConfig(carConfig || DEFAULT_CAR),
     cosmeticStyle: normalizeEquippedCosmeticStyle(normalizedCosmetics.equipped, normalizedCosmetics.owned)
+  };
+}
+
+function createCosmeticPreviewState(cosmetics, itemId) {
+  const normalizedCosmetics = normalizePlayerCosmetics(cosmetics);
+  const item = getGarageCosmeticItem(itemId);
+  if (!item) return normalizedCosmetics;
+  const owned = {
+    ...normalizedCosmetics.owned,
+    [item.id]: normalizeCosmeticOwnedEntry(
+      normalizedCosmetics.owned[item.id] || { free: Boolean(item.free) },
+      item
+    )
+  };
+  return {
+    ...normalizedCosmetics,
+    owned,
+    equipped: normalizeEquippedCosmeticStyle(
+      {
+        ...normalizedCosmetics.equipped,
+        [item.category]: item.id
+      },
+      owned
+    )
+  };
+}
+
+function applyPlayerCosmeticPreviewToCarConfig(carConfig, cosmetics, itemId) {
+  const previewCosmetics = createCosmeticPreviewState(cosmetics, itemId);
+  return {
+    ...normalizeCarConfig(carConfig || DEFAULT_CAR),
+    cosmeticStyle: normalizeEquippedCosmeticStyle(previewCosmetics.equipped, previewCosmetics.owned)
   };
 }
 
@@ -8211,6 +8245,8 @@ class PlayerProfileManager {
     this.saveStatus = "Not saved yet";
     this.saveBatchDepth = 0;
     this.savePending = false;
+    this.mutationVersion = 0;
+    this.garageDataVersion = 0;
     this.data = this.load();
   }
 
@@ -8308,7 +8344,11 @@ class PlayerProfileManager {
     };
   }
 
-  save() {
+  save(options = {}) {
+    this.mutationVersion = (this.mutationVersion + 1) % Number.MAX_SAFE_INTEGER;
+    if (options.invalidateGarage !== false) {
+      this.garageDataVersion = (this.garageDataVersion + 1) % Number.MAX_SAFE_INTEGER;
+    }
     if (this.saveBatchDepth > 0) {
       this.savePending = true;
       this.saveStatus = "Save queued";
@@ -8342,6 +8382,8 @@ class PlayerProfileManager {
     safeStorageRemoveItem(this.storageKey);
     this.data = this.defaultData();
     this.saveStatus = "Local data reset";
+    this.mutationVersion = (this.mutationVersion + 1) % Number.MAX_SAFE_INTEGER;
+    this.garageDataVersion = (this.garageDataVersion + 1) % Number.MAX_SAFE_INTEGER;
   }
 
   getCurrentPlayer() {
@@ -8387,10 +8429,10 @@ class PlayerProfileManager {
     return player;
   }
 
-  selectPlayer(id) {
+  selectPlayer(id, options = {}) {
     if (this.data.players.some((player) => player.id === id)) {
       this.data.currentPlayerId = id;
-      this.save();
+      if (options.save !== false) this.save({ invalidateGarage: false });
       return true;
     }
     return false;
@@ -10526,6 +10568,9 @@ class InputManager {
     this.menuRepeatStartedAt = 0;
     this.menuLastRepeatAt = 0;
     this.menuFocusDecorated = new Set();
+    this.controllerStatusRenderKey = "";
+    this.controllerStatusRenderDomVersion = -1;
+    this.controllerStatusRenderAt = 0;
     this.lastPointerTime = 0;
     this.boundKeyDown = this.onKeyDown.bind(this);
     this.boundKeyUp = this.onKeyUp.bind(this);
@@ -10610,10 +10655,32 @@ class InputManager {
     this.refreshControllerStatusDisplay();
   }
 
-  refreshControllerStatusDisplay() {
+  refreshControllerStatusDisplay(options = {}) {
     if (!["title", "settings"].includes(this.game.screen)) return;
     if (typeof document === "undefined" || typeof document.querySelectorAll !== "function") return;
     const diagnostic = this.getControllerDiagnosticSnapshot();
+    const now = performance.now();
+    const renderKey = [
+      diagnostic.status,
+      diagnostic.detected,
+      diagnostic.id,
+      diagnostic.mapping,
+      diagnostic.presetLabel,
+      diagnostic.lastButton,
+      diagnostic.lastAxis,
+      GAMEPAD_DIAGNOSTIC_FLAGS.map((entry) => diagnostic.detectedInputs[entry.key] ? "1" : "0").join("")
+    ].join("|");
+    const domVersion = this.game?.menuDomVersion || 0;
+    const staleSameValueUpdate = now - (this.controllerStatusRenderAt || 0) > 500;
+    if (!options.force
+      && renderKey === this.controllerStatusRenderKey
+      && domVersion === this.controllerStatusRenderDomVersion
+      && !staleSameValueUpdate) {
+      return;
+    }
+    this.controllerStatusRenderKey = renderKey;
+    this.controllerStatusRenderDomVersion = domVersion;
+    this.controllerStatusRenderAt = now;
     const controllerText = diagnostic.status;
     const nodes = document.querySelectorAll("[data-controller-status]");
     nodes.forEach((node) => {
@@ -10950,7 +11017,11 @@ class InputManager {
       return;
     }
     this.updateGamepadDiagnosticState(state);
-    const shouldRefreshStatus = !this.gamepadConnected || this.gamepadActiveIndex !== state.index || this.game.screen === "settings";
+    const diagnosticInputChanged = state.pressedButtons?.length || state.activeAxes?.length;
+    const shouldRefreshStatus = !this.gamepadConnected
+      || this.gamepadActiveIndex !== state.index
+      || diagnosticInputChanged
+      || this.game.screen === "settings";
     this.gamepadConnected = true;
     this.gamepadActiveIndex = state.index;
     this.gamepadLastId = state.id;
@@ -17778,7 +17849,10 @@ class Renderer {
       laneW: 120
     };
     this.resize();
-    window.addEventListener("resize", () => this.resize());
+    window.addEventListener("resize", () => {
+      this.resize();
+      this.game?.markMenuCanvasDirty?.("resize");
+    });
   }
 
   getRaceControlHintText() {
@@ -24025,6 +24099,35 @@ class NeonRoadRally {
     this.leaderboardOfficialRouteId = defaultOfficialRoute?.id || DEFAULT_OFFICIAL_ROUTE_ID;
     this.playtestReportCopyText = "";
     this.roadDirectorReportCopyText = "";
+    this.garagePreviewCosmeticId = "";
+    this.garageMemoVersion = -1;
+    this.garageNormalizedLeaderboardCache = new Map();
+    this.garageNormalizedPlaygroundCache = new Map();
+    this.garageTimeAttackSourceRowsCache = new Map();
+    this.garageTimeAttackRowsCache = new Map();
+    this.garageOfficialScoreRowsCache = new Map();
+    this.garagePlaygroundRowsCache = new Map();
+    this.garageRouteChampionCache = new Map();
+    this.garageChampionSummaryCache = new Map();
+    this.garageDriverRecordSummaryCache = new Map();
+    this.garageFavoriteTrackCache = new Map();
+    this.garageLastPlayedCache = new Map();
+    this.garagePerformanceLast = null;
+    this.pendingProfileSaveTimer = null;
+    this.pendingProfileSaveOptions = null;
+    this.menuCanvasDirty = true;
+    this.menuCanvasDirtyReason = "boot";
+    this.menuCanvasStats = {
+      menuFrames: 0,
+      raceFrames: 0,
+      canvasRenders: 0,
+      menuCanvasRenders: 0,
+      menuCanvasSkips: 0,
+      lastRenderReason: "",
+      lastRenderMs: 0,
+      lastScreen: "title"
+    };
+    this.menuDomVersion = 0;
     this.roadRng = null;
     this.officialFullRouteSignatureCache = new Map();
     this.officialEnduranceBestByRoute = new Map();
@@ -24662,6 +24765,7 @@ class NeonRoadRally {
     this.lastFrame = time;
     const debugFrozen = this.screen === "game" && this.run?.debugFrozen;
     this.lastDt = debugFrozen ? 0 : dt;
+    const activeRaceScreen = this.screen === "game";
     if (this.screen === "game" && this.run && !this.run.ended && !debugFrozen) {
       this.recordFrameTelemetry(rawDt);
     }
@@ -24672,13 +24776,24 @@ class NeonRoadRally {
       this.updateRun(dt);
     } else if (this.screen === "game" && !this.run.paused && this.run.ended && !debugFrozen) {
       this.updateFinishVisualCoast(dt);
-    } else if (this.screen !== "game") {
-      this.attractDistance = (this.attractDistance + dt * 210) % 100000;
     }
-    if (!(this.screen === "game" && (this.run.paused || this.run.debugFrozen))) {
+    if (activeRaceScreen && !(this.run.paused || this.run.debugFrozen)) {
       this.updateArcadeEffects(dt);
     }
-    this.renderer.render();
+    const shouldRender = this.shouldRenderCanvasFrame(time);
+    if (shouldRender) {
+      const renderStartedAt = performance.now();
+      this.renderer.render();
+      const renderMs = performance.now() - renderStartedAt;
+      const renderReason = activeRaceScreen ? "race" : (this.menuCanvasDirtyReason || `screen:${this.screen}`);
+      if (!activeRaceScreen) {
+        this.menuCanvasDirty = false;
+        this.menuCanvasDirtyReason = "";
+      }
+      this.recordCanvasFrameStats({ rendered: true, renderMs, reason: renderReason });
+    } else {
+      this.recordCanvasFrameStats({ rendered: false });
+    }
     requestAnimationFrame((nextTime) => this.loop(nextTime));
   }
 
@@ -28118,6 +28233,9 @@ class NeonRoadRally {
     const previousRouteBestTimeRecord = officialRoute
       ? this.getOfficialRouteBestTimeRecord(officialRoute.id, run.raceTypeId)
       : null;
+    const previousRouteBestScoreRecord = officialRoute
+      ? this.getOfficialScoreChampion(officialRoute.id, run.raceTypeId)
+      : null;
     const previousBestTimeMs = previousBestTimeRecord?.finishTimeMs ?? null;
     const previousRouteBestTimeMs = previousRouteBestTimeRecord?.finishTimeMs ?? null;
     const personalBestTimeDelta = finishTimeMs !== null && previousBestTimeMs !== null
@@ -28512,6 +28630,10 @@ class NeonRoadRally {
       summary.bestTimeMs = timeUpdate.current.finishTimeMs;
       summary.bestTimeSecondsPrecise = timeUpdate.current.finishTimeSecondsPrecise;
     }
+    summary.championCallouts = this.buildOfficialChampionResultCallouts(summary, {
+      previousTimeChampion: previousRouteBestTimeRecord,
+      previousScoreChampion: previousRouteBestScoreRecord
+    });
     summary.timeAttackPlacement = this.getTimeAttackPlacementText(summary);
     summary.scoreAttackPlacement = this.getScoreAttackPlacementText(summary);
     const skipBadges = Boolean(options.skipBadges || officialEnduranceFinal);
@@ -31038,24 +31160,64 @@ class NeonRoadRally {
   }
 
   setScreen(screen) {
-    this.screen = screen;
+    const nextScreen = screen || "title";
+    this.screen = nextScreen;
+    this.menuDomVersion = (this.menuDomVersion || 0) + 1;
+    const menuScreen = nextScreen !== "game";
+    document.body?.classList?.toggle("is-nrr-menu-screen", menuScreen);
+    document.body?.classList?.toggle("is-nrr-race-screen", !menuScreen);
+    if (menuScreen) this.markMenuCanvasDirty(`screen:${nextScreen}`);
+  }
+
+  markMenuCanvasDirty(reason = "menu") {
+    this.menuCanvasDirty = true;
+    this.menuCanvasDirtyReason = reason;
+  }
+
+  shouldRenderCanvasFrame() {
+    if (this.screen === "game") return true;
+    return Boolean(this.menuCanvasDirty);
+  }
+
+  recordCanvasFrameStats({ rendered, renderMs = 0, reason = "" } = {}) {
+    const stats = this.menuCanvasStats || {};
+    if (this.screen === "game") stats.raceFrames = (stats.raceFrames || 0) + 1;
+    else stats.menuFrames = (stats.menuFrames || 0) + 1;
+    if (rendered) {
+      stats.canvasRenders = (stats.canvasRenders || 0) + 1;
+      if (this.screen !== "game") stats.menuCanvasRenders = (stats.menuCanvasRenders || 0) + 1;
+      stats.lastRenderReason = reason || (this.screen === "game" ? "race" : "menu");
+      stats.lastRenderMs = Number(renderMs.toFixed ? renderMs.toFixed(2) : renderMs) || 0;
+      stats.lastScreen = this.screen;
+    } else if (this.screen !== "game") {
+      stats.menuCanvasSkips = (stats.menuCanvasSkips || 0) + 1;
+    }
+    this.menuCanvasStats = stats;
+    if (typeof window !== "undefined") {
+      window.__nrrMenuCanvasStats = { ...stats };
+    }
   }
 
   clearLayer() {
     this.layer.innerHTML = "";
     this.layer.classList.add("is-empty");
+    this.menuDomVersion = (this.menuDomVersion || 0) + 1;
   }
 
   getActivePanelScrollTop() {
-    const panel = this.layer?.querySelector(".panel, .page");
+    const panel = this.getActiveScrollContainer();
     return panel ? panel.scrollTop : 0;
   }
 
   setActivePanelScrollTop(value = 0) {
-    const panel = this.layer?.querySelector(".panel, .page");
+    const panel = this.getActiveScrollContainer();
     if (!panel) return;
     const nextScrollTop = Number.isFinite(value) ? Math.max(0, value) : 0;
     panel.scrollTop = nextScrollTop;
+  }
+
+  getActiveScrollContainer() {
+    return this.layer?.querySelector(".garage-page, .settings-page, .panel, .page") || null;
   }
 
   shouldShowNewDriverHint() {
@@ -33930,12 +34092,13 @@ class NeonRoadRally {
           const badgeProgress = this.profiles.getPlayerBadgeProgress(player);
           const car = normalizeCarConfig(player.car);
           const carLabel = getOptionalCarNickname(car) || getCarBodyStyleLabel(car.bodyStyle);
+          const championClaims = normalizeNonNegativeInteger(this.getDriverOfficialChampionSummary(player).totalClaims, 0, 999);
           return `
             <div class="party-driver-row ${selected ? "is-selected" : ""}">
               ${this.renderDriverMiniCanvas(player, "mini-car-preview party-row-preview")}
               <div>
-                <strong>${escapeHtml(player.name)}</strong>
-                <span>${escapeHtml(carLabel)} · Best ${formatScore(player.bestScore)} · ${badgeProgress.earnedCount}/${badgeProgress.totalCount} badges</span>
+                <strong>${escapeHtml(player.name)}${championClaims ? ` <span class="party-champion-marker">Route Champion</span>` : ""}</strong>
+                <span>${escapeHtml(carLabel)} · Best ${formatScore(player.bestScore)} · ${badgeProgress.earnedCount}/${badgeProgress.totalCount} badges${championClaims ? ` · Route Champion x${championClaims}` : ""}</span>
               </div>
               <button class="small-button party-driver-toggle ${selected ? "is-on" : ""}" data-action="partyTogglePlayer" data-id="${escapeAttr(player.id)}" ${disabled ? "disabled" : ""}>${selected ? "In" : "Add"}</button>
             </div>
@@ -34803,6 +34966,77 @@ class NeonRoadRally {
     `).join("") + (overflow ? `<span class="score-callout is-title">+${overflow} more titles</span>` : "");
   }
 
+  buildOfficialChampionResultCallouts(summary, previous = {}) {
+    if (!summary?.officialRouteId || !summary.scoreSaved || normalizeRunStatus(summary.status) !== "finished") return [];
+    const playerId = normalizeStorageId(summary.playerId, "");
+    if (!playerId) return [];
+    const timeChampion = this.getOfficialTimeChampion(summary.officialRouteId, summary.raceTypeId);
+    const scoreChampion = this.getOfficialScoreChampion(summary.officialRouteId, summary.raceTypeId);
+    const previousTimePlayerId = normalizeStorageId(previous.previousTimeChampion?.playerId, "");
+    const previousScorePlayerId = normalizeStorageId(previous.previousScoreChampion?.playerId, "");
+    const ownsTime = Boolean(timeChampion?.playerId === playerId);
+    const ownsScore = Boolean(scoreChampion?.playerId === playerId);
+    const newTimeChampion = ownsTime && previousTimePlayerId !== playerId;
+    const newScoreChampion = ownsScore && previousScorePlayerId !== playerId;
+    const newTimeRecord = ownsTime && summary.runId && timeChampion?.runId === summary.runId;
+    const newScoreRecord = ownsScore && summary.runId && scoreChampion?.runId === summary.runId;
+    const defendedTime = ownsTime && previousTimePlayerId === playerId;
+    const defendedScore = ownsScore && previousScorePlayerId === playerId;
+    const callouts = [];
+    const championKinds = [
+      newTimeChampion ? "Time" : "",
+      newScoreChampion ? "Score" : ""
+    ].filter(Boolean);
+    if (championKinds.length) {
+      callouts.push({
+        label: "NEW ROUTE CHAMPION",
+        detail: `${championKinds.join(" + ")} #1 on ${getOfficialRouteEntryDisplayName(summary)}`,
+        tone: "gold"
+      });
+    } else if (defendedTime || defendedScore) {
+      const defendedKinds = [
+        defendedTime ? "Time" : "",
+        defendedScore ? "Score" : ""
+      ].filter(Boolean);
+      callouts.push({
+        label: "ROUTE CHAMPION DEFENDED",
+        detail: `${defendedKinds.join(" + ")} #1 still held`,
+        tone: "gold"
+      });
+    }
+    if (newTimeRecord) {
+      callouts.push({
+        label: "NEW TIME RECORD",
+        detail: timeChampion?.valueText || formatFinishTimeMs(summary.finishTimeMs),
+        tone: "cyan"
+      });
+    }
+    if (newScoreRecord) {
+      callouts.push({
+        label: "NEW SCORE RECORD",
+        detail: scoreChampion?.valueText || formatScore(summary.finalScore || 0),
+        tone: "cyan"
+      });
+    }
+    return callouts.slice(0, 3);
+  }
+
+  renderOfficialChampionCallouts(summary, options = {}) {
+    const callouts = Array.isArray(summary?.championCallouts) ? summary.championCallouts : [];
+    if (!callouts.length) return "";
+    const compact = Boolean(options.compact);
+    return `
+      <div class="official-champion-callout-strip ${compact ? "is-compact" : ""}" aria-label="Official champion result">
+        ${callouts.map((item) => `
+          <span class="official-champion-callout is-${escapeAttr(item.tone || "gold")}">
+            <strong>${escapeHtml(item.label)}</strong>
+            <small>${escapeHtml(item.detail || "")}</small>
+          </span>
+        `).join("")}
+      </div>
+    `;
+  }
+
   renderNewBadgeCallouts(summary) {
     const badges = Array.isArray(summary?.newlyEarnedBadges) ? summary.newlyEarnedBadges : [];
     if (!badges.length) return "";
@@ -35361,6 +35595,7 @@ class NeonRoadRally {
             <span><strong>Official Score Attack</strong><em>${escapeHtml(scoreAttackText)}</em></span>
             <span><strong>PB / Route Record</strong><em>${escapeHtml(pbText)}</em></span>
           </div>
+          ${!final ? this.renderOfficialChampionCallouts(summary, { compact: true }) : ""}
         </div>
         <div class="official-record-chase-next-card">
           <span>${final ? "Official Record Chase Complete" : "Pass Controller"}</span>
@@ -36094,15 +36329,167 @@ class NeonRoadRally {
     this.showDriverGarageScreen(message);
   }
 
+  getGarageMemoDataVersion() {
+    return normalizeNonNegativeInteger(this.profiles?.garageDataVersion, 0, Number.MAX_SAFE_INTEGER);
+  }
+
+  syncGarageMemoCaches() {
+    const version = this.getGarageMemoDataVersion();
+    if (this.garageMemoVersion === version) return;
+    this.garageMemoVersion = version;
+    this.garageNormalizedLeaderboardCache?.clear();
+    this.garageNormalizedPlaygroundCache?.clear();
+    this.garageTimeAttackSourceRowsCache?.clear();
+    this.garageTimeAttackRowsCache?.clear();
+    this.garageOfficialScoreRowsCache?.clear();
+    this.garagePlaygroundRowsCache?.clear();
+    this.garageRouteChampionCache?.clear();
+    this.garageChampionSummaryCache?.clear();
+    this.garageDriverRecordSummaryCache?.clear();
+    this.garageFavoriteTrackCache?.clear();
+    this.garageLastPlayedCache?.clear();
+  }
+
+  getGarageMemoValue(cache, key, createValue) {
+    this.syncGarageMemoCaches();
+    if (!(cache instanceof Map)) return createValue();
+    if (cache.has(key)) return cache.get(key);
+    const value = createValue();
+    cache.set(key, value);
+    return value;
+  }
+
+  getGarageMemoRows(cache, key, createRows) {
+    const rows = this.getGarageMemoValue(cache, key, () => {
+      const value = createRows();
+      return Array.isArray(value) ? value : [];
+    });
+    return rows.slice();
+  }
+
+  getNormalizedLeaderboardEntries() {
+    return this.getGarageMemoRows(this.garageNormalizedLeaderboardCache, "leaderboard", () => (
+      (this.profiles.data.leaderboard || [])
+        .map((entry) => normalizeLeaderboardEntry(entry))
+        .filter(Boolean)
+    ));
+  }
+
+  getNormalizedPlaygroundRecords() {
+    return this.getGarageMemoRows(this.garageNormalizedPlaygroundCache, "playground", () => (
+      (this.profiles.data.playgroundRecords || [])
+        .map((entry) => normalizePlaygroundRecordEntry(entry))
+        .filter(Boolean)
+    ));
+  }
+
+  getTimeAttackSourceRows() {
+    return this.getGarageMemoRows(this.garageTimeAttackSourceRowsCache, "timeAttackSources", () => {
+      const rows = [];
+      const addRow = (source) => {
+        if (!source) return;
+        const finishTimeMs = getEntryFinishTimeMs(source);
+        if (finishTimeMs === null) return;
+        const raceTypeId = normalizeRaceTypeId(source.raceType || source.raceTypeId, DEFAULT_RACE_TYPE_ID);
+        const speedClassId = normalizeSpeedClassId(source.raceMode || source.speedClass || source.speedClassId, DEFAULT_SPEED_CLASS_ID);
+        const trackId = normalizeTrackId(source.trackId, DEFAULT_TRACK_ID);
+        const pacingRulesVersion = normalizePacingRulesVersion(
+          source.pacingRulesVersion || source.pacingVersion,
+          getMissingPacingRulesFallback(raceTypeId)
+        );
+        const officialRecordChase = Boolean(source.officialRecordChase || source.partyOfficialRecordChase);
+        const officialRoute = (source.partyMode && !officialRecordChase) || source.challengeId
+          ? null
+          : getOfficialRouteForRun(trackId, speedClassId, raceTypeId, source.seed || source.roadSeed, source.officialRouteId);
+        rows.push({
+          ...source,
+          trackId,
+          trackName: source.trackName || getTrackById(trackId).name,
+          raceType: raceTypeId,
+          raceTypeId,
+          raceMode: speedClassId,
+          speedClass: speedClassId,
+          pacingRulesVersion,
+          status: "finished",
+          finishTimeMs,
+          finishTimeSecondsPrecise: getFinishTimeSecondsPrecise(finishTimeMs),
+          time: finishTimeMs / 1000,
+          score: normalizeNonNegativeInteger(source.score || source.finalScore, 0, MAX_DISPLAY_SCORE),
+          seed: normalizeStoredRoadSeed(source.seed || source.roadSeed, ""),
+          officialRouteId: officialRoute?.id || "",
+          officialRouteName: officialRoute?.name || "",
+          officialSeed: officialRoute?.seed || "",
+          officialRecordChase: Boolean(officialRecordChase && officialRoute),
+          competitionKind: getCompetitionKindLabel(officialRoute),
+          date: normalizeDateString(source.date || source.timestamp, "")
+        });
+      };
+
+      (this.profiles.data.players || []).forEach((player) => {
+        const car = normalizeCarConfig(player.car);
+        Object.values(normalizeBestTimeRecords(player.bestTimes || player.personalBestTimes)).forEach((record) => {
+          addRow({
+            ...record,
+            playerId: player.id,
+            playerName: player.name,
+            carName: getCarGarageLabel(car),
+            trackName: getTrackById(record.trackId).name,
+            raceType: record.raceTypeId,
+            raceMode: record.speedClassId,
+            status: "finished",
+            time: record.finishTimeMs / 1000
+          });
+        });
+      });
+      this.getNormalizedLeaderboardEntries().forEach(addRow);
+      return rows;
+    });
+  }
+
+  recordGarageRenderTiming(reason, startedAt) {
+    const now = typeof performance !== "undefined" && typeof performance.now === "function"
+      ? performance.now()
+      : Date.now();
+    const durationMs = Math.max(0, now - startedAt);
+    this.garagePerformanceLast = {
+      reason,
+      durationMs,
+      dataVersion: this.getGarageMemoDataVersion(),
+      cacheSizes: {
+        sources: this.garageTimeAttackSourceRowsCache?.size || 0,
+        timeRows: this.garageTimeAttackRowsCache?.size || 0,
+        scoreRows: this.garageOfficialScoreRowsCache?.size || 0,
+        playgroundRows: this.garagePlaygroundRowsCache?.size || 0,
+        champions: this.garageRouteChampionCache?.size || 0,
+        driverSummaries: this.garageDriverRecordSummaryCache?.size || 0
+      }
+    };
+    if (typeof document !== "undefined" && document.documentElement?.dataset) {
+      document.documentElement.dataset.garageRenderMs = durationMs.toFixed(1);
+      document.documentElement.dataset.garageDataVersion = String(this.garagePerformanceLast.dataVersion);
+      document.documentElement.dataset.garageRenderReason = reason;
+    }
+    if (typeof window !== "undefined") {
+      const reports = Array.isArray(window.__garageRenderReports) ? window.__garageRenderReports : [];
+      reports.push(this.garagePerformanceLast);
+      window.__garageRenderReports = reports.slice(-20);
+    }
+    if (this.debugMode && durationMs > 24) {
+      console.debug("Garage render", this.garagePerformanceLast);
+    }
+  }
+
   getPlayerLastPlayedLabel(player) {
     const playerId = normalizeStorageId(player?.id, "");
     if (!playerId) return "No runs yet";
-    const latestTimestamp = (this.profiles.data.leaderboard || [])
-      .filter((entry) => normalizeStorageId(entry.playerId, "") === playerId)
-      .map((entry) => normalizeDateString(entry.date, ""))
-      .filter(Boolean)
-      .sort((a, b) => Date.parse(b) - Date.parse(a))[0] || "";
-    return latestTimestamp ? formatShortDate(latestTimestamp) : "No runs yet";
+    return this.getGarageMemoValue(this.garageLastPlayedCache, playerId, () => {
+      const latestTimestamp = this.getNormalizedLeaderboardEntries()
+        .filter((entry) => normalizeStorageId(entry.playerId, "") === playerId)
+        .map((entry) => normalizeDateString(entry.date, ""))
+        .filter(Boolean)
+        .sort((a, b) => Date.parse(b) - Date.parse(a))[0] || "";
+      return latestTimestamp ? formatShortDate(latestTimestamp) : "No runs yet";
+    });
   }
 
   renderDriverMiniCanvas(player, className = "mini-car-preview") {
@@ -36122,13 +36509,15 @@ class NeonRoadRally {
     const carNickname = getCarGarageLabel(car);
     const bodyStyle = getCarBodyStyleLabel(car.bodyStyle);
     const lastPlayed = this.getPlayerLastPlayedLabel(player);
+    const championSummary = options.championSummary || this.getDriverOfficialChampionSummary(player);
+    const championClaims = normalizeNonNegativeInteger(championSummary.totalClaims, 0, 999);
     if (context === "garage") {
       return `
-        <article class="garage-driver-row ${isCurrent ? "is-active" : ""}">
+        <article class="garage-driver-row ${isCurrent ? "is-active" : ""}" data-driver-id="${escapeAttr(player.id)}">
           ${this.renderDriverMiniCanvas(player, "mini-car-preview garage-row-preview")}
           <div class="garage-driver-copy">
             <strong>${escapeHtml(player.name)}</strong>
-            <span>${escapeHtml(bodyStyle)}${carNickname !== "No nickname" ? ` · ${escapeHtml(carNickname)}` : ""}</span>
+            <span>${escapeHtml(bodyStyle)}${carNickname !== "No nickname" ? ` · ${escapeHtml(carNickname)}` : ""}${championClaims ? ` · Route Champion ${championClaims}` : ""}</span>
           </div>
           <div class="garage-driver-meta">
             <span><b>${formatScore(player.bestScore)}</b><small>Best</small></span>
@@ -36283,30 +36672,35 @@ class NeonRoadRally {
   }
 
   getGarageDriverRecordSummary(player) {
-    return {
+    const playerId = normalizeStorageId(player?.id, "");
+    return this.getGarageMemoValue(this.garageDriverRecordSummaryCache, playerId || "none", () => ({
       officialTime: this.getGarageOfficialRecordGroup(player, LEADERBOARD_VIEW_TIME_ATTACK),
       officialScore: this.getGarageOfficialRecordGroup(player, LEADERBOARD_VIEW_SCORE_ATTACK),
       playgroundTime: this.getGaragePlaygroundRecordGroup(player, LEADERBOARD_VIEW_PLAYGROUND_TIME),
-      playgroundScore: this.getGaragePlaygroundRecordGroup(player, LEADERBOARD_VIEW_PLAYGROUND_SCORE)
-    };
+      playgroundScore: this.getGaragePlaygroundRecordGroup(player, LEADERBOARD_VIEW_PLAYGROUND_SCORE),
+      champion: this.getDriverOfficialChampionSummary(player),
+      favoriteTrack: this.getGarageFavoriteTrackLabel(player)
+    }));
   }
 
   getGarageFavoriteTrackLabel(player) {
     const playerId = normalizeStorageId(player?.id, "");
     if (!playerId) return "No track yet";
-    const counts = new Map();
-    const addTrack = (entry) => {
-      if (!entry || normalizeStorageId(entry.playerId, "") !== playerId) return;
-      const track = getTrackById(entry.trackId);
-      const key = track.id;
-      const current = counts.get(key) || { label: track.name, count: 0 };
-      current.count += 1;
-      counts.set(key, current);
-    };
-    (this.profiles.data.leaderboard || []).map((entry) => normalizeLeaderboardEntry(entry)).forEach(addTrack);
-    (this.profiles.data.playgroundRecords || []).map((entry) => normalizePlaygroundRecordEntry(entry)).forEach(addTrack);
-    const favorite = Array.from(counts.values()).sort((a, b) => b.count - a.count || a.label.localeCompare(b.label))[0] || null;
-    return favorite ? favorite.label : "No track yet";
+    return this.getGarageMemoValue(this.garageFavoriteTrackCache, playerId, () => {
+      const counts = new Map();
+      const addTrack = (entry) => {
+        if (!entry || normalizeStorageId(entry.playerId, "") !== playerId) return;
+        const track = getTrackById(entry.trackId);
+        const key = track.id;
+        const current = counts.get(key) || { label: track.name, count: 0 };
+        current.count += 1;
+        counts.set(key, current);
+      };
+      this.getNormalizedLeaderboardEntries().forEach(addTrack);
+      this.getNormalizedPlaygroundRecords().forEach(addTrack);
+      const favorite = Array.from(counts.values()).sort((a, b) => b.count - a.count || a.label.localeCompare(b.label))[0] || null;
+      return favorite ? favorite.label : "No track yet";
+    });
   }
 
   getGarageTotalFinishes(player) {
@@ -36324,104 +36718,209 @@ class NeonRoadRally {
     return Math.max(badgeFinishes, seenRuns.size);
   }
 
+  formatGarageRouteCount(count, singular = "route") {
+    const safeCount = normalizeNonNegativeInteger(count, 0, 9999);
+    return `${safeCount.toLocaleString()} ${singular}${safeCount === 1 ? "" : "s"}`;
+  }
+
+  formatGarageOfficialCrownText(count, label) {
+    const safeCount = normalizeNonNegativeInteger(count, 0, 9999);
+    return safeCount
+      ? `#1 on ${this.formatGarageRouteCount(safeCount, `Official ${label} route`)}`
+      : `No ${label} crown yet`;
+  }
+
+  formatGarageSavedRecordsText(count, label) {
+    const safeCount = normalizeNonNegativeInteger(count, 0, 9999);
+    return `${safeCount.toLocaleString()} saved ${label} record${safeCount === 1 ? "" : "s"}`;
+  }
+
+  formatGarageLocalFunRecordsText(count) {
+    const safeCount = normalizeNonNegativeInteger(count, 0, 9999);
+    return safeCount
+      ? `${safeCount.toLocaleString()} Local Fun Record${safeCount === 1 ? "" : "s"}`
+      : "No Local Fun records yet";
+  }
+
+  formatGarageChampionClaimText(champion = {}) {
+    const totalClaims = normalizeNonNegativeInteger(champion?.totalClaims, 0, 9999);
+    return totalClaims
+      ? `${totalClaims.toLocaleString()} Official Route Crown${totalClaims === 1 ? "" : "s"}`
+      : "No Official Route Crowns yet";
+  }
+
+  getGarageLocalFunHighlight(summary = {}) {
+    const candidates = [];
+    const addCandidate = (group, label, priority) => {
+      if (!group?.best) return;
+      candidates.push({
+        ...group.best,
+        label,
+        priority
+      });
+    };
+    addCandidate(summary.playgroundScore, "Best Local Fun Score", 0);
+    addCandidate(summary.playgroundTime, "Best Local Fun Time", 1);
+    return candidates.sort((a, b) => (
+      a.rank - b.rank
+      || a.priority - b.priority
+      || (b.score || 0) - (a.score || 0)
+      || (a.finishTimeMs ?? Infinity) - (b.finishTimeMs ?? Infinity)
+    ))[0] || null;
+  }
+
   renderGarageStats(player, summary = this.getGarageDriverRecordSummary(player)) {
     if (!player) {
       return `
-        <div class="garage-profile-stat-grid">
+        <div class="garage-profile-stat-grid garage-profile-identity-grid">
           <div class="garage-profile-stat-card is-neon-cash"><span>Neon Cash</span><strong>0</strong><small>Earned in-game · cosmetic only</small></div>
-          <div class="garage-profile-stat-card"><span>Official Time Attack</span><strong>0 #1</strong><small>No official records</small></div>
-          <div class="garage-profile-stat-card"><span>Official Score Attack</span><strong>0 #1</strong><small>No official records</small></div>
-          <div class="garage-profile-stat-card"><span>Playground Records</span><strong>0</strong><small>Local/fun records</small></div>
-          <div class="garage-profile-stat-card"><span>Total Badges</span><strong>0/${getVisibleBadgeDefinitions().length}</strong><small>Add a driver</small></div>
+          <div class="garage-profile-stat-card is-official"><span>Route Champion</span><strong>No Official Route Crowns yet</strong><small>Set a #1 Official Time or Score record</small></div>
+          <div class="garage-profile-stat-card is-local-fun"><span>Local Fun Records</span><strong>No Local Fun records yet</strong><small>Playground/custom runs · not official</small></div>
         </div>
       `;
     }
-    const badgeProgress = this.profiles.getPlayerBadgeProgress(player);
-    const titleCount = this.profiles.getPlayerTitles(player).length;
-    const playgroundCount = summary.playgroundScore.entries;
-    const totalFinishes = this.getGarageTotalFinishes(player);
-    const favoriteTrack = this.getGarageFavoriteTrackLabel(player);
+    const playgroundCount = Math.max(summary.playgroundScore.entries, summary.playgroundTime.entries);
+    const champion = summary.champion || this.getDriverOfficialChampionSummary(player);
     const cashBalance = normalizeNeonCashBalance(player.neonCash);
     return `
-      <div class="garage-profile-stat-grid" aria-label="Driver profile summary">
+      <div class="garage-profile-stat-grid garage-profile-identity-grid" aria-label="Driver profile summary">
         <div class="garage-profile-stat-card is-neon-cash">
           <span>Neon Cash</span>
           <strong>${cashBalance.toLocaleString()}</strong>
           <small>Earned in-game · cosmetic only</small>
         </div>
-        <div class="garage-profile-stat-card">
-          <span>Official Time Attack</span>
-          <strong>${summary.officialTime.wins} #1</strong>
-          <small>${summary.officialTime.top3} Top 3 · ${summary.officialTime.top10} Top 10</small>
+        <div class="garage-profile-stat-card is-official">
+          <span>Route Champion</span>
+          <strong>${escapeHtml(this.formatGarageChampionClaimText(champion))}</strong>
+          <small>${escapeHtml(this.formatGarageOfficialCrownText(champion.timeClaims, "Time"))} · ${escapeHtml(this.formatGarageOfficialCrownText(champion.scoreClaims, "Score"))}</small>
         </div>
-        <div class="garage-profile-stat-card">
-          <span>Official Score Attack</span>
-          <strong>${summary.officialScore.wins} #1</strong>
-          <small>${summary.officialScore.top3} Top 3 · ${summary.officialScore.top10} Top 10</small>
-        </div>
-        <div class="garage-profile-stat-card">
-          <span>Playground Records</span>
-          <strong>${playgroundCount}</strong>
-          <small>${summary.playgroundScore.wins} local/fun #1 · separate from Official</small>
-        </div>
-        <div class="garage-profile-stat-card">
-          <span>Total Badges</span>
-          <strong>${badgeProgress.earnedCount}/${badgeProgress.totalCount}</strong>
-          <small>${titleCount}/${TITLE_DEFINITIONS.length} titles held</small>
-        </div>
-        <div class="garage-profile-stat-card">
-          <span>Total Finishes</span>
-          <strong>${totalFinishes}</strong>
-          <small>${escapeHtml(this.getPlayerLastPlayedLabel(player))} last played</small>
-        </div>
-        <div class="garage-profile-stat-card">
-          <span>Favorite Track</span>
-          <strong>${escapeHtml(favoriteTrack)}</strong>
-          <small>Based on saved local runs</small>
+        <div class="garage-profile-stat-card is-local-fun">
+          <span>Local Fun Records</span>
+          <strong>${escapeHtml(this.formatGarageLocalFunRecordsText(playgroundCount))}</strong>
+          <small>Playground, Party custom, and Custom Road only</small>
         </div>
       </div>
     `;
   }
 
-  renderGarageRecordGroup(summary) {
+  renderGarageOfficialHighlightCard(summary, options = {}) {
     const hasRecords = summary.entries > 0;
+    const title = options.title || "Official Highlight";
+    const emptyTitle = options.emptyTitle || "No Official record yet";
+    const emptyCopy = options.emptyCopy || "Run Official routes to start a fair record chase.";
     return `
-      <article class="garage-record-group-card ${hasRecords ? "" : "is-empty"}">
-        <div class="garage-record-group-head">
-          <span>${escapeHtml(summary.title)}</span>
-          <strong>${summary.wins} #1</strong>
-        </div>
-        <div class="garage-record-metrics">
-          <span><b>${summary.top3}</b><small>Top 3</small></span>
-          <span><b>${summary.top10}</b><small>Top 10</small></span>
-          <span><b>${summary.entries}</b><small>Saved</small></span>
-        </div>
+      <article class="garage-record-group-card garage-record-story-card is-official ${hasRecords ? "" : "is-empty"}">
         ${hasRecords ? `
           <div class="garage-record-highlight">
-            <small>Best highlight</small>
-            <strong>${escapeHtml(summary.best.routeName)} · ${escapeHtml(formatOrdinalRank(summary.best.rank))}</strong>
-            <span>${escapeHtml(summary.best.value)} · ${escapeHtml(summary.best.detail)}</span>
+            <small>${escapeHtml(title)}</small>
+            <strong>${escapeHtml(summary.best.routeName)}</strong>
+            <b>${escapeHtml(summary.best.value)}</b>
+            <span>${escapeHtml(summary.best.detail)} · ${escapeHtml(formatOrdinalRank(summary.best.rank))} Official placement</span>
           </div>
         ` : `
           <div class="garage-record-highlight is-empty">
-            <strong>No records yet</strong>
-            <span>${summary.title.startsWith("Official") ? "Run official routes to join this board." : "Custom Road and Party custom runs will appear here."}</span>
+            <small>${escapeHtml(title)}</small>
+            <strong>${escapeHtml(emptyTitle)}</strong>
+            <span>${escapeHtml(emptyCopy)}</span>
           </div>
         `}
       </article>
     `;
   }
 
+  renderGarageLocalFunSummary(summary = {}) {
+    const highlight = this.getGarageLocalFunHighlight(summary);
+    return `
+      <article class="garage-record-group-card garage-record-story-card is-local-fun ${highlight ? "" : "is-empty"}">
+        ${highlight ? `
+          <div class="garage-record-highlight">
+            <small>Local Fun Highlight · non-official</small>
+            <strong>${escapeHtml(highlight.routeName)}</strong>
+            <b>${escapeHtml(highlight.value)}</b>
+            <span>${escapeHtml(highlight.label)} · ${escapeHtml(formatOrdinalRank(highlight.rank))} local placement · ${escapeHtml(highlight.detail)}</span>
+          </div>
+        ` : `
+          <div class="garage-record-highlight is-empty">
+            <small>Local Fun Highlight · non-official</small>
+            <strong>No Local Fun highlight yet</strong>
+            <span>Playground, Party custom, Practice, and Custom Road runs appear here without touching Official records.</span>
+          </div>
+        `}
+        <p class="garage-record-story-copy">Separate from Official competition.</p>
+      </article>
+    `;
+  }
+
+  renderGarageFavoriteTrackHighlight(player, summary = this.getGarageDriverRecordSummary(player)) {
+    const favoriteTrack = summary.favoriteTrack || this.getGarageFavoriteTrackLabel(player);
+    return `
+      <article class="garage-record-group-card garage-record-story-card is-favorite-track">
+        <div class="garage-record-highlight ${favoriteTrack === "No track yet" ? "is-empty" : ""}">
+          <small>Favorite Track</small>
+          <strong>${escapeHtml(favoriteTrack)}</strong>
+          <span>${favoriteTrack === "No track yet" ? "Run a route to build a driver identity." : "Based on saved local runs."}</span>
+        </div>
+      </article>
+    `;
+  }
+
   renderGarageRecordsSummary(player, summary = this.getGarageDriverRecordSummary(player)) {
     return `
-      <div class="garage-record-group-grid">
-        ${[
-          summary.officialTime,
-          summary.officialScore,
-          summary.playgroundTime,
-          summary.playgroundScore
-        ].map((group) => this.renderGarageRecordGroup(group)).join("")}
+      ${this.renderGarageChampionStatus(player, summary.champion)}
+      <div class="garage-record-group-grid garage-record-story-grid" aria-label="Driver accomplishment highlights">
+        ${this.renderGarageOfficialHighlightCard(summary.officialTime, {
+          title: "Best Official Time",
+          emptyTitle: "No Official Time yet",
+          emptyCopy: "Finish an Official route to save a fair time record."
+        })}
+        ${this.renderGarageOfficialHighlightCard(summary.officialScore, {
+          title: "Biggest Official Score",
+          emptyTitle: "No Official Score yet",
+          emptyCopy: "Run an Official route to put a score on the board."
+        })}
+        ${this.renderGarageLocalFunSummary(summary)}
+        ${this.renderGarageFavoriteTrackHighlight(player, summary)}
       </div>
+    `;
+  }
+
+  renderGarageChampionStatus(player, champion = this.getDriverOfficialChampionSummary(player)) {
+    if (!player) {
+      return `
+        <article class="garage-champion-status-card is-empty">
+          <div>
+            <span class="label label--cyan">Champion Status</span>
+            <strong>No driver selected</strong>
+            <small>Hold a #1 local Official Time or Score record to become a Route Champion.</small>
+          </div>
+        </article>
+      `;
+    }
+    const totalClaims = normalizeNonNegativeInteger(champion?.totalClaims, 0, 999);
+    const routeClaims = normalizeNonNegativeInteger(champion?.routeClaims, 0, 999);
+    const claims = Array.isArray(champion?.claims) ? champion.claims.slice(0, 3) : [];
+    return `
+      <article class="garage-champion-status-card ${totalClaims ? "is-champion" : "is-empty"}">
+        <div class="garage-champion-status-head">
+          <div>
+            <span class="label label--cyan">Champion Status</span>
+            <strong>${escapeHtml(this.formatGarageChampionClaimText(champion))}</strong>
+            <small>${totalClaims ? `${routeClaims} Official route${routeClaims === 1 ? "" : "s"} claimed · display-only identity` : "Set a #1 Official Time or Score record to claim a route."}</small>
+          </div>
+          <p>${escapeHtml(this.formatGarageOfficialCrownText(champion?.timeClaims, "Time"))} · ${escapeHtml(this.formatGarageOfficialCrownText(champion?.scoreClaims, "Score"))}</p>
+        </div>
+        ${claims.length ? `
+          <div class="garage-champion-claim-list">
+            ${claims.map((claim) => `
+              <span class="garage-champion-claim">
+                <strong>${escapeHtml(claim.title)}</strong>
+                <em>${escapeHtml(claim.routeName)} · ${escapeHtml(claim.valueText)}</em>
+                <small>${escapeHtml(claim.detailText)}</small>
+              </span>
+            `).join("")}
+          </div>
+        ` : ""}
+      </article>
     `;
   }
 
@@ -36435,7 +36934,7 @@ class NeonRoadRally {
     }
     const badgeProgress = this.profiles.getPlayerBadgeProgress(player);
     const titles = this.profiles.getPlayerTitles(player);
-    const championCount = summary.officialTime.wins + summary.officialScore.wins;
+    const championCount = normalizeNonNegativeInteger(summary.champion?.totalClaims, 0, 999);
     const futureRewards = ["Drift Sound", "Boost Sound", "Champion Aura"];
     return `
       <div class="garage-unlocks-preview">
@@ -36453,7 +36952,7 @@ class NeonRoadRally {
           <div class="garage-unlock-status-card ${championCount ? "is-earned" : "is-locked"}">
             <span>Route Champion</span>
             <strong>${championCount ? "Earned" : "Locked"}</strong>
-            <small>${championCount ? `${championCount} Official #1 records` : "Hold an Official #1 record"}</small>
+            <small>${championCount ? `${championCount} Route Champion claim${championCount === 1 ? "" : "s"}` : "Hold a #1 Official record"}</small>
           </div>
         </div>
         <div class="garage-future-reward-grid" aria-label="Future reward categories">
@@ -36468,35 +36967,46 @@ class NeonRoadRally {
     `;
   }
 
+  getGarageShopItemView(player, item, cosmetics = normalizePlayerCosmetics(player?.cosmetics), balance = normalizeNeonCashBalance(player?.neonCash)) {
+    const owned = Boolean(cosmetics.owned[item.id]);
+    const equipped = cosmetics.equipped[item.category] === item.id;
+    const price = normalizeNonNegativeInteger(item.price, 0, NEON_CASH_MAX_BALANCE);
+    const priceText = price ? (owned ? "Owned" : formatNeonCash(price)) : (owned ? "Free · Owned" : "Free");
+    const canBuy = Boolean(player && !owned && balance >= price);
+    const actionMarkup = !player
+      ? `<button class="btn btn--ghost btn--sm" disabled>Add Driver</button>`
+      : equipped
+      ? `<button class="btn btn--secondary btn--sm" disabled>Equipped</button>`
+      : owned
+      ? `<button class="btn btn--secondary btn--sm" data-action="equipCosmetic" data-id="${escapeAttr(item.id)}">Equip</button>`
+      : `<button class="btn btn--primary btn--sm" data-action="buyCosmetic" data-id="${escapeAttr(item.id)}" ${canBuy ? "" : "disabled"}>Buy + Equip</button>`;
+    return {
+      owned,
+      equipped,
+      priceText,
+      actionMarkup,
+      stateClass: equipped ? "is-equipped" : (owned ? "is-owned" : "is-locked")
+    };
+  }
+
   renderGarageShop(player) {
     const cosmetics = normalizePlayerCosmetics(player?.cosmetics);
     const balance = normalizeNeonCashBalance(player?.neonCash);
     const categoryOrder = ["paintFinish", "underglow", "trailStyle", "boostGlow"];
     const renderItem = (item) => {
-      const owned = Boolean(cosmetics.owned[item.id]);
-      const equipped = cosmetics.equipped[item.category] === item.id;
-      const price = normalizeNonNegativeInteger(item.price, 0, NEON_CASH_MAX_BALANCE);
-      const priceText = price ? (owned ? "Owned" : formatNeonCash(price)) : (owned ? "Free · Owned" : "Free");
-      const canBuy = Boolean(player && !owned && balance >= price);
-      const actionMarkup = !player
-        ? `<button class="btn btn--ghost btn--sm" disabled>Add Driver</button>`
-        : equipped
-        ? `<button class="btn btn--secondary btn--sm" disabled>Equipped</button>`
-        : owned
-        ? `<button class="btn btn--secondary btn--sm" data-action="equipCosmetic" data-id="${escapeAttr(item.id)}">Equip</button>`
-        : `<button class="btn btn--primary btn--sm" data-action="buyCosmetic" data-id="${escapeAttr(item.id)}" ${canBuy ? "" : "disabled"}>Buy + Equip</button>`;
+      const view = this.getGarageShopItemView(player, item, cosmetics, balance);
       const swatchStyle = item.color
         ? ` style="--cosmetic-color:${escapeAttr(item.color)}"`
         : "";
       return `
-        <article class="garage-shop-card ${equipped ? "is-equipped" : (owned ? "is-owned" : "is-locked")}">
+        <article class="garage-shop-card ${view.stateClass}" tabindex="0" data-preview-cosmetic="${escapeAttr(item.id)}" aria-label="Preview ${escapeAttr(item.name)}">
           <span class="garage-shop-swatch ${item.color ? "has-color" : ""}"${swatchStyle}></span>
           <div>
             <strong>${escapeHtml(item.name)}</strong>
             <small>${escapeHtml(item.description || "Cosmetic only.")}</small>
-            <em>${escapeHtml(priceText)}</em>
+            <em>${escapeHtml(view.priceText)}</em>
           </div>
-          ${actionMarkup}
+          ${view.actionMarkup}
         </article>
       `;
     };
@@ -36507,8 +37017,9 @@ class NeonRoadRally {
           <strong>${formatNeonCash(balance)}</strong>
           <small>Earned in-game. Cosmetic only. Official records stay fair.</small>
         </div>
+        <p class="garage-shop-explainer">Garage Shop cosmetics are earned visual effects: finishes, underglow, trails, and boost glow. Preview any item here; nothing is bought or equipped until Buy + Equip or Equip.</p>
         ${categoryOrder.map((category) => `
-          <div class="garage-shop-category">
+          <div class="garage-shop-category" data-garage-shop-category="${escapeAttr(category)}">
             <div class="garage-shop-category-head">
               <span>${escapeHtml(GARAGE_COSMETIC_CATEGORIES[category])}</span>
               <small>${escapeHtml(getGarageCosmeticItem(cosmetics.equipped[category])?.name || "Standard")}</small>
@@ -36520,6 +37031,227 @@ class NeonRoadRally {
         `).join("")}
       </div>
     `;
+  }
+
+  renderGarageProfileChips(player, car, routeChampionCount) {
+    const nickname = getOptionalCarNickname(car);
+    return `
+      ${routeChampionCount ? `<span class="garage-route-champion-chip">Route Champion · ${routeChampionCount} crown${routeChampionCount === 1 ? "" : "s"}</span>` : ""}
+      <span class="garage-profile-mini-chip">${player ? "Current Driver" : "No Driver Selected"}</span>
+      <span class="garage-profile-mini-chip">${escapeHtml(nickname === "No nickname" ? getCarGarageLabel(car) : nickname)}</span>
+    `;
+  }
+
+  getGarageProfileView(player) {
+    const recordSummary = this.getGarageDriverRecordSummary(player);
+    const routeChampionCount = normalizeNonNegativeInteger(recordSummary.champion?.totalClaims, 0, 999);
+    const car = applyPlayerCosmeticsToCarConfig(player?.car || DEFAULT_CAR, player?.cosmetics);
+    const carStyle = normalizeCarStyle(car.carStyle);
+    const nickname = getOptionalCarNickname(car);
+    const driverMeta = player
+      ? `${formatNeonCash(player.neonCash)} · ${getCarBodyStyleLabel(car.bodyStyle)} · ${routeChampionCount ? "Route Champion" : "Building a racing story"}`
+      : "No active driver";
+    const previewStatusText = player
+      ? `Current look · ${getGarageCosmeticItem(normalizePlayerCosmetics(player.cosmetics).equipped.paintFinish)?.name || "Standard Paint"}`
+      : "Create a driver to save a car profile.";
+    return {
+      player,
+      recordSummary,
+      routeChampionCount,
+      car,
+      carStyle,
+      nickname,
+      driverTitle: player ? player.name : "Add Driver",
+      driverMeta,
+      previewStatusText
+    };
+  }
+
+  resetGarageProfileScroll() {
+    const page = this.layer?.querySelector(".garage-page") || this.getActiveScrollContainer();
+    if (!page) return;
+    page.scrollTop = 0;
+    if (typeof requestAnimationFrame === "function") {
+      requestAnimationFrame(() => {
+        page.scrollTop = 0;
+      });
+    }
+  }
+
+  scheduleProfileSave(options = {}) {
+    if (this.pendingProfileSaveTimer && typeof clearTimeout === "function") {
+      clearTimeout(this.pendingProfileSaveTimer);
+    }
+    this.pendingProfileSaveOptions = {
+      ...(this.pendingProfileSaveOptions || {}),
+      ...options
+    };
+    const runSave = () => {
+      const saveOptions = this.pendingProfileSaveOptions || {};
+      this.pendingProfileSaveTimer = null;
+      this.pendingProfileSaveOptions = null;
+      this.profiles.save(saveOptions);
+    };
+    if (typeof setTimeout === "function") {
+      this.pendingProfileSaveTimer = setTimeout(runSave, 180);
+    } else {
+      runSave();
+    }
+  }
+
+  bindGarageDriverActionButtons(scope) {
+    scope.querySelectorAll?.("button[data-action='selectPlayer'], button[data-action='promptRenamePlayer']").forEach((button) => {
+      if (button.dataset.garageDriverActionBound === "true") return;
+      button.dataset.garageDriverActionBound = "true";
+      button.addEventListener("click", (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        this.audio.activate();
+        this.audio.playSfx("menu");
+        if (button.dataset.action === "selectPlayer") this.handleSelectPlayer(button.dataset.id);
+        else this.handlePromptRenamePlayer(button.dataset.id, button.dataset.returnScreen);
+      });
+    });
+  }
+
+  bindGarageShopActionButton(button) {
+    if (!button || button.dataset.garageShopActionBound === "true") return;
+    button.dataset.garageShopActionBound = "true";
+    button.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      this.audio.activate();
+      this.audio.playSfx("menu");
+      if (button.dataset.action === "buyCosmetic") this.handleBuyCosmetic(button.dataset.id);
+      else if (button.dataset.action === "equipCosmetic") this.handleEquipCosmetic(button.dataset.id);
+    });
+  }
+
+  updateGarageDriverListActiveState(currentPlayerId) {
+    const rows = Array.from(this.layer?.querySelectorAll?.(".garage-driver-row[data-driver-id]") || []);
+    rows.forEach((row) => {
+      const isCurrent = row.dataset.driverId === currentPlayerId;
+      row.classList.toggle("is-active", isCurrent);
+      const actions = row.querySelector(".garage-driver-actions");
+      if (!actions) return;
+      actions.innerHTML = isCurrent
+        ? `<span class="chip chip--cyan">Active</span>`
+        : `
+          <button class="btn btn--secondary btn--sm" data-action="selectPlayer" data-id="${escapeAttr(row.dataset.driverId || "")}">Use Driver</button>
+          <button class="btn btn--ghost btn--sm" data-action="promptRenamePlayer" data-id="${escapeAttr(row.dataset.driverId || "")}" data-return-screen="garage">Rename</button>
+        `;
+      this.bindGarageDriverActionButtons(actions);
+    });
+  }
+
+  updateGarageCarLookFields(view) {
+    const setRadioValue = (name, value) => {
+      document.querySelectorAll(`input[name="${name}"]`).forEach((input) => {
+        input.checked = input.value === value;
+      });
+    };
+    const carName = document.getElementById("carName");
+    if (carName) carName.value = view.nickname;
+    const bodyStyle = document.getElementById("bodyStyle");
+    if (bodyStyle) bodyStyle.value = view.car.bodyStyle;
+    const useSprite = document.getElementById("useSprite");
+    if (useSprite) useSprite.checked = view.car.useSprite !== false;
+    setRadioValue("carBodyColor", view.carStyle.bodyColor);
+    setRadioValue("carAccentColor", view.carStyle.accentColor);
+    setRadioValue("carBoostTrail", view.carStyle.boostTrail);
+    const carStyleHeading = document.querySelector("#garageCarStyle .garage-section-heading strong");
+    if (carStyleHeading) carStyleHeading.textContent = getCarBodyStyleLabel(view.car.bodyStyle);
+  }
+
+  updateGarageShopForPlayer(player) {
+    const panel = this.layer?.querySelector?.(".garage-shop-panel");
+    if (!panel) return;
+    const cosmetics = normalizePlayerCosmetics(player?.cosmetics);
+    const balance = normalizeNeonCashBalance(player?.neonCash);
+    const balanceLabel = panel.querySelector(".garage-shop-balance strong");
+    if (balanceLabel) balanceLabel.textContent = formatNeonCash(balance);
+    ["paintFinish", "underglow", "trailStyle", "boostGlow"].forEach((category) => {
+      const categoryNode = panel.querySelector(`[data-garage-shop-category="${category}"]`);
+      const equippedLabel = categoryNode?.querySelector(".garage-shop-category-head small");
+      if (equippedLabel) equippedLabel.textContent = getGarageCosmeticItem(cosmetics.equipped[category])?.name || "Standard";
+    });
+    panel.querySelectorAll(".garage-shop-card[data-preview-cosmetic]").forEach((card) => {
+      const item = getGarageCosmeticItem(card.dataset.previewCosmetic);
+      if (!item) return;
+      const view = this.getGarageShopItemView(player, item, cosmetics, balance);
+      card.classList.toggle("is-equipped", view.equipped);
+      card.classList.toggle("is-owned", !view.equipped && view.owned);
+      card.classList.toggle("is-locked", !view.equipped && !view.owned);
+      const price = card.querySelector("em");
+      if (price) price.textContent = view.priceText;
+      const oldButton = card.querySelector("button");
+      const template = document.createElement("template");
+      template.innerHTML = view.actionMarkup.trim();
+      const newButton = template.content.firstElementChild;
+      if (!newButton) return;
+      if (oldButton) oldButton.replaceWith(newButton);
+      else card.appendChild(newButton);
+      this.bindGarageShopActionButton(newButton);
+    });
+  }
+
+  refreshGarageSelectedDriverView(message = "") {
+    const page = this.layer?.querySelector?.(".garage-page");
+    if (this.screen !== "players" || !page) return false;
+    const startedAt = typeof performance !== "undefined" && typeof performance.now === "function"
+      ? performance.now()
+      : Date.now();
+    this.garagePreviewCosmeticId = "";
+    const player = this.profiles.ensurePlayerGarageEconomy(this.profiles.getCurrentPlayer());
+    const view = this.getGarageProfileView(player);
+    const nameEl = this.layer.querySelector(".garage-profile-main h2");
+    const metaEl = this.layer.querySelector(".garage-profile-main p");
+    const chipsEl = document.getElementById("garageProfileChips");
+    const previewEl = document.getElementById("garageProfilePreview");
+    const previewStatus = document.getElementById("garagePreviewStatus");
+    const statsEl = document.getElementById("garageProfileStats");
+    const recordsEl = document.getElementById("garageRecordsSummary");
+    const rewardsPreviewEl = document.getElementById("garageRewardsPreview");
+    const rewardsBody = this.layer.querySelector(".garage-rewards-body");
+    const driverListHeading = this.layer.querySelector("#garageDriverList .garage-section-heading strong");
+    const statusLine = this.layer.querySelector(".garage-status-line");
+    if (nameEl) nameEl.textContent = view.driverTitle;
+    if (metaEl) metaEl.textContent = view.driverMeta;
+    if (chipsEl) chipsEl.innerHTML = this.renderGarageProfileChips(player, view.car, view.routeChampionCount);
+    if (previewEl) previewEl.classList.toggle("is-route-champion", Boolean(view.routeChampionCount));
+    if (previewStatus) {
+      previewStatus.dataset.defaultText = view.previewStatusText;
+      previewStatus.textContent = view.previewStatusText;
+      previewStatus.classList.remove("is-previewing");
+    }
+    if (statsEl) statsEl.innerHTML = this.renderGarageStats(player, view.recordSummary);
+    if (recordsEl) recordsEl.innerHTML = this.renderGarageRecordsSummary(player, view.recordSummary);
+    if (rewardsPreviewEl) rewardsPreviewEl.innerHTML = this.renderGarageRewardsPreview(player, view.recordSummary);
+    if (rewardsBody) {
+      rewardsBody.innerHTML = `
+        ${this.renderPlayerTitlePanel(player)}
+        ${this.renderPlayerBadgePanel(player)}
+      `;
+      this.bindGarageBadgeFilterButtons(rewardsBody);
+    }
+    if (driverListHeading) driverListHeading.textContent = player ? player.name : "No active driver";
+    if (statusLine) statusLine.textContent = message;
+    this.updateGarageDriverListActiveState(player?.id || "");
+    this.updateGarageCarLookFields(view);
+    this.updateGarageShopForPlayer(player);
+    this.renderCarPreview();
+    this.resetGarageProfileScroll();
+    const focusTarget = this.layer.querySelector(".garage-race-action") || this.layer.querySelector(".garage-profile-hero");
+    if (focusTarget?.focus) {
+      try {
+        focusTarget.focus({ preventScroll: true });
+      } catch (error) {
+        focusTarget.focus();
+      }
+    }
+    this.recordGarageRenderTiming("garageDriverSwitchFast", startedAt);
+    this.input?.syncMenuFocusAfterRender?.();
+    return true;
   }
 
   captureGarageUiState(focusTarget = "") {
@@ -36534,28 +37266,36 @@ class NeonRoadRally {
   }
 
   showDriverGarageScreen(message = "", options = {}) {
+    const renderStartedAt = typeof performance !== "undefined" && typeof performance.now === "function"
+      ? performance.now()
+      : Date.now();
     this.setScreen("players");
+    this.syncGarageMemoCaches();
+    this.garagePreviewCosmeticId = "";
     const player = this.profiles.ensurePlayerGarageEconomy(this.profiles.getCurrentPlayer());
     if (!player) {
       this.audio.playMusic("title", false);
     }
     const players = this.profiles.data.players;
+    const driverChampionSummaries = new Map(players.map((item) => [item.id, this.getDriverOfficialChampionSummary(item)]));
     const car = applyPlayerCosmeticsToCarConfig(player?.car || DEFAULT_CAR, player?.cosmetics);
     const carStyle = normalizeCarStyle(car.carStyle);
     const nickname = getOptionalCarNickname(car);
     const driverTitle = player ? escapeHtml(player.name) : "Add Driver";
-    const badgeProgress = player ? this.profiles.getPlayerBadgeProgress(player) : null;
     const recordSummary = this.getGarageDriverRecordSummary(player);
-    const routeChampionCount = (recordSummary.officialTime.wins || 0) + (recordSummary.officialScore.wins || 0);
+    const routeChampionCount = normalizeNonNegativeInteger(recordSummary.champion?.totalClaims, 0, 999);
     const driverMeta = player
-      ? `${formatNeonCash(player.neonCash)} · ${badgeProgress.earnedCount}/${badgeProgress.totalCount} badges · ${this.profiles.getPlayerTitles(player).length}/${TITLE_DEFINITIONS.length} titles · ${getCarBodyStyleLabel(car.bodyStyle)}`
+      ? `${formatNeonCash(player.neonCash)} · ${getCarBodyStyleLabel(car.bodyStyle)} · ${routeChampionCount ? "Route Champion" : "Building a racing story"}`
       : "No active driver";
     const headerAction = player
       ? `<button class="btn btn--primary garage-race-action" data-action="start">Race</button>`
       : `<button class="btn btn--primary garage-race-action" data-action="focusGarageSection" data-target="garageAddDriver">Add Driver</button>`;
     const championChip = routeChampionCount
-      ? `<span class="garage-route-champion-chip">Route Champion · ${routeChampionCount} Official #1</span>`
+      ? `<span class="garage-route-champion-chip">Route Champion · ${routeChampionCount} crown${routeChampionCount === 1 ? "" : "s"}</span>`
       : "";
+    const previewStatusText = player
+      ? `Current look · ${getGarageCosmeticItem(normalizePlayerCosmetics(player.cosmetics).equipped.paintFinish)?.name || "Standard Paint"}`
+      : "Create a driver to save a car profile.";
     this.audio.playMusic("title", false);
     this.layer.classList.remove("is-empty");
     this.layer.innerHTML = `
@@ -36580,7 +37320,7 @@ class NeonRoadRally {
                   <span class="label label--cyan">Driver Profile</span>
                   <h2>${driverTitle}</h2>
                   <p>${escapeHtml(driverMeta)}</p>
-                  <div class="garage-profile-chip-row">
+                  <div class="garage-profile-chip-row" id="garageProfileChips">
                     ${championChip}
                     <span class="garage-profile-mini-chip">${player ? "Current Driver" : "No Driver Selected"}</span>
                     <span class="garage-profile-mini-chip">${escapeHtml(nickname === "No nickname" ? getCarGarageLabel(car) : nickname)}</span>
@@ -36594,26 +37334,32 @@ class NeonRoadRally {
                     <button class="btn btn--ghost" data-action="focusGarageSection" data-target="garageRewards" ${player ? "" : "disabled"}>Unlocks</button>
                   </div>
                 </div>
-                <div class="garage-profile-preview">
+                <div class="garage-profile-preview ${routeChampionCount ? "is-route-champion" : ""}" id="garageProfilePreview">
                   <canvas id="carPreview" class="car-preview garage-main-preview" width="360" height="250" aria-label="Active driver car preview"></canvas>
-                  <small>${player ? `Selected car · ${escapeHtml(getCarBodyStyleLabel(car.bodyStyle))}` : "Create a driver to save a car profile."}</small>
+                  <small id="garagePreviewStatus" class="garage-preview-status" data-default-text="${escapeAttr(previewStatusText)}">${escapeHtml(previewStatusText)}</small>
                 </div>
-                ${this.renderGarageStats(player, recordSummary)}
+                <div id="garageProfileStats">
+                  ${this.renderGarageStats(player, recordSummary)}
+                </div>
               </section>
 
               <section class="garage-section garage-records-section" id="garageRecords" tabindex="-1">
                 <div class="garage-section-heading">
                   <span class="label label--cyan">Records & Rivals</span>
-                  <strong>${player ? "Selected driver highlights" : "Add a driver"}</strong>
+                  <strong>${player ? "Driver highlights" : "Add a driver"}</strong>
                 </div>
-                ${this.renderGarageRecordsSummary(player, recordSummary)}
+                <p class="garage-section-copy">Official records are fair competition boards. Local Fun records are Playground, Custom Road, Practice, and Party custom runs kept separate from Official competition.</p>
+                <div id="garageRecordsSummary">
+                  ${this.renderGarageRecordsSummary(player, recordSummary)}
+                </div>
               </section>
 
               <section class="garage-section garage-shop-section" id="garageShop" tabindex="-1">
                 <div class="garage-section-heading">
                   <span class="label label--cyan">Garage Shop</span>
-                  <strong>${player ? "Neon Cash cosmetics" : "Add a driver"}</strong>
+                  <strong>${player ? "Earned cosmetic effects" : "Add a driver"}</strong>
                 </div>
+                <p class="garage-section-copy">Earned cosmetic effects: finishes, underglow, trails, boost glow. Cosmetic only. Official records stay fair.</p>
                 ${this.renderGarageShop(player)}
               </section>
 
@@ -36622,6 +37368,7 @@ class NeonRoadRally {
                   <span class="label">Car Look</span>
                   <strong>${escapeHtml(getCarBodyStyleLabel(car.bodyStyle))}</strong>
                 </div>
+                <p class="garage-section-copy">Free base look: body color, accent color, nickname, basic trail color.</p>
                 <div class="field">
                   <label for="carName">Car Nickname</label>
                   <input id="carName" type="text" maxlength="${LOCAL_CAR_NAME_MAX_LENGTH}" value="${escapeAttr(nickname)}" placeholder="Optional nickname" ${player ? "" : "disabled"}>
@@ -36688,7 +37435,7 @@ class NeonRoadRally {
                   <strong>${player ? escapeHtml(player.name) : "No active driver"}</strong>
                 </div>
                 <div class="driver-card-grid garage-driver-list">
-                  ${players.length ? players.map((item) => this.renderDriverCard(item, { context: "garage", currentId: player?.id || "" })).join("") : `<span class="micro">No local drivers yet.</span>`}
+                  ${players.length ? players.map((item) => this.renderDriverCard(item, { context: "garage", currentId: player?.id || "", championSummary: driverChampionSummaries.get(item.id) })).join("") : `<span class="micro">No local drivers yet.</span>`}
                 </div>
               </section>
 
@@ -36697,7 +37444,9 @@ class NeonRoadRally {
                   <span class="label">Unlocks & Rewards</span>
                   <strong>${player ? "Badges, titles, future rewards" : "Add a driver"}</strong>
                 </div>
-                ${this.renderGarageRewardsPreview(player, recordSummary)}
+                <div id="garageRewardsPreview">
+                  ${this.renderGarageRewardsPreview(player, recordSummary)}
+                </div>
                 <details class="garage-rewards-details" ${options.rewardsOpen ? "open" : ""}>
                   <summary>Titles and Badges Details</summary>
                   <div class="garage-rewards-body">
@@ -36718,6 +37467,7 @@ class NeonRoadRally {
     this.renderCarPreview();
     this.renderDriverMiniPreviews();
     this.setActivePanelScrollTop(options.preserveScrollTop ?? 0);
+    this.recordGarageRenderTiming("showDriverGarageScreen", renderStartedAt);
   }
 
   showCustomizeScreen(message = "") {
@@ -36776,12 +37526,55 @@ class NeonRoadRally {
     } else if (!this.profiles.getCurrentPlayer() && addInput) {
       requestAnimationFrame(() => addInput.focus({ preventScroll: true }));
     }
+    this.bindGarageShopPreviewControls();
+  }
+
+  previewGarageCosmetic(itemId) {
+    const item = getGarageCosmeticItem(itemId);
+    if (!item) return;
+    if (this.garagePreviewCosmeticId === item.id) return;
+    this.garagePreviewCosmeticId = item.id;
+    this.renderCarPreview();
+  }
+
+  clearGarageCosmeticPreview(itemId = "") {
+    if (itemId && this.garagePreviewCosmeticId !== itemId) return;
+    if (!this.garagePreviewCosmeticId) return;
+    this.garagePreviewCosmeticId = "";
+    this.renderCarPreview();
+  }
+
+  bindGarageShopPreviewControls() {
+    const shop = document.getElementById("garageShop");
+    if (!shop) return;
+    const cards = Array.from(shop.querySelectorAll("[data-preview-cosmetic]"));
+    cards.forEach((card) => {
+      const itemId = card.dataset.previewCosmetic || "";
+      card.addEventListener("pointerenter", () => this.previewGarageCosmetic(itemId));
+      card.addEventListener("pointerleave", () => {
+        if (!card.matches(":focus-within")) this.clearGarageCosmeticPreview(itemId);
+      });
+      card.addEventListener("focusin", () => this.previewGarageCosmetic(itemId));
+      card.addEventListener("focusout", (event) => {
+        if (!card.contains(event.relatedTarget)) this.clearGarageCosmeticPreview(itemId);
+      });
+      card.addEventListener("click", (event) => {
+        if (event.target?.closest?.("button")) return;
+        this.previewGarageCosmetic(itemId);
+      });
+    });
+    shop.addEventListener("mouseleave", () => {
+      if (!shop.matches(":focus-within")) this.clearGarageCosmeticPreview();
+    });
+    shop.addEventListener("focusout", (event) => {
+      if (!shop.contains(event.relatedTarget)) this.clearGarageCosmeticPreview();
+    });
   }
 
   focusGarageSection(targetId) {
     const target = document.getElementById(targetId);
     if (!target) return;
-    const panel = target.closest(".panel");
+    const panel = target.closest(".garage-page, .panel, .page");
     if (panel) {
       const panelRect = panel.getBoundingClientRect();
       const targetRect = target.getBoundingClientRect();
@@ -36813,7 +37606,7 @@ class NeonRoadRally {
       ctx.lineTo(x + 80, canvas.height);
       ctx.stroke();
     }
-    const car = this.readCarForm();
+    const car = this.readCarForm({ previewCosmetic: true });
     const previewLaneWidth = this.renderer?.road?.laneW || canvas.width / LANES;
     drawPlayerCar(ctx, canvas.width / 2, canvas.height / 2 + 16, car, {
       preview: true,
@@ -36838,6 +37631,14 @@ class NeonRoadRally {
       } else {
         spriteStatus.textContent = "Classic car preview";
       }
+    }
+    const previewStatus = document.getElementById("garagePreviewStatus");
+    if (previewStatus) {
+      const item = getGarageCosmeticItem(this.garagePreviewCosmeticId);
+      previewStatus.textContent = item
+        ? `Previewing ${item.name} · not saved until Buy + Equip or Equip`
+        : (previewStatus.dataset.defaultText || "Current equipped look");
+      previewStatus.classList.toggle("is-previewing", Boolean(item));
     }
   }
 
@@ -37020,7 +37821,7 @@ class NeonRoadRally {
     return normalizeCarPaintOptionId(input?.value, options, fallbackId);
   }
 
-  readCarForm() {
+  readCarForm(options = {}) {
     const carStyle = normalizeCarStyle({
       bodyColor: this.readPaintRadio("carBodyColor", CAR_BODY_COLOR_OPTIONS, DEFAULT_CAR_STYLE.bodyColor),
       accentColor: this.readPaintRadio("carAccentColor", CAR_ACCENT_COLOR_OPTIONS, DEFAULT_CAR_STYLE.accentColor),
@@ -37035,7 +37836,10 @@ class NeonRoadRally {
       useSprite: document.getElementById("useSprite")?.checked !== false,
       carStyle
     };
-    return applyPlayerCosmeticsToCarConfig(baseCar, this.profiles.getCurrentPlayer()?.cosmetics);
+    const cosmetics = this.profiles.getCurrentPlayer()?.cosmetics;
+    return options.previewCosmetic !== false && this.garagePreviewCosmeticId
+      ? applyPlayerCosmeticPreviewToCarConfig(baseCar, cosmetics, this.garagePreviewCosmeticId)
+      : applyPlayerCosmeticsToCarConfig(baseCar, cosmetics);
   }
 
   normalizeLeaderboardView(value) {
@@ -37062,18 +37866,20 @@ class NeonRoadRally {
     if (!route) return [];
     const maxRows = normalizeNonNegativeInteger(options.limit, 0, LEADERBOARD_STORAGE_MAX_ENTRIES) || LEADERBOARD_MAX_ENTRIES;
     const raceTypeId = normalizeRaceTypeId(options.raceTypeId || route.raceTypeId || DEFAULT_RACE_TYPE_ID, DEFAULT_RACE_TYPE_ID);
-    const entries = Array.isArray(options.entries) ? options.entries : this.profiles.data.leaderboard || [];
-    return entries
-      .map((entry) => normalizeLeaderboardEntry(entry))
+    const entries = Array.isArray(options.entries)
+      ? options.entries.map((entry) => normalizeLeaderboardEntry(entry)).filter(Boolean)
+      : this.getNormalizedLeaderboardEntries();
+    const buildRows = () => entries
       .filter((entry) => (
-        entry
-        && entry.officialRouteId === route.id
+        entry.officialRouteId === route.id
         && entry.raceType === raceTypeId
         && (!entry.partyMode || entry.officialRecordChase)
         && !isExperimentalRaceType(entry.raceType || entry.raceTypeId)
       ))
       .sort((a, b) => b.score - a.score || (getEntryFinishTimeMs(a) ?? Infinity) - (getEntryFinishTimeMs(b) ?? Infinity) || String(a.date).localeCompare(String(b.date)))
       .slice(0, maxRows);
+    if (Array.isArray(options.entries)) return buildRows();
+    return this.getGarageMemoRows(this.garageOfficialScoreRowsCache, `${route.id}|${raceTypeId}|${maxRows}`, buildRows);
   }
 
   getOfficialEnduranceRows(routeId, view = LEADERBOARD_VIEW_ENDURANCE_SURVIVAL, options = {}) {
@@ -37122,21 +37928,22 @@ class NeonRoadRally {
     const trackId = normalizeTrackId(filter.trackId || this.leaderboardTrackId || DEFAULT_TRACK_ID, DEFAULT_TRACK_ID);
     const raceTypeId = normalizeRaceTypeId(filter.raceTypeId || this.leaderboardRaceTypeId || DEFAULT_RACE_TYPE_ID, DEFAULT_RACE_TYPE_ID);
     const speedClassId = normalizeSpeedClassId(filter.speedClassId || this.leaderboardSpeedClassId || this.profiles.data.speedClassId, DEFAULT_SPEED_CLASS_ID);
-    const rows = (this.profiles.data.playgroundRecords || [])
-      .map((entry) => normalizePlaygroundRecordEntry(entry))
-      .filter((entry) => (
-        entry
-        && entry.trackId === trackId
-        && entry.raceType === raceTypeId
-        && (entry.raceMode || entry.speedClass) === speedClassId
-      ));
-    const sorter = activeView === LEADERBOARD_VIEW_PLAYGROUND_TIME
-      ? comparePlaygroundTimeRecords
-      : comparePlaygroundScoreRecords;
-    return rows
-      .filter((entry) => activeView !== LEADERBOARD_VIEW_PLAYGROUND_TIME || getEntryFinishTimeMs(entry) !== null)
-      .sort(sorter)
-      .slice(0, maxRows);
+    const buildRows = () => {
+      const rows = this.getNormalizedPlaygroundRecords()
+        .filter((entry) => (
+          entry.trackId === trackId
+          && entry.raceType === raceTypeId
+          && (entry.raceMode || entry.speedClass) === speedClassId
+        ));
+      const sorter = activeView === LEADERBOARD_VIEW_PLAYGROUND_TIME
+        ? comparePlaygroundTimeRecords
+        : comparePlaygroundScoreRecords;
+      return rows
+        .filter((entry) => activeView !== LEADERBOARD_VIEW_PLAYGROUND_TIME || getEntryFinishTimeMs(entry) !== null)
+        .sort(sorter)
+        .slice(0, maxRows);
+    };
+    return this.getGarageMemoRows(this.garagePlaygroundRowsCache, `${activeView}|${trackId}|${raceTypeId}|${speedClassId}|${maxRows}`, buildRows);
   }
 
   getPlaygroundRecordPlacement(record, view = LEADERBOARD_VIEW_PLAYGROUND_SCORE) {
@@ -37207,6 +38014,134 @@ class NeonRoadRally {
     }, { legacy: false, limit: LEADERBOARD_STORAGE_MAX_ENTRIES })
       .filter((entry) => entry.officialRouteId === route.id);
     return rows[0] || null;
+  }
+
+  getOfficialTimeChampion(routeId, raceTypeId = DEFAULT_RACE_TYPE_ID) {
+    const route = getOfficialRouteById(routeId);
+    if (!route) return null;
+    const safeRaceTypeId = normalizeRaceTypeId(raceTypeId, DEFAULT_RACE_TYPE_ID);
+    const record = this.getOfficialRouteBestTimeRecord(route.id, safeRaceTypeId);
+    if (!record) return null;
+    const finishTimeMs = getEntryFinishTimeMs(record);
+    return {
+      kind: LEADERBOARD_VIEW_TIME_ATTACK,
+      routeId: route.id,
+      routeName: getOfficialRouteDisplayName(route),
+      trackId: route.trackId,
+      raceTypeId: safeRaceTypeId,
+      speedClassId: route.speedClassId,
+      playerId: normalizeStorageId(record.playerId, ""),
+      playerName: sanitizePlayerName(record.playerName, "PLAYER"),
+      runId: normalizeStorageId(record.runId, ""),
+      score: normalizeNonNegativeInteger(record.score, 0, MAX_DISPLAY_SCORE),
+      finishTimeMs,
+      valueText: finishTimeMs === null ? "No time" : formatFinishTimeMs(finishTimeMs),
+      detailText: `${getRaceTypeLabel(safeRaceTypeId)} · ${getSpeedClassLabel(route.speedClassId)}`
+    };
+  }
+
+  getOfficialScoreChampion(routeId, raceTypeId = DEFAULT_RACE_TYPE_ID) {
+    const route = getOfficialRouteById(routeId);
+    if (!route) return null;
+    const safeRaceTypeId = normalizeRaceTypeId(raceTypeId, DEFAULT_RACE_TYPE_ID);
+    const record = this.getOfficialScoreAttackRows(route.id, { raceTypeId: safeRaceTypeId, limit: 1 })[0] || null;
+    if (!record) return null;
+    return {
+      kind: LEADERBOARD_VIEW_SCORE_ATTACK,
+      routeId: route.id,
+      routeName: getOfficialRouteDisplayName(route),
+      trackId: route.trackId,
+      raceTypeId: safeRaceTypeId,
+      speedClassId: route.speedClassId,
+      playerId: normalizeStorageId(record.playerId, ""),
+      playerName: sanitizePlayerName(record.playerName, "PLAYER"),
+      runId: normalizeStorageId(record.runId, ""),
+      score: normalizeNonNegativeInteger(record.score, 0, MAX_DISPLAY_SCORE),
+      finishTimeMs: getEntryFinishTimeMs(record),
+      valueText: formatScore(record.score || 0),
+      detailText: `${getRaceTypeLabel(safeRaceTypeId)} · ${getSpeedClassLabel(route.speedClassId)}`
+    };
+  }
+
+  getOfficialRouteChampions(routeId, raceTypeId = DEFAULT_RACE_TYPE_ID) {
+    const route = getOfficialRouteById(routeId);
+    if (!route) return { time: null, score: null };
+    const safeRaceTypeId = normalizeRaceTypeId(raceTypeId, DEFAULT_RACE_TYPE_ID);
+    return this.getGarageMemoValue(this.garageRouteChampionCache, `${route.id}|${safeRaceTypeId}`, () => ({
+      time: this.getOfficialTimeChampion(route.id, safeRaceTypeId),
+      score: this.getOfficialScoreChampion(route.id, safeRaceTypeId)
+    }));
+  }
+
+  getDriverOfficialChampionStatus(playerId, routeId, raceTypeId = DEFAULT_RACE_TYPE_ID) {
+    const safePlayerId = normalizeStorageId(playerId, "");
+    const champions = this.getOfficialRouteChampions(routeId, raceTypeId);
+    return {
+      ownsTime: Boolean(safePlayerId && champions.time?.playerId === safePlayerId),
+      ownsScore: Boolean(safePlayerId && champions.score?.playerId === safePlayerId),
+      time: champions.time,
+      score: champions.score
+    };
+  }
+
+  getDriverOfficialChampionSummary(playerOrId) {
+    const playerId = normalizeStorageId(typeof playerOrId === "string" ? playerOrId : playerOrId?.id, "");
+    const createEmptySummary = () => ({
+      playerId,
+      timeClaims: 0,
+      scoreClaims: 0,
+      totalClaims: 0,
+      routeClaims: 0,
+      claims: []
+    });
+    if (!playerId) return createEmptySummary();
+    return this.getGarageMemoValue(this.garageChampionSummaryCache, playerId, () => {
+      const summary = createEmptySummary();
+      const routeClaimKeys = new Set();
+      OFFICIAL_ROUTES.forEach((route) => {
+        OFFICIAL_ROUTE_RACE_TYPE_IDS.forEach((raceTypeId) => {
+          if (!officialRouteSupportsRaceType(route, raceTypeId)) return;
+          const status = this.getDriverOfficialChampionStatus(playerId, route.id, raceTypeId);
+          if (status.ownsTime) {
+            summary.timeClaims += 1;
+            summary.claims.push({
+              ...status.time,
+              title: "Time Champion",
+              sortValue: status.time.finishTimeMs ?? Infinity
+            });
+            routeClaimKeys.add(`${route.id}:${raceTypeId}`);
+          }
+          if (status.ownsScore) {
+            summary.scoreClaims += 1;
+            summary.claims.push({
+              ...status.score,
+              title: "Score Champion",
+              sortValue: -(status.score.score || 0)
+            });
+            routeClaimKeys.add(`${route.id}:${raceTypeId}`);
+          }
+        });
+      });
+      summary.totalClaims = summary.timeClaims + summary.scoreClaims;
+      summary.routeClaims = routeClaimKeys.size;
+      summary.claims.sort((a, b) => a.routeName.localeCompare(b.routeName) || a.sortValue - b.sortValue || a.title.localeCompare(b.title));
+      return summary;
+    });
+  }
+
+  formatOfficialRouteChampionLine(champion, label) {
+    if (!champion) return `${label}: Unclaimed`;
+    return `${label}: ${champion.playerName} ${champion.valueText}`;
+  }
+
+  renderOfficialRouteChampionLines(route, raceTypeId = DEFAULT_RACE_TYPE_ID) {
+    const champions = this.getOfficialRouteChampions(route?.id, raceTypeId);
+    return `
+      <div class="official-route-champion-lines" aria-label="Route champions">
+        <small class="route-champion-line">${escapeHtml(this.formatOfficialRouteChampionLine(champions.time, "Time Champion"))}</small>
+        <small class="route-champion-line">${escapeHtml(this.formatOfficialRouteChampionLine(champions.score, "Score Champion"))}</small>
+      </div>
+    `;
   }
 
   getLeaderboardFilter(options = {}) {
@@ -37575,6 +38510,7 @@ class NeonRoadRally {
               <strong>${escapeHtml(getOfficialRouteDisplayName(route))}</strong>
               <span class="official-route-speed">${escapeHtml(route.speedClassLabel)}</span>
               <small>${escapeHtml(routeStatText)}</small>
+              ${this.renderOfficialRouteChampionLines(route, raceTypeId)}
             </button>
           `;
         }).join("")}
@@ -37598,6 +38534,7 @@ class NeonRoadRally {
             <strong class="route-name">${escapeHtml(getOfficialRouteDisplayName(route))}</strong>
             <span class="route-class official-route-speed">${escapeHtml(route.speedClassLabel)}</span>
             <small class="${pbClass}">${escapeHtml(pbText)}</small>
+            ${this.renderOfficialRouteChampionLines(route, safeRaceTypeId)}
           </button>
         `;
         }).join("")}
@@ -37699,80 +38636,35 @@ class NeonRoadRally {
 
   getTimeAttackLeaderboardRows(filter, options = {}) {
     const legacy = Boolean(options.legacy);
-    const rows = [];
-    const seen = new Set();
     const targetTrackId = normalizeTrackId(filter.trackId, DEFAULT_TRACK_ID);
     const targetRaceTypeId = normalizeRaceTypeId(filter.raceTypeId, DEFAULT_RACE_TYPE_ID);
     const targetSpeedClassId = normalizeSpeedClassId(filter.speedClassId, DEFAULT_SPEED_CLASS_ID);
-    const addRow = (source) => {
-      if (!source) return;
-      const finishTimeMs = getEntryFinishTimeMs(source);
-      if (finishTimeMs === null) return;
-      const raceTypeId = normalizeRaceTypeId(source.raceType || source.raceTypeId, DEFAULT_RACE_TYPE_ID);
-      const speedClassId = normalizeSpeedClassId(source.raceMode || source.speedClass || source.speedClassId, DEFAULT_SPEED_CLASS_ID);
-      const trackId = normalizeTrackId(source.trackId, DEFAULT_TRACK_ID);
-      if (trackId !== targetTrackId || raceTypeId !== targetRaceTypeId || speedClassId !== targetSpeedClassId) return;
-      const pacingRulesVersion = normalizePacingRulesVersion(
-        source.pacingRulesVersion || source.pacingVersion,
-        getMissingPacingRulesFallback(raceTypeId)
-      );
-      const officialRecordChase = Boolean(source.officialRecordChase || source.partyOfficialRecordChase);
-      const officialRoute = (source.partyMode && !officialRecordChase) || source.challengeId
-        ? null
-        : getOfficialRouteForRun(trackId, speedClassId, raceTypeId, source.seed || source.roadSeed, source.officialRouteId);
-      const row = {
-        ...source,
-        trackId,
-        trackName: source.trackName || getTrackById(trackId).name,
-        raceType: raceTypeId,
-        raceTypeId,
-        raceMode: speedClassId,
-        speedClass: speedClassId,
-        pacingRulesVersion,
-        status: "finished",
-        finishTimeMs,
-        finishTimeSecondsPrecise: getFinishTimeSecondsPrecise(finishTimeMs),
-        time: finishTimeMs / 1000,
-        score: normalizeNonNegativeInteger(source.score || source.finalScore, 0, MAX_DISPLAY_SCORE),
-        seed: normalizeStoredRoadSeed(source.seed || source.roadSeed, ""),
-        officialRouteId: officialRoute?.id || "",
-        officialRouteName: officialRoute?.name || "",
-        officialSeed: officialRoute?.seed || "",
-        officialRecordChase: Boolean(officialRecordChase && officialRoute),
-        competitionKind: getCompetitionKindLabel(officialRoute),
-        date: normalizeDateString(source.date || source.timestamp, "")
-      };
-      const rowLegacy = isLegacyPacingRecord(row);
-      if (rowLegacy !== legacy) return;
-      const key = row.runId
-        ? `run:${row.runId}`
-        : `${row.playerId || row.playerName}|${row.trackId}|${row.raceType}|${row.raceMode}|${row.pacingRulesVersion}|${row.finishTimeMs}|${row.score}`;
-      if (seen.has(key)) return;
-      seen.add(key);
-      rows.push(row);
-    };
-
-    (this.profiles.data.players || []).forEach((player) => {
-      const car = normalizeCarConfig(player.car);
-      Object.values(normalizeBestTimeRecords(player.bestTimes || player.personalBestTimes)).forEach((record) => {
-        addRow({
-          ...record,
-          playerId: player.id,
-          playerName: player.name,
-          carName: getCarGarageLabel(car),
-          trackName: getTrackById(record.trackId).name,
-          raceType: record.raceTypeId,
-          raceMode: record.speedClassId,
-          status: "finished",
-          time: record.finishTimeMs / 1000
-        });
+    const maxRows = normalizeNonNegativeInteger(options.limit, LEADERBOARD_MAX_ENTRIES, LEADERBOARD_STORAGE_MAX_ENTRIES);
+    const buildRows = () => {
+      const rows = [];
+      const seen = new Set();
+      this.getTimeAttackSourceRows().forEach((row) => {
+        if (
+          row.trackId !== targetTrackId
+          || row.raceType !== targetRaceTypeId
+          || row.speedClass !== targetSpeedClassId
+          || isLegacyPacingRecord(row) !== legacy
+        ) {
+          return;
+        }
+        const key = row.runId
+          ? `run:${row.runId}`
+          : `${row.playerId || row.playerName}|${row.trackId}|${row.raceType}|${row.raceMode}|${row.pacingRulesVersion}|${row.finishTimeMs}|${row.score}`;
+        if (seen.has(key)) return;
+        seen.add(key);
+        rows.push(row);
       });
-    });
-    (this.profiles.data.leaderboard || []).forEach(addRow);
 
-    return rows
-      .sort((a, b) => a.finishTimeMs - b.finishTimeMs || b.score - a.score || String(a.date).localeCompare(String(b.date)))
-      .slice(0, normalizeNonNegativeInteger(options.limit, LEADERBOARD_MAX_ENTRIES, LEADERBOARD_STORAGE_MAX_ENTRIES));
+      return rows
+        .sort((a, b) => a.finishTimeMs - b.finishTimeMs || b.score - a.score || String(a.date).localeCompare(String(b.date)))
+        .slice(0, maxRows);
+    };
+    return this.getGarageMemoRows(this.garageTimeAttackRowsCache, `${legacy ? "legacy" : "current"}|${targetTrackId}|${targetRaceTypeId}|${targetSpeedClassId}|${maxRows}`, buildRows);
   }
 
   renderTimeAttackRows(rows, emptyText) {
@@ -38472,6 +39364,7 @@ class NeonRoadRally {
                 ${resultChipMarkup || `<span class="chip chip--cyan">${escapeHtml(outcomeText)}</span>`}
                 <span class="result-primary-detail">${escapeHtml(primaryResultSub)}</span>
               </div>
+              ${this.renderOfficialChampionCallouts(summary)}
             </div>
             <div class="result-side-board">
               <div class="label label--cyan">Score Board</div>
@@ -38805,10 +39698,28 @@ class NeonRoadRally {
   }
 
   handleSelectPlayer(id) {
-    const garageUiState = this.captureGarageUiState("garageDriverList");
-    this.profiles.selectPlayer(id);
+    const nextId = normalizeStorageId(id, "");
+    const currentId = normalizeStorageId(this.profiles.data.currentPlayerId, "");
+    if (this.screen === "players" && this.layer?.querySelector?.(".garage-page")) {
+      if (!nextId || nextId === currentId) {
+        this.resetGarageProfileScroll();
+        return;
+      }
+      const selected = this.profiles.selectPlayer(nextId, { save: false });
+      const player = this.profiles.getCurrentPlayer();
+      if (!selected || !player) {
+        this.showDriverGarageScreen("Driver not found.", { preserveScrollTop: 0 });
+        return;
+      }
+      this.scheduleProfileSave({ invalidateGarage: false });
+      if (!this.refreshGarageSelectedDriverView(`${player.name} selected.`)) {
+        this.showDriverGarageScreen(`${player.name} selected.`, { preserveScrollTop: 0 });
+      }
+      return;
+    }
+    this.profiles.selectPlayer(nextId);
     const player = this.profiles.getCurrentPlayer();
-    this.showDriverGarageScreen(player ? `${player.name} selected.` : "", garageUiState);
+    this.showDriverGarageScreen(player ? `${player.name} selected.` : "", { preserveScrollTop: 0 });
   }
 
   handleRenameDriver() {
@@ -38885,7 +39796,7 @@ class NeonRoadRally {
 
   handleSaveCar() {
     const garageUiState = this.captureGarageUiState("garageCarStyle");
-    this.profiles.updateCurrentCar(this.readCarForm());
+    this.profiles.updateCurrentCar(this.readCarForm({ previewCosmetic: false }));
     const player = this.profiles.getCurrentPlayer();
     this.showDriverGarageScreen(`${player?.name || "Driver"} style saved.`, garageUiState);
   }

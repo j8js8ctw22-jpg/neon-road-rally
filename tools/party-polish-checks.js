@@ -383,6 +383,89 @@ vm.runInContext(`
   assert.strictEqual(economyManager.getPlayerById("p1").neonCash, 40, "Cosmetic purchase should subtract Neon Cash from the active driver only");
   const equippedCar = applyPlayerCosmeticsToCarConfig(economyManager.getPlayerById("p1").car, economyManager.getPlayerById("p1").cosmetics);
   assert.strictEqual(equippedCar.cosmeticStyle.underglow, "underglow_cyan", "Equipped cosmetic style should apply to the runtime car config");
+  const championManager = new PlayerProfileManager("party-polish-champion-test");
+  championManager.data.players = players.map((player) => ({
+    ...player,
+    badges: createDefaultBadgeSave(),
+    badgeStats: createDefaultPlayerBadgeStats(),
+    challengeProgress: createDefaultPlayerChallengeSave()
+  }));
+  championManager.data.currentPlayerId = "p1";
+  championManager.recordScore({
+    runId: "champion-time-lucas",
+    playerId: "p1",
+    playerName: "Lucas",
+    carName: "Neon Runner",
+    trackId: officialRoute.trackId,
+    trackName: getTrackById(officialRoute.trackId).name,
+    seed: officialRoute.seed,
+    raceMode: officialRoute.speedClassId,
+    speedClass: officialRoute.speedClassId,
+    raceType: DEFAULT_RACE_TYPE_ID,
+    pacingRulesVersion: getActivePacingRulesVersion(DEFAULT_RACE_TYPE_ID),
+    officialRouteId: officialRoute.id,
+    score: 90000,
+    status: "finished",
+    time: 41,
+    finishTimeMs: 41000
+  });
+  championManager.recordScore({
+    runId: "champion-score-jonah",
+    playerId: "p2",
+    playerName: "Jonah",
+    carName: "Neon Runner",
+    trackId: officialRoute.trackId,
+    trackName: getTrackById(officialRoute.trackId).name,
+    seed: officialRoute.seed,
+    raceMode: officialRoute.speedClassId,
+    speedClass: officialRoute.speedClassId,
+    raceType: DEFAULT_RACE_TYPE_ID,
+    pacingRulesVersion: getActivePacingRulesVersion(DEFAULT_RACE_TYPE_ID),
+    officialRouteId: officialRoute.id,
+    score: 110000,
+    status: "finished",
+    time: 43,
+    finishTimeMs: 43000
+  });
+  const championApp = Object.create(NeonRoadRally.prototype);
+  championApp.profiles = championManager;
+  const timeChampion = championApp.getOfficialTimeChampion(officialRoute.id, DEFAULT_RACE_TYPE_ID);
+  const scoreChampion = championApp.getOfficialScoreChampion(officialRoute.id, DEFAULT_RACE_TYPE_ID);
+  assert.strictEqual(timeChampion.playerId, "p1", "Champion helper should find the #1 Official Time Attack driver");
+  assert.strictEqual(scoreChampion.playerId, "p2", "Champion helper should find the #1 Official Score Attack driver");
+  const lucasChampionStatus = championApp.getDriverOfficialChampionStatus("p1", officialRoute.id, DEFAULT_RACE_TYPE_ID);
+  assert.strictEqual(lucasChampionStatus.ownsTime, true, "Driver champion status should expose owned Time #1");
+  assert.strictEqual(lucasChampionStatus.ownsScore, false, "Driver champion status should not claim unowned Score #1");
+  const lucasChampionSummary = championApp.getDriverOfficialChampionSummary("p1");
+  assert(lucasChampionSummary.timeClaims >= 1 && lucasChampionSummary.totalClaims >= 1, "Driver champion summary should count current Official #1 claims");
+  const routeChampionMarkup = championApp.renderOfficialRouteChampionLines(officialRoute, DEFAULT_RACE_TYPE_ID);
+  assert(routeChampionMarkup.includes("Time Champion") && routeChampionMarkup.includes(timeChampion.playerName), "Official route cards should show Time Champion copy: " + routeChampionMarkup);
+  assert(routeChampionMarkup.includes("Score Champion") && routeChampionMarkup.includes(scoreChampion.playerName), "Official route cards should show Score Champion copy: " + routeChampionMarkup);
+  const garageChampionMarkup = championApp.renderGarageChampionStatus(championManager.getPlayerById("p1"), lucasChampionSummary);
+  assert(/Champion Status|Official Route Crown|Official Time route/i.test(garageChampionMarkup), "Garage should render a compact champion status panel");
+  const resultChampionCallouts = championApp.buildOfficialChampionResultCallouts({
+    runId: "champion-time-lucas",
+    playerId: "p1",
+    playerName: "Lucas",
+    officialRouteId: officialRoute.id,
+    officialRouteName: officialRoute.name,
+    raceTypeId: DEFAULT_RACE_TYPE_ID,
+    status: "finished",
+    scoreSaved: true,
+    finishTimeMs: 41000,
+    finalScore: 90000
+  }, {
+    previousTimeChampion: null,
+    previousScoreChampion: scoreChampion
+  });
+  assert(resultChampionCallouts.some((item) => item.label === "NEW ROUTE CHAMPION"), "Official #1 result should call out a new Route Champion");
+  assert(resultChampionCallouts.some((item) => item.label === "NEW TIME RECORD"), "Official #1 Time result should call out a new time record");
+  assert.strictEqual(championApp.buildOfficialChampionResultCallouts({
+    playerId: "p1",
+    officialRouteId: "",
+    status: "finished",
+    scoreSaved: true
+  }).length, 0, "Playground/custom results should not create Official champion callouts");
   const paceBeat = getOfficialPaceResultText({
     officialRouteId: officialRoute.id,
     status: "finished",

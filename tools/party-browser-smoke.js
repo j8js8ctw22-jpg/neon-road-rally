@@ -242,6 +242,55 @@ async function run() {
     };
   }
 
+  async function runGlobalMenuPerformanceQa() {
+    const settleMenuFrames = () => page.evaluate(() => new Promise((resolve) => {
+      requestAnimationFrame(() => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+    }));
+    const readStats = () => page.evaluate(() => ({
+      screen: window.neonRoadRally?.screen || "",
+      stats: { ...(window.__nrrMenuCanvasStats || window.neonRoadRally?.menuCanvasStats || {}) },
+      bodyClass: document.body.className,
+      consoleScreen: document.querySelector("#screenLayer")?.className || ""
+    }));
+    const baseline = await readStats();
+    await page.evaluate(() => window.neonRoadRally.showTitle());
+    await settleMenuFrames();
+    await page.evaluate(() => window.neonRoadRally.showDriverGarageScreen());
+    await settleMenuFrames();
+    await page.evaluate(() => {
+      const pageNode = document.querySelector(".garage-page");
+      if (pageNode) pageNode.scrollTop = Math.max(0, pageNode.scrollHeight - pageNode.clientHeight);
+    });
+    await settleMenuFrames();
+    await page.evaluate(() => window.neonRoadRally.showPreRaceScreen());
+    await settleMenuFrames();
+    await page.evaluate(() => window.neonRoadRally.showLeaderboard("scoreAttack"));
+    await settleMenuFrames();
+    await page.evaluate(() => {
+      const pageNode = document.querySelector(".leaderboard-page");
+      if (pageNode) pageNode.scrollTop = Math.max(0, pageNode.scrollHeight - pageNode.clientHeight);
+    });
+    await settleMenuFrames();
+    await page.evaluate(() => window.neonRoadRally.showSettingsScreen());
+    await settleMenuFrames();
+    const final = await readStats();
+    const baselineStats = baseline.stats || {};
+    const finalStats = final.stats || {};
+    const delta = {
+      menuFrames: (finalStats.menuFrames || 0) - (baselineStats.menuFrames || 0),
+      raceFrames: (finalStats.raceFrames || 0) - (baselineStats.raceFrames || 0),
+      menuCanvasRenders: (finalStats.menuCanvasRenders || 0) - (baselineStats.menuCanvasRenders || 0),
+      menuCanvasSkips: (finalStats.menuCanvasSkips || 0) - (baselineStats.menuCanvasSkips || 0)
+    };
+    if (final.screen !== "settings" || !final.bodyClass.includes("is-nrr-menu-screen")) {
+      throw new Error(`Menu performance QA should end in Settings menu state: ${JSON.stringify(final)}`);
+    }
+    if (delta.raceFrames !== 0 || delta.menuCanvasSkips < 4 || delta.menuCanvasRenders > 8) {
+      throw new Error(`Menu navigation should not run continuous race/canvas rendering: ${JSON.stringify({ baseline, final, delta })}`);
+    }
+    return { baseline: baselineStats, final: finalStats, delta };
+  }
+
   async function runControllerMenuNavigationQa() {
     await installVirtualGamepad();
     await page.evaluate(() => {
@@ -303,7 +352,7 @@ async function run() {
       Boolean(document.querySelector("#garageRewards"))
     ), null, { timeout: 5000 });
     const garageCopy = await page.evaluate(() => document.body.innerText.replace(/\s+/g, " "));
-    const garageTerms = ["Driver Profile", "Neon Cash", "Garage Shop", "Records & Rivals", "Official Time Attack", "Official Score Attack", "Playground Time", "Playground Score", "Unlocks & Rewards"];
+    const garageTerms = ["Driver Profile", "Neon Cash", "Garage Shop", "Records & Rivals", "Champion Status", "Best Official Time", "Biggest Official Score", "Local Fun Highlight", "Unlocks & Rewards"];
     const lowerGarageCopy = garageCopy.toLowerCase();
     if (!garageTerms.every((term) => lowerGarageCopy.includes(term.toLowerCase()))) {
       throw new Error(`Garage should expose Driver Profile, records, and unlocks copy: ${garageCopy.slice(0, 1200)}`);
@@ -363,6 +412,10 @@ async function run() {
       app.profiles.data.currentPlayerId = originalIds[0] || null;
       app.profiles.data.leaderboard = [];
       app.profiles.data.playgroundRecords = [];
+      app.profiles.data.players.forEach((driver) => {
+        driver.bestTimes = {};
+        driver.personalBestTimes = {};
+      });
       const [lucas, jonah] = app.profiles.data.players;
       lucas.neonCash = 360;
       jonah.neonCash = 40;
@@ -454,33 +507,53 @@ async function run() {
         neonCash: lowerText.includes("neon cash") && lowerText.includes("earned in-game") && lowerText.includes("cosmetic only"),
         shopCopy: lowerText.includes("garage shop") && lowerText.includes("official records stay fair"),
         routeChampion: lowerText.includes("route champion"),
-        officialTime: lowerText.includes("official time attack"),
-        officialScore: lowerText.includes("official score attack"),
-        playgroundTime: lowerText.includes("playground time"),
-        playgroundScore: lowerText.includes("playground score"),
-        localFun: lowerText.includes("local/fun"),
+        officialTime: lowerText.includes("best official time") && lowerText.includes("official time route"),
+        officialScore: lowerText.includes("biggest official score") && lowerText.includes("official score route"),
+        localFun: lowerText.includes("local fun highlight") && lowerText.includes("separate from official competition"),
+        carLookCopy: lowerText.includes("free base look") && lowerText.includes("body color") && lowerText.includes("basic trail color"),
+        shopPreviewCopy: lowerText.includes("preview any item") && lowerText.includes("nothing is bought or equipped"),
+        championStatus: lowerText.includes("champion status") && lowerText.includes("official route crown"),
         freeStandardPaint: lowerText.includes("standard paint") && lowerText.includes("free"),
         comingSoon: ["Drift Sound", "Boost Sound", "Champion Aura"].every((label) => lowerText.includes(label.toLowerCase())) && lowerText.includes("coming soon")
       };
     });
-    if (!initial.hasProfile || !initial.hasRecords || !initial.hasShop || !initial.hasUnlocks || !initial.neonCash || !initial.shopCopy || !initial.routeChampion || !initial.officialTime || !initial.officialScore || !initial.playgroundTime || !initial.playgroundScore || !initial.localFun || !initial.freeStandardPaint || !initial.comingSoon) {
+    if (!initial.hasProfile || !initial.hasRecords || !initial.hasShop || !initial.hasUnlocks || !initial.neonCash || !initial.shopCopy || !initial.routeChampion || !initial.officialTime || !initial.officialScore || !initial.localFun || !initial.carLookCopy || !initial.shopPreviewCopy || !initial.championStatus || !initial.freeStandardPaint || !initial.comingSoon) {
       throw new Error(`Garage profile should show driver, records, official/playground separation, and unlock preview: ${JSON.stringify(initial)}`);
     }
 
+    const beforeSwitch = await page.evaluate(() => {
+      const page = document.querySelector(".garage-page");
+      const records = document.querySelector("#garageRecords");
+      if (page && records) page.scrollTop = records.offsetTop;
+      return {
+        scrollTop: page?.scrollTop || 0,
+        renderReportCount: window.__garageRenderReports?.length || 0
+      };
+    });
     await page.locator('.garage-driver-list button[data-action="selectPlayer"]:not([disabled])').first().click();
     await page.waitForFunction((name) => document.querySelector(".garage-profile-main h2")?.textContent.trim() !== name, setup.lucasName, { timeout: 5000 });
-    const switched = await page.evaluate(() => {
+    const switched = await page.evaluate((priorReportCount) => {
       const text = document.body.innerText.replace(/\s+/g, " ");
       const lowerText = text.toLowerCase();
+      const page = document.querySelector(".garage-page");
+      const hero = document.querySelector(".garage-profile-hero");
+      const pageRect = page?.getBoundingClientRect();
+      const heroRect = hero?.getBoundingClientRect();
+      const reports = (window.__garageRenderReports || []).slice(priorReportCount);
       return {
         profileName: document.querySelector(".garage-profile-main h2")?.textContent.trim() || "",
         recordsVisible: Boolean(document.querySelector("#garageRecords")),
         shopVisible: Boolean(document.querySelector("#garageShop")),
         noGarageCrash: window.neonRoadRally?.screen === "players",
-        recordCopy: ["Neon Cash", "Garage Shop", "Official Time Attack", "Official Score Attack", "Playground Time", "Playground Score"].every((label) => lowerText.includes(label.toLowerCase()))
+        recordCopy: ["Neon Cash", "Garage Shop", "Champion Status", "Best Official Time", "Biggest Official Score", "Local Fun Highlight"].every((label) => lowerText.includes(label.toLowerCase())),
+        scrollTop: page?.scrollTop || 0,
+        heroVisible: Boolean(pageRect && heroRect && heroRect.top >= pageRect.top - 4 && heroRect.top < pageRect.bottom),
+        renderReasons: reports.map((item) => item.reason).filter(Boolean),
+        crypticStats: /\b\d+\s+#1\b|Playground Time|Playground Score|\btop 3\b|\bsaved\b/i.test(document.querySelector(".garage-profile-hero")?.innerText || "")
       };
-    });
-    if (!switched.noGarageCrash || !switched.recordsVisible || !switched.shopVisible || !switched.recordCopy || switched.profileName === setup.lucasName) {
+    }, beforeSwitch.renderReportCount);
+    const driverSwitchRenders = switched.renderReasons.filter((reason) => reason === "garageDriverSwitchFast" || reason === "showDriverGarageScreen");
+    if (!switched.noGarageCrash || !switched.recordsVisible || !switched.shopVisible || !switched.recordCopy || switched.profileName === setup.lucasName || switched.scrollTop > 4 || !switched.heroVisible || switched.crypticStats || driverSwitchRenders.length !== 1 || switched.renderReasons.includes("showDriverGarageScreen")) {
       throw new Error(`Garage driver switch should update profile and keep records visible: ${JSON.stringify(switched)}`);
     }
 
@@ -543,6 +616,56 @@ async function run() {
       };
     });
     await page.waitForFunction(() => Boolean(document.querySelector("#garageShop")), null, { timeout: 5000 });
+    const previewItems = [
+      { id: "paint_pearl", name: "Pearl Finish" },
+      { id: "paint_chrome", name: "Chrome Sheen" },
+      { id: "underglow_magenta", name: "Magenta Underglow" },
+      { id: "trail_ribbon", name: "Ribbon Trail" },
+      { id: "boost_starburst", name: "Starburst Boost" }
+    ];
+    const previewReports = [];
+    for (const item of previewItems) {
+      const card = page.locator(`.garage-shop-card[data-preview-cosmetic="${item.id}"]`).first();
+      await card.focus();
+      await page.waitForFunction((name) => (
+        document.querySelector("#garagePreviewStatus")?.textContent.includes(`Previewing ${name}`)
+      ), item.name, { timeout: 5000 });
+      await card.hover();
+      await page.waitForFunction((name) => (
+        document.querySelector("#garagePreviewStatus")?.textContent.includes(`Previewing ${name}`)
+      ), item.name, { timeout: 5000 });
+      previewReports.push(await page.evaluate((expected) => {
+        const app = window.neonRoadRally;
+        const player = app.profiles.getCurrentPlayer();
+        return {
+          expected,
+          status: document.querySelector("#garagePreviewStatus")?.textContent || "",
+          balance: normalizeNeonCashBalance(player?.neonCash),
+          owned: Boolean(player?.cosmetics?.owned?.[expected.id]),
+          equipped: player?.cosmetics?.equipped?.[getGarageCosmeticItem(expected.id)?.category] || ""
+        };
+      }, item));
+    }
+    await page.locator("#garageRecords").hover();
+    await page.locator("#garageRecords").focus();
+    await page.waitForFunction(() => !document.querySelector("#garagePreviewStatus")?.textContent.includes("Previewing"), null, { timeout: 5000 });
+    const previewState = await page.evaluate((balanceBefore) => {
+      const app = window.neonRoadRally;
+      const player = app.profiles.getCurrentPlayer();
+      return {
+        balance: normalizeNeonCashBalance(player?.neonCash),
+        equipped: { ...normalizePlayerCosmetics(player?.cosmetics).equipped },
+        previewLabel: document.querySelector("#garagePreviewStatus")?.textContent || "",
+        previewReports: window.__garagePreviewReports || null,
+        expectedBalance: balanceBefore
+      };
+    }, setup.balanceBefore);
+    previewState.previewReports = previewReports;
+    const previewChangedState = previewState.balance !== setup.balanceBefore
+      || previewReports.some((item) => item.balance !== setup.balanceBefore || item.owned);
+    if (previewChangedState || previewState.previewLabel.includes("Previewing")) {
+      throw new Error(`Garage Shop preview should not buy, equip, or spend Neon Cash: ${JSON.stringify(previewState)}`);
+    }
     await page.locator('[data-action="buyCosmetic"][data-id="underglow_cyan"]').click();
     await page.waitForFunction(() => (
       window.neonRoadRally?.profiles?.getCurrentPlayer?.()?.cosmetics?.equipped?.underglow === "underglow_cyan" &&
@@ -1228,6 +1351,10 @@ async function run() {
       app.profiles.data.leaderboard = [];
       app.profiles.data.bestTimes = [];
       app.profiles.data.playgroundRecords = [];
+      app.profiles.data.players.forEach((driver) => {
+        driver.bestTimes = {};
+        driver.personalBestTimes = {};
+      });
       app.profiles.selectPlayer(app.profiles.data.players[0].id);
       const player = app.profiles.getCurrentPlayer();
       const route = getDefaultOfficialRouteForTrack(DEFAULT_TRACK_ID);
@@ -1264,6 +1391,28 @@ async function run() {
         playerName: player.name
       };
     });
+
+    const routeCardReport = await page.evaluate((expectedPlayerName) => {
+      const app = window.neonRoadRally;
+      const route = getDefaultOfficialRouteForTrack(DEFAULT_TRACK_ID);
+      app.showPreRaceScreen();
+      const selectedRow = document.querySelector(`.official-route-row[data-official-route-id="${route.id}"]`);
+      const selectedText = selectedRow?.innerText.replace(/\s+/g, " ").trim() || "";
+      const allRouteText = Array.from(document.querySelectorAll(".official-route-row"))
+        .map((row) => row.innerText.replace(/\s+/g, " ").trim())
+        .join(" | ");
+      return {
+        selectedText,
+        allRouteText,
+        seedVisibleOnRouteRow: selectedText.includes(route.seed),
+        hasTimeChampion: selectedText.toLowerCase().includes(`time champion: ${String(expectedPlayerName || "").toLowerCase()}`),
+        hasScoreChampion: selectedText.toLowerCase().includes(`score champion: ${String(expectedPlayerName || "").toLowerCase()}`),
+        hasUnclaimed: /Unclaimed/i.test(allRouteText)
+      };
+    }, routeSetup.playerName);
+    if (!routeCardReport.hasTimeChampion || !routeCardReport.hasScoreChampion || !routeCardReport.hasUnclaimed || routeCardReport.seedVisibleOnRouteRow) {
+      throw new Error(`Official route cards should show compact champion/unclaimed copy without raw seeds: ${JSON.stringify(routeCardReport)}`);
+    }
 
     async function finishSoloRun(config) {
       const startReport = await page.evaluate((runConfig) => {
@@ -1356,6 +1505,7 @@ async function run() {
               balanceAfter: summary.neonCashAward.balanceAfter || 0,
               breakdown: summary.neonCashAward.breakdown || []
             } : null,
+            championCallouts: summary.championCallouts || [],
             profileBalance: normalizeNeonCashBalance(app.profiles.getPlayerById(summary.playerId)?.neonCash),
             scoreEntryHasNeonCash: Boolean(summary.scoreEntry && Object.prototype.hasOwnProperty.call(summary.scoreEntry, "neonCashAward")),
             playgroundRecordHasNeonCash: Boolean(summary.playgroundRecord && Object.prototype.hasOwnProperty.call(summary.playgroundRecord, "neonCashAward"))
@@ -1371,6 +1521,22 @@ async function run() {
         };
       });
       return { ...startReport, ...report, firstViewportText };
+    }
+
+    const championTakeover = await finishSoloRun({
+      label: "Solo Official champion takeover",
+      official: true,
+      officialRouteId: routeSetup.routeId,
+      playerIndex: 1,
+      time: 40.5,
+      score: 150000
+    });
+    if (!championTakeover.summary.championCallouts.some((item) => item.label === "NEW ROUTE CHAMPION")
+      || !/NEW ROUTE CHAMPION|NEW TIME RECORD|NEW SCORE RECORD/i.test(championTakeover.firstViewportText)) {
+      throw new Error(`Taking #1 on an Official route should show Route Champion callouts: ${JSON.stringify(championTakeover.summary.championCallouts)} ${championTakeover.firstViewportText.slice(0, 1400)}`);
+    }
+    if (championTakeover.summary.playgroundRecordSaved || !championTakeover.summary.officialRouteId) {
+      throw new Error(`Official Route Champion result should remain Official-only: ${JSON.stringify(championTakeover.summary)}`);
     }
 
     const officialFinished = await finishSoloRun({
@@ -1430,6 +1596,9 @@ async function run() {
     }
     if (!/Playground Result/i.test(playgroundFinished.firstViewportText) || !/Playground Record|Score Rank|Time Rank/i.test(playgroundFinished.firstViewportText) || !new RegExp(playgroundFinished.playerName, "i").test(playgroundFinished.firstViewportText)) {
       throw new Error(`Playground finished result first viewport should show record placement and driver: ${playgroundFinished.firstViewportText.slice(0, 1400)}`);
+    }
+    if (/ROUTE CHAMPION|NEW TIME RECORD|NEW SCORE RECORD/i.test(playgroundFinished.firstViewportText) || playgroundFinished.summary.championCallouts.length) {
+      throw new Error(`Playground results should not show Official champion claims: ${JSON.stringify(playgroundFinished.summary.championCallouts)} ${playgroundFinished.firstViewportText.slice(0, 1000)}`);
     }
 
     const playgroundCrashed = await finishSoloRun({
@@ -1503,9 +1672,10 @@ async function run() {
     }
 
     await page.evaluate(() => window.neonRoadRally.showTitle());
-    return { routeSetup, officialFinished, officialCrashed, playgroundFinished, playgroundCrashed, boardSeparation };
+    return { routeSetup, routeCardReport, championTakeover, officialFinished, officialCrashed, playgroundFinished, playgroundCrashed, boardSeparation };
   }
 
+  const globalMenuPerformanceQa = await runGlobalMenuPerformanceQa();
   const controllerMenuNavigationQa = await runControllerMenuNavigationQa();
   const leaderboardControllerSelectQa = await runLeaderboardControllerSelectQa();
   const officialRecordChaseQa = await runOfficialRecordChaseQa();
@@ -1810,6 +1980,7 @@ async function run() {
     ok: true,
     sawRoundShuffle,
     keyboardPartyStartQa,
+    globalMenuPerformanceQa,
     settingsControllerQa,
     controllerMenuNavigationQa,
     leaderboardControllerSelectQa,
