@@ -35537,6 +35537,31 @@ class NeonRoadRally {
     `;
   }
 
+  renderPartySetupOrderPreview(selectedPlayers, setup) {
+    const orderMode = normalizePartyStartingOrderMode(setup?.startingOrderMode, PARTY_STARTING_ORDER_MODE_ROSTER);
+    const orderLabel = getPartyStartingOrderLabel(orderMode);
+    const names = selectedPlayers.map((player) => player.name);
+    const previewNames = names.slice(0, 5);
+    const extraCount = Math.max(0, names.length - previewNames.length);
+    const orderText = previewNames.length
+      ? `${previewNames.join(" -> ")}${extraCount ? ` -> +${extraCount} more` : ""}`
+      : `Choose ${PARTY_MIN_PLAYERS}-${PARTY_MAX_PLAYERS} drivers`;
+    const firstDriver = names[0] || "first driver";
+    const modeNote = orderMode === PARTY_STARTING_ORDER_MODE_ROSTER
+      ? `This is the turn order. Next up when the round starts: ${firstDriver}.`
+      : `${orderLabel} before racing; roster still shows who is playing. Next driver appears after Start.`;
+    return `
+      <div class="party-setup-order-strip" aria-label="Party turn order preview">
+        <div>
+          <span class="eyebrow">Turn Order</span>
+          <strong id="partySetupOrderPreview">${escapeHtml(orderText)}</strong>
+          <small id="partySetupOrderHint">${escapeHtml(modeNote)}</small>
+        </div>
+        <span class="party-ready-pill" id="partySetupReadyPill">${selectedPlayers.length >= PARTY_MIN_PLAYERS ? "Ready" : "Need drivers"}</span>
+      </div>
+    `;
+  }
+
   readPartySetupForm() {
     const setup = this.getPartySetup();
     const raceMode = document.getElementById("partyRaceMode");
@@ -35678,6 +35703,7 @@ class NeonRoadRally {
                 <span class="eyebrow">Drivers</span>
                 <strong>${selectedPlayers.length}/${PARTY_MAX_PLAYERS} selected</strong>
               </div>
+              ${this.renderPartySetupOrderPreview(selectedPlayers, setup)}
               <div class="party-driver-tools">
                 <div class="field">
                   <label for="partyNewDriverName">Add Driver</label>
@@ -35721,6 +35747,10 @@ class NeonRoadRally {
               <div class="setup-section-heading">
                 <span class="eyebrow">Shared Race</span>
                 <strong>${escapeHtml(track.name)} · ${escapeHtml(partyRaceType.label)} · ${escapeHtml(getSpeedClassLabel(setup.raceMode))}</strong>
+              </div>
+              <div class="party-shared-road-summary" aria-label="Shared party road">
+                <strong>Same road for each turn</strong>
+                <span id="partySetupSharedRoad">Everyone gets the same ${escapeHtml(track.name)} road on ${escapeHtml(getSpeedClassLabel(setup.raceMode))}. ${escapeHtml(setup.sharedSeed || "A road code will lock in when the party starts.")}</span>
               </div>
               <div class="field party-field-compact party-track-field">
                 <label>Track</label>
@@ -35816,6 +35846,8 @@ class NeonRoadRally {
     const bonusSurvivalHint = document.getElementById("partyBonusSurvivalHint");
     const partySetupActionSummary = document.getElementById("partySetupActionSummary");
     const partySetupActionSeed = document.getElementById("partySetupActionSeed");
+    const partySetupSharedRoad = document.getElementById("partySetupSharedRoad");
+    const partySetupOrderHint = document.getElementById("partySetupOrderHint");
     const updateSeedDisplay = () => {
       if (!input) return;
       const normalized = normalizeRoadSeed(input.value, "");
@@ -35865,6 +35897,17 @@ class NeonRoadRally {
           ? normalizePartyBonusSurvival(bonusSurvival?.value || this.getPartySetup().bonusSurvival)
           : PARTY_BONUS_SURVIVAL_OFF;
         partySetupActionSeed.textContent = `${getPartyRoundTypeLabel(roundType?.value || this.getPartySetup().roundType)} · ${getPartyStartingOrderLabel(startingOrder?.value || this.getPartySetup().startingOrderMode)} · Bonus ${getPartyBonusSurvivalLabel(bonusMode)} · ${normalized || "Random road on start"}`;
+      }
+      if (partySetupSharedRoad) {
+        partySetupSharedRoad.textContent = `Everyone gets the same ${track.name} road on ${getSpeedClassLabel(mode)}. ${normalized || "A road code will lock in when the party starts."}`;
+      }
+      if (partySetupOrderHint) {
+        const orderMode = normalizePartyStartingOrderMode(startingOrder?.value || this.getPartySetup().startingOrderMode);
+        const orderLabel = getPartyStartingOrderLabel(orderMode);
+        const firstDriver = this.getPartySetupSelectedPlayers()[0]?.name || "first driver";
+        partySetupOrderHint.textContent = orderMode === PARTY_STARTING_ORDER_MODE_ROSTER
+          ? `This is the turn order. Next up when the round starts: ${firstDriver}.`
+          : `${orderLabel} before racing; roster still shows who is playing. Next driver appears after Start.`;
       }
     };
     const syncTrackDependentControls = () => {
@@ -36092,7 +36135,7 @@ class NeonRoadRally {
     this.showPartyTurnScreen(`${getPartyRoundTypeLabel(setup.roundType)} ready.`);
   }
 
-  renderPartyCallouts(session, standings, recentResult, final = false) {
+  renderPartyCallouts(session, standings, recentResult, final = false, summary = null) {
     const leader = standings[0] || null;
     const runnerUp = standings[1] || null;
     const callouts = [];
@@ -36104,6 +36147,15 @@ class NeonRoadRally {
     }
     if (leader && runnerUp && isPartyCloseRaceMargin(leader.rankScore, runnerUp.leaderMargin)) {
       callouts.push(`<span class="score-callout is-hot">Close Race</span>`);
+    }
+    if (recentResult && Number.isFinite(recentResult.score) && recentResult.score >= 200000) {
+      callouts.push(`<span class="score-callout is-hot">Huge Score</span>`);
+    }
+    if (summary?.status === "finished" && normalizeNonNegativeInteger(summary?.nearMisses, 0, 999) >= 6) {
+      callouts.push(`<span class="score-callout is-hot">Clutch Save</span>`);
+    }
+    if (summary?.status === "finished" && normalizeNonNegativeInteger(summary?.slowdownHits, 0, 999) === 0 && normalizeNonNegativeInteger(summary?.laneMoves, 0, 999) >= 3) {
+      callouts.push(`<span class="score-callout">Clean Driver</span>`);
     }
     if (final && leader) {
       callouts.push(`<span class="score-callout is-hot">Winner by ${formatScore(session.marginOfVictory() || 0)} points</span>`);
@@ -36278,12 +36330,12 @@ class NeonRoadRally {
             <h2>${officialChase ? "Official Record Chase Turn" : "Party Turn"}</h2>
           </div>
           <div class="party-turn-hero-card">
-            <span>${officialChase ? "Pass the controller for the same official route" : "Pass the controller or keyboard now"}</span>
+            <span>${officialChase ? "Next Driver · same official route" : "Next Driver · Pass the controller or keyboard now"}</span>
             <strong>${escapeHtml(player.name)}</strong>
             <em>${officialChase ? `${escapeHtml(officialRouteName)} · ` : ""}Run ${session.completedRuns + 1} of ${session.totalRuns} · ${escapeHtml(getRaceTypeLabel(session.raceType))} · ${escapeHtml(getSpeedClassLabel(session.raceMode))}</em>
           </div>
           <div class="row party-turn-action-row">
-            <button class="small-button primary" data-action="partyStartRun">${officialChase ? "Start Official Run" : "Start Run"}</button>
+            <button class="small-button primary" data-action="partyStartRun">${officialChase ? `Start ${escapeHtml(player.name)}'s Official Run` : `Start ${escapeHtml(player.name)}'s Run`}</button>
             <button class="small-button" data-action="partyChangeSetup">Change Setup</button>
             <button class="small-button" data-action="title">Back to Title</button>
           </div>
@@ -36910,6 +36962,17 @@ class NeonRoadRally {
     `;
   }
 
+  renderPartyHandoffCard(session, nextPlayer) {
+    if (!session?.isPartyMode || session.completed || !nextPlayer) return "";
+    return `
+      <div class="party-handoff-card" aria-label="Next driver handoff">
+        <span>Next Driver</span>
+        <strong>${escapeHtml(nextPlayer.name)}</strong>
+        <em>Pass the controller now · ${escapeHtml(getPartyStartingOrderLabel(session.startingOrderMode))} · Round ${session.roundNumber}</em>
+      </div>
+    `;
+  }
+
   getOfficialRecordChaseGapText(standing, leader) {
     if (!standing || !leader) return "Pending";
     if (standing.rank === 1) return "Leader";
@@ -37494,12 +37557,18 @@ class NeonRoadRally {
     const recentResult = summary?.partyResult || null;
     const bonusResult = summary?.officialEnduranceResult || null;
     const latestPartyScore = recentResult?.score ?? summary?.finalScore ?? 0;
+    const recentStanding = recentResult
+      ? standings.find((standing) => standing.playerId === recentResult.playerId)
+      : null;
+    const recentGapText = recentStanding
+      ? (recentStanding.leaderMargin === 0 ? "Leader now" : `${formatScore(recentStanding.leaderMargin)} behind the leader`)
+      : "";
     const latestRunLabel = bonusResult ? "Official Finish + Bonus Survival" : getRunStatusLabel(summary?.status, summary?.reason);
     const latestRunTime = bonusResult?.officialFinishTimeMs !== null && bonusResult?.officialFinishTimeMs !== undefined
       ? formatFinishTimeMs(bonusResult.officialFinishTimeMs)
       : formatRunElapsedTime(summary);
     const roundSeed = session.currentSeed;
-    const partyCallouts = this.renderPartyCallouts(session, standings, recentResult, final);
+    const partyCallouts = this.renderPartyCallouts(session, standings, recentResult, final, summary);
     const partyRunFeedback = this.renderPartyRunFeedback(session, standings, summary);
     const playgroundChip = summary?.playgroundRecordSaved ? this.renderPlaygroundRecordCard(summary, { compact: true }) : "";
     this.setScreen(final ? "partyFinal" : "partyStandings");
@@ -37507,6 +37576,10 @@ class NeonRoadRally {
     if (final && !session.finalSfxPlayed) {
       this.audio.playSfx("newHighScore");
       session.finalSfxPlayed = true;
+    }
+    if (!final && recentResult?.partyLeaderChanged && !recentResult.partyLeaderSfxPlayed) {
+      this.audio.playSfx("newHighScore", { volume: this.audio.sfxVolume * 0.72, cooldownMs: 700 });
+      recentResult.partyLeaderSfxPlayed = true;
     }
     this.layer.classList.remove("is-empty");
     this.layer.innerHTML = `
@@ -37536,6 +37609,7 @@ class NeonRoadRally {
               <span class="eyebrow">Latest Run</span>
               <strong>${escapeHtml(summary.playerName)}</strong>
               <span class="meta">${escapeHtml(summary.carName)} · Round ${summary.partyRoundIndex || recentResult?.roundNumber || 1} · ${escapeHtml(summary.partySeed || summary.seed)} · ${escapeHtml(latestRunLabel)} · ${escapeHtml(latestRunTime)}</span>
+              ${recentStanding ? `<span class="party-run-rank-chip">${escapeHtml(summary.playerName)} is ${escapeHtml(formatOrdinalRank(recentStanding.rank))} now · ${escapeHtml(recentGapText)}</span>` : ""}
             </div>
             <div class="party-last-score">
               <span data-tally-value="${escapeAttr(latestPartyScore)}">${formatScore(latestPartyScore)}</span>
@@ -37569,10 +37643,11 @@ class NeonRoadRally {
             ${this.renderBadgeEarnedPanel(summary, true)}
           </div>
         ` : ""}
+        ${this.renderPartyHandoffCard(session, nextPlayer)}
         <div class="party-section-heading ${final ? "is-final-standings" : ""}">
           <span class="eyebrow">${final ? "Final Standings" : "Current Standings"}</span>
           <h2>${final ? "Final Standings" : "Current Standings"}</h2>
-          <p class="hint">${final ? "The winner is locked in. Awards below spotlight more drivers from the session." : "Check the table, then pass to the next driver."}</p>
+          <p class="hint">${final ? "The winner is locked in. Awards below spotlight more drivers from the session." : "Leader, gap, and next driver are shown first for the couch handoff."}</p>
         </div>
         ${this.renderPartyStandingsList(session, standings, recentResult, final)}
         ${!final ? this.renderPartyTurnOrderPanel(session) : ""}
@@ -37584,7 +37659,7 @@ class NeonRoadRally {
             <button class="small-button" data-action="partyChangeSetup">Change Setup</button>
             <button class="small-button" data-action="title">Back to Title</button>
           ` : `
-            <button class="small-button primary" data-action="partyNextPlayer">Next Player</button>
+            <button class="small-button primary" data-action="partyNextPlayer">Next Driver: ${escapeHtml(nextPlayer?.name || "Driver")}</button>
             <button class="small-button" data-action="partyChangeSetup">Change Setup</button>
             <button class="small-button" data-action="title">Back to Title</button>
           `}

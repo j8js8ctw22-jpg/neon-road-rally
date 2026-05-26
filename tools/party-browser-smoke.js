@@ -966,7 +966,7 @@ async function run() {
     if (options.startVia === "keyboard") {
       await page.keyboard.press("Enter");
     } else {
-      await page.getByRole("button", { name: /^Start (Official )?Run$/ }).click();
+      await page.locator('[data-action="partyStartRun"]').click();
     }
     await page.waitForFunction(() => window.neonRoadRally?.screen === "game", null, { timeout: 5000 });
     await page.evaluate((runFields) => {
@@ -1002,7 +1002,7 @@ async function run() {
   async function advancePartyIfNeeded() {
     const final = await page.evaluate(() => window.neonRoadRally?.screen === "partyFinal");
     if (!final) {
-      await page.getByRole("button", { name: /^Next Player$/ }).click();
+      await page.getByRole("button", { name: /^Next (Player|Driver)/ }).click();
       await page.waitForFunction(() => window.neonRoadRally?.screen === "partyTurn", null, { timeout: 5000 });
     }
     return final;
@@ -1698,6 +1698,10 @@ async function run() {
     const text = document.body.innerText || "";
     const start = document.querySelector(".party-start-action")?.getBoundingClientRect();
     const startSummary = document.querySelector("#partySetupActionSummary")?.textContent.replace(/\s+/g, " ").trim() || "";
+    const orderPreview = document.querySelector("#partySetupOrderPreview")?.textContent.replace(/\s+/g, " ").trim() || "";
+    const orderHint = document.querySelector("#partySetupOrderHint")?.textContent.replace(/\s+/g, " ").trim() || "";
+    const sharedRoad = document.querySelector("#partySetupSharedRoad")?.textContent.replace(/\s+/g, " ").trim() || "";
+    const readyPill = document.querySelector("#partySetupReadyPill")?.textContent.replace(/\s+/g, " ").trim() || "";
     const trackHeights = Array.from(document.querySelectorAll("[data-track-card]")).map((node) => node.getBoundingClientRect().height);
     const driverHeights = Array.from(document.querySelectorAll(".party-driver-row")).map((node) => node.getBoundingClientRect().height);
     const speedHeights = Array.from(document.querySelectorAll(".mode-ladder.is-compact .mode-ladder-card")).map((node) => node.getBoundingClientRect().height);
@@ -1710,6 +1714,10 @@ async function run() {
       oldStepCount: document.querySelectorAll(".party-flow-strip").length,
       startActionCount: document.querySelectorAll(".party-start-action").length,
       startSummary,
+      orderPreview,
+      orderHint,
+      sharedRoad,
+      readyPill,
       startTop: start?.top || 9999,
       trackHeights,
       driverHeights,
@@ -1736,6 +1744,16 @@ async function run() {
   if (partySetupUi.startTop > 360) throw new Error(`Start Party Race should remain high in the setup flow: ${partySetupUi.startTop}`);
   if (!/3 drivers · Classic · .* · /.test(partySetupUi.startSummary)) {
     throw new Error(`Start summary should use selected settings once: ${partySetupUi.startSummary}`);
+  }
+  if (!/^[^>]+ -> [^>]+ -> [^>]+$/.test(partySetupUi.orderPreview) || !/Next up when the round starts: .+\./.test(partySetupUi.orderHint) || partySetupUi.readyPill !== "Ready") {
+    throw new Error(`Party setup should make turn order and readiness obvious: ${JSON.stringify({
+      orderPreview: partySetupUi.orderPreview,
+      orderHint: partySetupUi.orderHint,
+      readyPill: partySetupUi.readyPill
+    })}`);
+  }
+  if (!/Everyone gets the same .* road/.test(partySetupUi.sharedRoad)) {
+    throw new Error(`Party setup should explain the shared road: ${partySetupUi.sharedRoad}`);
   }
   if (!partySetupUi.trackHeights.every((height) => height <= 70)) {
     throw new Error(`Party track choices should be compact: ${JSON.stringify(partySetupUi.trackHeights)}`);
@@ -1805,6 +1823,7 @@ async function run() {
   await page.getByRole("button", { name: /Start Party Race/i }).first().click();
   await page.waitForFunction(() => window.neonRoadRally?.screen === "partyTurn", null, { timeout: 5000 });
   await expectText("Starting Order");
+  await expectText("Next Driver");
   await expectText("Pass the controller or keyboard now");
   await expectText("Player 1 of 3");
 
@@ -1831,6 +1850,7 @@ async function run() {
         const firstViewport = [
           document.querySelector(".party-drama-header")?.innerText || "",
           document.querySelector(".party-last-run-card")?.innerText || "",
+          document.querySelector(".party-handoff-card")?.innerText || "",
           document.querySelector(".party-action-row")?.innerText || ""
         ].join("\n");
         return {
@@ -1846,7 +1866,7 @@ async function run() {
       if (partyCustomCrashReport.screen !== "partyStandings" || partyCustomCrashReport.status !== "crashed" || !partyCustomCrashReport.playgroundRecordSaved || partyCustomCrashReport.playgroundTimeRank) {
         throw new Error(`Party custom crash should show standings and save Playground score only: ${JSON.stringify(partyCustomCrashReport)}`);
       }
-      if (!/Current Party Race|Latest Run|Playground Record|Next Player/i.test(partyCustomCrashReport.firstViewport)) {
+      if (!/Current Party Race|Latest Run|Playground Record|Next Driver/i.test(partyCustomCrashReport.firstViewport)) {
         throw new Error(`Party custom crash first viewport should prioritize standings, latest player, Playground chip, and next action: ${partyCustomCrashReport.firstViewport.slice(0, 1400)}`);
       }
     }

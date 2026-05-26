@@ -35,6 +35,8 @@ const BRAVE_PATH = "/Applications/Brave Browser.app/Contents/MacOS/Brave Browser
 const BASE_URL = process.env.NRR_SMOKE_URL || "http://127.0.0.1:8085/";
 const ROUTE_TIMEOUT_MS = Number(process.env.NRR_PERF_ROUTE_TIMEOUT_MS || 120000);
 const POST_ROUTE_CLEANUP_MS = 900;
+const ROUTE_PROGRESS_LOG_MS = Number(process.env.NRR_PERF_PROGRESS_LOG_MS || 15000);
+const LOG_PROGRESS = process.env.NRR_PERF_LOG_PROGRESS !== "0";
 const ISOLATED_WORST_FRAME_SLOW_PERCENT_GRACE = 0.1;
 const INCLUDE_SEQUENCE = process.env.NRR_PERF_INCLUDE_SEQUENCE === "1";
 const DEFAULT_PERF_ROUTE_IDS = [
@@ -163,65 +165,32 @@ function getRouteList() {
   });
 }
 
-async function runRoute(page, route) {
-  await page.evaluate((routeConfig) => {
-    const app = window.neonRoadRally;
-    if (!app) throw new Error("Neon Road Rally app missing");
-    localStorage.clear();
-    app.profiles.data.players = [];
-    app.profiles.data.currentPlayerId = null;
-    const driver = app.profiles.createPlayer("Perf QA");
-    app.profiles.selectPlayer(driver.id);
-    if (app.collision) app.collision.update = () => {};
-    app.startRace({
-      trackId: routeConfig.trackId,
-      speedClassId: routeConfig.speedClassId,
-      raceTypeId: routeConfig.raceTypeId,
-      seed: routeConfig.seed,
-      officialRouteId: routeConfig.routeId
-    });
-    app.run.countdownTimer = 0;
-    app.run.raceActive = true;
-    app.run.frameSampleCount = 0;
-    app.run.frameTimeSumMs = 0;
-    app.run.frameTimeMaxMs = 0;
-    app.run.frameTimeSlowCount = 0;
-    app.run.frameTimeRecentSamples = [];
-    app.run.frameTimeRecentAvgMs = 0;
-    app.run.frameTimeRecentMaxMs = 0;
-    app.run.averageFrameMs = 0;
-    app.run.averageFps = 0;
-    app.run.slowFramePercent = 0;
-    app.run.performanceEffectScale = 1;
-    app.run.renderEffectScale = 1;
-    app.run.renderEffectScaleMin = 1;
-    app.lastFrame = performance.now();
-  }, route);
+function logProgress(message) {
+  if (!LOG_PROGRESS) return;
+  process.stderr.write(`[live-run-performance] ${message}\n`);
+}
 
+async function readRouteDiagnostic(page, route) {
   try {
-    await page.waitForFunction(() => {
-      const app = window.neonRoadRally;
-      const run = app?.run;
-      return Boolean(run?.ended || (run?.officialEnduranceActive && run?.officialFinishLocked && (app?.lastSummary?.status === "finished" || run?.officialFinishTimeMs != null)));
-    }, null, { timeout: ROUTE_TIMEOUT_MS });
-    await page.evaluate(() => {
-      const app = window.neonRoadRally;
-      if (app?.canEndOfficialEndurance?.()) {
-        app.endOfficialEndurance("Performance Sample Ended");
-      }
-    });
-    await page.waitForFunction(() => window.neonRoadRally?.run?.ended === true, null, { timeout: 5000 });
-  } catch (error) {
-    const diagnostic = await page.evaluate(() => {
+    if (page.isClosed()) {
+      return { routeId: route?.routeId || "", pageClosed: true };
+    }
+    return await page.evaluate((routeConfig) => {
       const app = window.neonRoadRally;
       const run = app?.run || {};
+      const finishDistance = Math.max(1, Number(run.track?.distanceToFinish) || 1);
+      const distance = Math.max(0, Number(run.distance) || 0);
       return {
+        routeId: routeConfig?.routeId || run.officialRouteId || "",
+        routeName: routeConfig?.routeName || "",
         screen: app?.screen || "",
         ended: Boolean(run.ended),
         raceActive: Boolean(run.raceActive),
+        paused: Boolean(run.paused),
         countdownTimer: Number((run.countdownTimer || 0).toFixed(2)),
-        distance: Math.round(run.distance || 0),
-        finishDistance: Math.round(run.track?.distanceToFinish || 0),
+        distance: Math.round(distance),
+        finishDistance: Math.round(finishDistance),
+        progressPercent: Number((Math.min(1, distance / finishDistance) * 100).toFixed(1)),
         elapsed: Number((run.elapsed || 0).toFixed(2)),
         currentSpeed: Math.round(run.currentSpeed || 0),
         frameSampleCount: run.frameSampleCount || 0,
@@ -233,13 +202,112 @@ async function runRoute(page, route) {
         officialEnduranceActive: Boolean(run.officialEnduranceActive),
         officialEnduranceLap: run.officialEnduranceLap || 1,
         officialFinishTimeMs: run.officialFinishTimeMs ?? null,
+        lastSummaryStatus: app?.lastSummary?.status || "",
         routeSeedLocked: Boolean(run.routeSeedLocked || run.officialRouteSeedLocked),
         routeSignatureHash: run.routeSignatureHash || "",
         runProgressSignatureHash: run.runProgressSignatureHash || run.routeSignatureHash || "",
         officialFullRouteSignatureHash: run.officialFullRouteSignatureHash || ""
       };
+    }, route);
+  } catch (error) {
+    return {
+      routeId: route?.routeId || "",
+      routeName: route?.routeName || "",
+      diagnosticError: error?.message || String(error)
+    };
+  }
+}
+
+function formatDiagnosticProgress(diagnostic) {
+  if (!diagnostic || diagnostic.diagnosticError || diagnostic.pageClosed) {
+    return JSON.stringify(diagnostic || {});
+  }
+  return `${diagnostic.routeId} ${diagnostic.progressPercent}% elapsed=${diagnostic.elapsed}s speed=${diagnostic.currentSpeed} fps=${diagnostic.averageFps} samples=${diagnostic.frameSampleCount} screen=${diagnostic.screen} endurance=${diagnostic.officialEnduranceActive ? "on" : "off"} ended=${diagnostic.ended}`;
+}
+
+async function runRoute(page, route) {
+  const startedAt = Date.now();
+  let lastDiagnostic = null;
+  let polling = false;
+  const progressTimer = ROUTE_PROGRESS_LOG_MS > 0
+    ? setInterval(async () => {
+      if (polling) return;
+      polling = true;
+      lastDiagnostic = await readRouteDiagnostic(page, route);
+      logProgress(`${formatDiagnosticProgress(lastDiagnostic)} wall=${Math.round((Date.now() - startedAt) / 1000)}s`);
+      polling = false;
+    }, ROUTE_PROGRESS_LOG_MS)
+    : null;
+  if (progressTimer?.unref) progressTimer.unref();
+
+  logProgress(`starting ${route.routeId} (${route.routeName})`);
+  try {
+    await page.evaluate((routeConfig) => {
+      const app = window.neonRoadRally;
+      if (!app) throw new Error("Neon Road Rally app missing");
+      localStorage.clear();
+      app.profiles.data.players = [];
+      app.profiles.data.currentPlayerId = null;
+      const driver = app.profiles.createPlayer("Perf QA");
+      app.profiles.selectPlayer(driver.id);
+      if (app.collision) app.collision.update = () => {};
+      app.startRace({
+        trackId: routeConfig.trackId,
+        speedClassId: routeConfig.speedClassId,
+        raceTypeId: routeConfig.raceTypeId,
+        seed: routeConfig.seed,
+        officialRouteId: routeConfig.routeId
+      });
+      app.run.countdownTimer = 0;
+      app.run.raceActive = true;
+      app.run.frameSampleCount = 0;
+      app.run.frameTimeSumMs = 0;
+      app.run.frameTimeMaxMs = 0;
+      app.run.frameTimeSlowCount = 0;
+      app.run.frameTimeRecentSamples = [];
+      app.run.frameTimeRecentAvgMs = 0;
+      app.run.frameTimeRecentMaxMs = 0;
+      app.run.averageFrameMs = 0;
+      app.run.averageFps = 0;
+      app.run.slowFramePercent = 0;
+      app.run.performanceEffectScale = 1;
+      app.run.renderEffectScale = 1;
+      app.run.renderEffectScaleMin = 1;
+      app.lastFrame = performance.now();
+    }, route);
+
+    await page.waitForFunction(() => {
+      const app = window.neonRoadRally;
+      const run = app?.run;
+      return Boolean(run?.ended || (run?.officialEnduranceActive && run?.officialFinishLocked && (app?.lastSummary?.status === "finished" || run?.officialFinishTimeMs != null)));
+    }, null, { timeout: ROUTE_TIMEOUT_MS });
+    const finalizeState = await page.evaluate(() => {
+      const app = window.neonRoadRally;
+      if (app?.canEndOfficialEndurance?.()) {
+        app.endOfficialEndurance("Performance Sample Ended");
+        return "endedOfficialEndurance";
+      }
+      const run = app?.run;
+      if (run?.officialEnduranceActive && run?.officialFinishLocked && !run?.ended && typeof app?.endRace === "function") {
+        app.endRace("crashed", "Performance Sample Ended", {
+          officialEnduranceFinal: true,
+          skipScoreRecord: true,
+          skipBestTimeRecord: true,
+          skipBadges: true,
+          skipPlaytest: true
+        });
+        return "forcedOfficialEnduranceEnd";
+      }
+      return run?.ended ? "alreadyEnded" : "finishStateReached";
     });
+    await page.waitForFunction(() => window.neonRoadRally?.run?.ended === true, null, { timeout: 5000 });
+    lastDiagnostic = await readRouteDiagnostic(page, route);
+    logProgress(`finished ${route.routeId} via ${finalizeState}: ${formatDiagnosticProgress(lastDiagnostic)}`);
+  } catch (error) {
+    const diagnostic = await readRouteDiagnostic(page, route);
     throw new Error(`Timed out waiting for ${route.routeName} to finish: ${error.message} ${JSON.stringify(diagnostic)}`);
+  } finally {
+    if (progressTimer) clearInterval(progressTimer);
   }
 
   const result = await page.evaluate((routeConfig) => {
@@ -372,15 +440,12 @@ function assertPerformanceResults(results) {
 }
 
 async function main() {
+  const routes = getRouteList();
+  logProgress(`sampling ${routes.length} route${routes.length === 1 ? "" : "s"} from ${BASE_URL}`);
   const browser = await chromium.launch({
     headless: true,
     executablePath: BRAVE_PATH,
-    args: [
-      "--disable-background-timer-throttling",
-      "--disable-backgrounding-occluded-windows",
-      "--disable-renderer-backgrounding",
-      "--disable-features=CalculateNativeWinOcclusion"
-    ]
+    timeout: 30000
   });
   const page = await browser.newPage({ viewport: { width: 1366, height: 900 } });
   const consoleIssues = [];
@@ -390,9 +455,9 @@ async function main() {
   page.on("pageerror", (error) => consoleIssues.push(`pageerror: ${error.message}`));
 
   try {
-    await page.goto(BASE_URL, { waitUntil: "networkidle" });
+    await page.goto(BASE_URL, { waitUntil: "networkidle", timeout: 30000 });
     const results = [];
-    for (const route of getRouteList()) {
+    for (const route of routes) {
       results.push(await runRoute(page, route));
     }
     assertPerformanceResults(results);

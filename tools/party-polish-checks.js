@@ -31,6 +31,11 @@ const context = vm.createContext({
 
 vm.runInContext(source, context, { filename: "game.js" });
 
+assert(source.includes("party-setup-order-strip"), "Party setup should expose a couch-readable turn order strip");
+assert(source.includes("Same road for each turn"), "Party setup should explain the shared road in plain language");
+assert(source.includes("Next Driver:"), "Party results should label the next handoff action with the driver name");
+assert(source.includes("party-handoff-card"), "Party standings should render a dedicated next-driver handoff card");
+
 vm.runInContext(`
 (() => {
   const players = [
