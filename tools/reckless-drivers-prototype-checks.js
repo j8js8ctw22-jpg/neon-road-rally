@@ -140,6 +140,17 @@ vm.runInContext(`
     }));
   }
 
+  function normalizeSequenceSpine(captureResult) {
+    return (captureResult.sequence || []).map((wave) => ({
+      type: wave.type || "",
+      family: wave.family || "",
+      sectionId: wave.sectionId || "",
+      distance: Math.round(wave.distance || 0),
+      lanes: (wave.blockedLanes || []).slice().join(","),
+      rewardLanes: (wave.rewardLanes || []).slice().join(",")
+    }));
+  }
+
   function assertTelemetryShape(captureResult, label) {
     const numericFields = [
       "recklessEventsSeen",
@@ -251,7 +262,8 @@ vm.runInContext(`
     trackId: "sunset-highway",
     speedClassId: "turbo",
     raceTypeId: DEFAULT_RACE_TYPE_ID,
-    seed: "RECKLESS-PROTOTYPE-CUSTOM"
+    seed: "RECKLESS-PROTOTYPE-CUSTOM",
+    waveLimit: 180
   });
   assertTelemetryShape(customCapture, "custom reckless capture");
   assert(scheduledEvents(customCapture).length > 0, "Playground/Custom Classic should be eligible for reckless prototype events");
@@ -298,14 +310,30 @@ vm.runInContext(`
   assert.strictEqual(fuelCapture.recklessEventsSeen, 0, "Fuel Run should not show reckless telemetry events");
 
   const partyCapture = capture({
-    officialRouteId: officialScenario.routeId,
+    trackId: "sunset-highway",
+    speedClassId: "turbo",
     raceTypeId: DEFAULT_RACE_TYPE_ID,
+    seed: "RECKLESS-PROTOTYPE-CUSTOM",
     partyMode: true,
-    partySeedLocked: true
+    partySeedLocked: true,
+    waveLimit: 180
   });
-  assertTelemetryShape(partyCapture, "party disabled capture");
-  assert.strictEqual(scheduledEvents(partyCapture).length, 0, "Party Classic should not schedule reckless prototype events");
-  assert.strictEqual(partyCapture.recklessEventsSeen, 0, "Party Classic should not show reckless telemetry events");
+  assertTelemetryShape(partyCapture, "party classic capture");
+  assert(scheduledEvents(partyCapture).length > 0, "Party Classic should schedule reckless events from the shared Classic seed");
+  const partyRepeat = capture({
+    trackId: "sunset-highway",
+    speedClassId: "turbo",
+    raceTypeId: DEFAULT_RACE_TYPE_ID,
+    seed: "RECKLESS-PROTOTYPE-CUSTOM",
+    partyMode: true,
+    partySeedLocked: true,
+    waveLimit: 180
+  });
+  assert.deepStrictEqual(
+    normalizeScheduled(partyCapture),
+    normalizeScheduled(partyRepeat),
+    "Party Classic reckless events should repeat exactly for each driver on the same shared seed"
+  );
 
   const chaseCapture = capture({
     officialRouteId: officialScenario.routeId,
@@ -314,9 +342,51 @@ vm.runInContext(`
     officialRecordChase: true,
     partySeedLocked: true
   });
-  assertTelemetryShape(chaseCapture, "record chase disabled capture");
-  assert.strictEqual(scheduledEvents(chaseCapture).length, 0, "Official Record Chase should not schedule reckless prototype events yet");
-  assert.strictEqual(chaseCapture.recklessEventsSeen, 0, "Official Record Chase should not show reckless telemetry events");
+  assertTelemetryShape(chaseCapture, "record chase classic capture");
+  assert(scheduledEvents(chaseCapture).length > 0, "Official Record Chase Classic should schedule reckless events");
+  assert.deepStrictEqual(
+    normalizeScheduled(chaseCapture),
+    normalizeScheduled(officialScenario.capture),
+    "Official Record Chase Classic should mirror the solo Official Classic reckless hazard model"
+  );
+  assert.deepStrictEqual(
+    normalizeSequenceSpine(chaseCapture),
+    normalizeSequenceSpine(officialScenario.capture),
+    "Official Record Chase Classic should not alter the official route sequence spine"
+  );
+
+  const partyFuelCapture = capture({
+    trackId: "sunset-highway",
+    speedClassId: "turbo",
+    raceTypeId: FUEL_RUN_RACE_TYPE_ID,
+    seed: "RECKLESS-PARTY-FUEL",
+    partyMode: true,
+    partySeedLocked: true
+  });
+  assertTelemetryShape(partyFuelCapture, "party fuel disabled capture");
+  assert.strictEqual(scheduledEvents(partyFuelCapture).length, 0, "Party Fuel Run should not schedule reckless events");
+  assert.strictEqual(partyFuelCapture.recklessEventsSeen, 0, "Party Fuel Run should not show reckless telemetry events");
+
+  const pursuitCapture = capture({
+    trackId: "sunset-highway",
+    speedClassId: "turbo",
+    raceTypeId: PURSUIT_RACE_TYPE_ID,
+    seed: "RECKLESS-PURSUIT-DISABLED"
+  });
+  assertTelemetryShape(pursuitCapture, "pursuit disabled capture");
+  assert.strictEqual(scheduledEvents(pursuitCapture).length, 0, "Pursuit should not schedule reckless events");
+  assert.strictEqual(pursuitCapture.recklessEventsSeen, 0, "Pursuit should not show reckless telemetry events");
+
+  const challengeCapture = capture({
+    trackId: "sunset-highway",
+    speedClassId: "turbo",
+    raceTypeId: DEFAULT_RACE_TYPE_ID,
+    seed: "RECKLESS-CHALLENGE-DISABLED",
+    challengeMode: true
+  });
+  assertTelemetryShape(challengeCapture, "challenge disabled capture");
+  assert.strictEqual(scheduledEvents(challengeCapture).length, 0, "Challenge Mode should not schedule reckless events");
+  assert.strictEqual(challengeCapture.recklessEventsSeen, 0, "Challenge Mode should not show reckless telemetry events");
 
   const enduranceCapture = capture({
     officialRouteId: officialScenario.routeId,
@@ -356,10 +426,13 @@ vm.runInContext(`
       recklessRejectsByDetail: redlineCapture.recklessRejectsByDetail
     },
     customEvents: normalizeScheduled(customCapture),
+    partyClassicEvents: normalizeScheduled(partyCapture),
+    recordChaseEvents: normalizeScheduled(chaseCapture),
     disabledModeEvents: {
       fuel: scheduledEvents(fuelCapture).length,
-      party: scheduledEvents(partyCapture).length,
-      recordChase: scheduledEvents(chaseCapture).length,
+      partyFuel: scheduledEvents(partyFuelCapture).length,
+      pursuit: scheduledEvents(pursuitCapture).length,
+      challenge: scheduledEvents(challengeCapture).length,
       endurance: scheduledEvents(enduranceCapture).length
     }
   };

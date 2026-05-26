@@ -1096,6 +1096,112 @@ async function run() {
     return report;
   }
 
+  async function runPartyRecklessIntegrationQa() {
+    const report = await page.evaluate(() => {
+      const app = window.neonRoadRally;
+      const scheduled = (capture) => (capture.recklessDriverEvents || []).filter((event) => event.kind === "scheduled");
+      const normalize = (capture) => scheduled(capture).map((event) => ({
+        behavior: event.behavior,
+        waveType: event.waveType,
+        sectionId: event.sectionId,
+        distance: event.distance,
+        sourceLane: event.sourceLane,
+        targetLane: event.targetLane,
+        laneDelta: event.laneDelta,
+        telegraphSeconds: event.telegraphSeconds,
+        mergeSeconds: event.mergeSeconds
+      }));
+      const customClassic = app.captureRoadDirectorSequence({
+        trackId: "sunset-highway",
+        speedClassId: "turbo",
+        raceTypeId: DEFAULT_RACE_TYPE_ID,
+        seed: "RECKLESS-PARTY-SHARED",
+        waveLimit: 180
+      });
+      const partyClassic = app.captureRoadDirectorSequence({
+        trackId: "sunset-highway",
+        speedClassId: "turbo",
+        raceTypeId: DEFAULT_RACE_TYPE_ID,
+        seed: "RECKLESS-PARTY-SHARED",
+        partyMode: true,
+        partySeedLocked: true,
+        waveLimit: 180
+      });
+      const partyRepeat = app.captureRoadDirectorSequence({
+        trackId: "sunset-highway",
+        speedClassId: "turbo",
+        raceTypeId: DEFAULT_RACE_TYPE_ID,
+        seed: "RECKLESS-PARTY-SHARED",
+        partyMode: true,
+        partySeedLocked: true,
+        waveLimit: 180
+      });
+      const partyFuel = app.captureRoadDirectorSequence({
+        trackId: "sunset-highway",
+        speedClassId: "turbo",
+        raceTypeId: FUEL_RUN_RACE_TYPE_ID,
+        seed: "RECKLESS-PARTY-FUEL",
+        partyMode: true,
+        partySeedLocked: true,
+        waveLimit: 180
+      });
+      const officialRoute = getDefaultOfficialRouteForTrack(DEFAULT_TRACK_ID);
+      const officialClassic = app.captureRoadDirectorSequence({
+        officialRouteId: officialRoute.id,
+        raceTypeId: DEFAULT_RACE_TYPE_ID,
+        waveLimit: 180
+      });
+      const recordChase = app.captureRoadDirectorSequence({
+        officialRouteId: officialRoute.id,
+        raceTypeId: DEFAULT_RACE_TYPE_ID,
+        partyMode: true,
+        officialRecordChase: true,
+        partySeedLocked: true,
+        waveLimit: 180
+      });
+      app.partySetup = app.createDefaultPartySetup();
+      app.partySetup.selectedPlayerIds = app.profiles.data.players.slice(0, 3).map((player) => player.id);
+      app.partySetup.startingOrderMode = PARTY_STARTING_ORDER_MODE_ROSTER;
+      app.showPartySetupScreen();
+      const setupClassicText = document.body.innerText.replace(/\s+/g, " ");
+      const raceType = document.querySelector("#partyRaceType");
+      if (raceType) {
+        raceType.value = FUEL_RUN_RACE_TYPE_ID;
+        raceType.dispatchEvent(new Event("change", { bubbles: true }));
+      }
+      const setupFuelText = document.body.innerText.replace(/\s+/g, " ");
+      app.partySetup.raceType = DEFAULT_RACE_TYPE_ID;
+      app.partySetup.startingOrderMode = PARTY_STARTING_ORDER_MODE_ROSTER;
+      app.showPartySetupScreen();
+      return {
+        customEvents: normalize(customClassic),
+        partyEvents: normalize(partyClassic),
+        partyRepeatEvents: normalize(partyRepeat),
+        partyFuelCount: scheduled(partyFuel).length,
+        officialEvents: normalize(officialClassic),
+        recordChaseEvents: normalize(recordChase),
+        classicCopy: /Classic includes reckless traffic|reckless traffic/i.test(setupClassicText),
+        fuelCopy: /Fuel Run keeps reckless traffic off for now|Reckless traffic stays out for now/i.test(setupFuelText)
+      };
+    });
+    if (!report.customEvents.length || !report.partyEvents.length) {
+      throw new Error(`Party Classic should expose reckless events from a shared Classic seed: ${JSON.stringify(report)}`);
+    }
+    if (JSON.stringify(report.partyRepeatEvents) !== JSON.stringify(report.partyEvents)) {
+      throw new Error(`Party Classic reckless opportunities should repeat for each driver on the shared seed: ${JSON.stringify(report)}`);
+    }
+    if (report.partyFuelCount !== 0) {
+      throw new Error(`Party Fuel should keep reckless drivers disabled: ${JSON.stringify(report)}`);
+    }
+    if (!report.officialEvents.length || JSON.stringify(report.recordChaseEvents) !== JSON.stringify(report.officialEvents)) {
+      throw new Error(`Official Record Chase Classic should mirror solo Official Classic reckless opportunities: ${JSON.stringify(report)}`);
+    }
+    if (!report.classicCopy || !report.fuelCopy) {
+      throw new Error(`Party setup should explain Classic reckless traffic and Fuel Run exclusion: ${JSON.stringify(report)}`);
+    }
+    return report;
+  }
+
   async function runOfficialRecordChaseQa() {
     const startingPlaygroundCount = await page.evaluate(() => window.neonRoadRally?.profiles?.data?.playgroundRecords?.length || 0);
     await installVirtualGamepad();
@@ -1694,6 +1800,7 @@ async function run() {
   await expectText("3/8");
   const partyBonusSurvivalQa = await runPartyBonusSurvivalQa();
   const partyManageReorderQa = await runPartyManageDriverReorderQa();
+  const partyRecklessIntegrationQa = await runPartyRecklessIntegrationQa();
   const partySetupUi = await page.evaluate(() => {
     const text = document.body.innerText || "";
     const start = document.querySelector(".party-start-action")?.getBoundingClientRect();
@@ -2010,6 +2117,7 @@ async function run() {
     garageEconomyQa,
     partyBonusSurvivalQa,
     partyManageReorderQa,
+    partyRecklessIntegrationQa,
     ...result
   }, null, 2));
 }

@@ -35,6 +35,8 @@ assert(source.includes("party-setup-order-strip"), "Party setup should expose a 
 assert(source.includes("Same road for each turn"), "Party setup should explain the shared road in plain language");
 assert(source.includes("Next Driver:"), "Party results should label the next handoff action with the driver name");
 assert(source.includes("party-handoff-card"), "Party standings should render a dedicated next-driver handoff card");
+assert(source.includes("Classic includes reckless traffic."), "Party setup should explain that Classic includes reckless traffic");
+assert(source.includes("Fuel Run keeps reckless traffic off for now."), "Party setup should explain that Fuel Run excludes reckless traffic for now");
 
 vm.runInContext(`
 (() => {

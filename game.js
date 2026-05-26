@@ -15693,7 +15693,7 @@ class ObstacleManager {
     if (!RECKLESS_DRIVER_PROTOTYPE_CONFIG.enabled || !run || !this.track) return false;
     const raceTypeId = normalizeRaceTypeId(run.raceTypeId, DEFAULT_RACE_TYPE_ID);
     if (raceTypeId !== DEFAULT_RACE_TYPE_ID) return false;
-    if (run.partyMode || run.officialRecordChase || run.challengeMode) return false;
+    if (run.challengeMode) return false;
     if (isOfficialEnduranceRun(run) || isFuelRunRaceType(raceTypeId) || isPursuitRaceType(raceTypeId) || isBoostlineRaceType(raceTypeId)) return false;
     return this.getRecklessMaxForRun(run) > 0;
   }
@@ -34653,7 +34653,7 @@ class NeonRoadRally {
     if (raceTypeId === FUEL_RUN_RACE_TYPE_ID) {
       return {
         goal: "Finish fast while managing fuel.",
-        detail: "Gas cans refill the bar. Empty tank ends the run."
+        detail: "Gas cans refill the bar. Empty tank ends the run. Reckless traffic stays out for now."
       };
     }
     if (raceTypeId === PURSUIT_RACE_TYPE_ID) {
@@ -34664,7 +34664,7 @@ class NeonRoadRally {
     }
     return {
       goal: "Race to the finish.",
-      detail: "Traffic, boosts, ramps, clean driving, score, and precise time."
+      detail: "Traffic, reckless drivers, boosts, ramps, clean driving, score, and precise time."
     };
   }
 
@@ -35220,6 +35220,9 @@ class NeonRoadRally {
     const driverSummary = `${selectedPlayers.length} ${selectedPlayers.length === 1 ? "driver" : "drivers"}`;
     const routeName = getOfficialRouteDisplayName(route);
     const players = this.profiles.data.players;
+    const recordChaseHazardCopy = raceTypeId === DEFAULT_RACE_TYPE_ID
+      ? "Classic official routes include reckless traffic."
+      : "Fuel Run keeps reckless traffic off for now.";
     this.layer.classList.remove("is-empty");
     this.layer.innerHTML = `
 	      <section class="party-panel party-setup-screen official-record-chase-setup nrr">
@@ -35299,6 +35302,7 @@ class NeonRoadRally {
 	              <div class="official-record-chase-note">
 	                <strong>One attempt per driver</strong>
 	                <span>Pass the controller after each run. The route, speed, race type, and official setup stay locked.</span>
+	                <span id="recordChaseHazardHint">${escapeHtml(recordChaseHazardCopy)}</span>
 	              </div>
 	            </section>
 	          </div>
@@ -35317,6 +35321,7 @@ class NeonRoadRally {
     const raceTypeSelect = document.getElementById("recordChaseRaceType");
     const actionSummary = document.getElementById("recordChaseActionSummary");
     const routeSummary = document.getElementById("recordChaseRouteSummary");
+    const hazardHint = document.getElementById("recordChaseHazardHint");
     const syncDisplay = () => {
       const route = getOfficialRouteById(routeInput?.value || this.pendingOfficialRouteId) || this.getOfficialRecordChaseRoute();
       if (!route) return;
@@ -35343,6 +35348,11 @@ class NeonRoadRally {
       if (actionSummary) {
         const driverSummary = `${selectedPlayers.length} ${selectedPlayers.length === 1 ? "driver" : "drivers"}`;
         actionSummary.textContent = `${driverSummary} · ${routeName} · ${getRaceTypeLabel(raceTypeId)} · ${speedLabel}`;
+      }
+      if (hazardHint) {
+        hazardHint.textContent = raceTypeId === DEFAULT_RACE_TYPE_ID
+          ? "Classic official routes include reckless traffic."
+          : "Fuel Run keeps reckless traffic off for now.";
       }
     };
     document.querySelectorAll('input[name="recordChaseTrack"]').forEach((inputEl) => {
@@ -35657,6 +35667,9 @@ class NeonRoadRally {
     const selectedIds = new Set(setup.selectedPlayerIds);
     const driverSummary = `${selectedPlayers.length} ${selectedPlayers.length === 1 ? "driver" : "drivers"}`;
     const partyRaceTypes = getPartyRaceTypesForTrack(track, partyRaceType.id);
+    const partyHazardCopy = partyRaceType.id === DEFAULT_RACE_TYPE_ID
+      ? "Classic includes reckless traffic."
+      : "Fuel Run keeps reckless traffic off for now.";
     const manageDriversOpen = Boolean(uiState?.manageDriversOpen);
     const partyOptionsOpen = Boolean(uiState?.partyOptionsOpen);
     const partyRaceTypeToggle = `
@@ -35750,7 +35763,7 @@ class NeonRoadRally {
               </div>
               <div class="party-shared-road-summary" aria-label="Shared party road">
                 <strong>Same road for each turn</strong>
-                <span id="partySetupSharedRoad">Everyone gets the same ${escapeHtml(track.name)} road on ${escapeHtml(getSpeedClassLabel(setup.raceMode))}. ${escapeHtml(setup.sharedSeed || "A road code will lock in when the party starts.")}</span>
+                <span id="partySetupSharedRoad">Everyone gets the same ${escapeHtml(track.name)} road on ${escapeHtml(getSpeedClassLabel(setup.raceMode))}. ${escapeHtml(partyHazardCopy)} ${escapeHtml(setup.sharedSeed || "A road code will lock in when the party starts.")}</span>
               </div>
               <div class="field party-field-compact party-track-field">
                 <label>Track</label>
@@ -35866,8 +35879,8 @@ class NeonRoadRally {
       if (speedSummary) speedSummary.textContent = getSpeedClassLabel(mode);
       if (raceTypeHint) {
         raceTypeHint.textContent = selectedRaceType === FUEL_RUN_RACE_TYPE_ID
-          ? "Fuel: every player gets the same fuel rules. Grab gas cans; empty tank ends the run."
-          : "Classic Race: every player gets the same road, traffic, boosts, ramps, and finish-line scoring.";
+          ? "Fuel: every player gets the same fuel rules. Grab gas cans; empty tank ends the run. Reckless traffic stays out for now."
+          : "Classic Race: every player gets the same road, reckless traffic, boosts, ramps, and finish-line scoring.";
       }
       this.syncRaceTypeExplainCards("party", selectedRaceType);
       if (musicSummary) musicSummary.textContent = getTrackMusicStatus(track);
@@ -35899,7 +35912,10 @@ class NeonRoadRally {
         partySetupActionSeed.textContent = `${getPartyRoundTypeLabel(roundType?.value || this.getPartySetup().roundType)} · ${getPartyStartingOrderLabel(startingOrder?.value || this.getPartySetup().startingOrderMode)} · Bonus ${getPartyBonusSurvivalLabel(bonusMode)} · ${normalized || "Random road on start"}`;
       }
       if (partySetupSharedRoad) {
-        partySetupSharedRoad.textContent = `Everyone gets the same ${track.name} road on ${getSpeedClassLabel(mode)}. ${normalized || "A road code will lock in when the party starts."}`;
+        const hazardCopy = selectedRaceType === DEFAULT_RACE_TYPE_ID
+          ? "Classic includes reckless traffic."
+          : "Fuel Run keeps reckless traffic off for now.";
+        partySetupSharedRoad.textContent = `Everyone gets the same ${track.name} road on ${getSpeedClassLabel(mode)}. ${hazardCopy} ${normalized || "A road code will lock in when the party starts."}`;
       }
       if (partySetupOrderHint) {
         const orderMode = normalizePartyStartingOrderMode(startingOrder?.value || this.getPartySetup().startingOrderMode);
