@@ -4187,6 +4187,7 @@ const MENU_FOCUS_CONTAINER_SELECTOR = [
 const GAMEPAD_BUTTON_LABELS = {
   0: "Cross/X",
   1: "Circle",
+  3: "Triangle/Y",
   4: "L1",
   5: "R1",
   6: "L2",
@@ -4204,6 +4205,7 @@ const GAMEPAD_AXIS_LABELS = {
 const GAMEPAD_DIAGNOSTIC_FLAGS = [
   { key: "cross", label: "Cross/X" },
   { key: "circle", label: "Circle" },
+  { key: "triangle", label: "Triangle/Y" },
   { key: "options", label: "Options/Menu" },
   { key: "l1", label: "L1" },
   { key: "r1", label: "R1" },
@@ -4215,6 +4217,7 @@ const GAMEPAD_DIAGNOSTIC_FLAGS = [
 const GAMEPAD_MAPPING_ROWS_BY_PRESET = {
   [CONTROLLER_PRESET_STANDARD]: [
     { control: "Cross/X", action: "Boost / select" },
+    { control: "Triangle/Y", action: "Flow Break" },
     { control: "Circle", action: "Back / resume where supported" },
     { control: "Options/Menu", action: "Pause / end Bonus Survival" },
     { control: "L1/L2 + left/right", action: "Drift Dash" },
@@ -4222,6 +4225,7 @@ const GAMEPAD_MAPPING_ROWS_BY_PRESET = {
   ],
   [CONTROLLER_PRESET_SHOULDER_RACER]: [
     { control: "Cross/X", action: "Boost / select" },
+    { control: "Triangle/Y", action: "Flow Break" },
     { control: "Circle", action: "Back / resume where supported" },
     { control: "Options/Menu", action: "Pause / end Bonus Survival" },
     { control: "L1 / R1", action: "Lane left / lane right" },
@@ -4261,7 +4265,7 @@ const PACE_FEEDBACK_CONFIG = {
 const NEON_FLOW_CONFIG = {
   maxFlow: 100,
   maxArmedCharges: 1,
-  breakActiveSeconds: 0.72,
+  breakActiveSeconds: 2.25,
   breakReachMin: 2100,
   breakReachMax: 3800,
   breakReachSpeedScale: 0.5,
@@ -4303,6 +4307,7 @@ const NEON_FLOW_CONFIG = {
     cleanWindow: 6
   }
 };
+const FLOW_BREAK_IMPACT_EVENT_LIMIT = 24;
 
 const TRACK_VISUALS = {
   roadDetailIntensity: 0.48,
@@ -5928,6 +5933,79 @@ function normalizeCountMap(value, limit = 24) {
     if (id) result[id] = normalizeNonNegativeInteger(count, 0, 99999);
   });
   return result;
+}
+
+function normalizeFlowBreakImpactEvent(entry) {
+  if (!entry || typeof entry !== "object") return null;
+  const speedClassId = normalizeSpeedClassId(entry.speedClassId || entry.speedClass, DEFAULT_SPEED_CLASS_ID);
+  const raceTypeId = normalizeRaceTypeId(entry.raceTypeId || entry.raceType, DEFAULT_RACE_TYPE_ID);
+  const progress = clampNumber(entry.progress, 0, 1, 0);
+  const progressPercent = Number.isFinite(Number(entry.progressPercent))
+    ? clampNumber(Number(entry.progressPercent), 0, 100, 0)
+    : progress * 100;
+  const pressureBefore = normalizeOptionalFiniteNumber(entry.pressureBefore, 0, 999);
+  const pressureAfter = normalizeOptionalFiniteNumber(entry.pressureAfter, 0, 999);
+  const pressureDelta = normalizeOptionalFiniteNumber(entry.pressureDelta, -999, 999);
+  return {
+    id: normalizeStorageId(entry.id, ""),
+    useId: normalizeNonNegativeInteger(entry.useId, 0, 999),
+    elapsed: normalizeNonNegativeNumber(entry.elapsed, 0, 24 * 60 * 60),
+    distance: normalizeNonNegativeNumber(entry.distance, 0, 9999999),
+    progress,
+    progressPercent: roundStatNumber(progressPercent, 1),
+    sectionId: normalizeStorageId(entry.sectionId, ""),
+    sectionLabel: sanitizeName(entry.sectionLabel, "", DISPLAY_TEXT_MAX_LENGTH),
+    speedClassId,
+    speedClassLabel: sanitizeName(entry.speedClassLabel || getSpeedClassLabel(speedClassId), getSpeedClassLabel(speedClassId), DISPLAY_TEXT_MAX_LENGTH),
+    raceTypeId,
+    raceTypeLabel: sanitizeName(entry.raceTypeLabel || getRaceTypeLabel(raceTypeId), getRaceTypeLabel(raceTypeId), DISPLAY_TEXT_MAX_LENGTH),
+    trackId: normalizeStorageId(entry.trackId, ""),
+    officialRouteId: normalizeStorageId(entry.officialRouteId, ""),
+    speed: normalizeNonNegativeNumber(entry.speed, 0, 99999),
+    reason: sanitizeName(entry.reason, "", DISPLAY_TEXT_MAX_LENGTH),
+    triggerHazardType: sanitizeName(entry.triggerHazardType, "", DISPLAY_TEXT_MAX_LENGTH),
+    triggeredByMajorHazard: Boolean(entry.triggeredByMajorHazard),
+    emergency: Boolean(entry.emergency),
+    likelyCollisionPrevented: Boolean(entry.likelyCollisionPrevented),
+    usedDuringFinalPush: Boolean(entry.usedDuringFinalPush),
+    visibleHazardsAtTrigger: normalizeNonNegativeInteger(entry.visibleHazardsAtTrigger, 0, 9999),
+    nearestHazardDistance: normalizeOptionalFiniteNumber(entry.nearestHazardDistance, 0, VIEW_DISTANCE * 2),
+    hazardsCleared: normalizeNonNegativeInteger(entry.hazardsCleared, 0, 9999),
+    majorHazardsCleared: normalizeNonNegativeInteger(entry.majorHazardsCleared, 0, 9999),
+    minorHazardsCleared: normalizeNonNegativeInteger(entry.minorHazardsCleared, 0, 9999),
+    hazardsClearedAhead: normalizeNonNegativeInteger(entry.hazardsClearedAhead, 0, 9999),
+    hazardsClearedBehind: normalizeNonNegativeInteger(entry.hazardsClearedBehind, 0, 9999),
+    pressureBefore,
+    pressureAfter,
+    pressureDelta: pressureDelta !== null
+      ? pressureDelta
+      : (pressureBefore !== null && pressureAfter !== null ? roundStatNumber(pressureBefore - pressureAfter, 2) : null),
+    pressureBeforeVisibleHardBlockers: normalizeNonNegativeInteger(entry.pressureBeforeVisibleHardBlockers, 0, 99),
+    pressureAfterVisibleHardBlockers: normalizeNonNegativeInteger(entry.pressureAfterVisibleHardBlockers, 0, 99),
+    pressureBeforeTacticalHardBlockers: normalizeNonNegativeInteger(entry.pressureBeforeTacticalHardBlockers, 0, 99),
+    pressureAfterTacticalHardBlockers: normalizeNonNegativeInteger(entry.pressureAfterTacticalHardBlockers, 0, 99),
+	    pressureBeforeHardBlockersNext3Seconds: normalizeNonNegativeInteger(entry.pressureBeforeHardBlockersNext3Seconds, 0, 99),
+	    pressureAfterHardBlockersNext3Seconds: normalizeNonNegativeInteger(entry.pressureAfterHardBlockersNext3Seconds, 0, 99),
+	    manualActivation: Boolean(entry.manualActivation),
+	    phaseActivation: Boolean(entry.phaseActivation),
+	    phaseDuration: normalizeNonNegativeNumber(entry.phaseDuration, 0, 60),
+	    collisionsPhasedThrough: normalizeNonNegativeInteger(entry.collisionsPhasedThrough, 0, 9999),
+	    slowdownsPrevented: normalizeNonNegativeInteger(entry.slowdownsPrevented, 0, 9999),
+	    endedInDanger: Boolean(entry.endedInDanger),
+	    inputSource: sanitizeName(entry.inputSource, "", DISPLAY_TEXT_MAX_LENGTH),
+	    runFinished: Boolean(entry.runFinished),
+    playerCrashedWithin5s: Boolean(entry.playerCrashedWithin5s),
+    runStatus: entry.runStatus ? normalizeRunStatus(entry.runStatus) : "",
+    endReason: sanitizeName(entry.endReason, "", DISPLAY_TEXT_MAX_LENGTH)
+  };
+}
+
+function normalizeFlowBreakImpactEvents(value) {
+  const events = Array.isArray(value) ? value : [];
+  return events
+    .map((entry) => normalizeFlowBreakImpactEvent(entry))
+    .filter(Boolean)
+    .slice(-FLOW_BREAK_IMPACT_EVENT_LIMIT);
 }
 
 function normalizeDateString(value, fallback = "") {
@@ -7774,10 +7852,19 @@ function normalizePlaytestRunSummary(entry) {
     boostsCollectedAfterFinish: normalizeNonNegativeInteger(entry.boostsCollectedAfterFinish, 0, 9999),
     neonFlowEnabled: Boolean(entry.neonFlowEnabled),
     neonFlowTotalEarned: normalizeNonNegativeInteger(entry.neonFlowTotalEarned, 0, 99999),
-    flowBreaksArmed: normalizeNonNegativeInteger(entry.flowBreaksArmed, 0, 999),
-    flowBreaksTriggered: normalizeNonNegativeInteger(entry.flowBreaksTriggered, 0, 999),
-    flowBreakArmedUnused: normalizeNonNegativeInteger(entry.flowBreakArmedUnused, 0, NEON_FLOW_CONFIG.maxArmedCharges),
-    flowBreakHazardsCleared: normalizeNonNegativeInteger(entry.flowBreakHazardsCleared, 0, 9999),
+	    flowBreaksArmed: normalizeNonNegativeInteger(entry.flowBreaksArmed, 0, 999),
+	    flowBreaksTriggered: normalizeNonNegativeInteger(entry.flowBreaksTriggered, 0, 999),
+	    flowBreakArmedUnused: normalizeNonNegativeInteger(entry.flowBreakArmedUnused, 0, NEON_FLOW_CONFIG.maxArmedCharges),
+	    flowBreakUnusedAtRaceEnd: normalizeNonNegativeInteger(entry.flowBreakUnusedAtRaceEnd ?? entry.flowBreakArmedUnused, 0, NEON_FLOW_CONFIG.maxArmedCharges),
+	    flowBreakManualActivationAttempts: normalizeNonNegativeInteger(entry.flowBreakManualActivationAttempts, 0, 9999),
+	    flowBreakManualTriggerSuccesses: normalizeNonNegativeInteger(entry.flowBreakManualTriggerSuccesses, 0, 9999),
+	    flowBreakNoTargetAttempts: normalizeNonNegativeInteger(entry.flowBreakNoTargetAttempts, 0, 9999),
+	    flowBreakPhaseActivations: normalizeNonNegativeInteger(entry.flowBreakPhaseActivations, 0, 9999),
+	    flowBreakPhaseDuration: normalizeNonNegativeNumber(entry.flowBreakPhaseDuration, 0, 24 * 60 * 60),
+	    flowBreakCollisionsPhasedThrough: normalizeNonNegativeInteger(entry.flowBreakCollisionsPhasedThrough, 0, 9999),
+	    flowBreakSlowdownsPrevented: normalizeNonNegativeInteger(entry.flowBreakSlowdownsPrevented, 0, 9999),
+	    flowBreakEndedInDanger: normalizeNonNegativeInteger(entry.flowBreakEndedInDanger, 0, 9999),
+	    flowBreakHazardsCleared: normalizeNonNegativeInteger(entry.flowBreakHazardsCleared, 0, 9999),
     flowBreakHazardsClearedAhead: normalizeNonNegativeInteger(entry.flowBreakHazardsClearedAhead, 0, 9999),
     flowBreakHazardsClearedBehind: normalizeNonNegativeInteger(entry.flowBreakHazardsClearedBehind, 0, 9999),
     flowBreakHazardsConsidered: normalizeNonNegativeInteger(entry.flowBreakHazardsConsidered, 0, 99999),
@@ -7811,6 +7898,15 @@ function normalizePlaytestRunSummary(entry) {
     flowBreakNearestHazardDistance: normalizeOptionalFiniteNumber(entry.flowBreakNearestHazardDistance, 0, VIEW_DISTANCE * 2),
     flowBreakForwardReach: normalizeNonNegativeNumber(entry.flowBreakForwardReach, 0, VIEW_DISTANCE * 2),
     flowBreakFrontBuffer: normalizeNonNegativeNumber(entry.flowBreakFrontBuffer, 0, VIEW_DISTANCE),
+    flowBreakImpactEvents: normalizeFlowBreakImpactEvents(entry.flowBreakImpactEvents),
+    flowBreakLikelyCollisionPrevented: normalizeNonNegativeInteger(entry.flowBreakLikelyCollisionPrevented, 0, 9999),
+    flowBreakTriggersDuringFinalPush: normalizeNonNegativeInteger(entry.flowBreakTriggersDuringFinalPush, 0, 9999),
+    flowBreakCrashesWithin5s: normalizeNonNegativeInteger(entry.flowBreakCrashesWithin5s, 0, 9999),
+    flowBreakPressureBeforeAverage: normalizeNonNegativeNumber(entry.flowBreakPressureBeforeAverage, 0, 999),
+    flowBreakPressureAfterAverage: normalizeNonNegativeNumber(entry.flowBreakPressureAfterAverage, 0, 999),
+    flowBreakPressureDropAverage: normalizeOptionalFiniteNumber(entry.flowBreakPressureDropAverage, -999, 999) || 0,
+    flowBreakHazardsClearedPerTriggerAverage: normalizeNonNegativeNumber(entry.flowBreakHazardsClearedPerTriggerAverage, 0, 999),
+    flowBreakMajorHazardsClearedPerTriggerAverage: normalizeNonNegativeNumber(entry.flowBreakMajorHazardsClearedPerTriggerAverage, 0, 999),
     distanceCompleted: normalizeNonNegativeNumber(entry.distanceCompleted || entry.distance),
     finishProgressPercent: clampNumber(progressPercent, 0, 100, 0),
     endReason: sanitizeName(entry.endReason || entry.reason, "", DISPLAY_TEXT_MAX_LENGTH),
@@ -9428,9 +9524,18 @@ class PartySession {
       medals: Array.isArray(summary?.medals) ? summary.medals.slice(0, 3) : [],
       neonFlowEnabled: Boolean(summary?.neonFlowEnabled),
       neonFlowTotalEarned: normalizeNonNegativeInteger(summary?.neonFlowTotalEarned, 0, 99999),
-      flowBreaksArmed: normalizeNonNegativeInteger(summary?.flowBreaksArmed, 0, 999),
-      flowBreaksTriggered: normalizeNonNegativeInteger(summary?.flowBreaksTriggered, 0, 999),
-      flowBreakHazardsCleared: normalizeNonNegativeInteger(summary?.flowBreakHazardsCleared, 0, 9999),
+	      flowBreaksArmed: normalizeNonNegativeInteger(summary?.flowBreaksArmed, 0, 999),
+	      flowBreaksTriggered: normalizeNonNegativeInteger(summary?.flowBreaksTriggered, 0, 999),
+	      flowBreakUnusedAtRaceEnd: normalizeNonNegativeInteger(summary?.flowBreakUnusedAtRaceEnd ?? summary?.flowBreakArmedUnused, 0, NEON_FLOW_CONFIG.maxArmedCharges),
+	      flowBreakManualActivationAttempts: normalizeNonNegativeInteger(summary?.flowBreakManualActivationAttempts, 0, 9999),
+	      flowBreakManualTriggerSuccesses: normalizeNonNegativeInteger(summary?.flowBreakManualTriggerSuccesses, 0, 9999),
+	      flowBreakNoTargetAttempts: normalizeNonNegativeInteger(summary?.flowBreakNoTargetAttempts, 0, 9999),
+	      flowBreakPhaseActivations: normalizeNonNegativeInteger(summary?.flowBreakPhaseActivations, 0, 9999),
+	      flowBreakPhaseDuration: normalizeNonNegativeNumber(summary?.flowBreakPhaseDuration, 0, 24 * 60 * 60),
+	      flowBreakCollisionsPhasedThrough: normalizeNonNegativeInteger(summary?.flowBreakCollisionsPhasedThrough, 0, 9999),
+	      flowBreakSlowdownsPrevented: normalizeNonNegativeInteger(summary?.flowBreakSlowdownsPrevented, 0, 9999),
+	      flowBreakEndedInDanger: normalizeNonNegativeInteger(summary?.flowBreakEndedInDanger, 0, 9999),
+	      flowBreakHazardsCleared: normalizeNonNegativeInteger(summary?.flowBreakHazardsCleared, 0, 9999),
       flowBreakTriggerHazardType: sanitizeName(summary?.flowBreakTriggerHazardType, "", DISPLAY_TEXT_MAX_LENGTH),
       flowBreakTriggeredByMajorHazard: Boolean(summary?.flowBreakTriggeredByMajorHazard),
       flowBreakMinorHazardsCleared: normalizeNonNegativeInteger(summary?.flowBreakMinorHazardsCleared, 0, 9999),
@@ -11003,14 +11108,15 @@ class InputManager {
     const dpadUp = this.gamepadButtonPressed(gamepad, 12);
     const dpadDown = this.gamepadButtonPressed(gamepad, 13);
     const dpadLeft = this.gamepadButtonPressed(gamepad, 14);
-    const dpadRight = this.gamepadButtonPressed(gamepad, 15);
-    const left = dpadLeft || axisX <= -GAMEPAD_CONFIG.stickDeadzone;
-    const right = dpadRight || axisX >= GAMEPAD_CONFIG.stickDeadzone;
-    const up = dpadUp || axisY <= -GAMEPAD_CONFIG.stickDeadzone;
-    const down = dpadDown || axisY >= GAMEPAD_CONFIG.stickDeadzone;
-    const cross = this.gamepadButtonPressed(gamepad, 0);
-    const circle = this.gamepadButtonPressed(gamepad, 1);
-    const options = this.gamepadButtonPressed(gamepad, 9);
+	    const dpadRight = this.gamepadButtonPressed(gamepad, 15);
+	    const left = dpadLeft || axisX <= -GAMEPAD_CONFIG.stickDeadzone;
+	    const right = dpadRight || axisX >= GAMEPAD_CONFIG.stickDeadzone;
+	    const up = dpadUp || axisY <= -GAMEPAD_CONFIG.stickDeadzone;
+	    const down = dpadDown || axisY >= GAMEPAD_CONFIG.stickDeadzone;
+	    const cross = this.gamepadButtonPressed(gamepad, 0);
+	    const circle = this.gamepadButtonPressed(gamepad, 1);
+	    const triangle = this.gamepadButtonPressed(gamepad, 3);
+	    const options = this.gamepadButtonPressed(gamepad, 9);
     const l1 = this.gamepadButtonPressed(gamepad, 4);
     const r1 = this.gamepadButtonPressed(gamepad, 5);
     const l2 = this.gamepadButtonPressed(gamepad, 6, GAMEPAD_CONFIG.triggerPressedThreshold);
@@ -11023,12 +11129,13 @@ class InputManager {
     const laneLeft = shoulderRacer ? (left || l1) : left;
     const laneRight = shoulderRacer ? (right || r1) : right;
     const driftLeft = shoulderRacer ? l2 : (modifierDrift && left);
-    const driftRight = shoulderRacer ? r2 : (modifierDrift && right);
-    const boost = cross;
-    const back = circle;
-    const pause = options;
-    const drift = shoulderRacer ? (l2 || r2) : modifierDrift;
-    const anyInput = left || right || up || down || boost || back || pause || l1 || r1 || l2 || r2;
+	    const driftRight = shoulderRacer ? r2 : (modifierDrift && right);
+	    const boost = cross;
+	    const flowBreak = triangle;
+	    const back = circle;
+	    const pause = options;
+	    const drift = shoulderRacer ? (l2 || r2) : modifierDrift;
+	    const anyInput = left || right || up || down || boost || flowBreak || back || pause || l1 || r1 || l2 || r2;
     return {
       connected: Boolean(gamepad.connected),
       index: gamepad.index,
@@ -11038,9 +11145,10 @@ class InputManager {
       axisY,
       pressedButtons,
       activeAxes,
-      cross,
-      circle,
-      options,
+	      cross,
+	      circle,
+	      triangle,
+	      options,
       l1,
       r1,
       l2,
@@ -11055,8 +11163,9 @@ class InputManager {
       driftRight,
       up,
       down,
-      boost,
-      back,
+	      boost,
+	      flowBreak,
+	      back,
       pause,
       drift,
       controllerPresetId,
@@ -11072,9 +11181,10 @@ class InputManager {
     if (edgeButton) this.gamepadLastButton = formatGamepadButtonDiagnostic(edgeButton.index, edgeButton.value);
     const activeAxis = state.activeAxes?.[0];
     if (activeAxis) this.gamepadLastAxis = formatGamepadAxisDiagnostic(activeAxis.index, activeAxis.value);
-    if (state.cross) this.gamepadDetectedInputs.cross = true;
-    if (state.circle) this.gamepadDetectedInputs.circle = true;
-    if (state.options) this.gamepadDetectedInputs.options = true;
+	    if (state.cross) this.gamepadDetectedInputs.cross = true;
+	    if (state.circle) this.gamepadDetectedInputs.circle = true;
+	    if (state.triangle) this.gamepadDetectedInputs.triangle = true;
+	    if (state.options) this.gamepadDetectedInputs.options = true;
     if (state.l1) this.gamepadDetectedInputs.l1 = true;
     if (state.r1) this.gamepadDetectedInputs.r1 = true;
     if (state.l2) this.gamepadDetectedInputs.l2 = true;
@@ -11249,9 +11359,10 @@ class InputManager {
       this.updateDriftInput();
       return;
     }
-    const leftEdge = this.gamepadEdge(state, "laneLeft");
-    const rightEdge = this.gamepadEdge(state, "laneRight");
-    const boostEdge = this.gamepadEdge(state, "boost");
+	    const leftEdge = this.gamepadEdge(state, "laneLeft");
+	    const rightEdge = this.gamepadEdge(state, "laneRight");
+	    const boostEdge = this.gamepadEdge(state, "boost");
+	    const flowBreakEdge = this.gamepadEdge(state, "flowBreak");
     this.gamepadVerticalInput = state.up === state.down ? 0 : (state.up ? -1 : 1);
     this.gamepadLeftHeld = state.driftLeft;
     this.gamepadRightHeld = state.driftRight;
@@ -11263,13 +11374,17 @@ class InputManager {
       this.requestLaneStep("gamepad-right", 1, "gamepad");
       this.game.recordInputEvent("gamepad-right");
     }
-    if (boostEdge && this.canAcceptGamepadBoostEdge(now)) {
-      this.lastBoostEdgeTime = now;
-      this.lastBoostInputSource = "gamepad";
-      this.game.recordInputEvent("gamepad-boost");
-      this.game.useManualBoost();
-    }
-    this.updateVerticalInput();
+	    if (boostEdge && this.canAcceptGamepadBoostEdge(now)) {
+	      this.lastBoostEdgeTime = now;
+	      this.lastBoostInputSource = "gamepad";
+	      this.game.recordInputEvent("gamepad-boost");
+	      this.game.useManualBoost();
+	    }
+	    if (flowBreakEdge) {
+	      this.game.recordInputEvent("gamepad-flow-break");
+	      this.game.activateFlowBreak("gamepad");
+	    }
+	    this.updateVerticalInput();
     this.updateDriftInput();
   }
 
@@ -11672,14 +11787,16 @@ class InputManager {
       } else if (keyId === "right") {
         if (this.isShiftHeld()) this.updateDriftInput();
         else if (this.canAcceptKeyboardLaneEdge(performance.now())) this.requestLaneStep("right", 1);
-      } else if (keyId === "boost") {
-        const now = performance.now();
-        if (this.canAcceptKeyboardBoostEdge(now)) {
-          this.lastBoostEdgeTime = now;
-          this.lastBoostInputSource = "keyboard";
-          this.game.useManualBoost();
-        }
-      }
+	      } else if (keyId === "boost") {
+	        const now = performance.now();
+	        if (this.canAcceptKeyboardBoostEdge(now)) {
+	          this.lastBoostEdgeTime = now;
+	          this.lastBoostInputSource = "keyboard";
+	          this.game.useManualBoost();
+	        }
+	      } else if (keyId === "flowBreak") {
+	        this.game.activateFlowBreak("keyboard");
+	      }
       if (keyId === "left" || keyId === "right" || keyId === "shift") {
         this.updateDriftInput();
       }
@@ -11723,8 +11840,9 @@ class InputManager {
     if (key === "ArrowRight" || lower === "d") return "right";
     if (key === "ArrowUp" || lower === "w") return "up";
     if (key === "ArrowDown" || lower === "s") return "down";
-    if (key === " " || key === "Spacebar" || event.code === "Space") return "boost";
-    if (key === "Shift" || event.code === "ShiftLeft" || event.code === "ShiftRight") return "shift";
+	    if (key === " " || key === "Spacebar" || event.code === "Space") return "boost";
+	    if (lower === "e") return "flowBreak";
+	    if (key === "Shift" || event.code === "ShiftLeft" || event.code === "ShiftRight") return "shift";
     if (key === "Escape") return "escape";
     if (key === "Enter") return "enter";
     return "";
@@ -11732,7 +11850,7 @@ class InputManager {
 
   shouldPreventDefault(keyId, key) {
     if (["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", " ", "Spacebar", "Enter", "Escape"].includes(key)) return true;
-    return this.game.screen === "game" && ["left", "right", "up", "down", "boost", "shift"].includes(keyId);
+	    return this.game.screen === "game" && ["left", "right", "up", "down", "boost", "flowBreak", "shift"].includes(keyId);
   }
 
   isEditableTarget(target) {
@@ -11741,11 +11859,11 @@ class InputManager {
   }
 
   isControlKey(keyId) {
-    return ["left", "right", "up", "down", "boost", "shift", "escape", "enter"].includes(keyId);
+	    return ["left", "right", "up", "down", "boost", "flowBreak", "shift", "escape", "enter"].includes(keyId);
   }
 
   shouldSuppressGameplayInput(keyId) {
-    if (!["left", "right", "up", "down", "boost", "shift"].includes(keyId)) return false;
+	    if (!["left", "right", "up", "down", "boost", "flowBreak", "shift"].includes(keyId)) return false;
     const run = this.game.run;
     return !run || run.ended || run.paused || !run.raceActive || this.suppressedUntilKeyup.has(keyId);
   }
@@ -21442,23 +21560,18 @@ class Renderer {
       ? run.flowBreakCenterLaneFloat
       : this.game.getFlowBreakCenterLaneFloat(run);
     const laneX = this.laneCenter(clamp(centerLaneFloat, 0, LANES - 1));
-    const radiusLanes = active
-      ? clampNumber(run.flowBreakLateralRadiusLanes, 0.5, 2.5, NEON_FLOW_CONFIG.breakLateralRadiusLanes)
-      : 0.46;
+    const radiusLanes = active ? 0.72 : 0.46;
     const zoneW = this.road.laneW * radiusLanes * 2;
     ctx.save();
     ctx.globalCompositeOperation = highDetail ? "screen" : "source-over";
     if (active) {
-      const reach = Number.isFinite(run.flowBreakReach) ? run.flowBreakReach : this.game.getFlowBreakReach(run);
-      const startAhead = Number.isFinite(run.flowBreakStartAhead) && run.flowBreakStartAhead > 0
-        ? run.flowBreakStartAhead
-        : this.game.getFlowBreakZone(run, { active: true }).startAhead;
-      const yEnd = clamp(this.yForDistanceAt((run.distance || 0) + startAhead + reach, run.distance), this.road.y, this.height);
-      const yStart = clamp(this.yForDistanceAt((run.distance || 0) + startAhead, run.distance), this.road.y, this.height);
+      const playerY = this.getPlayerScreenY();
+      const yStart = clamp(playerY + this.road.laneW * 0.76, this.road.y, this.height);
+      const yEnd = clamp(playerY - this.road.laneW * (1.65 + effectScale * 0.55), this.road.y, this.height);
       const yMid = (yStart + yEnd) / 2;
       const breakT = clamp((run.flowBreakActiveTimer || 0) / Math.max(0.001, run.flowBreakDuration || NEON_FLOW_CONFIG.breakActiveSeconds), 0, 1);
       const bloom = 1 - breakT;
-      const alpha = (0.12 + breakT * 0.2) * effectScale;
+      const alpha = (0.14 + breakT * 0.18) * effectScale;
       const gradient = ctx.createLinearGradient(laneX, yEnd, laneX, yStart);
       gradient.addColorStop(0, "rgba(94, 232, 255, 0.04)");
       gradient.addColorStop(0.34, `rgba(94, 232, 255, ${alpha})`);
@@ -21467,9 +21580,9 @@ class Renderer {
       ctx.fillStyle = gradient;
       ctx.shadowBlur = highDetail ? 8 : 0;
       ctx.shadowColor = "#5ee8ff";
-      const nearHalfW = this.road.laneW * 0.36;
-      const midHalfW = zoneW * (0.32 + bloom * 0.08);
-      const farHalfW = zoneW * 0.48;
+      const nearHalfW = this.road.laneW * 0.42;
+      const midHalfW = zoneW * (0.34 + bloom * 0.08);
+      const farHalfW = zoneW * 0.54;
       ctx.beginPath();
       ctx.moveTo(laneX - nearHalfW, yStart);
       ctx.quadraticCurveTo(laneX - midHalfW, yMid, laneX - farHalfW, yEnd);
@@ -21601,6 +21714,10 @@ class Renderer {
     const boostTrailPunch = boostTrailDuration > 0 ? clamp((run.boostTrailPunchTimer || 0) / boostTrailDuration, 0, 1) : 0;
     const driftVisualIntensity = getRunDriftVisualIntensity(run);
     const sparkBoostActive = (run.flowBreakSparkBoostTimer || 0) > 0;
+    const flowBreakPhaseActive = (run.flowBreakActiveTimer || 0) > 0;
+    const flowBreakPhase = flowBreakPhaseActive
+      ? clamp((run.flowBreakActiveTimer || 0) / Math.max(0.001, run.flowBreakDuration || NEON_FLOW_CONFIG.breakActiveSeconds), 0, 1)
+      : 0;
     drawPlayerCar(this.ctx, x, y, run.player.car, {
       boosting: run.boostTimer > 0 || run.padBoostTimer > 0 || run.driftBoostTimer > 0 || sparkBoostActive,
       airborne: run.airborne,
@@ -21612,6 +21729,8 @@ class Renderer {
       laneDelta: run.targetLane - run.renderLaneFloat,
       driftDirection: isRunDrifting(run) ? run.driftDirection : (run.driftLastDirection || 0),
       driftIntensity: driftVisualIntensity,
+      flowBreakPhaseActive,
+      flowBreakPhase,
       verticalInput: run.verticalInput,
       crashFlash: run.crashFlash
     }, this.game.carSprites);
@@ -23026,16 +23145,16 @@ class Renderer {
     const chipH = compact ? 38 : 42;
     const x = w - (compact ? 22 : 36) - chipW;
     const y = h - (compact ? 152 : 166);
-    const breakArmed = Boolean(run.flowBreakArmed);
-    const breakActive = (run.flowBreakActiveTimer || 0) > 0;
-    const sparkBoost = (run.flowBreakSparkBoostTimer || 0) > 0;
-    const suppressed = (run.neonFlowSuppressedTimer || 0) > 0;
-    const pct = breakArmed || breakActive
-      ? 1
-      : clamp((run.neonFlow || 0) / Math.max(1, NEON_FLOW_CONFIG.maxFlow), 0, 1);
-    const tone = breakActive || sparkBoost || breakArmed ? "#5ee8ff" : (suppressed ? "#ffd23f" : "#ff3d9a");
-    const label = breakActive ? "FLOW BREAK" : (sparkBoost ? "SPARK BOOST" : (breakArmed ? "BREAK READY" : (suppressed ? "FLOW PAUSED" : "FLOW")));
-    const valueText = breakArmed ? "READY" : (breakActive ? "CONVERT" : (sparkBoost ? "SPEED" : `${Math.round(pct * 100)}%`));
+	    const breakArmed = Boolean(run.flowBreakArmed);
+	    const breakActive = (run.flowBreakActiveTimer || 0) > 0;
+	    const sparkBoost = (run.flowBreakSparkBoostTimer || 0) > 0;
+	    const suppressed = (run.neonFlowSuppressedTimer || 0) > 0;
+	    const pct = breakArmed || breakActive
+	      ? 1
+	      : clamp((run.neonFlow || 0) / Math.max(1, NEON_FLOW_CONFIG.maxFlow), 0, 1);
+	    const tone = breakActive || sparkBoost || breakArmed ? "#5ee8ff" : (suppressed ? "#ffd23f" : "#ff3d9a");
+	    const label = breakActive ? "FLOW BREAK" : (sparkBoost ? "SPARK BOOST" : (breakArmed ? "FLOW BREAK READY" : (suppressed ? "FLOW PAUSED" : "FLOW")));
+	    const valueText = breakArmed ? this.game.getFlowBreakInputHintText() : (breakActive ? "PHASING" : (sparkBoost ? "SPEED" : `${Math.round(pct * 100)}%`));
     const gainText = !breakArmed && !breakActive && !sparkBoost && (run.neonFlowLastGainTimer || 0) > 0 ? String(run.neonFlowLastGainText || "") : "";
     ctx.save();
     ctx.textBaseline = "middle";
@@ -24207,6 +24326,35 @@ function drawPlayerCar(ctx, x, y, carConfig, state, spriteManager = null) {
   drawCanvasPlayerCar(ctx, x, y, carConfig, state);
 }
 
+function drawFlowBreakPhaseCarGlow(ctx, w, h, state = {}) {
+  if (!state.flowBreakPhaseActive) return;
+  const phase = clampNumber(state.flowBreakPhase, 0, 1, 0);
+  const pulse = 0.58 + Math.sin(Date.now() * 0.018) * 0.18;
+  ctx.save();
+  ctx.globalCompositeOperation = "lighter";
+  ctx.globalAlpha = (0.3 + phase * 0.24) * pulse;
+  ctx.strokeStyle = "#5ee8ff";
+  ctx.fillStyle = "rgba(94, 232, 255, 0.12)";
+  ctx.shadowBlur = 16 + phase * 14;
+  ctx.shadowColor = "#5ee8ff";
+  ctx.lineWidth = Math.max(2, w * 0.035);
+  ctx.beginPath();
+  ctx.ellipse(0, 0, w * 0.72, h * 0.58, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.stroke();
+  ctx.globalAlpha = 0.22 + phase * 0.16;
+  ctx.strokeStyle = "#f6fbff";
+  ctx.lineWidth = Math.max(2, w * 0.028);
+  for (let i = 0; i < 3; i += 1) {
+    const offset = (i - 1) * w * 0.22;
+    ctx.beginPath();
+    ctx.moveTo(offset - w * 0.22, -h * 0.48);
+    ctx.lineTo(offset + w * 0.1, h * 0.58);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
 function drawSpritePlayerCar(ctx, x, y, carConfig, state, sprite) {
   const stripe = getCarAccentColor(carConfig);
   const boostTrail = getCarBoostTrailColor(carConfig);
@@ -24284,6 +24432,7 @@ function drawSpritePlayerCar(ctx, x, y, carConfig, state, sprite) {
     ctx.restore();
   }
 
+  drawFlowBreakPhaseCarGlow(ctx, spriteBox.w, spriteBox.h, state);
   ctx.restore();
 }
 
@@ -24514,6 +24663,7 @@ function drawCanvasPlayerCar(ctx, x, y, carConfig, state) {
   ctx.fillRect(w * 0.18, -h * 0.35, w * 0.08, h * 0.48);
   ctx.fillStyle = "rgba(255,255,255,0.28)";
   ctx.fillRect(-w * 0.1, -h * 0.46, w * 0.2, h * 0.035);
+  drawFlowBreakPhaseCarGlow(ctx, w, h, state);
   ctx.restore();
 }
 
@@ -25297,13 +25447,21 @@ class NeonRoadRally {
       : "Stick / D-pad";
   }
 
-  getControllerDriftHintText() {
-    return this.getControllerPresetId() === CONTROLLER_PRESET_SHOULDER_RACER
-      ? "L2/R2"
-      : "L1/L2 + left/right";
-  }
+	  getControllerDriftHintText() {
+	    return this.getControllerPresetId() === CONTROLLER_PRESET_SHOULDER_RACER
+	      ? "L2/R2"
+	      : "L1/L2 + left/right";
+	  }
 
-  createEmptyRun() {
+	  getControllerFlowBreakHintText() {
+	    return "Triangle/Y";
+	  }
+
+	  getFlowBreakInputHintText() {
+	    return this.input?.gamepadConnected ? this.getControllerFlowBreakHintText() : "PRESS E";
+	  }
+
+	  createEmptyRun() {
     const player = this.profiles.getCurrentPlayer() || {
       name: "PLAYER 1",
       car: { ...DEFAULT_CAR },
@@ -25535,11 +25693,23 @@ class NeonRoadRally {
       neonFlowSuppressedTimer: 0,
       neonFlowLastGainText: "",
       neonFlowLastGainTimer: 0,
-      flowBreakArmed: false,
-      flowBreaksArmed: 0,
-      flowBreaksTriggered: 0,
-      flowBreakArmedUnused: 0,
-      flowBreakHazardsCleared: 0,
+	      flowBreakArmed: false,
+	      flowBreaksArmed: 0,
+	      flowBreaksTriggered: 0,
+	      flowBreakArmedUnused: 0,
+	      flowBreakUnusedAtRaceEnd: 0,
+	      flowBreakManualActivationAttempts: 0,
+	      flowBreakManualTriggerSuccesses: 0,
+	      flowBreakNoTargetAttempts: 0,
+	      flowBreakNoTargetTimer: 0,
+	      flowBreakNoTargetCooldownTimer: 0,
+	      flowBreakPhaseActivations: 0,
+	      flowBreakPhaseDuration: 0,
+	      flowBreakCollisionsPhasedThrough: 0,
+	      flowBreakSlowdownsPrevented: 0,
+	      flowBreakEndedInDanger: 0,
+	      flowBreakEndCueTimer: 0,
+	      flowBreakHazardsCleared: 0,
       flowBreakHazardsClearedAhead: 0,
       flowBreakHazardsClearedBehind: 0,
       flowBreakHazardsConsidered: 0,
@@ -25587,6 +25757,18 @@ class NeonRoadRally {
       flowBreakNearestHazardDistance: null,
       flowBreakClearedThisUse: 0,
       flowBreakEmergencyObstacleId: "",
+      flowBreakImpactEvents: [],
+      flowBreakLikelyCollisionPrevented: 0,
+      flowBreakTriggersDuringFinalPush: 0,
+      flowBreakCrashesWithin5s: 0,
+      flowBreakPressureBeforeSum: 0,
+      flowBreakPressureAfterSum: 0,
+      flowBreakPressureSampleCount: 0,
+      flowBreakPressureBeforeAverage: 0,
+      flowBreakPressureAfterAverage: 0,
+      flowBreakPressureDropAverage: 0,
+      flowBreakHazardsClearedPerTriggerAverage: 0,
+      flowBreakMajorHazardsClearedPerTriggerAverage: 0,
       flowBreakSparkBoostTimer: 0,
       flowBreakVisualTimer: 0,
       flowBreakBursts: [],
@@ -26797,9 +26979,11 @@ class NeonRoadRally {
   updateNeonFlowTimers(dt) {
     const run = this.run;
     if (!run) return;
-    run.neonFlowSuppressedTimer = Math.max(0, (run.neonFlowSuppressedTimer || 0) - dt);
-    run.neonFlowLastGainTimer = Math.max(0, (run.neonFlowLastGainTimer || 0) - dt);
-    run.flowBreakVisualTimer = Math.max(0, (run.flowBreakVisualTimer || 0) - dt);
+	    run.neonFlowSuppressedTimer = Math.max(0, (run.neonFlowSuppressedTimer || 0) - dt);
+	    run.neonFlowLastGainTimer = Math.max(0, (run.neonFlowLastGainTimer || 0) - dt);
+	    run.flowBreakVisualTimer = Math.max(0, (run.flowBreakVisualTimer || 0) - dt);
+	    run.flowBreakNoTargetTimer = Math.max(0, (run.flowBreakNoTargetTimer || 0) - dt);
+	    run.flowBreakNoTargetCooldownTimer = Math.max(0, (run.flowBreakNoTargetCooldownTimer || 0) - dt);
     if (Array.isArray(run.flowBreakBursts) && run.flowBreakBursts.length) {
       let writeIndex = 0;
       const keepFrom = Math.max(0, run.flowBreakBursts.length - 12);
@@ -26813,6 +26997,126 @@ class NeonRoadRally {
       }
       run.flowBreakBursts.length = writeIndex;
     }
+  }
+
+  getFlowBreakPressureSnapshot(run = this.run) {
+    const density = this.obstacles?.getActiveFieldDensity
+      ? this.obstacles.getActiveFieldDensity(this.obstacles.obstacles, run?.distance || 0)
+      : {};
+    const visibleHardBlockers = Math.max(0, density.visibleHardBlockers || 0);
+    const tacticalHardBlockers = Math.max(0, density.tacticalHardBlockers || 0);
+    const hardBlockersNext3Seconds = Math.max(0, density.hardBlockersNext3Seconds || 0);
+    const maxHardBlockersInTwoSeconds = Math.max(0, density.maxHardBlockersInTwoSeconds || 0);
+    const maxHardBlockersInThreeLaneNeighborhood = Math.max(0, density.maxHardBlockersInThreeLaneNeighborhood || 0);
+    const score = visibleHardBlockers
+      + tacticalHardBlockers * 1.25
+      + hardBlockersNext3Seconds * 1.5
+      + maxHardBlockersInTwoSeconds * 0.75
+      + maxHardBlockersInThreeLaneNeighborhood * 0.5;
+    return {
+      score: roundStatNumber(score, 2),
+      visibleHardBlockers,
+      tacticalHardBlockers,
+      hardBlockersNext3Seconds,
+      maxHardBlockersInTwoSeconds,
+      maxHardBlockersInThreeLaneNeighborhood
+    };
+  }
+
+  isLikelyFlowBreakCollisionPrevention(triggerCandidate, run = this.run, zone = this.getFlowBreakZone(run), options = {}) {
+    if (options.emergency) return true;
+    if (!triggerCandidate?.decision || !run) return false;
+    const decision = triggerCandidate.decision;
+    const speed = Math.max(1, Number.isFinite(run.currentSpeed) ? run.currentSpeed : run.baseCruiseSpeed || SPEED_TUNING.minSpeed);
+    const playerAhead = Number.isFinite(zone?.playerForwardAhead) ? Math.max(0, zone.playerForwardAhead) : this.getFlowBreakPlayerForwardAhead(run);
+    const conflictAhead = playerAhead + speed * 1.15;
+    return Boolean(
+      this.isFlowBreakMajorTriggerType(decision.type)
+      && Math.abs(Number(decision.obstacleLane) - this.getFlowBreakCenterLaneFloat(run)) <= 0.62
+      && Number.isFinite(decision.ahead)
+      && decision.ahead <= conflictAhead
+    );
+  }
+
+  updateFlowBreakImpactAverages(run = this.run) {
+    if (!run) return;
+    const triggered = Math.max(0, run.flowBreaksTriggered || 0);
+    run.flowBreakHazardsClearedPerTriggerAverage = triggered
+      ? roundStatNumber((run.flowBreakHazardsCleared || 0) / triggered, 2)
+      : 0;
+    run.flowBreakMajorHazardsClearedPerTriggerAverage = triggered
+      ? roundStatNumber((run.flowBreakMajorHazardsCleared || 0) / triggered, 2)
+      : 0;
+    const pressureSamples = Math.max(0, run.flowBreakPressureSampleCount || 0);
+    run.flowBreakPressureBeforeAverage = pressureSamples
+      ? roundStatNumber((run.flowBreakPressureBeforeSum || 0) / pressureSamples, 2)
+      : 0;
+    run.flowBreakPressureAfterAverage = pressureSamples
+      ? roundStatNumber((run.flowBreakPressureAfterSum || 0) / pressureSamples, 2)
+      : 0;
+    run.flowBreakPressureDropAverage = pressureSamples
+      ? roundStatNumber(run.flowBreakPressureBeforeAverage - run.flowBreakPressureAfterAverage, 2)
+      : 0;
+  }
+
+  recordFlowBreakImpactEvent(event) {
+    const run = this.run;
+    if (!run || !event) return null;
+    if (!Array.isArray(run.flowBreakImpactEvents)) run.flowBreakImpactEvents = [];
+    const cleanEvent = normalizeFlowBreakImpactEvent(event);
+    if (!cleanEvent) return null;
+    run.flowBreakImpactEvents.push(cleanEvent);
+    run.flowBreakImpactEvents = run.flowBreakImpactEvents.slice(-FLOW_BREAK_IMPACT_EVENT_LIMIT);
+    if (cleanEvent.likelyCollisionPrevented) {
+      run.flowBreakLikelyCollisionPrevented = Math.max(0, (run.flowBreakLikelyCollisionPrevented || 0) + 1);
+    }
+    if (cleanEvent.usedDuringFinalPush) {
+      run.flowBreakTriggersDuringFinalPush = Math.max(0, (run.flowBreakTriggersDuringFinalPush || 0) + 1);
+    }
+    if (cleanEvent.pressureBefore !== null && cleanEvent.pressureAfter !== null) {
+      run.flowBreakPressureBeforeSum = Math.max(0, (run.flowBreakPressureBeforeSum || 0) + cleanEvent.pressureBefore);
+      run.flowBreakPressureAfterSum = Math.max(0, (run.flowBreakPressureAfterSum || 0) + cleanEvent.pressureAfter);
+      run.flowBreakPressureSampleCount = Math.max(0, (run.flowBreakPressureSampleCount || 0) + 1);
+    }
+    this.updateFlowBreakImpactAverages(run);
+    return cleanEvent;
+  }
+
+  updateLatestFlowBreakImpactEvent(updates = {}) {
+    const run = this.run;
+    if (!run || !Array.isArray(run.flowBreakImpactEvents) || !run.flowBreakImpactEvents.length) return null;
+    const latestIndex = run.flowBreakImpactEvents.length - 1;
+    const latest = run.flowBreakImpactEvents[latestIndex];
+    const next = normalizeFlowBreakImpactEvent({
+      ...latest,
+      likelyCollisionPrevented: Boolean(latest.likelyCollisionPrevented || updates.likelyCollisionPrevented),
+      collisionsPhasedThrough: Math.max(0, (latest.collisionsPhasedThrough || 0) + (updates.collisionsPhasedThrough || 0)),
+      slowdownsPrevented: Math.max(0, (latest.slowdownsPrevented || 0) + (updates.slowdownsPrevented || 0)),
+      endedInDanger: Boolean(latest.endedInDanger || updates.endedInDanger)
+    });
+    if (!next) return null;
+    run.flowBreakImpactEvents[latestIndex] = next;
+    return next;
+  }
+
+  finalizeFlowBreakImpactTelemetry(run = this.run, status = "") {
+    if (!run || !Array.isArray(run.flowBreakImpactEvents) || !run.flowBreakImpactEvents.length) return;
+    const normalizedStatus = normalizeRunStatus(status || run.endReason || "");
+    const crashed = normalizedStatus === "crashed";
+    run.flowBreakCrashesWithin5s = 0;
+    run.flowBreakImpactEvents = run.flowBreakImpactEvents.map((event) => {
+      const elapsedSinceTrigger = Math.max(0, (run.elapsed || 0) - (event.elapsed || 0));
+      const playerCrashedWithin5s = Boolean(crashed && elapsedSinceTrigger <= 5);
+      if (playerCrashedWithin5s) run.flowBreakCrashesWithin5s += 1;
+      return normalizeFlowBreakImpactEvent({
+        ...event,
+        runFinished: normalizedStatus === "finished",
+        playerCrashedWithin5s,
+        runStatus: normalizedStatus,
+        endReason: run.endReason || ""
+      });
+    });
+    this.updateFlowBreakImpactAverages(run);
   }
 
   getFlowBreakReach(run = this.run) {
@@ -27048,33 +27352,74 @@ class NeonRoadRally {
     };
   }
 
-  maybeTriggerFlowBreak() {
-    const run = this.run;
-    if (!run?.flowBreakArmed || !this.isNeonFlowEnabledForRun(run) || run.ended || !run.raceActive || run.paused) return false;
-    const plan = this.getFlowBreakTriggerPlan(run);
-    if (!plan.candidates.length) return false;
-    return this.triggerFlowBreak(plan.zone, plan);
-  }
+	  activateFlowBreak(inputSource = "keyboard") {
+	    const run = this.run;
+	    if (!run || !this.isNeonFlowEnabledForRun(run) || run.ended || !run.raceActive || run.paused) return false;
+	    if (!run.flowBreakArmed) return false;
+	    run.flowBreakManualActivationAttempts = Math.max(0, (run.flowBreakManualActivationAttempts || 0) + 1);
+	    const success = this.triggerFlowBreak(this.getFlowBreakZone(run), {
+	      reason: "manual-phase",
+	      manualActivation: true,
+	      phaseActivation: true,
+	      inputSource
+	    });
+	    if (success) {
+	      run.flowBreakManualTriggerSuccesses = Math.max(0, (run.flowBreakManualTriggerSuccesses || 0) + 1);
+	      return true;
+	    }
+	    return false;
+	  }
 
-  triggerFlowBreak(zone = this.getFlowBreakZone(this.run), options = {}) {
+	  triggerFlowBreak(zone = this.getFlowBreakZone(this.run), options = {}) {
     const run = this.run;
     if (!run?.flowBreakArmed || !this.isNeonFlowEnabledForRun(run)) return false;
     const expectedCandidates = Array.isArray(options.candidates) ? options.candidates : this.getFlowBreakCandidates(run, zone);
-    const forwardCandidateCount = expectedCandidates.filter((item) => (item?.decision?.ahead || 0) >= (zone.startAhead || 0)).length;
     const triggerCandidate = options.triggerCandidate || expectedCandidates.find((item) => {
       const type = item?.decision?.type || item?.obstacle?.type || "";
       return this.isFlowBreakMajorTriggerType(type) && (item?.decision?.ahead || 0) >= (zone.startAhead || 0);
-    });
-    if (!options.emergency && (!forwardCandidateCount || !triggerCandidate)) {
-      run.flowBreakTriggeredWithNoForwardHazard = Math.max(0, (run.flowBreakTriggeredWithNoForwardHazard || 0) + 1);
-      this.recordFlowBreakIgnoredMinorHazards(expectedCandidates);
-      return false;
-    }
+    }) || expectedCandidates[0] || null;
+    const pressureBefore = this.getFlowBreakPressureSnapshot(run);
+    const progress = clamp((run.distance || 0) / Math.max(1, run.track?.distanceToFinish || 1), 0, 1);
+    const sectionId = run.currentSectionId || getTrackSection(run.track, progress).id;
+    const phaseDuration = NEON_FLOW_CONFIG.breakActiveSeconds;
+    const impactBase = {
+      elapsed: run.elapsed || 0,
+      distance: run.distance || 0,
+      progress,
+      progressPercent: progress * 100,
+      sectionId,
+      sectionLabel: run.currentSectionLabel || getTrackSection(run.track, progress).label,
+      speedClassId: run.speedClassId || DEFAULT_SPEED_CLASS_ID,
+      speedClassLabel: run.speedClass?.label || getSpeedClassLabel(run.speedClassId),
+      raceTypeId: run.raceTypeId || DEFAULT_RACE_TYPE_ID,
+      raceTypeLabel: getRaceTypeLabel(run.raceTypeId),
+      trackId: run.track?.id || "",
+      officialRouteId: run.officialRouteId || "",
+      speed: run.currentSpeed || 0,
+      reason: options.reason || "",
+      triggerHazardType: options.triggerHazardType || triggerCandidate?.decision?.type || triggerCandidate?.obstacle?.type || "phase",
+      triggeredByMajorHazard: Boolean(options.triggeredByMajorHazard || (triggerCandidate && this.isFlowBreakMajorTriggerType(triggerCandidate.decision?.type || triggerCandidate.obstacle?.type))),
+      emergency: false,
+      likelyCollisionPrevented: false,
+      usedDuringFinalPush: sectionId === "finalPush",
+      visibleHazardsAtTrigger: Number.isFinite(options.visibleCount) ? options.visibleCount : this.getVisibleFlowBreakCandidateCount(run, expectedCandidates),
+      nearestHazardDistance: this.getNearestFlowBreakHazardDistance(run, zone),
+	      pressureBefore: pressureBefore.score,
+	      pressureBeforeVisibleHardBlockers: pressureBefore.visibleHardBlockers,
+	      pressureBeforeTacticalHardBlockers: pressureBefore.tacticalHardBlockers,
+	      pressureBeforeHardBlockersNext3Seconds: pressureBefore.hardBlockersNext3Seconds,
+	      manualActivation: Boolean(options.manualActivation),
+	      phaseActivation: true,
+	      phaseDuration,
+	      inputSource: sanitizeName(options.inputSource, "", DISPLAY_TEXT_MAX_LENGTH)
+	    };
     run.flowBreakArmed = false;
     run.flowBreaksTriggered = Math.max(0, (run.flowBreaksTriggered || 0) + 1);
+    run.flowBreakPhaseActivations = Math.max(0, (run.flowBreakPhaseActivations || 0) + 1);
+    run.flowBreakPhaseDuration = roundStatNumber(Math.max(0, (run.flowBreakPhaseDuration || 0) + phaseDuration), 2);
     run.flowBreakUseId = Math.max(0, (run.flowBreakUseId || 0) + 1);
-    run.flowBreakActiveTimer = NEON_FLOW_CONFIG.breakActiveSeconds;
-    run.flowBreakDuration = NEON_FLOW_CONFIG.breakActiveSeconds;
+    run.flowBreakActiveTimer = phaseDuration;
+    run.flowBreakDuration = phaseDuration;
     run.flowBreakCenterLaneFloat = Number(zone.centerLaneFloat.toFixed(3));
     run.flowBreakReach = zone.reach;
     run.flowBreakForwardReach = zone.reach;
@@ -27085,37 +27430,32 @@ class NeonRoadRally {
     run.flowBreakNearestHazardDistance = this.getNearestFlowBreakHazardDistance(run, zone);
     run.flowBreakClearedThisUse = 0;
     run.flowBreakEmergencyObstacleId = options.emergencyObstacleId || "";
-    run.flowBreakTriggerHazardType = options.triggerHazardType || triggerCandidate?.decision?.type || triggerCandidate?.obstacle?.type || (options.emergency ? "collision" : "");
-    run.flowBreakTriggeredByMajorHazard = Boolean(options.emergency || options.triggeredByMajorHazard || triggerCandidate);
+    run.flowBreakTriggerHazardType = impactBase.triggerHazardType;
+    run.flowBreakTriggeredByMajorHazard = impactBase.triggeredByMajorHazard;
     run.flowBreakPerfWatchFrames = Math.max(run.flowBreakPerfWatchFrames || 0, NEON_FLOW_CONFIG.breakPerfWatchFrames);
-    run.flowBreakVisibleHazardsAtTrigger = Math.max(0, (run.flowBreakVisibleHazardsAtTrigger || 0) + (Number.isFinite(options.visibleCount) ? options.visibleCount : this.getVisibleFlowBreakCandidateCount(run, expectedCandidates)));
-    const cleared = this.clearFlowBreakHazards({ emergencyObstacleId: run.flowBreakEmergencyObstacleId });
-    if (cleared <= 0 && !options.emergency) {
-      run.flowBreakTriggeredWithZeroEffect = Math.max(0, (run.flowBreakTriggeredWithZeroEffect || 0) + 1);
-      run.flowBreakArmed = true;
-      run.flowBreaksTriggered = Math.max(0, (run.flowBreaksTriggered || 0) - 1);
-      run.flowBreakActiveTimer = 0;
-      run.flowBreakDuration = 0;
-      run.flowBreakCenterLaneFloat = null;
-      run.flowBreakReach = 0;
-      run.flowBreakForwardReach = 0;
-      run.flowBreakFrontBuffer = 0;
-      run.flowBreakPlayerForwardAhead = 0;
-      run.flowBreakStartAhead = 0;
-      run.flowBreakLateralRadiusLanes = 0;
-      run.flowBreakClearedThisUse = 0;
-      run.flowBreakEmergencyObstacleId = "";
-      run.flowBreakTriggerHazardType = "";
-      run.flowBreakTriggeredByMajorHazard = false;
-      return false;
-    }
-    if (cleared <= 0 && options.emergency) {
-      run.flowBreakTriggeredWithZeroEffect = Math.max(0, (run.flowBreakTriggeredWithZeroEffect || 0) + 1);
-    }
-    run.flowBreakVisualTimer = Math.max(run.flowBreakVisualTimer || 0, NEON_FLOW_CONFIG.breakActiveSeconds + 0.48);
+    run.flowBreakVisibleHazardsAtTrigger = Math.max(0, (run.flowBreakVisibleHazardsAtTrigger || 0) + impactBase.visibleHazardsAtTrigger);
+    const pressureAfter = this.getFlowBreakPressureSnapshot(run);
+    this.recordFlowBreakImpactEvent({
+      ...impactBase,
+      id: `flow-impact-${run.flowBreakUseId}`,
+      useId: run.flowBreakUseId,
+      hazardsCleared: 0,
+      majorHazardsCleared: 0,
+      minorHazardsCleared: 0,
+      hazardsClearedAhead: 0,
+      hazardsClearedBehind: 0,
+      collisionsPhasedThrough: 0,
+      slowdownsPrevented: 0,
+      pressureAfter: pressureAfter.score,
+      pressureDelta: roundStatNumber(pressureBefore.score - pressureAfter.score, 2),
+      pressureAfterVisibleHardBlockers: pressureAfter.visibleHardBlockers,
+      pressureAfterTacticalHardBlockers: pressureAfter.tacticalHardBlockers,
+      pressureAfterHardBlockersNext3Seconds: pressureAfter.hardBlockersNext3Seconds
+    });
+    run.flowBreakVisualTimer = Math.max(run.flowBreakVisualTimer || 0, phaseDuration + 0.48);
     run.screenShake = Math.max(run.screenShake || 0, 0.08);
-    this.showRaceStateCallout(cleared > 1 ? `FLOW BREAK x${cleared}` : "FLOW BREAK", "flow", 1.05, { replace: true });
-    this.addFloatingScoreText(cleared > 1 ? `FLOW BREAK x${cleared}` : "FLOW BREAK", {
+    this.showRaceStateCallout("FLOW BREAK", "flow", 1.05, { replace: true });
+    this.addFloatingScoreText("FLOW BREAK", {
       color: "#5ee8ff",
       size: 22,
       life: 0.72,
@@ -27347,62 +27687,68 @@ class NeonRoadRally {
     run.flowBreakSparks = run.flowBreakSparks.filter((spark) => spark && !spark.collected && !spark.expired);
   }
 
-  preventFlowBreakCollision(obstacle) {
+  isFlowBreakPlayerInDanger() {
     const run = this.run;
-    if (!this.isNeonFlowEnabledForRun(run)) return false;
-    if (run.flowBreakArmed) {
-      if (!this.isFlowBreakMajorTriggerType(obstacle?.type)) return false;
-      const zone = this.getFlowBreakZone(run);
-      const emergencyZone = this.getFlowBreakZone(run, { emergency: true });
-      const emergencyDecision = this.getFlowBreakObstacleDecision(obstacle, run, emergencyZone);
-      if (emergencyDecision.decision === "clear") {
-        this.triggerFlowBreak(emergencyZone, {
-          emergency: true,
-          emergencyObstacleId: obstacle.id,
-          candidates: [],
-          visibleCount: 1,
-          reason: "collision-prevent",
-          triggerHazardType: obstacle.type,
-          triggeredByMajorHazard: true
-        });
-        if (obstacle.flowBreakCleared || obstacle.hit || obstacle.remove) {
-          run.flowBreakCollisionPrevented = Math.max(0, (run.flowBreakCollisionPrevented || 0) + 1);
-          run.collisionState = "flow break prevented collision";
-          return true;
-        }
-      }
-    }
-    if ((run.flowBreakActiveTimer || 0) <= 0) return false;
-    const zone = this.getFlowBreakZone(run, { active: true });
-    const decision = this.getFlowBreakObstacleDecision(obstacle, run, zone);
-    this.recordFlowBreakDecision(obstacle, decision);
-    let emergencyObstacleId = "";
-    if (decision.decision !== "clear") {
-      const emergencyZone = this.getFlowBreakZone(run, { emergency: true });
-      const emergencyDecision = this.getFlowBreakObstacleDecision(obstacle, run, emergencyZone);
-      if (emergencyDecision.decision !== "clear") return false;
-      emergencyObstacleId = obstacle.id;
-    }
-    const cleared = this.clearFlowBreakHazards({ emergencyObstacleId });
-    if (obstacle.hit || obstacle.remove || cleared > 0) {
-      run.flowBreakCollisionPrevented = Math.max(0, (run.flowBreakCollisionPrevented || 0) + 1);
-      run.collisionState = "flow break prevented collision";
-      return true;
+    if (!run || !this.renderer?.getPlayerHitbox || !this.renderer?.getObstacleHitbox) return false;
+    const playerBox = this.renderer.getPlayerHitbox();
+    for (const obstacle of this.obstacles.obstacles) {
+      if (!obstacle || obstacle.hit || obstacle.remove || !this.isFlowBreakClearableType(obstacle.type)) continue;
+      const obstacleBox = this.renderer.getObstacleHitbox(obstacle);
+      if (!obstacleBox) continue;
+      const minOverlapPx = getCollisionMinOverlapPx(obstacle.type);
+      if (rectsOverlapByThreshold(playerBox, obstacleBox, minOverlapPx).hit) return true;
     }
     return false;
+  }
+
+	  preventFlowBreakCollision(obstacle) {
+	    const run = this.run;
+	    if (!this.isNeonFlowEnabledForRun(run)) return false;
+	    if ((run.flowBreakActiveTimer || 0) <= 0) return false;
+	    if (!this.isFlowBreakClearableType(obstacle?.type)) return false;
+	    const firstPhaseContact = obstacle.flowBreakPhasedUseId !== run.flowBreakUseId;
+	    if (firstPhaseContact) {
+	      obstacle.flowBreakPhasedUseId = run.flowBreakUseId;
+	      const major = this.isFlowBreakMajorTriggerType(obstacle.type);
+	      if (major) {
+	        run.flowBreakCollisionsPhasedThrough = Math.max(0, (run.flowBreakCollisionsPhasedThrough || 0) + 1);
+	        run.flowBreakCollisionPrevented = Math.max(0, (run.flowBreakCollisionPrevented || 0) + 1);
+	        run.flowBreakLikelyCollisionPrevented = Math.max(0, (run.flowBreakLikelyCollisionPrevented || 0) + 1);
+	        this.updateLatestFlowBreakImpactEvent({ collisionsPhasedThrough: 1, likelyCollisionPrevented: true });
+	      } else {
+	        run.flowBreakSlowdownsPrevented = Math.max(0, (run.flowBreakSlowdownsPrevented || 0) + 1);
+	        this.updateLatestFlowBreakImpactEvent({ slowdownsPrevented: 1 });
+	      }
+	    }
+	    const label = OBSTACLE_INFO[obstacle.type]?.label || obstacle.type || "hazard";
+	    run.collisionState = `flow break phased ${label}`;
+	    return true;
   }
 
   updateFlowBreak(dt) {
     const run = this.run;
     if (!run) return;
-    this.updateFlowBreakSparks(dt);
-    if (!this.isNeonFlowEnabledForRun(run)) return;
-    if ((run.flowBreakActiveTimer || 0) > 0) {
-      run.flowBreakActiveTimer = Math.max(0, run.flowBreakActiveTimer - dt);
-    } else {
-      this.maybeTriggerFlowBreak();
-    }
-  }
+	    this.updateFlowBreakSparks(dt);
+	    if (!this.isNeonFlowEnabledForRun(run)) return;
+	    const wasActive = (run.flowBreakActiveTimer || 0) > 0;
+	    if (wasActive) {
+	      run.flowBreakActiveTimer = Math.max(0, run.flowBreakActiveTimer - dt);
+	      if (run.flowBreakActiveTimer <= 0) {
+	        if (this.isFlowBreakPlayerInDanger()) {
+	          run.flowBreakEndedInDanger = Math.max(0, (run.flowBreakEndedInDanger || 0) + 1);
+	          this.updateLatestFlowBreakImpactEvent({ endedInDanger: true });
+	        }
+	        this.showRaceStateCallout("FLOW BREAK ENDED", "flow", 0.72, { replace: true });
+	        this.addFloatingScoreText("PHASE ENDED", {
+	          color: "#f6fbff",
+	          size: 16,
+	          life: 0.42,
+	          yOffset: -80,
+	          vy: -28
+	        });
+	      }
+	    }
+	  }
 
   updateRun(dt) {
     const run = this.run;
@@ -27583,8 +27929,13 @@ class NeonRoadRally {
       "progress", "status", "reason", "time", "finishTimeMs", "finishTimeSecondsPrecise",
       "previousBestTimeMs", "bestTimeMs", "bestTimeSecondsPrecise", "newPersonalBestTime",
       "personalBestTimeDelta", "paceAheadTime", "paceBehindTime", "manualBoostsUsed",
-      "neonFlowEnabled", "neonFlowTotalEarned", "flowBreaksArmed", "flowBreaksTriggered",
-      "flowBreakArmedUnused", "flowBreakHazardsCleared", "flowBreakHazardsClearedAhead",
+	      "neonFlowEnabled", "neonFlowTotalEarned", "flowBreaksArmed", "flowBreaksTriggered",
+	      "flowBreakArmedUnused", "flowBreakUnusedAtRaceEnd", "flowBreakManualActivationAttempts",
+	      "flowBreakManualTriggerSuccesses", "flowBreakNoTargetAttempts",
+	      "flowBreakPhaseActivations", "flowBreakPhaseDuration",
+	      "flowBreakCollisionsPhasedThrough", "flowBreakSlowdownsPrevented",
+	      "flowBreakEndedInDanger",
+	      "flowBreakHazardsCleared", "flowBreakHazardsClearedAhead",
       "flowBreakHazardsClearedBehind", "flowBreakVisibleHazardsAtTrigger",
       "flowBreakTriggeredWithZeroEffect", "flowBreakTriggeredWithNoForwardHazard",
       "flowBreakTriggerHazardType", "flowBreakTriggeredByMajorHazard",
@@ -27596,7 +27947,11 @@ class NeonRoadRally {
       "flowBreakSparkDisplaySpeedAfter", "flowBreakSparkBoostMultiplier", "flowBreakSparkBoostDuration",
       "flowBreakSparkNormalBoostActive", "flowBreakSparkStackedWithBoost",
       "flowBreakForwardReach", "flowBreakFrontBuffer", "flowBreakCollisionPrevented",
-      "flowBreakFrameWorstMs", "flowBreakFrameSamples",
+      "flowBreakFrameWorstMs", "flowBreakFrameSamples", "flowBreakImpactEvents",
+      "flowBreakLikelyCollisionPrevented", "flowBreakTriggersDuringFinalPush",
+      "flowBreakCrashesWithin5s", "flowBreakPressureBeforeAverage",
+      "flowBreakPressureAfterAverage", "flowBreakPressureDropAverage",
+      "flowBreakHazardsClearedPerTriggerAverage", "flowBreakMajorHazardsClearedPerTriggerAverage",
       "boostPadsCollected", "boostPadsReachableSeen", "boostPadsMissedReachable",
       "bestBoostPadChain", "rampsUsed", "rampTargetsCleared", "laneMoves", "scoreSaved",
       "bestScore", "previousBestScore", "newPersonalBest", "entersTopTwenty",
@@ -29136,11 +29491,20 @@ class NeonRoadRally {
       maxEnduranceSpeed: summary.maxEnduranceSpeed || run.maxEnduranceSpeed || 0,
       boostsCollectedAfterFinish: summary.boostsCollectedAfterFinish || run.boostsCollectedAfterFinish || 0,
       neonFlowEnabled: Boolean(summary.neonFlowEnabled),
-      neonFlowTotalEarned: summary.neonFlowTotalEarned || 0,
-      flowBreaksArmed: summary.flowBreaksArmed || 0,
-      flowBreaksTriggered: summary.flowBreaksTriggered || 0,
-      flowBreakArmedUnused: summary.flowBreakArmedUnused || 0,
-      flowBreakHazardsCleared: summary.flowBreakHazardsCleared || 0,
+	      neonFlowTotalEarned: summary.neonFlowTotalEarned || 0,
+	      flowBreaksArmed: summary.flowBreaksArmed || 0,
+	      flowBreaksTriggered: summary.flowBreaksTriggered || 0,
+	      flowBreakArmedUnused: summary.flowBreakArmedUnused || 0,
+	      flowBreakUnusedAtRaceEnd: summary.flowBreakUnusedAtRaceEnd || summary.flowBreakArmedUnused || 0,
+	      flowBreakManualActivationAttempts: summary.flowBreakManualActivationAttempts || 0,
+	      flowBreakManualTriggerSuccesses: summary.flowBreakManualTriggerSuccesses || 0,
+	      flowBreakNoTargetAttempts: summary.flowBreakNoTargetAttempts || 0,
+	      flowBreakPhaseActivations: summary.flowBreakPhaseActivations || 0,
+	      flowBreakPhaseDuration: summary.flowBreakPhaseDuration || 0,
+	      flowBreakCollisionsPhasedThrough: summary.flowBreakCollisionsPhasedThrough || 0,
+	      flowBreakSlowdownsPrevented: summary.flowBreakSlowdownsPrevented || 0,
+	      flowBreakEndedInDanger: summary.flowBreakEndedInDanger || 0,
+	      flowBreakHazardsCleared: summary.flowBreakHazardsCleared || 0,
       flowBreakHazardsClearedAhead: summary.flowBreakHazardsClearedAhead || 0,
       flowBreakHazardsClearedBehind: summary.flowBreakHazardsClearedBehind || 0,
       flowBreakHazardsConsidered: summary.flowBreakHazardsConsidered || 0,
@@ -29173,6 +29537,15 @@ class NeonRoadRally {
       flowBreakCollisionPrevented: summary.flowBreakCollisionPrevented || 0,
       flowBreakFrameWorstMs: summary.flowBreakFrameWorstMs || 0,
       flowBreakFrameSamples: summary.flowBreakFrameSamples || 0,
+      flowBreakImpactEvents: normalizeFlowBreakImpactEvents(summary.flowBreakImpactEvents),
+      flowBreakLikelyCollisionPrevented: summary.flowBreakLikelyCollisionPrevented || 0,
+      flowBreakTriggersDuringFinalPush: summary.flowBreakTriggersDuringFinalPush || 0,
+      flowBreakCrashesWithin5s: summary.flowBreakCrashesWithin5s || 0,
+      flowBreakPressureBeforeAverage: summary.flowBreakPressureBeforeAverage || 0,
+      flowBreakPressureAfterAverage: summary.flowBreakPressureAfterAverage || 0,
+      flowBreakPressureDropAverage: summary.flowBreakPressureDropAverage || 0,
+      flowBreakHazardsClearedPerTriggerAverage: summary.flowBreakHazardsClearedPerTriggerAverage || 0,
+      flowBreakMajorHazardsClearedPerTriggerAverage: summary.flowBreakMajorHazardsClearedPerTriggerAverage || 0,
       distanceCompleted: summary.distance,
       finishProgressPercent: summary.progress * 100,
       endReason: summary.reason,
@@ -29363,6 +29736,7 @@ class NeonRoadRally {
     run.crashBeatTimer = status === "crashed" ? Math.max(run.crashBeatTimer || 0, 0.72) : 0;
     run.crashSparkTimer = status === "crashed" ? Math.max(run.crashSparkTimer || 0, ARCADE_FEEL.crashSparkMs / 1000) : run.crashSparkTimer;
     run.fuelOutBeatTimer = status === "outOfFuel" ? 0.78 : 0;
+    this.finalizeFlowBreakImpactTelemetry(run, status);
 
     if (status === "finished") {
       run.finishFlashTimer = ARCADE_FEEL.finishFlashSeconds;
@@ -29697,10 +30071,19 @@ class NeonRoadRally {
       neonFlow: Math.round(run.neonFlow || 0),
       neonFlowTotalEarned: Math.round(run.neonFlowTotalEarned || 0),
       neonFlowEvents: { ...(run.neonFlowEvents || {}) },
-      flowBreaksArmed: Math.max(0, run.flowBreaksArmed || 0),
-      flowBreaksTriggered: Math.max(0, run.flowBreaksTriggered || 0),
-      flowBreakArmedUnused: run.flowBreakArmed ? 1 : 0,
-      flowBreakHazardsCleared: Math.max(0, run.flowBreakHazardsCleared || 0),
+	      flowBreaksArmed: Math.max(0, run.flowBreaksArmed || 0),
+	      flowBreaksTriggered: Math.max(0, run.flowBreaksTriggered || 0),
+	      flowBreakArmedUnused: run.flowBreakArmed ? 1 : 0,
+	      flowBreakUnusedAtRaceEnd: run.flowBreakArmed ? 1 : 0,
+	      flowBreakManualActivationAttempts: Math.max(0, run.flowBreakManualActivationAttempts || 0),
+	      flowBreakManualTriggerSuccesses: Math.max(0, run.flowBreakManualTriggerSuccesses || 0),
+	      flowBreakNoTargetAttempts: Math.max(0, run.flowBreakNoTargetAttempts || 0),
+	      flowBreakPhaseActivations: Math.max(0, run.flowBreakPhaseActivations || 0),
+	      flowBreakPhaseDuration: Number(run.flowBreakPhaseDuration || 0),
+	      flowBreakCollisionsPhasedThrough: Math.max(0, run.flowBreakCollisionsPhasedThrough || 0),
+	      flowBreakSlowdownsPrevented: Math.max(0, run.flowBreakSlowdownsPrevented || 0),
+	      flowBreakEndedInDanger: Math.max(0, run.flowBreakEndedInDanger || 0),
+	      flowBreakHazardsCleared: Math.max(0, run.flowBreakHazardsCleared || 0),
       flowBreakHazardsClearedAhead: Math.max(0, run.flowBreakHazardsClearedAhead || 0),
       flowBreakHazardsClearedBehind: Math.max(0, run.flowBreakHazardsClearedBehind || 0),
       flowBreakHazardsConsidered: Math.max(0, run.flowBreakHazardsConsidered || 0),
@@ -29734,6 +30117,15 @@ class NeonRoadRally {
       flowBreakFrameWorstMs: Number(run.flowBreakFrameWorstMs || 0),
       flowBreakFrameSamples: Math.max(0, run.flowBreakFrameSamples || 0),
       flowBreakNearestHazardDistance: Number.isFinite(run.flowBreakNearestHazardDistance) ? run.flowBreakNearestHazardDistance : null,
+      flowBreakImpactEvents: normalizeFlowBreakImpactEvents(run.flowBreakImpactEvents),
+      flowBreakLikelyCollisionPrevented: Math.max(0, run.flowBreakLikelyCollisionPrevented || 0),
+      flowBreakTriggersDuringFinalPush: Math.max(0, run.flowBreakTriggersDuringFinalPush || 0),
+      flowBreakCrashesWithin5s: Math.max(0, run.flowBreakCrashesWithin5s || 0),
+      flowBreakPressureBeforeAverage: Number(run.flowBreakPressureBeforeAverage || 0),
+      flowBreakPressureAfterAverage: Number(run.flowBreakPressureAfterAverage || 0),
+      flowBreakPressureDropAverage: Number(run.flowBreakPressureDropAverage || 0),
+      flowBreakHazardsClearedPerTriggerAverage: Number(run.flowBreakHazardsClearedPerTriggerAverage || 0),
+      flowBreakMajorHazardsClearedPerTriggerAverage: Number(run.flowBreakMajorHazardsClearedPerTriggerAverage || 0),
       averageSpeed,
       maxSpeed: run.maxSpeedObserved || run.currentSpeed || 0,
       averageFrameMs: run.averageFrameMs || 0,
@@ -32421,9 +32813,10 @@ class NeonRoadRally {
       if (this.input) this.input.clearGameplayInput();
       this.audio.stopMusic(0.15);
       const run = this.run;
-      const controlHint = this.renderer?.getRaceControlHintText ? this.renderer.getRaceControlHintText() : "SHIFT+A/D DRIFT DASH";
-      const controllerMoveHint = this.getControllerMoveHintText();
-      const controllerDriftHint = this.getControllerDriftHintText();
+	      const controlHint = this.renderer?.getRaceControlHintText ? this.renderer.getRaceControlHintText() : "SHIFT+A/D DRIFT DASH";
+	      const controllerMoveHint = this.getControllerMoveHintText();
+	      const controllerDriftHint = this.getControllerDriftHintText();
+	      const controllerFlowBreakHint = this.getControllerFlowBreakHintText();
       const routeLabel = run.officialRouteName || run.track?.name || "Current Route";
       const raceLabel = isOfficialEnduranceRun(run)
         ? "Bonus Survival"
@@ -32447,9 +32840,10 @@ class NeonRoadRally {
             </div>
             <div class="pause-control-strip" aria-label="Controls">
               <span><b>Move</b> Arrows / ${escapeHtml(controllerMoveHint)}</span>
-              <span><b>Boost</b> Space / Cross</span>
-              <span><b>Drift</b> ${escapeHtml(controlHint)} / ${escapeHtml(controllerDriftHint)}</span>
-              <span><b>Audio</b> M / N</span>
+	              <span><b>Boost</b> Space / Cross</span>
+	              <span><b>Drift</b> ${escapeHtml(controlHint)} / ${escapeHtml(controllerDriftHint)}</span>
+	              <span><b>Flow Break</b> E / ${escapeHtml(controllerFlowBreakHint)}</span>
+	              <span><b>Audio</b> M / N</span>
             </div>
           </div>
         </section>
@@ -32675,15 +33069,15 @@ class NeonRoadRally {
   }
 
   getHowToPlaySections() {
-    const controllerPreset = this.getControllerPresetDefinition();
-    const controllerLine = controllerPreset.id === CONTROLLER_PRESET_SHOULDER_RACER
-      ? "Controller Shoulder Racer: D-pad or left stick still moves lanes; L1/R1 tap lanes; L2/R2 Drift Dash; Cross boosts/selects; Circle backs/resumes; Options pauses."
-      : "Controller Standard: D-pad or left stick moves lanes; Cross boosts/selects; Circle backs/resumes; Options pauses; hold L1/L2 plus left/right for Drift Dash.";
+	    const controllerPreset = this.getControllerPresetDefinition();
+	    const controllerLine = controllerPreset.id === CONTROLLER_PRESET_SHOULDER_RACER
+	      ? "Controller Shoulder Racer: D-pad or left stick still moves lanes; L1/R1 tap lanes; L2/R2 Drift Dash; Cross boosts/selects; Triangle/Y spends Flow Break; Circle backs/resumes; Options pauses."
+	      : "Controller Standard: D-pad or left stick moves lanes; Cross boosts/selects; Triangle/Y spends Flow Break; Circle backs/resumes; Options pauses; hold L1/L2 plus left/right for Drift Dash.";
     return {
       basics: [
         {
           title: "Basic Controls",
-          chips: ["A/D Lanes", "Controller", "Space Boost", "Enter"],
+	          chips: ["A/D Lanes", "Controller", "Space Boost", "E Flow Break"],
           points: [
             "A/D or Left/Right: tap once to change one lane.",
             "Shift + A/D or Shift + Left/Right: drift dash across lanes.",
@@ -32691,7 +33085,8 @@ class NeonRoadRally {
             "Release Shift or the drift direction to settle into the lane.",
             "Cut across lanes fast. Great for reaching boosts and dodging traffic.",
             "Mistime it and you can clip traffic.",
-            "W/S or Up/Down moves forward and back. Space uses manual boost."
+	            "W/S or Up/Down moves forward and back. Space uses manual boost.",
+	            "Drive well to charge Neon Flow. When Flow Break is ready, press E or Triangle/Y to phase through traffic for a short window."
           ]
         },
         {
@@ -32759,7 +33154,7 @@ class NeonRoadRally {
           points: [
             "Party Mode is local pass-the-controller or pass-the-keyboard competition on one computer.",
             "Players use the same road for fair comparison.",
-            "Classic Party includes Neon Flow and Flow Break.",
+	            "Classic Party includes Neon Flow and manual Flow Break.",
             "Bonus Survival can let Classic Party turns continue after the official finish until crash or manual end.",
             "One Run Each, Best of 3, and Total Score decide the winner by highest score.",
             "Party Fuel: Take turns in Fuel Run and see who can survive longest or score highest."
@@ -33109,15 +33504,17 @@ class NeonRoadRally {
                 <small class="settings-controller-note">${escapeHtml(controllerPreset.description)}</small>
               </div>
               <div class="settings-key-grid">
-                <span><b>A / D</b><em>Change lane</em></span>
-                <span><b>Shift + A/D</b><em>Drift Dash</em></span>
-                <span><b>Space</b><em>Manual boost</em></span>
-                <span><b>Esc</b><em>Pause</em></span>
+	                <span><b>A / D</b><em>Change lane</em></span>
+	                <span><b>Shift + A/D</b><em>Drift Dash</em></span>
+	                <span><b>Space</b><em>Manual boost</em></span>
+	                <span><b>E</b><em>Flow Break</em></span>
+	                <span><b>Esc</b><em>Pause</em></span>
                 <span><b>D-pad / Left Stick</b><em>Steer / vertical</em></span>
                 <span><b>${controllerPreset.id === CONTROLLER_PRESET_SHOULDER_RACER ? "L1 / R1" : "L1 / L2"}</b><em>${controllerPreset.id === CONTROLLER_PRESET_SHOULDER_RACER ? "Lane left/right" : "Drift modifier"}</em></span>
                 <span><b>${controllerPreset.id === CONTROLLER_PRESET_SHOULDER_RACER ? "L2 / R2" : "R1 / R2"}</b><em>${controllerPreset.id === CONTROLLER_PRESET_SHOULDER_RACER ? "Drift Dash left/right" : "Diagnostic only"}</em></span>
-                <span><b>Cross/X</b><em>Boost / select</em></span>
-                <span><b>Circle</b><em>Back / resume</em></span>
+	                <span><b>Cross/X</b><em>Boost / select</em></span>
+	                <span><b>Triangle/Y</b><em>Flow Break</em></span>
+	                <span><b>Circle</b><em>Back / resume</em></span>
                 <span><b>Options/Menu</b><em>Pause / end bonus</em></span>
                 <span><b>R</b><em>Restart</em></span>
                 <span><b>F</b><em>Fullscreen</em></span>
@@ -33278,6 +33675,53 @@ class NeonRoadRally {
       .sort((a, b) => b.count - a.count || a.label.localeCompare(b.label));
   }
 
+  buildFlowBreakSpeedClassRows(runs) {
+    return ["overdrive", "redline"].map((speedClassId) => {
+      const classRuns = runs.filter((run) => {
+        const runSpeed = normalizeSpeedClassId(run.raceModeId || run.speedClassId || run.speedClass, "");
+        const raceTypeId = normalizeRaceTypeId(run.raceTypeId || run.raceType, DEFAULT_RACE_TYPE_ID);
+        return runSpeed === speedClassId && raceTypeId === DEFAULT_RACE_TYPE_ID;
+      });
+	      const events = classRuns.flatMap((run) => normalizeFlowBreakImpactEvents(run.flowBreakImpactEvents));
+	      const triggers = classRuns.reduce((sum, run) => sum + (Number(run.flowBreaksTriggered) || 0), 0);
+	      const manualAttempts = classRuns.reduce((sum, run) => sum + (Number(run.flowBreakManualActivationAttempts) || 0), 0);
+	      const manualSuccesses = classRuns.reduce((sum, run) => sum + (Number(run.flowBreakManualTriggerSuccesses) || 0), 0);
+	      const noTargetAttempts = classRuns.reduce((sum, run) => sum + (Number(run.flowBreakNoTargetAttempts) || 0), 0);
+	      const phaseActivations = classRuns.reduce((sum, run) => sum + (Number(run.flowBreakPhaseActivations) || 0), 0);
+	      const collisionsPhasedThrough = classRuns.reduce((sum, run) => sum + (Number(run.flowBreakCollisionsPhasedThrough) || 0), 0);
+	      const slowdownsPrevented = classRuns.reduce((sum, run) => sum + (Number(run.flowBreakSlowdownsPrevented) || 0), 0);
+	      const hazardsCleared = classRuns.reduce((sum, run) => sum + (Number(run.flowBreakHazardsCleared) || 0), 0);
+      const majorHazardsCleared = classRuns.reduce((sum, run) => sum + (Number(run.flowBreakMajorHazardsCleared) || 0), 0);
+      const pressureBeforeValues = events.map((event) => event.pressureBefore).filter((value) => value !== null);
+      const pressureAfterValues = events.map((event) => event.pressureAfter).filter((value) => value !== null);
+      const pressureDropValues = events.map((event) => event.pressureDelta).filter((value) => value !== null);
+      return {
+        speedClassId,
+        label: getSpeedClassLabel(speedClassId),
+        runs: classRuns.length,
+        finished: classRuns.filter((run) => normalizeRunStatus(run.status) === "finished").length,
+	        armed: classRuns.reduce((sum, run) => sum + (Number(run.flowBreaksArmed) || 0), 0),
+	        manualAttempts,
+	        manualSuccesses,
+	        noTargetAttempts,
+	        phaseActivations,
+	        collisionsPhasedThrough,
+	        slowdownsPrevented,
+	        triggered: triggers,
+        hazardsCleared,
+        majorHazardsCleared,
+        likelyCollisionPrevented: events.filter((event) => event.likelyCollisionPrevented).length,
+        finalPushTriggers: events.filter((event) => event.usedDuringFinalPush).length,
+        crashesWithin5s: events.filter((event) => event.playerCrashedWithin5s).length,
+        averageHazardsClearedPerTrigger: triggers ? roundStatNumber(hazardsCleared / triggers, 2) : 0,
+        averageMajorHazardsClearedPerTrigger: triggers ? roundStatNumber(majorHazardsCleared / triggers, 2) : 0,
+        pressureBeforeAverage: roundStatNumber(getNumberStats(pressureBeforeValues).average, 2),
+        pressureAfterAverage: roundStatNumber(getNumberStats(pressureAfterValues).average, 2),
+        pressureDropAverage: roundStatNumber(getNumberStats(pressureDropValues).average, 2)
+      };
+    });
+  }
+
   buildPlaytestReportAggregate(filterValue = "all") {
     const filter = normalizePlaytestReportFilter(filterValue);
     const allRuns = this.playtestReports.getRuns();
@@ -33304,6 +33748,19 @@ class NeonRoadRally {
     const redlineRecklessRuns = recklessRuns.filter((run) => normalizeSpeedClassId(run.raceModeId || run.speedClassId, "") === "redline");
     const redlineFlowBreakHazardsCleared = redlineRecklessRuns.reduce((sum, run) => sum + (Number(run.flowBreakHazardsCleared) || 0), 0);
     const redlineRecklessEventsSeen = redlineRecklessRuns.reduce((sum, run) => sum + (Number(run.recklessEventsSeen) || 0), 0);
+	    const flowBreakRuns = runs.filter((run) => (Number(run.flowBreaksArmed) || 0) > 0
+	      || (Number(run.flowBreakManualActivationAttempts) || 0) > 0
+	      || (Number(run.flowBreakPhaseActivations) || 0) > 0
+	      || (Number(run.flowBreakCollisionsPhasedThrough) || 0) > 0
+	      || (Number(run.flowBreakSlowdownsPrevented) || 0) > 0
+	      || (Number(run.flowBreakNoTargetAttempts) || 0) > 0
+	      || (Number(run.flowBreaksTriggered) || 0) > 0
+	      || normalizeFlowBreakImpactEvents(run.flowBreakImpactEvents).length > 0);
+    const flowBreakImpactEvents = flowBreakRuns.flatMap((run) => normalizeFlowBreakImpactEvents(run.flowBreakImpactEvents));
+    const flowBreakPressureBeforeValues = flowBreakImpactEvents.map((event) => event.pressureBefore).filter((value) => value !== null);
+    const flowBreakPressureAfterValues = flowBreakImpactEvents.map((event) => event.pressureAfter).filter((value) => value !== null);
+    const flowBreakPressureDropValues = flowBreakImpactEvents.map((event) => event.pressureDelta).filter((value) => value !== null);
+    const flowBreakHighSpeedRows = this.buildFlowBreakSpeedClassRows(runs);
     const officialRouteRuns = runs.filter((run) => Boolean(run.officialRouteId));
     const officialFullRouteSignatureRows = this.countPlaytestRuns(
       officialRouteRuns.filter((run) => run.officialFullRouteSignatureHash),
@@ -33433,6 +33890,27 @@ class NeonRoadRally {
         redlineRecklessEventsSeen,
         redlineFlowBreakHazardsCleared,
         redlineFlowBreakSafetyFlag: Boolean(redlineRecklessRuns.length && redlineFlowBreakHazardsCleared >= Math.max(8, redlineRecklessRuns.length * 4) && redlineRecklessEventsSeen <= redlineRecklessRuns.length),
+        flowBreakRunCount: flowBreakRuns.length,
+        flowBreakImpactEventCount: flowBreakImpactEvents.length,
+	        flowBreaksArmed: flowBreakRuns.reduce((sum, run) => sum + (Number(run.flowBreaksArmed) || 0), 0),
+	        flowBreakManualActivationAttempts: flowBreakRuns.reduce((sum, run) => sum + (Number(run.flowBreakManualActivationAttempts) || 0), 0),
+	        flowBreakManualTriggerSuccesses: flowBreakRuns.reduce((sum, run) => sum + (Number(run.flowBreakManualTriggerSuccesses) || 0), 0),
+	        flowBreakNoTargetAttempts: flowBreakRuns.reduce((sum, run) => sum + (Number(run.flowBreakNoTargetAttempts) || 0), 0),
+	        flowBreakPhaseActivations: flowBreakRuns.reduce((sum, run) => sum + (Number(run.flowBreakPhaseActivations) || 0), 0),
+	        flowBreakPhaseDuration: flowBreakRuns.reduce((sum, run) => sum + (Number(run.flowBreakPhaseDuration) || 0), 0),
+	        flowBreakCollisionsPhasedThrough: flowBreakRuns.reduce((sum, run) => sum + (Number(run.flowBreakCollisionsPhasedThrough) || 0), 0),
+	        flowBreakSlowdownsPrevented: flowBreakRuns.reduce((sum, run) => sum + (Number(run.flowBreakSlowdownsPrevented) || 0), 0),
+	        flowBreakEndedInDanger: flowBreakRuns.reduce((sum, run) => sum + (Number(run.flowBreakEndedInDanger) || 0), 0),
+	        flowBreaksTriggered: flowBreakRuns.reduce((sum, run) => sum + (Number(run.flowBreaksTriggered) || 0), 0),
+        flowBreakHazardsCleared: flowBreakRuns.reduce((sum, run) => sum + (Number(run.flowBreakHazardsCleared) || 0), 0),
+        flowBreakMajorHazardsCleared: flowBreakRuns.reduce((sum, run) => sum + (Number(run.flowBreakMajorHazardsCleared) || 0), 0),
+        flowBreakLikelyCollisionPrevented: flowBreakImpactEvents.filter((event) => event.likelyCollisionPrevented).length,
+        flowBreakTriggersDuringFinalPush: flowBreakImpactEvents.filter((event) => event.usedDuringFinalPush).length,
+        flowBreakCrashesWithin5s: flowBreakImpactEvents.filter((event) => event.playerCrashedWithin5s).length,
+        flowBreakPressureBeforeStats: serializeNumberStats(getNumberStats(flowBreakPressureBeforeValues), 2),
+        flowBreakPressureAfterStats: serializeNumberStats(getNumberStats(flowBreakPressureAfterValues), 2),
+        flowBreakPressureDropStats: serializeNumberStats(getNumberStats(flowBreakPressureDropValues), 2),
+        flowBreakHighSpeedRows,
         minPerformanceEffectScale: frameTelemetryRuns.length
           ? frameTelemetryRuns.reduce((min, run) => Math.min(min, clampNumber(Number(run.performanceEffectScale), 0.62, 1, 1)), 1)
           : 1,
@@ -33675,6 +34153,29 @@ class NeonRoadRally {
             redlineFlowBreakHazardsCleared: aggregate.redlineFlowBreakHazardsCleared,
             redlineFlowBreakSafetyFlag: aggregate.redlineFlowBreakSafetyFlag
           },
+	          flowBreakImpact: {
+	            runs: aggregate.flowBreakRunCount,
+	            armed: aggregate.flowBreaksArmed,
+	            manualAttempts: aggregate.flowBreakManualActivationAttempts,
+	            manualSuccesses: aggregate.flowBreakManualTriggerSuccesses,
+	            noTargetAttempts: aggregate.flowBreakNoTargetAttempts,
+	            phaseActivations: aggregate.flowBreakPhaseActivations,
+	            phaseDurationSeconds: roundStatNumber(aggregate.flowBreakPhaseDuration, 2),
+	            collisionsPhasedThrough: aggregate.flowBreakCollisionsPhasedThrough,
+	            slowdownsPrevented: aggregate.flowBreakSlowdownsPrevented,
+	            endedInDanger: aggregate.flowBreakEndedInDanger,
+	            triggered: aggregate.flowBreaksTriggered,
+            impactEvents: aggregate.flowBreakImpactEventCount,
+            hazardsCleared: aggregate.flowBreakHazardsCleared,
+            majorHazardsCleared: aggregate.flowBreakMajorHazardsCleared,
+            likelyCollisionPrevented: aggregate.flowBreakLikelyCollisionPrevented,
+            triggersDuringFinalPush: aggregate.flowBreakTriggersDuringFinalPush,
+            crashesWithin5Seconds: aggregate.flowBreakCrashesWithin5s,
+            pressureBefore: aggregate.flowBreakPressureBeforeStats,
+            pressureAfter: aggregate.flowBreakPressureAfterStats,
+            pressureDrop: aggregate.flowBreakPressureDropStats,
+            highSpeedClassicRows: aggregate.flowBreakHighSpeedRows
+          },
           minPerformanceEffectScale: roundStatNumber(aggregate.minPerformanceEffectScale, 2),
           minRenderEffectScale: roundStatNumber(aggregate.minRenderEffectScale, 2),
           officialRouteRuns: aggregate.officialRouteRunCount,
@@ -33791,6 +34292,13 @@ class NeonRoadRally {
     const latestRecklessDiagnostics = latest
       ? `scheduled ${formatMapInline(latest.recklessScheduledByBehavior)}, sections ${formatMapInline(latest.recklessScheduledBySection)}, rejects ${formatMapInline(latest.recklessRejectsByReason)}`
       : "not recorded yet";
+	    const latestFlowBreakImpact = latest
+	      ? `${latest.flowBreakManualActivationAttempts || 0} manual attempts, ${latest.flowBreakPhaseActivations || latest.flowBreaksTriggered || 0} phase activations, ${formatNumber(latest.flowBreakPhaseDuration || 0, 1)}s phased, ${latest.flowBreakCollisionsPhasedThrough || 0} collisions phased, ${latest.flowBreakSlowdownsPrevented || 0} slowdowns prevented, ${latest.flowBreakEndedInDanger || 0} ended in danger`
+	      : "not recorded yet";
+    const highSpeedFlowBreakText = (aggregate.flowBreakHighSpeedRows || [])
+      .filter((row) => row.runs > 0 || row.triggered > 0)
+	      .map((row) => `${row.label}: ${row.runs} runs, ${row.manualAttempts} attempts, ${row.phaseActivations || row.triggered} phase activations, ${row.collisionsPhasedThrough || 0} collisions phased, ${row.slowdownsPrevented || 0} slowdowns prevented, ${row.finalPushTriggers} finalPush, ${row.crashesWithin5s} crash<5s`)
+      .join("; ") || "no Overdrive/Redline Classic Flow Break samples";
     return [
       "Neon Road Rally Feedback Report",
       `Build version: ${GAME_VERSION}`,
@@ -33808,6 +34316,7 @@ class NeonRoadRally {
       `Drift usage: ${latestDrift}`,
       `Reckless Drivers: ${latestReckless}`,
       `Reckless Diagnostics: ${latestRecklessDiagnostics}`,
+      `Flow Break Impact: ${latestFlowBreakImpact}`,
       "",
       "Session Summary",
       `Runs in report: ${aggregate.filteredCount}/${aggregate.totalStored}`,
@@ -33817,7 +34326,9 @@ class NeonRoadRally {
       `Reckless Drivers: ${aggregate.recklessEventsSeen} seen (${aggregate.recklessSlowMerges} slow merges / ${aggregate.recklessAggressiveOvertakes} overtakes / ${aggregate.recklessPanicCorrections} panic corrections), ${aggregate.recklessAvoidedWithDriftDash} avoided with Drift Dash, ${aggregate.recklessCrashes} crashes, telegraph avg ${formatNumber(aggregate.recklessTelegraphAverageSeconds, 2)}s, movement avg ${formatNumber(aggregate.recklessMovementAverageSeconds, 2)}s`,
       `Reckless Scheduled: behaviors ${formatMapInline(aggregate.recklessScheduledByBehaviorRows)}; sections ${formatMapInline(aggregate.recklessScheduledBySectionRows)}`,
       `Reckless Rejects: reasons ${formatMapInline(aggregate.recklessRejectReasonRows)}; sections ${formatMapInline(aggregate.recklessRejectSectionRows)}; details ${formatMapInline(aggregate.recklessRejectDetailRows)}`,
-      `Redline Flow Break Watch: ${aggregate.redlineRecklessRunCount} reckless Redline runs, ${aggregate.redlineRecklessEventsSeen} reckless events seen, ${aggregate.redlineFlowBreakHazardsCleared} Flow Break hazards cleared${aggregate.redlineFlowBreakSafetyFlag ? " (watch: Flow Break may be clearing too much Redline pressure)" : ""}`,
+      `Redline Flow Break Watch: ${aggregate.redlineRecklessRunCount} reckless Redline runs, ${aggregate.redlineRecklessEventsSeen} reckless events seen, ${aggregate.flowBreakCollisionsPhasedThrough} Flow Break traffic passes, ${aggregate.flowBreakEndedInDanger} phase endings in danger`,
+      `Flow Break Impact: ${aggregate.flowBreakManualActivationAttempts} manual attempts, ${aggregate.flowBreakPhaseActivations} phase activations, ${formatNumber(aggregate.flowBreakPhaseDuration, 1)}s phased, ${aggregate.flowBreakCollisionsPhasedThrough} collisions phased, ${aggregate.flowBreakSlowdownsPrevented} slowdowns prevented, ${aggregate.flowBreakEndedInDanger} ended in danger, ${aggregate.flowBreakTriggersDuringFinalPush} finalPush triggers, ${aggregate.flowBreakCrashesWithin5s} crash<5s`,
+      `Overdrive/Redline Flow Break: ${highSpeedFlowBreakText}`,
       `Total missed reachable boosts: ${aggregate.totalBoostPadsMissedReachable}`,
       `Total missed gas cans: ${aggregate.fuelSummary.totalGasCansMissed}`,
       "",
@@ -34431,8 +34942,18 @@ class NeonRoadRally {
       const recklessScheduledText = `${summarizeCountRows(aggregate.recklessScheduledByBehaviorRows)} · ${summarizeCountRows(aggregate.recklessScheduledBySectionRows)}`;
       const recklessRejectText = `${summarizeCountRows(aggregate.recklessRejectReasonRows)} · ${summarizeCountRows(aggregate.recklessRejectDetailRows)}`;
       const redlineFlowBreakWatchText = aggregate.redlineRecklessRunCount
-        ? `${aggregate.redlineRecklessEventsSeen} reckless seen · ${aggregate.redlineFlowBreakHazardsCleared} Flow Break clears${aggregate.redlineFlowBreakSafetyFlag ? " · watch" : ""}`
+        ? `${aggregate.redlineRecklessEventsSeen} reckless seen · ${aggregate.flowBreakCollisionsPhasedThrough || 0} Flow Break traffic passes${aggregate.flowBreakEndedInDanger ? " · watch endings" : ""}`
         : "no Redline reckless runs";
+	      const flowBreakImpactText = aggregate.flowBreakRunCount
+	        ? `${aggregate.flowBreakManualActivationAttempts} attempt${aggregate.flowBreakManualActivationAttempts === 1 ? "" : "s"} · ${aggregate.flowBreakPhaseActivations} phase${aggregate.flowBreakPhaseActivations === 1 ? "" : "s"} · ${aggregate.flowBreakCollisionsPhasedThrough} traffic pass${aggregate.flowBreakCollisionsPhasedThrough === 1 ? "" : "es"} · ${aggregate.flowBreakSlowdownsPrevented} slowdown${aggregate.flowBreakSlowdownsPrevented === 1 ? "" : "s"} prevented`
+	        : "no Flow Break samples";
+      const flowBreakPressureText = aggregate.flowBreakImpactEventCount
+        ? `${this.formatPlaytestDecimal(aggregate.flowBreakPressureBeforeStats.average, 1)} -> ${this.formatPlaytestDecimal(aggregate.flowBreakPressureAfterStats.average, 1)} pressure · ${aggregate.flowBreakTriggersDuringFinalPush} finalPush · ${aggregate.flowBreakCrashesWithin5s} crash<5s`
+        : "no pressure samples";
+      const highSpeedFlowBreakText = (aggregate.flowBreakHighSpeedRows || [])
+        .filter((row) => row.runs > 0 || row.triggered > 0)
+	        .map((row) => `${row.label} ${row.phaseActivations || row.triggered}/${row.manualAttempts} phase · ${row.collisionsPhasedThrough || 0} traffic passes · ${row.slowdownsPrevented || 0} slowdowns prevented`)
+        .join(" / ") || "no Overdrive/Redline samples";
       this.layer.classList.remove("is-empty");
       this.layer.innerHTML = `
       <section class="panel playtest-report-panel">
@@ -34478,6 +34999,9 @@ class NeonRoadRally {
             <div class="score-card"><strong>Reckless Scheduled</strong><span class="is-compact">${escapeHtml(recklessScheduledText)}</span></div>
             <div class="score-card"><strong>Reckless Rejects</strong><span class="is-compact">${escapeHtml(recklessRejectText)}</span></div>
             <div class="score-card"><strong>Redline Flow Watch</strong><span class="is-compact">${escapeHtml(redlineFlowBreakWatchText)}</span></div>
+            <div class="score-card"><strong>Flow Break Impact</strong><span class="is-compact">${escapeHtml(flowBreakImpactText)}</span></div>
+            <div class="score-card"><strong>Flow Pressure</strong><span class="is-compact">${escapeHtml(flowBreakPressureText)}</span></div>
+            <div class="score-card"><strong>Overdrive/Redline Flow</strong><span class="is-compact">${escapeHtml(highSpeedFlowBreakText)}</span></div>
             <div class="score-card"><strong>Avg Lane Changes</strong><span>${this.formatPlaytestDecimal(aggregate.averageLaneChanges)}</span></div>
             <div class="score-card"><strong>Frame Telemetry Runs</strong><span>${aggregate.frameTelemetryRunCount}</span></div>
             <div class="score-card"><strong>Avg Frame Time</strong><span>${this.formatPlaytestDecimal(aggregate.averageFrameMs, 1)}ms / ${this.formatPlaytestDecimal(aggregate.averageFps, 0)}fps</span></div>
@@ -37337,6 +37861,8 @@ class NeonRoadRally {
       if (!summary) return "";
       const roadblocks = Math.max(0, summary.roadblocksCleared || 0);
       const flowBreakClears = Math.max(0, summary.flowBreakHazardsCleared || 0);
+      const flowBreakPhases = Math.max(0, summary.flowBreakPhaseActivations || summary.flowBreaksTriggered || 0);
+      const flowBreakPasses = Math.max(0, summary.flowBreakCollisionsPhasedThrough || 0);
       const bestBoostChain = Math.max(0, summary.bestBoostPadChain || 0);
       const boosts = Math.max(0, summary.boostPadsCollected || 0);
       const rampClears = Math.max(0, summary.rampTargetsCleared || 0);
@@ -37345,6 +37871,8 @@ class NeonRoadRally {
       const jumpDistance = Math.max(0, Math.round(summary.biggestJumpDistance || 0));
       const cleanFinish = normalizeRunStatus(summary.status) === "finished" && (summary.slowdownHits || 0) === 0;
       if (roadblocks > 0) return `Roadblock cleared${roadblocks > 1 ? ` x${roadblocks}` : ""}`;
+      if (flowBreakPasses > 0) return `Flow Break phased through ${flowBreakPasses} traffic hit${flowBreakPasses === 1 ? "" : "s"}`;
+      if (flowBreakPhases > 0) return "Flow Break phase escape";
       if (flowBreakClears > 0) return `Flow Break converted ${flowBreakClears} hazard${flowBreakClears === 1 ? "" : "s"}`;
       if (bestBoostChain >= 2) return `Best boost chain x${bestBoostChain}`;
       if (rampClears > 0) return jumpDistance > 0 ? `Clear jump ${jumpDistance.toLocaleString()} road units` : `Clear jump x${rampClears}`;
@@ -37367,6 +37895,8 @@ class NeonRoadRally {
       const rampClears = Math.max(0, summary.rampTargetsCleared || 0);
       const flowBreaks = Math.max(0, summary.flowBreaksTriggered || 0);
       const flowBreakClears = Math.max(0, summary.flowBreakHazardsCleared || 0);
+      const flowBreakPasses = Math.max(0, summary.flowBreakCollisionsPhasedThrough || 0);
+      const flowBreakSlowdownStops = Math.max(0, summary.flowBreakSlowdownsPrevented || 0);
       const sparkCollects = Math.max(0, summary.flowBreakSparksCollected || 0);
       const flowEarned = Math.max(0, summary.neonFlowTotalEarned || 0);
       const add = (title, detail) => {
@@ -37383,12 +37913,12 @@ class NeonRoadRally {
             : "Drift dash helped your racing line."));
           add(driftNote, driftDetail);
       }
-      if (summary.neonFlowEnabled && flowBreaks > 0) {
-        add("Flow Break triggered", flowBreakClears > 0
-          ? `${flowBreakClears} danger${flowBreakClears === 1 ? "" : "s"} converted into ${sparkCollects} boost spark${sparkCollects === 1 ? "" : "s"}.`
-          : "Flow armed and burst through a danger window.");
-      } else if (summary.neonFlowEnabled && (summary.flowBreakArmedUnused || 0) > 0) {
-        add("Flow Break ready unused", "Flow armed, but no clearable danger entered the break zone before the run ended.");
+	      if (summary.neonFlowEnabled && flowBreaks > 0) {
+	        add("Flow Break phase", flowBreakPasses > 0 || flowBreakSlowdownStops > 0
+	          ? `Phased through ${flowBreakPasses} traffic hit${flowBreakPasses === 1 ? "" : "s"} and prevented ${flowBreakSlowdownStops} slowdown${flowBreakSlowdownStops === 1 ? "" : "s"}.`
+	          : "Flow armed and phased the car for a short escape window.");
+	      } else if (summary.neonFlowEnabled && (summary.flowBreakArmedUnused || 0) > 0) {
+	        add("Flow Break ready unused", "Flow armed, but the charge was not spent before the run ended.");
       } else if (summary.neonFlowEnabled && flowEarned >= 40) {
         add("Flow built", "Close calls, boosts, and ramp clears charged the route.");
       }
@@ -37643,8 +38173,8 @@ class NeonRoadRally {
             ${summary.neonFlowEnabled && (summary.flowBreaksTriggered || summary.flowBreakSparksCollected) ? `
               <div class="party-stat-grid">
                 <span><strong>Flow Break</strong><em>${Math.max(0, summary.flowBreaksTriggered || 0)}</em></span>
-                <span><strong>Sparks</strong><em>${Math.max(0, summary.flowBreakSparksCollected || 0)}</em></span>
-                <span><strong>Danger Cleared</strong><em>${Math.max(0, summary.flowBreakHazardsCleared || 0)}</em></span>
+                <span><strong>Traffic Phased</strong><em>${Math.max(0, summary.flowBreakCollisionsPhasedThrough || 0)}</em></span>
+                <span><strong>Slowdowns Blocked</strong><em>${Math.max(0, summary.flowBreakSlowdownsPrevented || 0)}</em></span>
               </div>
             ` : ""}
             ${summary.raceTypeId === FUEL_RUN_RACE_TYPE_ID ? `
@@ -40954,7 +41484,7 @@ class NeonRoadRally {
           <div class="score-card"><strong>Score Attack Result</strong><span class="is-compact">${formatScore(summary.finalScore)} · ${escapeHtml(leaderboardText)}</span></div>
           <div class="score-card"><strong>Time Attack Result</strong><span class="is-compact">${escapeHtml(resultTimeText)} · ${escapeHtml(paceDeltaText)}</span></div>
           ${summary.driftsStarted || summary.driftDashesCompleted || summary.driftBoostsReleased ? `<div class="score-card"><strong>Drift</strong><span class="is-compact">${Math.max(0, summary.driftDashesCompleted || 0)} dashes · best ${Number(summary.longestDriftDashLanes || 0).toFixed(1)} lanes · hold ${escapeHtml(formatTime(summary.maxDriftHold || summary.maxDriftCharge || summary.longestDrift || 0))}${summary.driftNearMisses ? ` · ${Math.max(0, summary.driftNearMisses || 0)} risky` : ""}</span></div>` : ""}
-          ${summary.neonFlowEnabled ? `<div class="score-card"><strong>Neon Flow</strong><span class="is-compact">${Math.max(0, summary.neonFlowTotalEarned || 0)} flow · ${Math.max(0, summary.flowBreaksArmed || 0)} armed · ${Math.max(0, summary.flowBreaksTriggered || 0)} break${Math.max(0, summary.flowBreaksTriggered || 0) === 1 ? "" : "s"} · ${Math.max(0, summary.flowBreakHazardsCleared || 0)} converted · ${Math.max(0, summary.flowBreakSparksCollected || 0)} spark${Math.max(0, summary.flowBreakSparksCollected || 0) === 1 ? "" : "s"}</span></div>` : ""}
+	          ${summary.neonFlowEnabled ? `<div class="score-card"><strong>Neon Flow</strong><span class="is-compact">${Math.max(0, summary.neonFlowTotalEarned || 0)} flow · ${Math.max(0, summary.flowBreaksArmed || 0)} armed · ${Math.max(0, summary.flowBreakManualActivationAttempts || 0)} attempt${Math.max(0, summary.flowBreakManualActivationAttempts || 0) === 1 ? "" : "s"} · ${Math.max(0, summary.flowBreakPhaseActivations || summary.flowBreaksTriggered || 0)} phase${Math.max(0, summary.flowBreakPhaseActivations || summary.flowBreaksTriggered || 0) === 1 ? "" : "s"} · ${Math.max(0, summary.flowBreakCollisionsPhasedThrough || 0)} traffic pass${Math.max(0, summary.flowBreakCollisionsPhasedThrough || 0) === 1 ? "" : "es"} · ${Math.max(0, summary.flowBreakSlowdownsPrevented || 0)} slowdown${Math.max(0, summary.flowBreakSlowdownsPrevented || 0) === 1 ? "" : "s"} blocked</span></div>` : ""}
           <div class="score-card"><strong>Competition</strong><span>${escapeHtml(summary.competitionKind || (summary.officialRouteId ? "Official Race" : "Custom Road"))}</span></div>
           ${summary.officialRouteId ? `<div class="score-card"><strong>Official Route</strong><span class="is-compact">${escapeHtml(officialRouteDisplayName)}</span></div>` : ""}
           <div class="score-card"><strong>Track</strong><span>${escapeHtml(summary.trackName)}</span></div>

@@ -47,17 +47,27 @@ async function setupHarness(page) {
     app.profiles.selectPlayer(driver.id);
 
     window.__flowBreakQa = {
+      laneCount() {
+        return typeof LANES === "number" ? LANES : 7;
+      },
+      centerLane() {
+        return typeof TRACK_DIRECTOR === "object" && Number.isFinite(TRACK_DIRECTOR.centerLane)
+          ? TRACK_DIRECTOR.centerLane
+          : Math.floor(this.laneCount() / 2);
+      },
       reset(options = {}) {
-        const laneFloat = Number.isFinite(options.laneFloat) ? options.laneFloat : 2;
+        const laneFloat = Number.isFinite(options.laneFloat) ? options.laneFloat : this.centerLane();
         const targetLane = Number.isFinite(options.targetLane) ? options.targetLane : Math.round(laneFloat);
         const raceTypeId = options.raceTypeId || "classic";
         const raceOptions = {
-          trackId: "sunset-highway",
-          speedClassId: "turbo",
+          trackId: options.trackId || "sunset-highway",
+          speedClassId: options.speedClassId || "turbo",
           raceTypeId,
-          seed: "SUNSET-PALM-SPRINT-TURBO"
+          seed: options.seed || "SUNSET-PALM-SPRINT-TURBO"
         };
-        if (raceTypeId === "classic") raceOptions.officialRouteId = "sunset-neon-palm-sprint";
+        if (raceTypeId === "classic" && options.officialRouteId !== false) {
+          raceOptions.officialRouteId = options.officialRouteId || "sunset-neon-palm-sprint";
+        }
         app.startRace(raceOptions);
         app.run.debugFrozen = true;
         app.run.countdownTimer = 0;
@@ -80,7 +90,8 @@ async function setupHarness(page) {
         return this.snapshot();
       },
       add(type, lane, ahead) {
-        const obstacle = app.obstacles.createObstacle(type, lane, app.run.distance + ahead, { allowLaneAdjust: false });
+        const safeLane = Math.max(0, Math.min(this.laneCount() - 1, Math.round(lane)));
+        const obstacle = app.obstacles.createObstacle(type, safeLane, app.run.distance + ahead, { allowLaneAdjust: false });
         app.obstacles.obstacles.push(obstacle);
         return obstacle.id;
       },
@@ -98,12 +109,16 @@ async function setupHarness(page) {
         app.renderer.render();
         return this.snapshot();
       },
-      tick(dt = 0.016) {
-        app.run.elapsed += dt;
-        app.updateFlowBreak(dt);
-        return this.snapshot();
-      },
-      advance(distanceDelta, dt = 0.016) {
+	      tick(dt = 0.016) {
+	        app.run.elapsed += dt;
+	        app.updateFlowBreak(dt);
+	        return this.snapshot();
+	      },
+	      activate(inputSource = "qa") {
+	        const success = app.activateFlowBreak(inputSource);
+	        return { success, snapshot: this.snapshot() };
+	      },
+	      advance(distanceDelta, dt = 0.016) {
         app.run.distance += distanceDelta;
         app.run.elapsed += dt;
         app.updateFlowBreak(dt);
@@ -113,12 +128,13 @@ async function setupHarness(page) {
         return this.snapshot();
       },
       measureFlowBreakFrameCost() {
-        this.reset();
-        this.armFromFlow();
-        this.add("slowCar", 2, 2200);
-        this.add("truck", 1, 2450);
-        this.add("slowCar", 2, 2850);
-        const samples = [];
+	        this.reset();
+	        this.armFromFlow();
+	        this.add("slowCar", this.centerLane(), 2200);
+	        this.add("truck", Math.max(0, this.centerLane() - 1), 2450);
+	        this.add("slowCar", this.centerLane(), 2850);
+	        app.activateFlowBreak("qa-perf");
+	        const samples = [];
         let triggerSnapshot = null;
         for (let frame = 0; frame < 90; frame += 1) {
           const started = performance.now();
@@ -167,15 +183,76 @@ async function setupHarness(page) {
           collisionState: app.run.collisionState
         };
       },
+      runCollisionDuringPhase(type, lane) {
+        const activation = app.activateFlowBreak("qa-phase-collision");
+        const ahead = app.renderer.aheadForY(app.renderer.getPlayerScreenY());
+        const obstacle = app.obstacles.createObstacle(type, lane, app.run.distance + ahead, { allowLaneAdjust: false });
+        app.obstacles.obstacles.push(obstacle);
+        app.collision.update();
+        return {
+          activation,
+          id: obstacle.id,
+          ahead,
+          hit: Boolean(obstacle.hit),
+          remove: Boolean(obstacle.remove),
+          flowBreakCleared: Boolean(obstacle.flowBreakCleared),
+          flowBreakPhasedUseId: obstacle.flowBreakPhasedUseId || 0,
+          activeTimer: Number((app.run.flowBreakActiveTimer || 0).toFixed(3)),
+          pendingEndStatus: app.run.pendingEndStatus || "",
+          pendingEndReason: app.run.pendingEndReason || "",
+          flowBreakCollisionPrevented: app.run.flowBreakCollisionPrevented || 0,
+          collisionsPhasedThrough: app.run.flowBreakCollisionsPhasedThrough || 0,
+          slowdownsPrevented: app.run.flowBreakSlowdownsPrevented || 0,
+          collisionState: app.run.collisionState || "",
+          impactEvents: Array.isArray(app.run.flowBreakImpactEvents) ? app.run.flowBreakImpactEvents.map((event) => ({
+            phaseActivation: Boolean(event.phaseActivation),
+            collisionsPhasedThrough: event.collisionsPhasedThrough || 0,
+            slowdownsPrevented: event.slowdownsPrevented || 0,
+            likelyCollisionPrevented: Boolean(event.likelyCollisionPrevented)
+          })) : []
+        };
+      },
+      runCollisionAfterPhaseExpires(type, lane) {
+        const activation = app.activateFlowBreak("qa-phase-expire");
+        const ahead = app.renderer.aheadForY(app.renderer.getPlayerScreenY());
+        const obstacle = app.obstacles.createObstacle(type, lane, app.run.distance + ahead, { allowLaneAdjust: false });
+        app.obstacles.obstacles.push(obstacle);
+        app.updateFlowBreak((app.run.flowBreakDuration || 0) + 0.05);
+        app.collision.update();
+        return {
+          activation,
+          id: obstacle.id,
+          ahead,
+          activeTimer: Number((app.run.flowBreakActiveTimer || 0).toFixed(3)),
+          hit: Boolean(obstacle.hit),
+          remove: Boolean(obstacle.remove),
+          flowBreakCleared: Boolean(obstacle.flowBreakCleared),
+          pendingEndStatus: app.run.pendingEndStatus || "",
+          pendingEndReason: app.run.pendingEndReason || "",
+          collisionsPhasedThrough: app.run.flowBreakCollisionsPhasedThrough || 0,
+          slowdownsPrevented: app.run.flowBreakSlowdownsPrevented || 0,
+          endedInDanger: app.run.flowBreakEndedInDanger || 0,
+          collisionState: app.run.collisionState || ""
+        };
+      },
       snapshot() {
         const run = app.run;
         return {
           flowEnabled: app.isNeonFlowEnabledForRun(run),
           flow: run.neonFlow || 0,
-          armed: Boolean(run.flowBreakArmed),
-          armedCount: run.flowBreaksArmed || 0,
-          triggered: run.flowBreaksTriggered || 0,
-          activeTimer: Number((run.flowBreakActiveTimer || 0).toFixed(3)),
+	          armed: Boolean(run.flowBreakArmed),
+	          armedCount: run.flowBreaksArmed || 0,
+	          triggered: run.flowBreaksTriggered || 0,
+	          manualAttempts: run.flowBreakManualActivationAttempts || 0,
+	          manualSuccesses: run.flowBreakManualTriggerSuccesses || 0,
+	          noTargetAttempts: run.flowBreakNoTargetAttempts || 0,
+	          phaseActivations: run.flowBreakPhaseActivations || 0,
+	          phaseDuration: Number((run.flowBreakPhaseDuration || 0).toFixed(3)),
+	          collisionsPhasedThrough: run.flowBreakCollisionsPhasedThrough || 0,
+	          slowdownsPrevented: run.flowBreakSlowdownsPrevented || 0,
+	          endedInDanger: run.flowBreakEndedInDanger || 0,
+	          noTargetTimer: Number((run.flowBreakNoTargetTimer || 0).toFixed(3)),
+	          activeTimer: Number((run.flowBreakActiveTimer || 0).toFixed(3)),
           centerLaneFloat: run.flowBreakCenterLaneFloat,
           reach: Math.round(run.flowBreakReach || 0),
           forwardReach: Math.round(run.flowBreakForwardReach || 0),
@@ -215,8 +292,43 @@ async function setupHarness(page) {
           sparkBoostTimer: Number((run.flowBreakSparkBoostTimer || 0).toFixed(3)),
           sparkPickupTimer: Number((run.flowBreakSparkPickupTimer || 0).toFixed(3)),
           collisionPrevented: run.flowBreakCollisionPrevented || 0,
+          impactEventCount: Array.isArray(run.flowBreakImpactEvents) ? run.flowBreakImpactEvents.length : 0,
+          likelyCollisionPrevented: run.flowBreakLikelyCollisionPrevented || 0,
+          triggersDuringFinalPush: run.flowBreakTriggersDuringFinalPush || 0,
+          crashesWithin5s: run.flowBreakCrashesWithin5s || 0,
+          pressureBeforeAverage: run.flowBreakPressureBeforeAverage || 0,
+          pressureAfterAverage: run.flowBreakPressureAfterAverage || 0,
+          pressureDropAverage: run.flowBreakPressureDropAverage || 0,
+          hazardsClearedPerTriggerAverage: run.flowBreakHazardsClearedPerTriggerAverage || 0,
+          majorHazardsClearedPerTriggerAverage: run.flowBreakMajorHazardsClearedPerTriggerAverage || 0,
           flowBreakFrameWorstMs: Number((run.flowBreakFrameWorstMs || 0).toFixed(3)),
           flowBreakFrameSamples: run.flowBreakFrameSamples || 0,
+          impactEvents: Array.isArray(run.flowBreakImpactEvents) ? run.flowBreakImpactEvents.map((event) => ({
+            id: event.id || "",
+            useId: event.useId || 0,
+            progressPercent: event.progressPercent ?? null,
+            sectionId: event.sectionId || "",
+            speedClassId: event.speedClassId || "",
+            raceTypeId: event.raceTypeId || "",
+            triggerHazardType: event.triggerHazardType || "",
+            hazardsCleared: event.hazardsCleared || 0,
+            majorHazardsCleared: event.majorHazardsCleared || 0,
+            minorHazardsCleared: event.minorHazardsCleared || 0,
+            phaseActivation: Boolean(event.phaseActivation),
+            phaseDuration: event.phaseDuration || 0,
+            collisionsPhasedThrough: event.collisionsPhasedThrough || 0,
+            slowdownsPrevented: event.slowdownsPrevented || 0,
+            endedInDanger: Boolean(event.endedInDanger),
+            likelyCollisionPrevented: Boolean(event.likelyCollisionPrevented),
+            usedDuringFinalPush: Boolean(event.usedDuringFinalPush),
+	            pressureBefore: event.pressureBefore ?? null,
+	            pressureAfter: event.pressureAfter ?? null,
+	            pressureDelta: event.pressureDelta ?? null,
+	            manualActivation: Boolean(event.manualActivation),
+	            inputSource: event.inputSource || "",
+	            runFinished: Boolean(event.runFinished),
+            playerCrashedWithin5s: Boolean(event.playerCrashedWithin5s)
+          })) : [],
           pendingEndStatus: run.pendingEndStatus || "",
           callout: run.raceStateCalloutText || "",
           obstacles: app.obstacles.obstacles.map((obstacle) => ({
@@ -263,9 +375,12 @@ async function runRealRouteSample(page, outDir) {
     app.run.debugFrozen = true;
     app.run.countdownTimer = 0;
     app.run.raceActive = true;
-    app.run.renderLaneFloat = 2;
-    app.run.playerLaneFloat = 2;
-    app.run.targetLane = 2;
+    const centerLane = typeof TRACK_DIRECTOR === "object" && Number.isFinite(TRACK_DIRECTOR.centerLane)
+      ? TRACK_DIRECTOR.centerLane
+      : 3;
+    app.run.renderLaneFloat = centerLane;
+    app.run.playerLaneFloat = centerLane;
+    app.run.targetLane = centerLane;
     app.run.neonFlow = 92;
     app.addNeonFlow("nearMiss", { ignoreSuppression: true });
     app.renderer.render();
@@ -275,33 +390,24 @@ async function runRealRouteSample(page, outDir) {
   await page.screenshot({ path: readyShot });
   const screenshots = [readyShot];
   let triggerShot = "";
-  let sparksShot = "";
-  let collectedShot = "";
   let finalSnapshot = null;
 
-  for (let frame = 0; frame < 1200; frame += 1) {
+  for (let frame = 0; frame < 180; frame += 1) {
     const snapshot = await page.evaluate((frameIndex) => {
       const app = window.neonRoadRally;
       const run = app.run;
-      if (Array.isArray(run.flowBreakSparks) && run.flowBreakSparks.length) {
-        const nextSpark = run.flowBreakSparks
-          .filter((spark) => !spark.collected)
-          .sort((a, b) => Math.max(0, a.distance - run.distance) - Math.max(0, b.distance - run.distance))[0];
-        if (nextSpark && nextSpark.distance - run.distance > 520) {
-          const sparkLane = Math.round(Math.max(0, Math.min(4, nextSpark.laneFloat)));
-          run.targetLane = sparkLane;
-          run.laneChangeTargetLane = sparkLane;
-          run.renderLaneFloat += Math.max(-0.12, Math.min(0.12, sparkLane - run.renderLaneFloat));
-          run.playerLaneFloat = run.renderLaneFloat;
-        }
-      }
-      app.updateRun(1 / 60);
+	      if (run.flowBreakArmed && (run.flowBreaksTriggered || 0) === 0) app.activateFlowBreak("qa-real-route");
+	      app.updateRun(1 / 60);
       app.renderer.render();
       return {
         frame: frameIndex,
         ended: Boolean(run.ended),
         pendingEndStatus: run.pendingEndStatus || "",
         triggered: run.flowBreaksTriggered || 0,
+        phaseActivations: run.flowBreakPhaseActivations || 0,
+        phaseDuration: run.flowBreakPhaseDuration || 0,
+        collisionsPhasedThrough: run.flowBreakCollisionsPhasedThrough || 0,
+        slowdownsPrevented: run.flowBreakSlowdownsPrevented || 0,
         armed: Boolean(run.flowBreakArmed),
         hazardsCleared: run.flowBreakHazardsCleared || 0,
         hazardsClearedAhead: run.flowBreakHazardsClearedAhead || 0,
@@ -360,15 +466,7 @@ async function runRealRouteSample(page, outDir) {
       await page.screenshot({ path: triggerShot });
       screenshots.push(triggerShot);
     }
-    if (snapshot.sparksCreated > 0 && snapshot.sparks.length && !sparksShot) {
-      sparksShot = path.join(outDir, "real-route-boost-sparks-visible.png");
-      await page.screenshot({ path: sparksShot });
-      screenshots.push(sparksShot);
-    }
-    if (snapshot.sparksCollected > 0 && !collectedShot) {
-      collectedShot = path.join(outDir, "real-route-boost-spark-collected.png");
-      await page.screenshot({ path: collectedShot });
-      screenshots.push(collectedShot);
+    if (snapshot.triggered > 0 && frame > 90) {
       break;
     }
     if (snapshot.ended) break;
@@ -400,10 +498,13 @@ async function runLiveFlowBreakFrameSample(page) {
     app.run.distance = 90000;
     app.run.elapsed = 0;
     app.run.currentSpeed = 3400;
-    app.run.renderLaneFloat = 2;
-    app.run.playerLaneFloat = 2;
-    app.run.targetLane = 2;
-    app.run.laneChangeTargetLane = 2;
+    const centerLane = typeof TRACK_DIRECTOR === "object" && Number.isFinite(TRACK_DIRECTOR.centerLane)
+      ? TRACK_DIRECTOR.centerLane
+      : 3;
+    app.run.renderLaneFloat = centerLane;
+    app.run.playerLaneFloat = centerLane;
+    app.run.targetLane = centerLane;
+    app.run.laneChangeTargetLane = centerLane;
     app.run.neonFlow = 0;
     app.run.frameSampleCount = 0;
     app.run.frameTimeSumMs = 0;
@@ -439,11 +540,15 @@ async function runLiveFlowBreakFrameSample(page) {
     app.run.neonFlow = 92;
     app.obstacles.obstacles = [];
     app.obstacles.nextObstacleId = 1;
-    app.obstacles.obstacles.push(app.obstacles.createObstacle("slowCar", 2, app.run.distance + 2200, { allowLaneAdjust: false }));
-    app.obstacles.obstacles.push(app.obstacles.createObstacle("truck", 1, app.run.distance + 2450, { allowLaneAdjust: false }));
-    app.lastFrame = performance.now();
-    app.addNeonFlow("nearMiss", { ignoreSuppression: true });
-  });
+    const centerLane = typeof TRACK_DIRECTOR === "object" && Number.isFinite(TRACK_DIRECTOR.centerLane)
+      ? TRACK_DIRECTOR.centerLane
+      : 3;
+	    app.obstacles.obstacles.push(app.obstacles.createObstacle("slowCar", centerLane, app.run.distance + 2200, { allowLaneAdjust: false }));
+	    app.obstacles.obstacles.push(app.obstacles.createObstacle("truck", Math.max(0, centerLane - 1), app.run.distance + 2450, { allowLaneAdjust: false }));
+	    app.lastFrame = performance.now();
+	    app.addNeonFlow("nearMiss", { ignoreSuppression: true });
+	    app.activateFlowBreak("qa-live-frame");
+	  });
   await page.waitForFunction(() => {
     const run = window.neonRoadRally?.run;
     return Boolean(run && run.flowBreaksTriggered >= 1 && run.flowBreakFrameSamples >= 12);
@@ -506,179 +611,204 @@ async function run() {
     assert.strictEqual(armed.flow, 0, "Flow should reset after arming");
     assert.strictEqual(armed.armed, true, "Flow Break should arm at 100 Flow");
     assert.strictEqual(armed.armedCount, 1, "Flow Break armed count should increment");
-    const emptyRoad = await page.evaluate(() => window.__flowBreakQa.tick());
-    assert.strictEqual(emptyRoad.armed, true, "Flow Break should stay armed on empty road");
-    assert.strictEqual(emptyRoad.triggered, 0, "Flow Break should not trigger on empty road");
-    const armedShot = path.join(OUT_DIR, "flow-ready-hud.png");
-    await page.screenshot({ path: armedShot });
+	    const emptyRoad = await page.evaluate(() => window.__flowBreakQa.tick());
+	    assert.strictEqual(emptyRoad.armed, true, "Flow Break should stay armed on empty road");
+	    assert.strictEqual(emptyRoad.triggered, 0, "Flow Break should not trigger on empty road");
+	    const armedShot = path.join(OUT_DIR, "flow-ready-hud.png");
+	    await page.screenshot({ path: armedShot });
     await page.setViewportSize({ width: 1280, height: 720 });
     await page.evaluate(() => window.__flowBreakQa.paint());
     const armed720Shot = path.join(OUT_DIR, "flow-ready-hud-1280x720.png");
     await page.screenshot({ path: armed720Shot });
-    await page.setViewportSize({ width: 1440, height: 900 });
-    await page.evaluate(() => window.__flowBreakQa.paint());
+	    await page.setViewportSize({ width: 1440, height: 900 });
+	    await page.evaluate(() => window.__flowBreakQa.paint());
 
-    const behindAhead = Math.max(20, armed.playerForwardAhead - 360);
-    const behindId = await page.evaluate((ahead) => window.__flowBreakQa.add("slowCar", 2, ahead), behindAhead);
-    const behindWait = await page.evaluate(() => window.__flowBreakQa.tick());
-    assert.strictEqual(behindWait.armed, true, "Flow Break should wait when the only clearable hazard is behind the player");
-    assert.strictEqual(behindWait.triggered, 0, "Flow Break should not trigger for behind-player hazards");
-    assert(!findObstacle(behindWait, behindId).flowBreakCleared, "Behind-player hazard should not be cleared by normal Flow Break");
-
-    const edgeOnlyId = await page.evaluate(() => window.__flowBreakQa.add("slowCar", 2, 4050));
-    const noEffectWait = await page.evaluate(() => window.__flowBreakQa.tick());
-    assert.strictEqual(noEffectWait.armed, true, "Flow Break should wait when only one edge hazard is outside trigger quality");
-    assert.strictEqual(noEffectWait.triggered, 0, "Flow Break should not trigger with no meaningful visible effect");
-    assert.strictEqual(noEffectWait.zeroEffectTriggers, 0, "Flow Break should not record zero-effect triggers");
-    assert.strictEqual(noEffectWait.noForwardHazardTriggers, 0, "Waiting should not create no-forward trigger telemetry");
-    assert(!findObstacle(noEffectWait, edgeOnlyId).flowBreakCleared, "Edge hazard should remain until it enters the trigger zone");
-
-    await page.evaluate(() => window.__flowBreakQa.reset());
-    await page.evaluate(() => window.__flowBreakQa.armFromFlow());
-    const coneOnlyId = await page.evaluate(() => window.__flowBreakQa.add("cone", 2, 2200));
-    const coneOnly = await page.evaluate(() => window.__flowBreakQa.tick());
-    assert.strictEqual(coneOnly.armed, true, "Cone-only forward zone should keep Flow Break armed");
-    assert.strictEqual(coneOnly.triggered, 0, "Cone-only forward zone should not trigger Flow Break");
-    assert(!findObstacle(coneOnly, coneOnlyId).flowBreakCleared, "Cone-only hazard should not be cleared without a major trigger");
-    assert(coneOnly.ignoredMinorHazardCount >= 1, "Cone-only forward zone should record an ignored minor hazard");
-    assert.strictEqual(coneOnly.zeroEffectTriggers, 0, "Cone-only wait should not create zero-effect telemetry");
-    assert.strictEqual(coneOnly.noForwardHazardTriggers, 0, "Cone-only wait should not create no-forward trigger telemetry");
-
-    await page.evaluate(() => window.__flowBreakQa.reset());
-    await page.evaluate(() => window.__flowBreakQa.armFromFlow());
-    const oilOnlyId = await page.evaluate(() => window.__flowBreakQa.add("oil", 2, 2200));
-    const branchOnlyId = await page.evaluate(() => window.__flowBreakQa.add("branch", 2, 2350));
-    const minorOnly = await page.evaluate(() => window.__flowBreakQa.tick());
-    assert.strictEqual(minorOnly.armed, true, "Oil/branch-only forward zone should keep Flow Break armed");
-    assert.strictEqual(minorOnly.triggered, 0, "Oil/branch-only forward zone should not trigger Flow Break");
-    assert(!findObstacle(minorOnly, oilOnlyId).flowBreakCleared, "Oil should not be cleared without a major trigger");
-    assert(!findObstacle(minorOnly, branchOnlyId).flowBreakCleared, "Branch should not be cleared without a major trigger");
-    assert(minorOnly.ignoredMinorHazardCount >= 2, "Oil/branch-only forward zone should record ignored minor hazards");
+	    const emptyManual = await page.evaluate(() => window.__flowBreakQa.activate("qa-targetless"));
+	    assert.strictEqual(emptyManual.success, true, "Manual Flow Break should activate even with no target");
+	    assert.strictEqual(emptyManual.snapshot.armed, false, "Targetless Flow Break should consume the charge");
+	    assert.strictEqual(emptyManual.snapshot.triggered, 1, "Targetless Flow Break should count as one spent charge");
+	    assert.strictEqual(emptyManual.snapshot.phaseActivations, 1, "Targetless Flow Break should start phase mode");
+	    assert(emptyManual.snapshot.activeTimer > 2, "Flow Break phase should last roughly two seconds");
+	    assert.strictEqual(emptyManual.snapshot.noTargetAttempts, 0, "Flow Break should not record no-target attempts anymore");
+	    assert.strictEqual(emptyManual.snapshot.hazardsCleared, 0, "Targetless Flow Break should not clear hazards");
 
     await page.evaluate(() => window.__flowBreakQa.reset());
     await page.evaluate(() => window.__flowBreakQa.armFromFlow());
 
-    const slowId = await page.evaluate(() => window.__flowBreakQa.add("slowCar", 2, 2200));
-    const truckClusterId = await page.evaluate(() => window.__flowBreakQa.add("truck", 1, 2450));
-    const coneClusterId = await page.evaluate(() => window.__flowBreakQa.add("cone", 2, 2260));
-    const branchClusterId = await page.evaluate(() => window.__flowBreakQa.add("branch", 1, 2380));
-    const farLaneId = await page.evaluate(() => window.__flowBreakQa.add("slowCar", 4, 2300));
-    const boostId = await page.evaluate(() => window.__flowBreakQa.add("boostPad", 2, 2050));
-    const rampId = await page.evaluate(() => window.__flowBreakQa.add("ramp", 2, 2150));
-    const gasId = await page.evaluate(() => window.__flowBreakQa.add("gasCan", 2, 2250));
-    const warningId = await page.evaluate(() => window.__flowBreakQa.add("warning", 2, 1950));
+    const slowId = await page.evaluate(() => window.__flowBreakQa.add("slowCar", window.__flowBreakQa.centerLane(), 2200));
+    const truckClusterId = await page.evaluate(() => window.__flowBreakQa.add("truck", Math.max(0, window.__flowBreakQa.centerLane() - 1), 2450));
+    const coneClusterId = await page.evaluate(() => window.__flowBreakQa.add("cone", window.__flowBreakQa.centerLane(), 2260));
+    const branchClusterId = await page.evaluate(() => window.__flowBreakQa.add("branch", Math.max(0, window.__flowBreakQa.centerLane() - 1), 2380));
+    const farLaneId = await page.evaluate(() => window.__flowBreakQa.add("slowCar", window.__flowBreakQa.laneCount() - 1, 2300));
+    const boostId = await page.evaluate(() => window.__flowBreakQa.add("boostPad", window.__flowBreakQa.centerLane(), 2050));
+    const rampId = await page.evaluate(() => window.__flowBreakQa.add("ramp", window.__flowBreakQa.centerLane(), 2150));
+    const gasId = await page.evaluate(() => window.__flowBreakQa.add("gasCan", window.__flowBreakQa.centerLane(), 2250));
+    const warningId = await page.evaluate(() => window.__flowBreakQa.add("warning", window.__flowBreakQa.centerLane(), 1950));
     await page.evaluate(() => window.__flowBreakQa.paint());
     const preTriggerShot = path.join(OUT_DIR, "pre-trigger-danger-visible.png");
     await page.screenshot({ path: preTriggerShot });
-    const triggered = await page.evaluate(() => window.__flowBreakQa.tick());
-    if (triggered.armed !== false || triggered.triggered !== 1) {
-      console.log("FLOW_BREAK_TRIGGER_SNAPSHOT", JSON.stringify(triggered, null, 2));
-    }
-    assert.strictEqual(triggered.armed, false, "Flow Break should disarm after triggering");
-    assert.strictEqual(triggered.triggered, 1, "Flow Break trigger count should increment");
-    assert(findObstacle(triggered, slowId).flowBreakCleared, "Same-lane slow car should be cleared");
-    assert(findObstacle(triggered, truckClusterId).flowBreakCleared, "Nearby truck should be clearable by Flow Break");
-    assert(findObstacle(triggered, coneClusterId).flowBreakCleared, "Minor hazard should clear when a nearby major hazard triggers Flow Break");
-    assert(findObstacle(triggered, branchClusterId).flowBreakCleared, "Branch should clear when a nearby major hazard triggers Flow Break");
+	    const armedWithDanger = await page.evaluate(() => window.__flowBreakQa.tick());
+	    assert.strictEqual(armedWithDanger.armed, true, "Armed Flow Break should not auto-fire when danger enters range");
+	    assert.strictEqual(armedWithDanger.triggered, 0, "Danger in range should wait for manual Flow Break input");
+	    assert(!findObstacle(armedWithDanger, slowId).flowBreakCleared, "Flow Break should not clear hazards before input");
+	    const triggered = await page.evaluate(() => {
+	      const app = window.neonRoadRally;
+	      app.run.debugFrozen = false;
+	      window.dispatchEvent(new KeyboardEvent("keydown", {
+	        key: "e",
+	        code: "KeyE",
+	        bubbles: true,
+	        cancelable: true
+	      }));
+	      window.dispatchEvent(new KeyboardEvent("keyup", {
+	        key: "e",
+	        code: "KeyE",
+	        bubbles: true,
+	        cancelable: true
+	      }));
+	      app.run.debugFrozen = true;
+	      return window.__flowBreakQa.snapshot();
+	    });
+	    if (triggered.armed !== false || triggered.triggered !== 1) {
+	      console.log("FLOW_BREAK_TRIGGER_SNAPSHOT", JSON.stringify(triggered, null, 2));
+	    }
+	    assert.strictEqual(triggered.armed, false, "Flow Break should disarm after triggering");
+	    assert.strictEqual(triggered.triggered, 1, "Flow Break trigger count should increment");
+	    assert.strictEqual(triggered.manualAttempts, 1, "Keyboard Flow Break should count as one manual attempt");
+	    assert.strictEqual(triggered.manualSuccesses, 1, "Keyboard Flow Break should count as one manual success");
+	    assert.strictEqual(triggered.noTargetAttempts, 0, "Successful keyboard Flow Break should not count as no-target");
+    assert.strictEqual(triggered.phaseActivations, 1, "Keyboard Flow Break should start a phase activation");
+    assert(triggered.phaseDuration >= 2.2, "Keyboard Flow Break should record the phase duration");
+    assert(!findObstacle(triggered, slowId).flowBreakCleared, "Same-lane slow car should stay on road after Flow Break activation");
+    assert(!findObstacle(triggered, truckClusterId).flowBreakCleared, "Nearby truck should stay on road after Flow Break activation");
+    assert(!findObstacle(triggered, coneClusterId).flowBreakCleared, "Minor hazard should stay on road after Flow Break activation");
+    assert(!findObstacle(triggered, branchClusterId).flowBreakCleared, "Branch should stay on road after Flow Break activation");
     assert(!findObstacle(triggered, farLaneId).flowBreakCleared, "Far-lane hazard outside radius should not clear");
     assert(!findObstacle(triggered, boostId).flowBreakCleared, "Boost pad should not clear");
     assert(!findObstacle(triggered, rampId).flowBreakCleared, "Ramp should not clear");
     assert(!findObstacle(triggered, gasId).flowBreakCleared, "Gas can should not clear");
     assert(!findObstacle(triggered, warningId).flowBreakCleared, "Warning should not clear");
-    assert(triggered.hazardsCleared >= 2, "Flow Break cleared telemetry should increment for visible hazards");
-    assert(triggered.hazardsClearedAhead >= 2, "Flow Break should classify normal clears as ahead");
+    assert.strictEqual(triggered.hazardsCleared, 0, "Flow Break phase should not clear hazards");
+    assert.strictEqual(triggered.hazardsClearedAhead, 0, "Flow Break phase should not classify cleared hazards");
     assert.strictEqual(triggered.hazardsClearedBehind, 0, "Normal Flow Break should not clear behind-player hazards");
-    assert(triggered.visibleHazardsAtTrigger >= 1, "Flow Break should record visible hazards at trigger");
+    assert(triggered.visibleHazardsAtTrigger >= 1, "Flow Break should still record visible hazards at activation");
     assert.strictEqual(triggered.zeroEffectTriggers, 0, "Flow Break should not trigger with zero effect");
     assert.strictEqual(triggered.noForwardHazardTriggers, 0, "Flow Break should not trigger without a forward hazard");
     assert(["slowCar", "truck", "fastCar", "barrier"].includes(triggered.triggerHazardType), "Flow Break trigger should record a major hazard type");
-    assert.strictEqual(triggered.triggeredByMajorHazard, true, "Flow Break trigger should be marked as major-hazard driven");
-    assert(triggered.majorHazardsCleared >= 2, "Major hazard clear telemetry should increment");
-    assert(triggered.minorHazardsCleared >= 2, "Minor hazards can clear after a major-triggered Flow Break");
-    assert(triggered.sparksCreated >= 2, "Flow Break should create boost sparks");
-    assert(triggered.sparksSpawnedAhead >= 2, "Flow Break sparks should spawn ahead of the player");
+    assert.strictEqual(triggered.triggeredByMajorHazard, true, "Flow Break activation should note a nearby major hazard when present");
+    assert.strictEqual(triggered.majorHazardsCleared, 0, "Major hazards should not be cleared by phase activation");
+    assert.strictEqual(triggered.minorHazardsCleared, 0, "Minor hazards should not be cleared by phase activation");
+    assert.strictEqual(triggered.sparksCreated, 0, "Flow Break phase should not create boost sparks from deleted hazards");
+    assert.strictEqual(triggered.sparksSpawnedAhead, 0, "Flow Break phase should not spawn forward sparks");
     assert.strictEqual(triggered.sparksSpawnedBehind, 0, "Flow Break should not spawn sparks behind the player");
-    assert(triggered.sparks.length >= 1, "Spark should remain collectible after burst");
-    assert(triggered.sparks.every((spark) => spark.ahead > triggered.playerForwardAhead), "All visible Flow Break sparks should be ahead of the player");
+    assert.strictEqual(triggered.sparks.length, 0, "Flow Break phase should not leave spark pickups");
+    assert.strictEqual(triggered.impactEventCount, 1, "Flow Break impact telemetry should record one trigger event");
+    assert.strictEqual(triggered.impactEvents.length, 1, "Flow Break impact event should be exposed in diagnostics");
+    const impact = triggered.impactEvents[0];
+    assert.strictEqual(impact.speedClassId, "turbo", "Flow Break impact should record speed class");
+    assert.strictEqual(impact.raceTypeId, "classic", "Flow Break impact should record race type");
+    assert(impact.sectionId, "Flow Break impact should record route section");
+    assert(impact.progressPercent !== null && impact.progressPercent >= 0, "Flow Break impact should record route progress");
+    assert.strictEqual(impact.triggerHazardType, triggered.triggerHazardType, "Flow Break impact should record trigger hazard type");
+    assert.strictEqual(impact.phaseActivation, true, "Flow Break impact should mark phase activation");
+    assert(impact.phaseDuration >= 2.2, "Flow Break impact should record phase duration");
+    assert.strictEqual(impact.hazardsCleared, 0, "Flow Break impact should record zero hazards cleared");
+    assert.strictEqual(impact.majorHazardsCleared, 0, "Flow Break impact should record zero major hazards cleared");
+    assert.strictEqual(impact.minorHazardsCleared, 0, "Flow Break impact should record zero minor hazards cleared");
+	    assert(impact.pressureBefore !== null, "Flow Break impact should record pressure before trigger");
+	    assert(impact.pressureAfter !== null, "Flow Break impact should record pressure after trigger");
+	    assert.strictEqual(impact.pressureBefore, impact.pressureAfter, "Flow Break phase should not reduce pressure by deleting hazards");
+	    assert.strictEqual(impact.manualActivation, true, "Flow Break impact should mark manual activation");
+	    assert.strictEqual(impact.inputSource, "keyboard", "Keyboard Flow Break should record input source");
+	    assert.strictEqual(triggered.hazardsClearedPerTriggerAverage, 0, "Flow Break phase should expose zero average hazards cleared");
+    assert.strictEqual(triggered.majorHazardsClearedPerTriggerAverage, 0, "Flow Break phase should expose zero average major hazards cleared");
     const breakShot = path.join(OUT_DIR, "flow-break-burst-frame.png");
     await page.screenshot({ path: breakShot });
-    await page.evaluate(() => window.__flowBreakQa.tick(0.12));
-    const sparksShot = path.join(OUT_DIR, "hazards-converted-sparks-visible.png");
-    await page.screenshot({ path: sparksShot });
 
-    const sparkAhead = triggered.sparks[0].ahead;
-    const turboSparkDisplayProbe = await page.evaluate(() => {
-      const app = window.neonRoadRally;
-      const rawBefore = 3890;
-      const rawAfter = rawBefore * 1.16;
-      return {
-        rawBefore,
-        rawAfter,
-        displayBefore: getDisplayedSpeedForRaw(rawBefore, app.run.track, app.run.speedClassId),
-        displayAfter: getDisplayedSpeedForRaw(rawAfter, app.run.track, app.run.speedClassId)
-      };
-    });
-    await page.evaluate(() => {
-      window.neonRoadRally.run.currentSpeed = 3890;
-      window.neonRoadRally.run.baseCruiseSpeed = Math.max(window.neonRoadRally.run.baseCruiseSpeed || 0, 3890);
-    });
-    const collected = await page.evaluate((delta) => window.__flowBreakQa.advance(delta), Math.max(0, sparkAhead - 120));
-    assert(collected.sparksCollected >= 1, "Boost spark should be collectable");
-    assert(collected.sparkBoostTimer > 0, "Collected spark should grant a short speed reward");
-    assert(collected.sparkPickupCount >= 1, "Spark pickup telemetry should increment");
-    assert(collected.sparkSpeedBefore !== null, "Spark pickup should record raw speed before reward");
-    if (!(collected.sparkSpeedAfter > collected.sparkSpeedBefore)) {
-      console.log("FLOW_BREAK_SPARK_COLLECTED_SNAPSHOT", JSON.stringify(collected, null, 2));
-    }
-    assert(collected.sparkSpeedAfter > collected.sparkSpeedBefore, "Spark pickup should increase raw speed");
-    assert(collected.sparkDisplaySpeedBefore !== null, "Spark pickup should record display speed before reward");
-    assert(collected.sparkDisplaySpeedAfter >= collected.sparkDisplaySpeedBefore, "Spark pickup should not lower displayed speed");
-    assert(turboSparkDisplayProbe.displayAfter > 230, "Turbo spark overrun should display above the base Turbo range");
-    assert(turboSparkDisplayProbe.displayAfter >= turboSparkDisplayProbe.displayBefore + 12, "Turbo spark pickup should show an obvious displayed-speed jump");
-    assert(collected.sparkBoostMultiplier >= 1.16, "Spark pickup should record its boost multiplier");
-    assert(collected.sparkPickupTimer > 0, "Spark pickup should trigger visible HUD feedback");
-    const collectedShot = path.join(OUT_DIR, "boost-spark-collected.png");
-    await page.screenshot({ path: collectedShot });
+    await page.evaluate(() => window.__flowBreakQa.reset());
+    await page.evaluate(() => window.__flowBreakQa.armFromFlow());
+    const phaseCollision = await page.evaluate(() => window.__flowBreakQa.runCollisionDuringPhase("slowCar", window.__flowBreakQa.centerLane()));
+    assert.strictEqual(phaseCollision.activation, true, "Flow Break should activate before a collision-zone hazard");
+    assert.strictEqual(phaseCollision.pendingEndStatus, "", "Flow Break phase should prevent crash while active");
+    assert.strictEqual(phaseCollision.hit, false, "Phased-through car should not be marked hit");
+    assert.strictEqual(phaseCollision.remove, false, "Phased-through car should remain on the road");
+    assert.strictEqual(phaseCollision.flowBreakCleared, false, "Phased-through car should not be cleared");
+    assert.strictEqual(phaseCollision.collisionsPhasedThrough, 1, "Flow Break should count phased-through traffic");
+    assert.strictEqual(phaseCollision.flowBreakCollisionPrevented, 1, "Legacy collision-prevented telemetry should stay compatible");
+    assert(phaseCollision.impactEvents[0]?.collisionsPhasedThrough >= 1, "Impact telemetry should count phased-through collisions");
+    assert.strictEqual(phaseCollision.impactEvents[0]?.likelyCollisionPrevented, true, "Impact telemetry should mark phased collision as a likely save");
+
+    await page.evaluate(() => window.__flowBreakQa.reset());
+    await page.evaluate(() => window.__flowBreakQa.armFromFlow());
+    const phaseSlowdown = await page.evaluate(() => window.__flowBreakQa.runCollisionDuringPhase("oil", window.__flowBreakQa.centerLane()));
+    assert.strictEqual(phaseSlowdown.pendingEndStatus, "", "Flow Break phase should not end the run on minor hazards");
+    assert.strictEqual(phaseSlowdown.hit, false, "Phased-through oil should not be marked hit");
+    assert.strictEqual(phaseSlowdown.remove, false, "Phased-through oil should remain on the road");
+    assert.strictEqual(phaseSlowdown.slowdownsPrevented, 1, "Flow Break should count prevented slowdown hazards");
+    assert(phaseSlowdown.impactEvents[0]?.slowdownsPrevented >= 1, "Impact telemetry should count prevented slowdowns");
+
+    await page.evaluate(() => window.__flowBreakQa.reset());
+    await page.evaluate(() => window.__flowBreakQa.armFromFlow());
+    const expiredCollision = await page.evaluate(() => window.__flowBreakQa.runCollisionAfterPhaseExpires("slowCar", window.__flowBreakQa.centerLane()));
+    assert.strictEqual(expiredCollision.activeTimer, 0, "Flow Break phase should expire");
+    assert(expiredCollision.pendingEndStatus, "Collision should resolve normally after Flow Break expires");
+    assert.strictEqual(expiredCollision.flowBreakCleared, false, "Expired Flow Break should not clear the collision hazard");
+    assert.strictEqual(expiredCollision.endedInDanger, 1, "Ending phase on a hazard should be recorded");
 
     const frameCost = await page.evaluate(() => window.__flowBreakQa.measureFlowBreakFrameCost());
     assert.strictEqual(frameCost.triggered, 1, "Performance sample should trigger Flow Break once");
-    assert(frameCost.hazardsCleared >= 1, "Performance sample should still clear hazards");
-    assert(frameCost.sparksCreated >= 1, "Performance sample should still create sparks");
+    assert.strictEqual(frameCost.hazardsCleared, 0, "Performance sample should not clear hazards");
+    assert.strictEqual(frameCost.sparksCreated, 0, "Performance sample should not create sparks from cleared hazards");
     assert(frameCost.worstMs < 50, `Focused Flow Break update/render should stay below major-spike budget, saw ${frameCost.worstMs}ms`);
     const liveFrameSample = await runLiveFlowBreakFrameSample(page);
     assert(liveFrameSample.triggered >= 1, "Live frame sample should trigger Flow Break");
-    assert(liveFrameSample.hazardsCleared >= 1, "Live frame sample should clear hazards");
-    assert.strictEqual(liveFrameSample.triggeredByMajorHazard, true, "Live frame sample should trigger from a major hazard");
+    assert.strictEqual(liveFrameSample.hazardsCleared, 0, "Live frame sample should not clear hazards");
+    assert.strictEqual(liveFrameSample.triggeredByMajorHazard, true, "Live frame sample should record nearby major hazard context");
     if (!(liveFrameSample.flowBreakFrameWorstMs < 120)) {
       console.log("FLOW_BREAK_LIVE_FRAME_SAMPLE", JSON.stringify(liveFrameSample, null, 2));
     }
     assert(liveFrameSample.flowBreakFrameWorstMs < 120, `Live Flow Break frame window should avoid 150-250ms spikes, saw ${liveFrameSample.flowBreakFrameWorstMs}ms`);
 
-    await page.evaluate(() => window.__flowBreakQa.reset());
-    await page.evaluate(() => window.__flowBreakQa.armFromFlow());
-    const truckId = await page.evaluate(() => window.__flowBreakQa.add("truck", 2, 2600));
-    const truck = await page.evaluate(() => window.__flowBreakQa.tick());
-    assert(findObstacle(truck, truckId).flowBreakCleared, "Truck should be clearable by Flow Break");
+	    await page.evaluate(() => window.__flowBreakQa.reset());
+	    await page.evaluate(() => window.__flowBreakQa.armFromFlow());
+	    const truckId = await page.evaluate(() => window.__flowBreakQa.add("truck", window.__flowBreakQa.centerLane(), 2600));
+	    const truck = (await page.evaluate(() => window.__flowBreakQa.activate("qa-truck"))).snapshot;
+	    assert(!findObstacle(truck, truckId).flowBreakCleared, "Truck should remain on road during Flow Break phase");
     assert.strictEqual(truck.triggerHazardType, "truck", "Truck should be recorded as the trigger hazard");
     assert.strictEqual(truck.triggeredByMajorHazard, true, "Truck trigger should be marked as major hazard");
 
-    await page.evaluate(() => window.__flowBreakQa.reset());
-    await page.evaluate(() => window.__flowBreakQa.armFromFlow());
-    const barrierId = await page.evaluate(() => window.__flowBreakQa.add("barrier", 2, 2200));
-    const barrier = await page.evaluate(() => window.__flowBreakQa.tick());
-    assert(findObstacle(barrier, barrierId).flowBreakCleared, "Barrier should trigger and clear through Flow Break");
+	    await page.evaluate(() => window.__flowBreakQa.reset());
+	    await page.evaluate(() => window.__flowBreakQa.armFromFlow());
+	    const barrierId = await page.evaluate(() => window.__flowBreakQa.add("barrier", window.__flowBreakQa.centerLane(), 2200));
+	    const barrier = (await page.evaluate(() => window.__flowBreakQa.activate("qa-barrier"))).snapshot;
+	    assert(!findObstacle(barrier, barrierId).flowBreakCleared, "Barrier should stay on road during Flow Break phase");
     assert.strictEqual(barrier.triggerHazardType, "barrier", "Barrier should be recorded as the trigger hazard");
 
-    await page.evaluate(() => window.__flowBreakQa.reset());
-    await page.evaluate(() => window.__flowBreakQa.armFromFlow());
-    const collision = await page.evaluate(() => window.__flowBreakQa.runCollisionWithArmedHazard("slowCar", 2));
-    if (collision.pendingEndStatus || !collision.flowBreakCleared) {
-      console.log("FLOW_BREAK_COLLISION_SNAPSHOT", JSON.stringify(collision, null, 2));
+    const laneTriggerSweep = await page.evaluate(() => {
+      const lanes = [0, window.__flowBreakQa.centerLane(), window.__flowBreakQa.laneCount() - 1];
+      return lanes.map((lane) => {
+	        window.__flowBreakQa.reset({ laneFloat: lane, targetLane: lane });
+	        window.__flowBreakQa.armFromFlow();
+	        const hazardId = window.__flowBreakQa.add("slowCar", lane, 2200);
+	        const snapshot = window.__flowBreakQa.activate("qa-lane-sweep").snapshot;
+	        return { lane, hazardId, snapshot };
+      });
+    });
+    for (const sample of laneTriggerSweep) {
+      assert.strictEqual(sample.snapshot.triggered, 1, `Flow Break should trigger on lane ${sample.lane}`);
+      assert(!findObstacle(sample.snapshot, sample.hazardId).flowBreakCleared, `Flow Break should not clear same-lane danger on lane ${sample.lane}`);
+      assert.strictEqual(sample.snapshot.sparks.length, 0, `Flow Break phase should not create sparks for lane ${sample.lane}`);
     }
-    assert(collision.flowBreakCleared, "Collision-zone hazard should be cleared by Flow Break fail-safe");
-    assert.strictEqual(collision.pendingEndStatus, "", "Flow Break should prevent crash into a cleared hazard");
-    assert(collision.flowBreakCollisionPrevented >= 1, "Collision-prevented telemetry should increment");
-    assert.strictEqual(collision.flowBreakSparksSpawnedBehind || 0, 0, "Emergency Flow Break should still avoid behind-player spark placement");
+
+	    await page.evaluate(() => window.__flowBreakQa.reset());
+	    await page.evaluate(() => window.__flowBreakQa.armFromFlow());
+	    const collision = await page.evaluate(() => window.__flowBreakQa.runCollisionWithArmedHazard("slowCar", window.__flowBreakQa.centerLane()));
+	    if (!collision.pendingEndStatus || collision.flowBreakCleared) {
+	      console.log("FLOW_BREAK_COLLISION_SNAPSHOT", JSON.stringify(collision, null, 2));
+	    }
+	    assert(!collision.flowBreakCleared, "Armed Flow Break should not auto-fire as a collision fail-safe");
+	    assert(collision.pendingEndStatus, "Collision-zone hazard should crash if the player did not manually spend Flow Break");
+	    assert.strictEqual(collision.flowBreakCollisionPrevented, 0, "Manual Flow Break should not record an automatic collision prevention");
 
     const fuel = await page.evaluate(() => {
       window.__flowBreakQa.reset({ raceTypeId: "fuelRun" });
@@ -697,29 +827,29 @@ async function run() {
     assert.strictEqual(partyClassicArmed.armed, true, "Party Classic should arm Flow Break from earned Flow");
 
     const partyClassicConeOnly = await page.evaluate(() => {
-      window.__flowBreakQa.reset({ partyMode: true });
-      window.__flowBreakQa.armFromFlow();
-      const coneId = window.__flowBreakQa.add("cone", 2, 2200);
-      const snapshot = window.__flowBreakQa.tick();
-      return { coneId, snapshot };
+	      window.__flowBreakQa.reset({ partyMode: true });
+	      window.__flowBreakQa.armFromFlow();
+	      const coneId = window.__flowBreakQa.add("cone", window.__flowBreakQa.centerLane(), 2200);
+	      const snapshot = window.__flowBreakQa.activate("qa-party-cone-only").snapshot;
+	      return { coneId, snapshot };
     });
-    assert.strictEqual(partyClassicConeOnly.snapshot.triggered, 0, "Party Classic Flow Break should not trigger from cone-only danger");
-    assert.strictEqual(partyClassicConeOnly.snapshot.armed, true, "Party Classic cone-only danger should leave Flow Break armed");
-    assert(!findObstacle(partyClassicConeOnly.snapshot, partyClassicConeOnly.coneId).flowBreakCleared, "Party Classic cone-only hazard should not clear without a major trigger");
+    assert.strictEqual(partyClassicConeOnly.snapshot.triggered, 1, "Party Classic Flow Break should activate from manual input even with minor-only danger");
+    assert.strictEqual(partyClassicConeOnly.snapshot.armed, false, "Party Classic manual Flow Break should spend its charge");
+    assert(!findObstacle(partyClassicConeOnly.snapshot, partyClassicConeOnly.coneId).flowBreakCleared, "Party Classic cone-only hazard should stay on road");
 
     const partyClassicMajor = await page.evaluate(() => {
       window.__flowBreakQa.reset({ partyMode: true });
-      window.__flowBreakQa.armFromFlow();
-      const slowId = window.__flowBreakQa.add("slowCar", 2, 2200);
-      const coneId = window.__flowBreakQa.add("cone", 2, 2260);
-      const snapshot = window.__flowBreakQa.tick();
-      return { slowId, coneId, snapshot };
+	      window.__flowBreakQa.armFromFlow();
+	      const slowId = window.__flowBreakQa.add("slowCar", window.__flowBreakQa.centerLane(), 2200);
+	      const coneId = window.__flowBreakQa.add("cone", window.__flowBreakQa.centerLane(), 2260);
+	      const snapshot = window.__flowBreakQa.activate("qa-party-major").snapshot;
+	      return { slowId, coneId, snapshot };
     });
     assert.strictEqual(partyClassicMajor.snapshot.triggered, 1, "Party Classic Flow Break should trigger from a forward major hazard");
     assert.strictEqual(partyClassicMajor.snapshot.triggeredByMajorHazard, true, "Party Classic trigger should be marked major-hazard driven");
-    assert(findObstacle(partyClassicMajor.snapshot, partyClassicMajor.slowId).flowBreakCleared, "Party Classic major hazard should clear");
-    assert(findObstacle(partyClassicMajor.snapshot, partyClassicMajor.coneId).flowBreakCleared, "Party Classic minor hazard may clear after a major trigger");
-    assert(partyClassicMajor.snapshot.sparksCreated >= 1, "Party Classic Flow Break should create forward sparks");
+    assert(!findObstacle(partyClassicMajor.snapshot, partyClassicMajor.slowId).flowBreakCleared, "Party Classic major hazard should remain during phase");
+    assert(!findObstacle(partyClassicMajor.snapshot, partyClassicMajor.coneId).flowBreakCleared, "Party Classic minor hazard should remain during phase");
+    assert.strictEqual(partyClassicMajor.snapshot.sparksCreated, 0, "Party Classic Flow Break should not create clear-sparks");
 
     const partyFuel = await page.evaluate(() => {
       window.__flowBreakQa.reset({ raceTypeId: "fuelRun", partyMode: true });
@@ -728,6 +858,70 @@ async function run() {
     });
     assert.strictEqual(partyFuel.flowEnabled, false, "Party Fuel Run should not enable Flow Break");
     assert.strictEqual(partyFuel.armed, false, "Party Fuel Run should not arm Flow Break");
+
+    const reportProbe = await page.evaluate(() => {
+      const app = window.neonRoadRally;
+      window.__flowBreakQa.reset({
+        trackId: "redline-run",
+        speedClassId: "redline",
+        seed: "REDLINE-CITY-LIMITS-REDLINE",
+        officialRouteId: "redline-city-limits-blaze"
+      });
+      app.run.currentSectionId = "finalPush";
+      app.run.currentSectionLabel = "Final Push";
+	      window.__flowBreakQa.armFromFlow();
+	      window.__flowBreakQa.add("slowCar", window.__flowBreakQa.centerLane(), 2200);
+	      window.__flowBreakQa.add("truck", Math.max(0, window.__flowBreakQa.centerLane() - 1), 2380);
+	      const triggeredSnapshot = window.__flowBreakQa.activate("qa-report").snapshot;
+      app.endRace("finished", "Flow QA Finish");
+      const latest = app.playtestReports.getRuns().slice(-1)[0] || {};
+      const aggregate = app.buildPlaytestReportAggregate("all");
+      const exportPayload = JSON.parse(app.buildPlaytestReportExportText("all"));
+      return {
+        triggeredSnapshot,
+        latest,
+	        aggregateFlowBreakImpact: {
+	          runs: aggregate.flowBreakRunCount,
+	          manualAttempts: aggregate.flowBreakManualActivationAttempts,
+	          manualSuccesses: aggregate.flowBreakManualTriggerSuccesses,
+	          noTargetAttempts: aggregate.flowBreakNoTargetAttempts,
+	          phaseActivations: aggregate.flowBreakPhaseActivations,
+	          collisionsPhasedThrough: aggregate.flowBreakCollisionsPhasedThrough,
+	          slowdownsPrevented: aggregate.flowBreakSlowdownsPrevented,
+	          triggered: aggregate.flowBreaksTriggered,
+          hazardsCleared: aggregate.flowBreakHazardsCleared,
+          majorHazardsCleared: aggregate.flowBreakMajorHazardsCleared,
+          likelyCollisionPrevented: aggregate.flowBreakLikelyCollisionPrevented,
+          finalPush: aggregate.flowBreakTriggersDuringFinalPush,
+          rows: aggregate.flowBreakHighSpeedRows
+        },
+        exportedFlowBreakImpact: exportPayload.totals.flowBreakImpact
+      };
+    });
+	    assert.strictEqual(reportProbe.triggeredSnapshot.triggered, 1, "Report probe should trigger Flow Break once");
+	    assert.strictEqual(reportProbe.triggeredSnapshot.manualAttempts, 1, "Report probe should record a manual Flow Break attempt");
+	    assert.strictEqual(reportProbe.triggeredSnapshot.manualSuccesses, 1, "Report probe should record a successful manual Flow Break");
+	    assert(reportProbe.latest.flowBreakImpactEvents?.length >= 1, "Playtest run should persist Flow Break impact events");
+	    assert.strictEqual(reportProbe.latest.flowBreakManualActivationAttempts, 1, "Playtest run should persist manual Flow Break attempts");
+	    assert.strictEqual(reportProbe.latest.flowBreakManualTriggerSuccesses, 1, "Playtest run should persist successful manual Flow Break triggers");
+	    assert.strictEqual(reportProbe.latest.flowBreakImpactEvents[0].runFinished, true, "Flow Break impact event should record finished run outcome");
+	    assert.strictEqual(reportProbe.latest.flowBreakImpactEvents[0].usedDuringFinalPush, true, "Flow Break impact event should record finalPush usage");
+	    assert.strictEqual(reportProbe.latest.flowBreakImpactEvents[0].manualActivation, true, "Flow Break impact event should record manual activation");
+    assert.strictEqual(reportProbe.latest.flowBreakImpactEvents[0].phaseActivation, true, "Flow Break impact event should record phase activation");
+    assert.strictEqual(reportProbe.latest.flowBreakHazardsClearedPerTriggerAverage, 0, "Playtest run should expose zero hazards cleared per trigger");
+    assert.strictEqual(reportProbe.latest.flowBreakPressureBeforeAverage, reportProbe.latest.flowBreakPressureAfterAverage, "Playtest run should show unchanged pressure for phase activation");
+	    assert(reportProbe.aggregateFlowBreakImpact.triggered >= 1, "Playtest aggregate should count Flow Break triggers");
+	    assert(reportProbe.aggregateFlowBreakImpact.manualAttempts >= 1, "Playtest aggregate should count manual Flow Break attempts");
+	    assert(reportProbe.aggregateFlowBreakImpact.manualSuccesses >= 1, "Playtest aggregate should count successful manual Flow Break triggers");
+	    assert(reportProbe.aggregateFlowBreakImpact.phaseActivations >= 1, "Playtest aggregate should count Flow Break phase activations");
+	    assert.strictEqual(reportProbe.aggregateFlowBreakImpact.majorHazardsCleared, 0, "Playtest aggregate should not count major hazards cleared");
+    assert(reportProbe.aggregateFlowBreakImpact.finalPush >= 1, "Playtest aggregate should count finalPush Flow Break triggers");
+    assert(reportProbe.aggregateFlowBreakImpact.rows.some((row) => row.speedClassId === "redline" && row.triggered >= 1), "Playtest aggregate should include a Redline Flow Break summary row");
+	    assert(reportProbe.exportedFlowBreakImpact?.triggered >= 1, "Playtest export should include Flow Break impact totals");
+	    assert(reportProbe.exportedFlowBreakImpact?.manualAttempts >= 1, "Playtest export should include manual Flow Break attempts");
+	    assert(reportProbe.exportedFlowBreakImpact?.manualSuccesses >= 1, "Playtest export should include manual Flow Break successes");
+	    assert(reportProbe.exportedFlowBreakImpact?.phaseActivations >= 1, "Playtest export should include Flow Break phase activations");
+    assert(reportProbe.exportedFlowBreakImpact?.highSpeedClassicRows?.some((row) => row.speedClassId === "redline" && row.triggered >= 1), "Playtest export should include Redline Flow Break row");
 
     const pageText = await page.textContent("body");
     const manualPulseCopyPattern = new RegExp([`PRESS ${"E"}`, `LANE ${"PULSE"}`, `${"PULSE"} READY`, `E ${"PULSE"}`].join("|"), "i");
@@ -738,15 +932,13 @@ async function run() {
 
     const realRouteSample = await runRealRouteSample(page, OUT_DIR);
     assert(realRouteSample.triggered >= 1, "Real route sample should trigger Flow Break");
-    assert(realRouteSample.hazardsCleared >= 1, "Real route sample should clear visible hazards");
-    assert(realRouteSample.hazardsClearedAhead >= 1, "Real route sample should clear forward hazards");
+    assert(realRouteSample.phaseActivations >= 1, "Real route sample should activate phase mode");
+    assert.strictEqual(realRouteSample.hazardsCleared, 0, "Real route sample should not clear visible hazards");
+    assert.strictEqual(realRouteSample.hazardsClearedAhead, 0, "Real route sample should not clear forward hazards");
     assert.strictEqual(realRouteSample.hazardsClearedBehind, 0, "Real route sample should not clear behind-player hazards");
-    assert(realRouteSample.sparksCreated >= 1, "Real route sample should create visible boost sparks");
-    assert(realRouteSample.sparksSpawnedAhead >= 1, "Real route sample should spawn forward boost sparks");
+    assert.strictEqual(realRouteSample.sparksCreated, 0, "Real route sample should not create boost sparks");
+    assert.strictEqual(realRouteSample.sparksSpawnedAhead, 0, "Real route sample should not spawn forward boost sparks");
     assert.strictEqual(realRouteSample.sparksSpawnedBehind, 0, "Real route sample should not spawn behind-player sparks");
-    assert(realRouteSample.sparksCollected >= 1, "Real route sample should collect at least one boost spark");
-    assert(realRouteSample.sparkSpeedAfter > realRouteSample.sparkSpeedBefore, "Real route spark pickup should increase raw speed");
-    assert.strictEqual(realRouteSample.triggeredByMajorHazard, true, "Real route sample should trigger from a major hazard");
     assert.strictEqual(realRouteSample.zeroEffectTriggers, 0, "Real route sample should have no zero-effect Flow Break triggers");
     assert.strictEqual(realRouteSample.noForwardHazardTriggers, 0, "Real route sample should not trigger without a forward hazard");
 
@@ -758,19 +950,15 @@ async function run() {
         armed720Shot,
         preTriggerShot,
         breakShot,
-        sparksShot,
-        collectedShot,
         ...realRouteSample.screenshots
       ],
       charging,
       armed,
       emptyRoad,
-      noEffectWait,
-      coneOnly,
-      minorOnly,
       triggered,
-      turboSparkDisplayProbe,
-      collected,
+      phaseCollision,
+      phaseSlowdown,
+      expiredCollision,
       frameCost,
       liveFrameSample,
       truck,
