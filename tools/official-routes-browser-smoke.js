@@ -231,33 +231,52 @@ async function assertOfficialSetupLayoutIntegrity(page, label) {
     const panel = document.querySelector(".pre-race-panel");
     const routeList = document.querySelector(".official-route-list");
     const longNames = ["Orange Sky Switchback", "Last Light Gauntlet", "Heatwave Express"];
+    const rectFor = (node) => {
+      const rect = node.getBoundingClientRect();
+      return {
+        className: node.className || node.tagName,
+        text: node.textContent.replace(/\s+/g, " ").trim(),
+        left: rect.left,
+        right: rect.right,
+        top: rect.top,
+        bottom: rect.bottom,
+        width: rect.width,
+        height: rect.height,
+        scrollWidth: node.scrollWidth,
+        clientWidth: node.clientWidth
+      };
+    };
+    const intersects = (a, b, slack = 1) => (
+      a.left < b.right - slack
+      && b.left < a.right - slack
+      && a.top < b.bottom - slack
+      && b.top < a.bottom - slack
+    );
     const rows = Array.from(document.querySelectorAll(".official-route-list [data-official-route-id]")).map((row) => {
       const rowRect = row.getBoundingClientRect();
-      const children = Array.from(row.children).map((child) => {
-        const rect = child.getBoundingClientRect();
-        return {
-          className: child.className || child.tagName,
-          text: child.textContent.replace(/\s+/g, " ").trim(),
-          left: rect.left,
-          right: rect.right,
-          top: rect.top,
-          bottom: rect.bottom,
-          width: rect.width,
-          height: rect.height,
-          scrollWidth: child.scrollWidth,
-          clientWidth: child.clientWidth
-        };
-      });
+      const children = Array.from(row.children).map(rectFor);
+      const championContainer = row.querySelector(".official-route-champion-lines");
+      const championBox = championContainer ? rectFor(championContainer) : null;
+      const championLines = Array.from(row.querySelectorAll(".route-champion-line")).map(rectFor);
+      const metadataTargets = [
+        row.querySelector(".route-name"),
+        row.querySelector(".official-route-speed"),
+        Array.from(row.children).find((child) => child.matches("small.route-pb, small:not(.route-champion-line)"))
+      ].filter(Boolean).map(rectFor);
       const overlaps = [];
       for (let index = 0; index < children.length; index += 1) {
         for (let next = index + 1; next < children.length; next += 1) {
           const a = children[index];
           const b = children[next];
-          const intersects = a.left < b.right - 1
-            && b.left < a.right - 1
-            && a.top < b.bottom - 1
-            && b.top < a.bottom - 1;
-          if (intersects) overlaps.push([a.text, b.text]);
+          if (intersects(a, b)) overlaps.push([a.text, b.text]);
+        }
+      }
+      const championLineOverlaps = [];
+      for (let index = 0; index < championLines.length; index += 1) {
+        for (let next = index + 1; next < championLines.length; next += 1) {
+          if (intersects(championLines[index], championLines[next], 0.5)) {
+            championLineOverlaps.push([championLines[index].text, championLines[next].text]);
+          }
         }
       }
       const outside = children.filter((child) => (
@@ -267,7 +286,22 @@ async function assertOfficialSetupLayoutIntegrity(page, label) {
         || child.bottom > rowRect.bottom + 1
         || child.scrollWidth > child.clientWidth + 1
       ));
-      const pb = row.querySelector("small")?.getBoundingClientRect();
+      const championOutside = championLines.filter((line) => (
+        line.left < rowRect.left - 1
+        || line.right > rowRect.right + 1
+        || line.top < rowRect.top - 1
+        || line.bottom > rowRect.bottom + 1
+        || (championBox && (
+          line.left < championBox.left - 1
+          || line.right > championBox.right + 1
+          || line.top < championBox.top - 1
+          || line.bottom > championBox.bottom + 1
+        ))
+      ));
+      const championMetadataCollisions = championLines.flatMap((line) => (
+        metadataTargets.filter((target) => intersects(line, target, 0.5)).map((target) => [line.text, target.text])
+      ));
+      const pb = (Array.from(row.children).find((child) => child.matches("small.route-pb, small:not(.route-champion-line)")))?.getBoundingClientRect();
       const title = row.querySelector("strong")?.textContent?.replace(/\s+/g, " ").trim() || "";
       return {
         id: row.dataset.officialRouteId,
@@ -276,6 +310,9 @@ async function assertOfficialSetupLayoutIntegrity(page, label) {
         height: rowRect.height,
         outside,
         overlaps,
+        championLineOverlaps,
+        championOutside,
+        championMetadataCollisions,
         title,
         pbInside: !pb || (pb.left >= rowRect.left - 1 && pb.right <= rowRect.right + 1)
       };
@@ -296,6 +333,10 @@ async function assertOfficialSetupLayoutIntegrity(page, label) {
   assert(outsideRows.length === 0, `${label} route row text should stay inside each row`, { outsideRows });
   const overlappingRows = metrics.rows.filter((row) => row.overlaps.length);
   assert(overlappingRows.length === 0, `${label} route row text should not overlap`, { overlappingRows });
+  const overlappingChampionRows = metrics.rows.filter((row) => row.championLineOverlaps.length || row.championMetadataCollisions.length);
+  assert(overlappingChampionRows.length === 0, `${label} route champion metadata should not overlap other route row text`, { overlappingChampionRows });
+  const outsideChampionRows = metrics.rows.filter((row) => row.championOutside.length);
+  assert(outsideChampionRows.length === 0, `${label} route champion metadata should stay inside the route row`, { outsideChampionRows });
   const pbOutsideRows = metrics.rows.filter((row) => !row.pbInside);
   assert(pbOutsideRows.length === 0, `${label} PB text should stay inside route rows`, { pbOutsideRows });
   if (metrics.rows.some((row) => ["Orange Sky Switchback", "Last Light Gauntlet", "Heatwave Express"].includes(row.title))) {
@@ -364,6 +405,11 @@ async function assertTrackOfficial10(page, trackId, label) {
     nodes.map((node) => ({
       id: node.dataset.officialRouteId,
       text: node.textContent || "",
+      championLines: Array.from(node.querySelectorAll(".route-champion-line")).map((line) => ({
+        text: line.textContent?.replace(/\s+/g, " ").trim() || "",
+        label: line.querySelector(".route-champion-label")?.textContent?.trim() || "",
+        value: line.querySelector(".route-champion-value")?.textContent?.trim() || ""
+      })),
       height: node.getBoundingClientRect().height
     }))
   ));
@@ -375,6 +421,10 @@ async function assertTrackOfficial10(page, trackId, label) {
     assertIncludes(card.text, route.name);
     assertIncludes(card.text, route.speedClass);
     assert(!card.text.includes(route.seed), "Official route setup cards should hide raw route seeds", { route, card: card.text });
+    assert(card.championLines.length === 2, "Official route rows should show Time and Score Champion lines", { route, championLines: card.championLines });
+    assert(card.championLines.every((line) => /Champion:$/i.test(line.label) && line.value.length > 0), "Official route champion lines should use readable label/value copy", { route, championLines: card.championLines });
+    assert(card.championLines.some((line) => /No Record Yet|Champion:/i.test(line.text)), "Official route champion metadata should present open records intentionally", { route, championLines: card.championLines });
+    assert(!/(?:TIMECHAMPION|SCORECHAMPION|TimeChampion|ScoreChampion)/.test(card.text), "Official route champion labels should not be smashed together", { route, card: card.text });
     assert(!/Arcade|Pro/i.test(`${route.name} ${route.speedClass}`), "Official cards should not use Arcade/Pro", { route });
   }
 

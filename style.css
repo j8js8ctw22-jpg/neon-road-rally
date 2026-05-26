@@ -2162,11 +2162,11 @@ body.is-nrr-menu-screen .result-page {
     "number champions champions";
   grid-template-columns: 32px minmax(0, 1fr) minmax(76px, 0.46fr);
   column-gap: 8px;
-  row-gap: 2px;
+  row-gap: 3px;
   align-items: center;
   min-width: 0;
   max-width: 100%;
-  min-height: 68px;
+  min-height: 82px;
   border: 1px solid rgba(40, 246, 255, 0.28);
   border-radius: 6px;
   padding: 7px 9px;
@@ -2216,7 +2216,7 @@ body.is-nrr-menu-screen .result-page {
 }
 
 .official-route-speed,
-.official-route-row small {
+.official-route-row > small {
   min-width: 0;
   max-width: 100%;
   font-size: 0.68rem;
@@ -2233,7 +2233,7 @@ body.is-nrr-menu-screen .result-page {
   text-align: right;
 }
 
-.official-route-row small {
+.official-route-row > small {
   grid-area: best;
   color: var(--green);
   justify-self: end;
@@ -2243,27 +2243,54 @@ body.is-nrr-menu-screen .result-page {
 .official-route-champion-lines {
   grid-area: champions;
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 4px 8px;
+  grid-template-columns: 1fr;
+  gap: 2px;
+  align-content: start;
   min-width: 0;
   width: 100%;
+  overflow: hidden;
 }
 
 .official-route-champion-lines .route-champion-line {
-  display: block;
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 2px 5px;
+  align-items: baseline;
   grid-area: auto;
   min-width: 0;
-  color: var(--yellow);
-  font-family: var(--font-mono);
-  font-size: 9px;
-  font-weight: 800;
-  letter-spacing: 0.08em;
-  line-height: 1.15;
+  max-width: 100%;
+  color: rgba(255, 247, 188, 0.92);
+  font-family: var(--font-ui);
+  font-size: 0.66rem;
+  font-weight: 750;
+  letter-spacing: 0;
+  line-height: 1.25;
   overflow: hidden;
   text-align: left;
   text-overflow: ellipsis;
-  text-transform: uppercase;
+  text-transform: none;
   white-space: nowrap;
+}
+
+.route-champion-label {
+  flex: 0 0 auto;
+  color: rgba(255, 228, 94, 0.94);
+  font-weight: 850;
+  white-space: nowrap;
+}
+
+.route-champion-value {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  color: rgba(255, 255, 255, 0.86);
+  font-weight: 750;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.route-champion-line.is-open .route-champion-value {
+  color: var(--ink-mute);
 }
 
 .official-rules-toggle {
@@ -3105,10 +3132,10 @@ button:disabled {
     "number name speed"
     "number name best"
     "number champions champions";
-  grid-template-columns: 24px minmax(0, 1fr) 96px;
+  grid-template-columns: 24px minmax(0, 1fr) 104px;
   column-gap: 8px;
-  row-gap: 2px;
-  min-height: 66px;
+  row-gap: 3px;
+  min-height: 82px;
   border: 0;
   border-bottom: 1px solid var(--line);
   border-radius: 0;
@@ -3169,7 +3196,7 @@ button:disabled {
 }
 
 .official-race-panel .official-route-speed,
-.official-race-panel .official-route-row small {
+.official-race-panel .official-route-row > small {
   justify-self: end;
   min-width: 0;
   overflow: hidden;
@@ -3197,10 +3224,10 @@ button:disabled {
   color: var(--class-redline);
 }
 
-.official-race-panel .official-route-row small,
+.official-race-panel .official-route-row > small,
 .official-race-panel .official-route-row .route-pb {
   grid-area: best;
-  max-width: 96px;
+  max-width: 104px;
   color: var(--green);
   font-size: 12px;
   font-weight: 700;
@@ -3212,15 +3239,25 @@ button:disabled {
 
 .official-race-panel .official-route-champion-lines {
   grid-area: champions;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  grid-template-columns: 1fr;
+  padding-top: 1px;
 }
 
 .official-race-panel .official-route-champion-lines .route-champion-line {
+  grid-area: auto;
   justify-self: stretch;
+  min-width: 0;
   max-width: none;
-  color: var(--yellow);
-  font-size: 9px;
+  color: rgba(255, 247, 188, 0.92);
+  font-family: var(--font-ui);
+  font-size: 10.5px;
+  letter-spacing: 0;
+  line-height: 1.25;
+  overflow: hidden;
   text-align: left;
+  text-overflow: ellipsis;
+  text-transform: none;
+  white-space: nowrap;
 }
 
 .official-race-panel .official-practice-disclosure {
@@ -3311,7 +3348,7 @@ button:disabled {
   }
 
   .official-race-panel .official-route-row.route-row {
-    min-height: 42px;
+    min-height: 82px;
     padding-top: 8px;
     padding-bottom: 8px;
   }
@@ -3328,7 +3365,7 @@ button:disabled {
   }
 
   .official-race-panel .official-route-row.route-row {
-    grid-template-columns: 22px minmax(0, 1fr) 74px;
+    grid-template-columns: 22px minmax(0, 1fr) 82px;
   }
 
   .official-launch-summary {
@@ -3362,7 +3399,7 @@ button:disabled {
   }
 
   .official-race-panel .official-route-row.route-row {
-    grid-template-columns: 22px minmax(0, 1fr) 74px;
+    grid-template-columns: 22px minmax(0, 1fr) 82px;
   }
 }
 
@@ -9109,14 +9146,19 @@ button:disabled {
     grid-template-areas:
       "number name"
       "number speed"
-      "number best";
+      "number best"
+      "number champions";
     grid-template-columns: 32px minmax(0, 1fr);
   }
 
   .official-route-speed,
-  .official-route-row small {
+  .official-route-row > small {
     justify-self: start;
     text-align: left;
+  }
+
+  .official-route-champion-lines {
+    grid-template-columns: 1fr;
   }
 
   .party-driver-row {

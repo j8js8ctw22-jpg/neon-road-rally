@@ -40171,16 +40171,30 @@ class NeonRoadRally {
   }
 
   formatOfficialRouteChampionLine(champion, label) {
-    if (!champion) return `${label}: Unclaimed`;
-    return `${label}: ${champion.playerName} ${champion.valueText}`;
+    if (!champion) return `${label}: No Record Yet`;
+    return `${label}: ${champion.playerName}${champion.valueText ? ` · ${champion.valueText}` : ""}`;
   }
 
   renderOfficialRouteChampionLines(route, raceTypeId = DEFAULT_RACE_TYPE_ID) {
     const champions = this.getOfficialRouteChampions(route?.id, raceTypeId);
+    const lines = [
+      { label: "Time Champion", champion: champions.time },
+      { label: "Score Champion", champion: champions.score }
+    ];
     return `
       <div class="official-route-champion-lines" aria-label="Route champions">
-        <small class="route-champion-line">${escapeHtml(this.formatOfficialRouteChampionLine(champions.time, "Time Champion"))}</small>
-        <small class="route-champion-line">${escapeHtml(this.formatOfficialRouteChampionLine(champions.score, "Score Champion"))}</small>
+        ${lines.map(({ label, champion }) => {
+          const value = champion
+            ? `${champion.playerName}${champion.valueText ? ` · ${champion.valueText}` : ""}`
+            : "No Record Yet";
+          const lineText = `${label}: ${value}`;
+          return `
+            <small class="route-champion-line ${champion ? "is-claimed" : "is-open"}" aria-label="${escapeAttr(lineText)}">
+              <span class="route-champion-label">${escapeHtml(label)}:</span>
+              <span class="route-champion-value">${escapeHtml(value)}</span>
+            </small>
+          `;
+        }).join("")}
       </div>
     `;
   }
@@ -40335,7 +40349,7 @@ class NeonRoadRally {
     if (pbTime) return `PB ${formatFinishTimeMs(pbTime.finishTimeMs)}`;
     const pbScore = player ? this.getOfficialBestScoreRecord(player.id, route.id, safeRaceTypeId) : null;
     if (pbScore) return `PB ${formatScore(pbScore.score)}`;
-    return "No PB";
+    return "No PB Yet";
   }
 
   getLeaderboardYourBest(route, view = this.leaderboardView, raceTypeId = DEFAULT_RACE_TYPE_ID) {

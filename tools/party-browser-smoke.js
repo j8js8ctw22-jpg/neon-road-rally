@@ -1507,17 +1507,23 @@ async function run() {
       const allRouteText = Array.from(document.querySelectorAll(".official-route-row"))
         .map((row) => row.innerText.replace(/\s+/g, " ").trim())
         .join(" | ");
+      const championLines = Array.from(selectedRow?.querySelectorAll(".route-champion-line") || []).map((line) => ({
+        label: line.querySelector(".route-champion-label")?.textContent?.trim() || "",
+        value: line.querySelector(".route-champion-value")?.textContent?.trim() || ""
+      }));
       return {
         selectedText,
         allRouteText,
         seedVisibleOnRouteRow: selectedText.includes(route.seed),
         hasTimeChampion: selectedText.toLowerCase().includes(`time champion: ${String(expectedPlayerName || "").toLowerCase()}`),
         hasScoreChampion: selectedText.toLowerCase().includes(`score champion: ${String(expectedPlayerName || "").toLowerCase()}`),
-        hasUnclaimed: /Unclaimed/i.test(allRouteText)
+        hasOpenChampion: /No Record Yet/i.test(allRouteText),
+        hasStructuredChampionCopy: championLines.length === 2 && championLines.every((line) => /Champion:$/i.test(line.label) && line.value.length > 0),
+        hasSmashedChampionCopy: /(?:TIMECHAMPION|SCORECHAMPION|TimeChampion|ScoreChampion)/.test(allRouteText)
       };
     }, routeSetup.playerName);
-    if (!routeCardReport.hasTimeChampion || !routeCardReport.hasScoreChampion || !routeCardReport.hasUnclaimed || routeCardReport.seedVisibleOnRouteRow) {
-      throw new Error(`Official route cards should show compact champion/unclaimed copy without raw seeds: ${JSON.stringify(routeCardReport)}`);
+    if (!routeCardReport.hasTimeChampion || !routeCardReport.hasScoreChampion || !routeCardReport.hasOpenChampion || !routeCardReport.hasStructuredChampionCopy || routeCardReport.hasSmashedChampionCopy || routeCardReport.seedVisibleOnRouteRow) {
+      throw new Error(`Official route cards should show readable champion/open-record copy without raw seeds: ${JSON.stringify(routeCardReport)}`);
     }
 
     async function finishSoloRun(config) {
