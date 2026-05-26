@@ -3931,6 +3931,158 @@ const DRIFT_TUNING = {
   settleMajorityThreshold: 0.51
 };
 
+const RECKLESS_DRIVER_BEHAVIORS = {
+  slowDriftMerge: "slowDriftMerge",
+  aggressiveOvertake: "aggressiveOvertake",
+  panicCorrection: "panicCorrection"
+};
+
+const RECKLESS_DRIVER_PROTOTYPE_CONFIG = {
+  enabled: true,
+  allowedVehicleTypes: ["slowCar", "fastCar"],
+  maxPerRunBySpeed: {
+    rookie: 0,
+    arcade: 1,
+    pro: 2,
+    turbo: 3,
+    overdrive: 4,
+    redline: 4
+  },
+  chanceBySpeed: {
+    arcade: 0.18,
+    pro: 0.28,
+    turbo: 0.48,
+    overdrive: 0.58,
+    redline: 0.64
+  },
+  targetProgressBySpeed: {
+    arcade: [0.38],
+    pro: [0.32, 0.66],
+    turbo: [0.24, 0.5, 0.74],
+    overdrive: [0.22, 0.44, 0.66, 0.86],
+    redline: [0.2, 0.42, 0.64, 0.86]
+  },
+  firstGuaranteedProgressBySpeed: {
+    arcade: 0.34,
+    pro: 0.3,
+    turbo: 0.24,
+    overdrive: 0.22,
+    redline: 0.2
+  },
+  minProgress: 0.16,
+  maxProgress: 0.93,
+  cooldownSecondsBySpeed: {
+    arcade: 7.2,
+    pro: 6.2,
+    turbo: 4.8,
+    overdrive: 4.5,
+    redline: 4.2
+  },
+  telegraphSecondsBySpeed: {
+    arcade: 1.35,
+    pro: 1.2,
+    turbo: 1.05,
+    overdrive: 0.95,
+    redline: 0.85
+  },
+  biasSecondsBySpeed: {
+    arcade: 0.55,
+    pro: 0.5,
+    turbo: 0.45,
+    overdrive: 0.4,
+    redline: 0.35
+  },
+  mergeSeconds: {
+    slowDriftMerge: 0.56,
+    aggressiveOvertake: 0.35,
+    panicCorrection: 0.32
+  },
+  settleSeconds: 0.25,
+  maxBiasLaneOffset: 0.2,
+  behaviorProfiles: {
+    slowDriftMerge: {
+      label: "Slow Drift Merge",
+      signalColor: "#ffe45e",
+      accentColor: "#ffb34f",
+      telegraphBonusSeconds: 0.16,
+      anticipationSeconds: 0.18,
+      commitPauseSeconds: 0.08,
+      commitPower: 1.28,
+      wobbleAmplitude: 0.036,
+      wobbleRate: 9.5,
+      signalIntensity: 0.92,
+      leanDegrees: 1.9,
+      visualSurge: 0.012,
+      brakeFlash: 0.08
+    },
+    aggressiveOvertake: {
+      label: "Aggressive Overtake",
+      signalColor: "#ff8d3a",
+      accentColor: "#ff3b58",
+      telegraphBonusSeconds: -0.04,
+      anticipationSeconds: 0.08,
+      commitPauseSeconds: 0.03,
+      commitPower: 0.58,
+      wobbleAmplitude: 0.056,
+      wobbleRate: 14.5,
+      signalIntensity: 1.44,
+      leanDegrees: 4.7,
+      visualSurge: 0.14,
+      brakeFlash: 0.04
+    },
+    panicCorrection: {
+      label: "Panic Correction",
+      signalColor: "#ff6a8f",
+      accentColor: "#f6fbff",
+      telegraphBonusSeconds: 0.08,
+      anticipationSeconds: 0.1,
+      commitPauseSeconds: 0.02,
+      commitPower: 0.86,
+      wobbleAmplitude: 0.052,
+      wobbleRate: 14,
+      signalIntensity: 1.14,
+      leanDegrees: 3,
+      visualSurge: 0.02,
+      brakeFlash: 1
+    }
+  },
+  maxActiveAtOnce: 1,
+  rewardExclusionSeconds: 0.78,
+  rewardExclusionMinDistance: 460,
+  pressureWaveBlocklist: [
+    "fourLaneSpike",
+    "needleThread",
+    "constructionSqueeze",
+    "officialBoostRampChain",
+    "rampEscape",
+    "rampOverpass",
+    "boostTemptation"
+  ],
+  sectionBlocklist: ["launch"],
+  maxVisibleHardBlockersForSchedule: 6,
+  maxHardBlockersNext3SecondsForSchedule: 4,
+  panicChanceWhenTargetUnsafe: 0.52,
+  aggressiveChanceBySpeed: {
+    arcade: 0.08,
+    pro: 0.34,
+    turbo: 0.62,
+    overdrive: 0.78,
+    redline: 0.86
+  },
+  debugEventLimit: 120
+};
+
+function getRecklessDriverBehaviorProfile(behavior) {
+  return RECKLESS_DRIVER_PROTOTYPE_CONFIG.behaviorProfiles?.[behavior]
+    || RECKLESS_DRIVER_PROTOTYPE_CONFIG.behaviorProfiles.slowDriftMerge;
+}
+
+function getRecklessTelemetryAverage(run, sumKey) {
+  const samples = Math.max(0, run?.recklessTelemetrySamples || 0);
+  if (!samples) return 0;
+  return Number(((run?.[sumKey] || 0) / samples).toFixed(3));
+}
+
 const ARCADE_FEEL = {
   enabled: true,
   countdownSeconds: 3.55,
@@ -3944,7 +4096,8 @@ const ARCADE_FEEL = {
   screenShakeDecay: 2.6,
   crashPauseMs: 110,
   crashShake: 1,
-  crashSparkMs: 420,
+  crashSparkMs: 500,
+  crashCauseMs: 900,
   bumpShake: 0.28,
   bumpFlashSeconds: 0.24,
   boostBurstSeconds: 0.48,
@@ -3959,6 +4112,9 @@ const ARCADE_FEEL = {
   finishStripeMs: 360,
   nearMissPopupCooldown: 0.38,
   nearMissSparkMs: 260,
+  nearMissDramaMs: 360,
+  nearMissRushMs: 420,
+  nearMissShake: 0.14,
   fuelWarningPulseMs: 620,
   fuelSavedPulseMs: 520,
   fuelSavedPopupCooldown: 1.1,
@@ -7582,6 +7738,33 @@ function normalizePlaytestRunSummary(entry) {
     paceBehindTime: normalizeOptionalFiniteNumber(entry.paceBehindTime, 0, 24 * 60 * 60),
     paceFeedbackActiveTime: normalizeOptionalFiniteNumber(entry.paceFeedbackActiveTime, 0, 24 * 60 * 60),
     paceFeedbackSampleCount: normalizeNonNegativeInteger(entry.paceFeedbackSampleCount, 0, 999999),
+    recklessDriversEnabled: Boolean(entry.recklessDriversEnabled),
+    recklessDriversScheduled: normalizeNonNegativeInteger(entry.recklessDriversScheduled, 0, 999),
+    recklessDriversStarted: normalizeNonNegativeInteger(entry.recklessDriversStarted, 0, 999),
+    recklessDriversCompleted: normalizeNonNegativeInteger(entry.recklessDriversCompleted, 0, 999),
+    recklessDriversPanicCorrections: normalizeNonNegativeInteger(entry.recklessDriversPanicCorrections, 0, 999),
+    recklessDriversCancelled: normalizeNonNegativeInteger(entry.recklessDriversCancelled, 0, 999),
+    recklessDriversSafetyRejects: normalizeNonNegativeInteger(entry.recklessDriversSafetyRejects, 0, 99999),
+    recklessDriversRewardRejects: normalizeNonNegativeInteger(entry.recklessDriversRewardRejects, 0, 99999),
+    recklessDriversPressureRejects: normalizeNonNegativeInteger(entry.recklessDriversPressureRejects, 0, 99999),
+    recklessDriversActiveMax: normalizeNonNegativeInteger(entry.recklessDriversActiveMax, 0, 9),
+    recklessEventsSeen: normalizeNonNegativeInteger(entry.recklessEventsSeen, 0, 999),
+    recklessSlowMerges: normalizeNonNegativeInteger(entry.recklessSlowMerges, 0, 999),
+    recklessAggressiveOvertakes: normalizeNonNegativeInteger(entry.recklessAggressiveOvertakes, 0, 999),
+    recklessPanicCorrections: normalizeNonNegativeInteger(entry.recklessPanicCorrections, 0, 999),
+    recklessNearMisses: normalizeNonNegativeInteger(entry.recklessNearMisses, 0, 999),
+    recklessCrashes: normalizeNonNegativeInteger(entry.recklessCrashes, 0, 999),
+    recklessAvoidedWithDriftDash: normalizeNonNegativeInteger(entry.recklessAvoidedWithDriftDash, 0, 999),
+    recklessTelegraphAverageSeconds: normalizeNonNegativeNumber(entry.recklessTelegraphAverageSeconds, 0, 60),
+    recklessMovementAverageSeconds: normalizeNonNegativeNumber(entry.recklessMovementAverageSeconds, 0, 60),
+    recklessScheduledByBehavior: normalizeCountMap(entry.recklessScheduledByBehavior, 8),
+    recklessScheduledBySection: normalizeSectionCountMap(entry.recklessScheduledBySection),
+    recklessSeenBySection: normalizeSectionCountMap(entry.recklessSeenBySection),
+    recklessCompletedByBehavior: normalizeCountMap(entry.recklessCompletedByBehavior, 8),
+    recklessCompletedBySection: normalizeSectionCountMap(entry.recklessCompletedBySection),
+    recklessRejectsByReason: normalizeCountMap(entry.recklessRejectsByReason, 8),
+    recklessRejectsBySection: normalizeSectionCountMap(entry.recklessRejectsBySection),
+    recklessRejectsByDetail: normalizeCountMap(entry.recklessRejectsByDetail, 16),
     enduranceSpeedMultiplier: normalizeNonNegativeNumber(entry.enduranceSpeedMultiplier, 0, 10),
     enduranceEscalationSeconds: normalizeNonNegativeNumber(entry.enduranceEscalationSeconds, 0, 24 * 60 * 60),
     enduranceLap: normalizeNonNegativeInteger(entry.enduranceLap, 0, 999),
@@ -9699,6 +9882,7 @@ class AudioManager {
       pursuitEscaped: 900,
       pursuitBusted: 900,
       nearMiss: 300,
+      nearMissDrama: 260,
       warning: 1000,
       finish: 600,
       crash: 600,
@@ -9726,6 +9910,7 @@ class AudioManager {
       finish: { path: "audio/finish.wav", audio: null, loaded: "untested", tone: tone([{ type: "triangle", frequency: 440, endFrequency: 880, duration: 0.16, gain: 0.22 }, { type: "sine", frequency: 660, endFrequency: 1320, start: 0.07, duration: 0.18, gain: 0.18 }], 0.28).tone },
       menu: { path: "audio/menu-select.wav", audio: null, loaded: "untested", tone: tone([{ type: "triangle", frequency: 360, endFrequency: 520, duration: 0.07, gain: 0.12 }], 0.08).tone },
       nearMiss: { path: "audio/near-miss.wav", audio: null, loaded: "untested", tone: tone([{ type: "sine", frequency: 720, endFrequency: 520, duration: 0.11, gain: 0.16 }, { noise: true, start: 0.02, duration: 0.09, gain: 0.05 }], 0.14).tone },
+      nearMissDrama: tone([{ type: "triangle", frequency: 980, endFrequency: 520, duration: 0.12, gain: 0.12 }, { noise: true, start: 0.01, duration: 0.11, gain: 0.035 }], 0.16),
       oil: { path: "audio/oil.wav", audio: null, loaded: "untested", tone: tone([{ type: "sawtooth", frequency: 180, endFrequency: 110, duration: 0.16, gain: 0.14 }], 0.16).tone },
       ramp: { path: "audio/ramp.wav", audio: null, loaded: "untested", tone: tone([{ type: "triangle", frequency: 240, endFrequency: 460, duration: 0.16, gain: 0.18 }], 0.18).tone },
       boostPickup: tone([{ type: "sawtooth", frequency: 260, endFrequency: 860, duration: 0.18, gain: 0.3 }, { type: "sine", frequency: 620, endFrequency: 1240, start: 0.02, duration: 0.14, gain: 0.18 }], 0.22),
@@ -15072,6 +15257,7 @@ class ObstacleManager {
     this.seedLockedSpawnObstacles = [];
     this.boostlineRouteScript = null;
     this.boostlineNextEventIndex = 0;
+    this.recklessActiveObstacleId = "";
     this.fallbackRng = createSeededRandomController("road-director-fallback");
     this.director = new RoadDirector(this);
   }
@@ -15089,6 +15275,7 @@ class ObstacleManager {
     this.seedLockedSpawnObstacles = [];
     this.boostlineRouteScript = null;
     this.boostlineNextEventIndex = 0;
+    this.recklessActiveObstacleId = "";
     this.director.reset(track);
     this.applyStartClearState();
     this.configureBoostlineRouteScript();
@@ -15109,6 +15296,7 @@ class ObstacleManager {
     }
     this.director.update(dt);
     this.spawnScheduledWave(run, track);
+    this.updateRecklessDrivers(dt);
 
     this.obstacles = this.obstacles.filter((obstacle) => {
       const ahead = obstacle.distance - run.distance;
@@ -15483,6 +15671,7 @@ class ObstacleManager {
       run.lastWaveSpawnSection = plan.section?.id || "";
       run.lastSpawnVisibleAhead = plan.minimumSpawnAhead;
       run.lastSpawnRevealBuffer = plan.revealBuffer;
+      this.tryScheduleRecklessFromWave(wave, spawnDistance, plan);
       const nextScheduledDistance = this.nextSpawnDistance + this.getNextScheduledWaveSpacing(wave, spawnDistance);
       this.nextSpawnDistance = Math.max(
         nextScheduledDistance,
@@ -15498,6 +15687,584 @@ class ObstacleManager {
     run.maxWavesSpawnedInSingleFrame = Math.max(run.maxWavesSpawnedInSingleFrame || 0, wavesSpawned);
     run.lastWaveDelayedForVisibleSafety = delayedForVisibility;
     return { ...plan, wavesSpawned, delayedForVisibility, underActivityCorrected, officialOpeningCorrected };
+  }
+
+  isRecklessPrototypeRun(run = this.game.run) {
+    if (!RECKLESS_DRIVER_PROTOTYPE_CONFIG.enabled || !run || !this.track) return false;
+    const raceTypeId = normalizeRaceTypeId(run.raceTypeId, DEFAULT_RACE_TYPE_ID);
+    if (raceTypeId !== DEFAULT_RACE_TYPE_ID) return false;
+    if (run.partyMode || run.officialRecordChase || run.challengeMode) return false;
+    if (isOfficialEnduranceRun(run) || isFuelRunRaceType(raceTypeId) || isPursuitRaceType(raceTypeId) || isBoostlineRaceType(raceTypeId)) return false;
+    return this.getRecklessMaxForRun(run) > 0;
+  }
+
+  getRecklessMaxForRun(run = this.game.run) {
+    const speedClassId = normalizeSpeedClassId(run?.speedClassId, DEFAULT_SPEED_CLASS_ID);
+    return Math.max(0, RECKLESS_DRIVER_PROTOTYPE_CONFIG.maxPerRunBySpeed[speedClassId] || 0);
+  }
+
+  shouldForceRecklessOpportunity(run = this.game.run, progress = 0) {
+    if (!run) return false;
+    const speedClassId = normalizeSpeedClassId(run.speedClassId, DEFAULT_SPEED_CLASS_ID);
+    const targets = RECKLESS_DRIVER_PROTOTYPE_CONFIG.targetProgressBySpeed[speedClassId] || [];
+    const scheduled = Math.max(0, run.recklessDriversScheduled || 0);
+    if (scheduled >= this.getRecklessMaxForRun(run) || scheduled >= targets.length) return false;
+    return progress >= targets[scheduled];
+  }
+
+  getRecklessTimingForRun(run = this.game.run, behavior = RECKLESS_DRIVER_BEHAVIORS.slowDriftMerge) {
+    const speedClassId = normalizeSpeedClassId(run?.speedClassId, DEFAULT_SPEED_CLASS_ID);
+    const profile = getRecklessDriverBehaviorProfile(behavior);
+    const baseTelegraphSeconds = RECKLESS_DRIVER_PROTOTYPE_CONFIG.telegraphSecondsBySpeed[speedClassId]
+      ?? RECKLESS_DRIVER_PROTOTYPE_CONFIG.telegraphSecondsBySpeed.arcade;
+    const telegraphSeconds = Math.max(0.85, baseTelegraphSeconds + (profile.telegraphBonusSeconds || 0));
+    const baseBiasSeconds = RECKLESS_DRIVER_PROTOTYPE_CONFIG.biasSecondsBySpeed[speedClassId]
+      ?? RECKLESS_DRIVER_PROTOTYPE_CONFIG.biasSecondsBySpeed.arcade;
+    const biasSeconds = clamp(baseBiasSeconds + Math.max(0, profile.telegraphBonusSeconds || 0) * 0.45, 0.24, Math.max(0.24, telegraphSeconds - 0.05));
+    return {
+      speedClassId,
+      telegraphSeconds,
+      biasSeconds,
+      mergeSeconds: RECKLESS_DRIVER_PROTOTYPE_CONFIG.mergeSeconds[behavior]
+        ?? RECKLESS_DRIVER_PROTOTYPE_CONFIG.mergeSeconds.slowDriftMerge,
+      settleSeconds: RECKLESS_DRIVER_PROTOTYPE_CONFIG.settleSeconds,
+      anticipationSeconds: Math.min(telegraphSeconds * 0.32, Math.max(0, profile.anticipationSeconds || 0)),
+      commitPauseSeconds: Math.max(0, profile.commitPauseSeconds || 0),
+      commitPower: Math.max(0.4, profile.commitPower || 1),
+      wobbleAmplitude: Math.max(0, profile.wobbleAmplitude || 0),
+      wobbleRate: Math.max(1, profile.wobbleRate || 10),
+      signalIntensity: Math.max(0.1, profile.signalIntensity || 1),
+      leanDegrees: profile.leanDegrees || 0,
+      visualSurge: Math.max(0, profile.visualSurge || 0),
+      brakeFlash: Math.max(0, profile.brakeFlash || 0),
+      behaviorProfileLabel: profile.label || behavior
+    };
+  }
+
+  getRecklessCooldownDistance(run = this.game.run, progress = 0) {
+    const speedClassId = normalizeSpeedClassId(run?.speedClassId, DEFAULT_SPEED_CLASS_ID);
+    const seconds = RECKLESS_DRIVER_PROTOTYPE_CONFIG.cooldownSecondsBySpeed[speedClassId]
+      ?? RECKLESS_DRIVER_PROTOTYPE_CONFIG.cooldownSecondsBySpeed.arcade;
+    const speed = Math.max(1, Number.isFinite(run?.currentSpeed)
+      ? run.currentSpeed
+      : getTrackCruiseSpeed(this.track || run?.track || TRACKS[0], progress, speedClassId));
+    return speed * seconds;
+  }
+
+  makeRecklessRng(obstacle, wave, label = "") {
+    const run = this.game.run || {};
+    const track = this.track || run.track || TRACKS[0];
+    const seedSource = run.roadSeedSource
+      || getRunRandomSeedSource(run.roadSeed || DEFAULT_ROAD_SEED, track, run.speedClassId || DEFAULT_SPEED_CLASS_ID, run.raceTypeId || DEFAULT_RACE_TYPE_ID);
+    const key = [
+      "reckless-v1",
+      seedSource,
+      label,
+      wave?.waveId || "wave",
+      wave?.type || "unknown",
+      Math.round(wave?.distance || obstacle?.distance || 0),
+      obstacle?.id || "",
+      obstacle?.type || "",
+      Number.isFinite(obstacle?.lane) ? obstacle.lane : "",
+      Math.round(obstacle?.distance || 0)
+    ].join("|");
+    return createSeededRandomController(key);
+  }
+
+  recordRecklessEvent(kind, data = {}) {
+    const run = this.game.run;
+    if (!run) return;
+    if (!Array.isArray(run.recklessDriverEvents)) run.recklessDriverEvents = [];
+    run.recklessDriverEvents.push({
+      kind,
+      elapsed: Number(Math.max(0, run.elapsed || 0).toFixed(3)),
+      runDistance: Math.round(run.distance || 0),
+      ...data
+    });
+    const limit = RECKLESS_DRIVER_PROTOTYPE_CONFIG.debugEventLimit;
+    if (run.recklessDriverEvents.length > limit) {
+      run.recklessDriverEvents.splice(0, run.recklessDriverEvents.length - limit);
+    }
+  }
+
+  recordRecklessSkip(reason, data = {}) {
+    const run = this.game.run;
+    if (!run) return;
+    if (reason === "safety") run.recklessDriversSafetyRejects = (run.recklessDriversSafetyRejects || 0) + 1;
+    else if (reason === "reward") run.recklessDriversRewardRejects = (run.recklessDriversRewardRejects || 0) + 1;
+    else if (reason === "pressure") run.recklessDriversPressureRejects = (run.recklessDriversPressureRejects || 0) + 1;
+    else if (reason === "disabled") run.recklessDriversDisabledModeSkips = (run.recklessDriversDisabledModeSkips || 0) + 1;
+    incrementCountMapValue(run.recklessRejectsByReason, reason);
+    const sectionId = data.sectionId || data.section || run.currentSectionId || "unknown";
+    incrementCountMapValue(run.recklessRejectsBySection, sectionId);
+    if (data.detail) incrementCountMapValue(run.recklessRejectsByDetail, data.detail);
+    this.recordRecklessEvent("skip", { reason, sectionId, ...data });
+  }
+
+  hasRecklessHighPressureConflict(wave, spawnDistance, plan) {
+    const run = this.game.run || {};
+    const waveType = wave?.type || "";
+    const metadata = wave?.metadata || {};
+    const sectionId = wave?.section?.id || plan?.section?.id || run.currentSectionId || "";
+    if (RECKLESS_DRIVER_PROTOTYPE_CONFIG.sectionBlocklist.includes(sectionId)) {
+      return { blocked: true, reason: `section:${sectionId || "unknown"}` };
+    }
+    if (RECKLESS_DRIVER_PROTOTYPE_CONFIG.pressureWaveBlocklist.includes(waveType)) {
+      return { blocked: true, reason: `wave:${waveType}` };
+    }
+    const rewardCount = (wave?.boostLanes?.length || 0) + (wave?.rampLanes?.length || 0) + (wave?.gasCanLanes?.length || 0);
+    if (metadata.family === "solution") {
+      return { blocked: true, reason: "solution-wave" };
+    }
+    if (rewardCount > 0 && waveType === "boostTemptation") {
+      return { blocked: true, reason: "boost-commitment-wave" };
+    }
+    const sampleDistance = Number.isFinite(spawnDistance) ? spawnDistance : (run.distance || 0);
+    const obstacles = this.getSpawnValidationObstacles(sampleDistance);
+    const density = this.getActiveFieldDensity(obstacles, this.getSafetyRunDistance(sampleDistance));
+    if (density.visibleHardBlockers > RECKLESS_DRIVER_PROTOTYPE_CONFIG.maxVisibleHardBlockersForSchedule) {
+      return { blocked: true, reason: "visible-density", density };
+    }
+    if (density.hardBlockersNext3Seconds > RECKLESS_DRIVER_PROTOTYPE_CONFIG.maxHardBlockersNext3SecondsForSchedule) {
+      return { blocked: true, reason: "next3-density", density };
+    }
+    return { blocked: false, reason: "" };
+  }
+
+  hasRecklessRewardConflict(obstacle, sourceLane, targetLane, speed) {
+    const protectedLanes = new Set();
+    const minLane = Math.min(sourceLane, targetLane);
+    const maxLane = Math.max(sourceLane, targetLane);
+    for (let lane = minLane - 1; lane <= maxLane + 1; lane += 1) {
+      if (lane >= 0 && lane < LANES) protectedLanes.add(lane);
+    }
+    const windowDistance = Math.max(
+      RECKLESS_DRIVER_PROTOTYPE_CONFIG.rewardExclusionMinDistance,
+      speed * RECKLESS_DRIVER_PROTOTYPE_CONFIG.rewardExclusionSeconds
+    );
+    return this.obstacles.some((item) => {
+      if (!item || item === obstacle || item.hit || item.remove) return false;
+      if (!["ramp", "boostPad", "gasCan"].includes(item.type)) return false;
+      if (Math.abs((item.distance || 0) - (obstacle.distance || 0)) > windowDistance) return false;
+      const lanes = this.getWorldLaneCoverage(item, 0.12);
+      const laneList = lanes.length ? lanes : [Math.round(clamp(Number.isFinite(item.laneFloat) ? item.laneFloat : item.lane, 0, LANES - 1))];
+      return laneList.some((lane) => protectedLanes.has(lane));
+    });
+  }
+
+  validateRecklessTargetLane(obstacle, targetLane) {
+    const sourceLane = Math.round(clamp(Number.isFinite(obstacle.laneFloat) ? obstacle.laneFloat : obstacle.lane, 0, LANES - 1));
+    const candidate = {
+      ...obstacle,
+      lane: targetLane,
+      laneFloat: targetLane,
+      recklessPrototype: true,
+      recklessSourceLane: sourceLane,
+      recklessTargetLane: targetLane,
+      recklessComplete: false
+    };
+    const existing = this.obstacles.filter((item) => item !== obstacle && item.id !== obstacle.id && !item.remove);
+    const overlap = this.findSpawnOverlap(candidate, existing);
+    if (overlap) {
+      return { ok: false, reason: "overlap", overlap };
+    }
+    const safety = this.validateCompleteSafetyPattern(existing.concat(candidate), this.game.run?.distance || 0);
+    return {
+      ok: !safety.invalid,
+      reason: safety.invalid ? (safety.reason || "route-safety") : "ok",
+      safety
+    };
+  }
+
+  pickRecklessBehavior(rng, speedClassId, targetValidation) {
+    if (!targetValidation?.ok) {
+      return rng.random() < RECKLESS_DRIVER_PROTOTYPE_CONFIG.panicChanceWhenTargetUnsafe
+        ? RECKLESS_DRIVER_BEHAVIORS.panicCorrection
+        : "";
+    }
+    const aggressiveChance = RECKLESS_DRIVER_PROTOTYPE_CONFIG.aggressiveChanceBySpeed[speedClassId] || 0;
+    if (rng.random() < aggressiveChance) return RECKLESS_DRIVER_BEHAVIORS.aggressiveOvertake;
+    if (speedClassId === "redline" || speedClassId === "overdrive") return RECKLESS_DRIVER_BEHAVIORS.aggressiveOvertake;
+    return RECKLESS_DRIVER_BEHAVIORS.slowDriftMerge;
+  }
+
+  scheduleRecklessDriver(obstacle, wave, behavior, sourceLane, targetLane, targetValidation) {
+    const run = this.game.run || {};
+    const timings = this.getRecklessTimingForRun(run, behavior);
+    const direction = Math.sign(targetLane - sourceLane) || 1;
+    obstacle.recklessPrototype = true;
+    obstacle.recklessBehavior = behavior;
+    obstacle.recklessSourceLane = sourceLane;
+    obstacle.recklessTargetLane = targetLane;
+    obstacle.recklessComplete = false;
+    obstacle.recklessState = {
+      phase: "queued",
+      behavior,
+      direction,
+      sourceLane,
+      targetLane,
+      telegraphSeconds: timings.telegraphSeconds,
+      biasSeconds: timings.biasSeconds,
+      mergeSeconds: timings.mergeSeconds,
+      settleSeconds: timings.settleSeconds,
+      anticipationSeconds: timings.anticipationSeconds,
+      commitPauseSeconds: timings.commitPauseSeconds,
+      commitPower: timings.commitPower,
+      wobbleAmplitude: timings.wobbleAmplitude,
+      wobbleRate: timings.wobbleRate,
+      signalIntensity: timings.signalIntensity,
+      leanDegrees: timings.leanDegrees,
+      visualSurge: timings.visualSurge,
+      brakeFlash: timings.brakeFlash,
+      behaviorProfileLabel: timings.behaviorProfileLabel,
+      sectionId: wave?.section?.id || obstacle.sectionId || "",
+      waveType: wave?.type || "",
+      startElapsed: null,
+      phaseElapsed: 0,
+      visualIntent: 0,
+      visualPulse: 0,
+      visualLean: 0,
+      visualSurgeAmount: 0,
+      visualBrake: 0,
+      targetSafetyOk: Boolean(targetValidation?.ok)
+    };
+    run.recklessDriversEnabled = true;
+    run.recklessDriversScheduled = (run.recklessDriversScheduled || 0) + 1;
+    if (behavior === RECKLESS_DRIVER_BEHAVIORS.panicCorrection) {
+      run.recklessDriversPanicCorrections = (run.recklessDriversPanicCorrections || 0) + 1;
+    }
+    const sectionId = wave?.section?.id || obstacle.sectionId || "";
+    incrementCountMapValue(run.recklessScheduledByBehavior, behavior);
+    incrementCountMapValue(run.recklessScheduledBySection, sectionId || "unknown");
+    run.recklessLastScheduleDistance = obstacle.distance || 0;
+    run.recklessFirstOpportunityGranted = true;
+    this.recordRecklessEvent("scheduled", {
+      obstacleId: obstacle.id,
+      behavior,
+      type: obstacle.type,
+      waveType: wave?.type || "",
+      waveId: wave?.waveId || "",
+      sectionId,
+      distance: Math.round(obstacle.distance || 0),
+      sourceLane,
+      targetLane,
+      laneDelta: targetLane - sourceLane,
+      telegraphSeconds: timings.telegraphSeconds,
+      biasSeconds: timings.biasSeconds,
+      mergeSeconds: timings.mergeSeconds,
+      settleSeconds: timings.settleSeconds,
+      anticipationSeconds: timings.anticipationSeconds,
+      commitPauseSeconds: timings.commitPauseSeconds,
+      commitPower: timings.commitPower,
+      wobbleAmplitude: timings.wobbleAmplitude,
+      wobbleRate: timings.wobbleRate,
+      signalIntensity: timings.signalIntensity,
+      behaviorProfileLabel: timings.behaviorProfileLabel,
+      targetSafetyOk: Boolean(targetValidation?.ok),
+      safetyReason: targetValidation?.reason || ""
+    });
+    return obstacle;
+  }
+
+  tryScheduleRecklessFromWave(wave, spawnDistance, plan) {
+    const run = this.game.run;
+    if (!run || !wave) return null;
+    if (!this.isRecklessPrototypeRun(run)) return null;
+    run.recklessDriversEnabled = true;
+    const maxForRun = this.getRecklessMaxForRun(run);
+    if ((run.recklessDriversScheduled || 0) >= maxForRun) return null;
+    const track = this.track || run.track || TRACKS[0];
+    const progress = clamp(spawnDistance / Math.max(1, track.distanceToFinish || 1), 0, 1);
+    if (progress < RECKLESS_DRIVER_PROTOTYPE_CONFIG.minProgress || progress > RECKLESS_DRIVER_PROTOTYPE_CONFIG.maxProgress) return null;
+    const speedClassId = normalizeSpeedClassId(run.speedClassId, DEFAULT_SPEED_CLASS_ID);
+    const speed = Math.max(1, Number.isFinite(run.currentSpeed)
+      ? run.currentSpeed
+      : getTrackCruiseSpeed(track, progress, speedClassId));
+    const firstProgress = RECKLESS_DRIVER_PROTOTYPE_CONFIG.firstGuaranteedProgressBySpeed[speedClassId]
+      ?? RECKLESS_DRIVER_PROTOTYPE_CONFIG.firstGuaranteedProgressBySpeed.arcade;
+    const forceFirstOpportunity = !run.recklessFirstOpportunityGranted && progress >= firstProgress;
+    const forceTargetOpportunity = this.shouldForceRecklessOpportunity(run, progress);
+    const cooldownDistance = this.getRecklessCooldownDistance(run, progress);
+    if (Number.isFinite(run.recklessLastScheduleDistance) && spawnDistance - run.recklessLastScheduleDistance < cooldownDistance) {
+      const targetCooldownDistance = cooldownDistance * (forceTargetOpportunity ? 0.55 : 1);
+      if (spawnDistance - run.recklessLastScheduleDistance < targetCooldownDistance) return null;
+    }
+    const pressureConflict = this.hasRecklessHighPressureConflict(wave, spawnDistance, plan);
+    if (pressureConflict.blocked) {
+      this.recordRecklessSkip("pressure", {
+        waveType: wave.type || "",
+        sectionId: wave?.section?.id || plan?.section?.id || run.currentSectionId || "",
+        detail: pressureConflict.reason || ""
+      });
+      return null;
+    }
+    const chanceRng = this.makeRecklessRng({ id: "wave", lane: 0, distance: spawnDistance }, wave, "chance");
+    const chance = RECKLESS_DRIVER_PROTOTYPE_CONFIG.chanceBySpeed[speedClassId] || 0;
+    if (!forceFirstOpportunity && !forceTargetOpportunity && chanceRng.random() > chance) return null;
+
+    const candidates = (Array.isArray(wave.spawned) ? wave.spawned : [])
+      .filter((obstacle) => obstacle && !obstacle.remove && !obstacle.hit)
+      .filter((obstacle) => RECKLESS_DRIVER_PROTOTYPE_CONFIG.allowedVehicleTypes.includes(obstacle.type))
+      .filter((obstacle) => !obstacle.recklessPrototype && Number.isFinite(obstacle.lane))
+      .sort((a, b) => (Math.abs(a.lane - TRACK_DIRECTOR.centerLane) - Math.abs(b.lane - TRACK_DIRECTOR.centerLane)) || String(a.id).localeCompare(String(b.id)));
+
+    for (const obstacle of candidates) {
+      const sourceLane = Math.round(clamp(Number.isFinite(obstacle.laneFloat) ? obstacle.laneFloat : obstacle.lane, 0, LANES - 1));
+      const rng = this.makeRecklessRng(obstacle, wave, "candidate");
+      const directions = rng.random() < 0.5 ? [-1, 1] : [1, -1];
+      for (const direction of directions) {
+        const targetLane = sourceLane + direction;
+        if (targetLane < 0 || targetLane >= LANES) continue;
+        if (this.hasRecklessRewardConflict(obstacle, sourceLane, targetLane, speed)) {
+          this.recordRecklessSkip("reward", {
+            obstacleId: obstacle.id,
+            waveType: wave.type || "",
+            sectionId: wave?.section?.id || obstacle.sectionId || "",
+            sourceLane,
+            targetLane
+          });
+          continue;
+        }
+        const targetValidation = this.validateRecklessTargetLane(obstacle, targetLane);
+        const behavior = this.pickRecklessBehavior(rng, speedClassId, targetValidation);
+        if (!behavior) {
+          this.recordRecklessSkip("safety", {
+            obstacleId: obstacle.id,
+            waveType: wave.type || "",
+            sectionId: wave?.section?.id || obstacle.sectionId || "",
+            sourceLane,
+            targetLane,
+            detail: targetValidation.reason || ""
+          });
+          continue;
+        }
+        return this.scheduleRecklessDriver(obstacle, wave, behavior, sourceLane, targetLane, targetValidation);
+      }
+    }
+    return null;
+  }
+
+  updateRecklessDrivers(dt) {
+    const run = this.game.run;
+    if (!run) return;
+    const recklessObstacles = this.obstacles.filter((obstacle) => (
+      obstacle.recklessPrototype && obstacle.recklessState && !obstacle.hit && !obstacle.remove
+    ));
+    if (!recklessObstacles.length) {
+      if (this.recklessActiveObstacleId) this.recklessActiveObstacleId = "";
+      return;
+    }
+    let activeCount = 0;
+    for (const obstacle of recklessObstacles) {
+      if (this.updateRecklessObstacle(obstacle, dt, run)) activeCount += 1;
+    }
+    run.recklessDriversActiveMax = Math.max(run.recklessDriversActiveMax || 0, activeCount);
+    if (this.recklessActiveObstacleId && !this.obstacles.some((item) => item.id === this.recklessActiveObstacleId && !item.recklessComplete && !item.remove)) {
+      this.recklessActiveObstacleId = "";
+    }
+  }
+
+  updateRecklessObstacle(obstacle, dt, run = this.game.run) {
+    const state = obstacle.recklessState;
+    if (!state || obstacle.recklessComplete) return false;
+    const sourceLane = Number.isFinite(state.sourceLane) ? state.sourceLane : obstacle.lane;
+    const targetLane = Number.isFinite(state.targetLane) ? state.targetLane : sourceLane;
+    const direction = Math.sign(targetLane - sourceLane) || state.direction || 1;
+    const speed = Math.max(1, Number.isFinite(run?.currentSpeed)
+      ? run.currentSpeed
+      : getTrackCruiseSpeed(this.track || run?.track || TRACKS[0], 0, this.getSpeedClassId()));
+    const playerAhead = this.getPlayerZoneAhead(run?.distance || 0);
+    const secondsToConflict = ((obstacle.distance || 0) - (run?.distance || 0) - playerAhead) / speed;
+    const activationLead = state.telegraphSeconds + state.mergeSeconds + state.settleSeconds + 0.28;
+    if (state.phase === "queued") {
+      if (secondsToConflict > activationLead) {
+        obstacle.laneFloat = sourceLane;
+        return false;
+      }
+      if (this.recklessActiveObstacleId && this.recklessActiveObstacleId !== obstacle.id) {
+        if (secondsToConflict <= state.telegraphSeconds + 0.08) {
+          this.completeRecklessDriver(obstacle, "suppressed-active");
+        }
+        return false;
+      }
+      this.recklessActiveObstacleId = obstacle.id;
+      run.recklessActiveObstacleId = obstacle.id;
+      state.phase = "telegraph";
+      state.startElapsed = Number.isFinite(run?.elapsed) ? run.elapsed : 0;
+      run.recklessDriversStarted = (run.recklessDriversStarted || 0) + 1;
+      if (!state.seenRecorded) {
+        state.seenRecorded = true;
+        run.recklessEventsSeen = (run.recklessEventsSeen || 0) + 1;
+        incrementCountMapValue(run.recklessSeenBySection, state.sectionId || run.currentSectionId || "unknown");
+        if (state.behavior === RECKLESS_DRIVER_BEHAVIORS.slowDriftMerge) {
+          run.recklessSlowMerges = (run.recklessSlowMerges || 0) + 1;
+        } else if (state.behavior === RECKLESS_DRIVER_BEHAVIORS.aggressiveOvertake) {
+          run.recklessAggressiveOvertakes = (run.recklessAggressiveOvertakes || 0) + 1;
+        } else if (state.behavior === RECKLESS_DRIVER_BEHAVIORS.panicCorrection) {
+          run.recklessPanicCorrections = (run.recklessPanicCorrections || 0) + 1;
+        }
+        run.recklessTelemetrySamples = (run.recklessTelemetrySamples || 0) + 1;
+        run.recklessTelegraphSecondsSum = (run.recklessTelegraphSecondsSum || 0) + (state.telegraphSeconds || 0);
+        run.recklessMovementSecondsSum = (run.recklessMovementSecondsSum || 0) + (state.mergeSeconds || 0);
+      }
+      this.recordRecklessEvent("started", {
+        obstacleId: obstacle.id,
+        behavior: state.behavior,
+        phase: "telegraph",
+        sectionId: state.sectionId || "",
+        waveType: state.waveType || "",
+        sourceLane,
+        targetLane,
+        secondsToConflict: Number(secondsToConflict.toFixed(3)),
+        telegraphSeconds: state.telegraphSeconds,
+        mergeSeconds: state.mergeSeconds,
+        anticipationSeconds: state.anticipationSeconds || 0,
+        behaviorProfileLabel: state.behaviorProfileLabel || state.behavior
+      });
+    }
+
+    const elapsed = Math.max(0, (Number.isFinite(run?.elapsed) ? run.elapsed : 0) - (state.startElapsed || 0));
+    state.phaseElapsed = elapsed;
+    const smooth = (value) => {
+      const t = clamp(value, 0, 1);
+      return t * t * (3 - 2 * t);
+    };
+    const easeByPower = (value, power = 1) => {
+      const t = smooth(value);
+      return clamp(Math.pow(t, Math.max(0.4, power || 1)), 0, 1);
+    };
+    const maxBias = RECKLESS_DRIVER_PROTOTYPE_CONFIG.maxBiasLaneOffset;
+    const wobbleRate = Math.max(1, state.wobbleRate || 10);
+    const wobbleAmplitude = Math.max(0, state.wobbleAmplitude || 0.03);
+    const telegraphProgress = smooth(elapsed / Math.max(0.001, state.telegraphSeconds || 1));
+    const huntingPulse = Math.sin((elapsed * wobbleRate) + (obstacle.distance || 0) * 0.013);
+    const wobble = huntingPulse * wobbleAmplitude * (0.25 + telegraphProgress * 0.75);
+    const telegraph = state.telegraphSeconds;
+    const merge = state.mergeSeconds;
+    const settle = state.settleSeconds;
+    const behavior = state.behavior;
+    const anticipation = Math.min(telegraph * 0.34, Math.max(0, state.anticipationSeconds || 0));
+    const commitPause = Math.min(merge * 0.38, Math.max(0, state.commitPauseSeconds || 0));
+    const intentPulse = 0.45 + Math.sin((elapsed * (state.signalIntensity || 1) * 10.5) + obstacle.distance * 0.017) * 0.55;
+    const setVisualState = (intent, commit = 0, brake = 0) => {
+      const visualIntent = clamp(intent, 0, 1);
+      state.visualIntent = visualIntent;
+      state.visualCommit = clamp(commit, 0, 1);
+      state.visualPulse = clamp(intentPulse * (state.signalIntensity || 1), 0, 1.55);
+      state.visualLean = direction * (state.leanDegrees || 0) * Math.PI / 180 * visualIntent;
+      state.visualSurgeAmount = (state.visualSurge || 0) * clamp(commit || visualIntent, 0, 1);
+      state.visualBrake = clamp(brake, 0, 1);
+    };
+
+    if (behavior === RECKLESS_DRIVER_BEHAVIORS.panicCorrection) {
+      const fakeCommitEnd = telegraph + merge * 0.46;
+      const correctionEnd = fakeCommitEnd + merge * 0.72;
+      if (elapsed <= telegraph) {
+        state.phase = "panicTell";
+        const biasStart = Math.max(anticipation, telegraph - state.biasSeconds);
+        const biasProgress = elapsed <= biasStart ? 0 : smooth((elapsed - biasStart) / Math.max(0.001, state.biasSeconds));
+        setVisualState(Math.max(telegraphProgress, biasProgress), 0, telegraphProgress * 0.48);
+        obstacle.laneFloat = sourceLane + direction * (maxBias * 1.25 * biasProgress) + wobble * biasProgress;
+        return true;
+      }
+      if (elapsed <= fakeCommitEnd) {
+        state.phase = "panicCommit";
+        const t = easeByPower((elapsed - telegraph) / Math.max(0.001, fakeCommitEnd - telegraph), state.commitPower || 1);
+        setVisualState(1, t, 0.72 + t * 0.2);
+        obstacle.laneFloat = sourceLane + direction * lerp(maxBias * 1.25, maxBias * 2.05, t) + wobble * 0.22;
+        return true;
+      }
+      if (elapsed <= correctionEnd) {
+        state.phase = "panicCorrection";
+        const t = easeByPower((elapsed - fakeCommitEnd) / Math.max(0.001, correctionEnd - fakeCommitEnd), 0.72);
+        setVisualState(1 - t * 0.22, 1 - t, 1);
+        obstacle.laneFloat = lerp(sourceLane + direction * maxBias * 2.05, sourceLane, t);
+        return true;
+      }
+      this.completeRecklessDriver(obstacle, "panic-corrected");
+      return false;
+    }
+
+    if (elapsed <= telegraph) {
+      state.phase = "telegraph";
+      const biasStart = Math.max(0, telegraph - state.biasSeconds);
+      const readableBiasStart = Math.max(anticipation, biasStart);
+      const biasProgress = elapsed <= readableBiasStart ? 0 : smooth((elapsed - readableBiasStart) / Math.max(0.001, state.biasSeconds));
+      setVisualState(Math.max(telegraphProgress, biasProgress), 0, 0);
+      obstacle.laneFloat = sourceLane + direction * maxBias * biasProgress + wobble * biasProgress;
+      return true;
+    }
+    if (elapsed <= telegraph + merge) {
+      state.phase = "merge";
+      const raw = elapsed - telegraph;
+      const t = raw <= commitPause ? 0 : easeByPower((raw - commitPause) / Math.max(0.001, merge - commitPause), state.commitPower || 1);
+      setVisualState(1, t, 0);
+      obstacle.laneFloat = lerp(sourceLane, targetLane, t) + wobble * 0.18 * (1 - t);
+      return true;
+    }
+    if (elapsed <= telegraph + merge + settle) {
+      state.phase = "settle";
+      const t = smooth((elapsed - telegraph - merge) / Math.max(0.001, settle));
+      setVisualState(1 - t, 1, 0);
+      obstacle.laneFloat = targetLane + direction * maxBias * 0.3 * (1 - t);
+      return true;
+    }
+    this.completeRecklessDriver(obstacle, "completed");
+    return false;
+  }
+
+  completeRecklessDriver(obstacle, reason = "completed") {
+    const run = this.game.run;
+    if (!obstacle?.recklessState) return;
+    const state = obstacle.recklessState;
+    const panic = state.behavior === RECKLESS_DRIVER_BEHAVIORS.panicCorrection;
+    const finalLane = panic ? state.sourceLane : state.targetLane;
+    obstacle.lane = Math.round(clamp(finalLane, 0, LANES - 1));
+    obstacle.laneFloat = obstacle.lane;
+    obstacle.recklessComplete = true;
+    state.phase = "done";
+    if (this.recklessActiveObstacleId === obstacle.id) this.recklessActiveObstacleId = "";
+    if (run) {
+      run.recklessActiveObstacleId = "";
+      if (reason === "suppressed-active") run.recklessDriversCancelled = (run.recklessDriversCancelled || 0) + 1;
+      else run.recklessDriversCompleted = (run.recklessDriversCompleted || 0) + 1;
+      if (reason !== "suppressed-active") {
+        incrementCountMapValue(run.recklessCompletedByBehavior, state.behavior || "unknown");
+        incrementCountMapValue(run.recklessCompletedBySection, state.sectionId || run.currentSectionId || "unknown");
+      }
+      this.recordRecklessEvent(reason === "suppressed-active" ? "cancelled" : "completed", {
+        obstacleId: obstacle.id,
+        behavior: state.behavior,
+        reason,
+        sectionId: state.sectionId || "",
+        waveType: state.waveType || "",
+        sourceLane: state.sourceLane,
+        targetLane: state.targetLane,
+        finalLane: obstacle.lane,
+        telegraphSeconds: state.telegraphSeconds || 0,
+        mergeSeconds: state.mergeSeconds || 0,
+        behaviorProfileLabel: state.behaviorProfileLabel || state.behavior
+      });
+    }
+  }
+
+  getRecklessDebugInfo(run = this.game.run) {
+    if (!run) return { enabled: false };
+    const active = this.obstacles.find((obstacle) => obstacle.id === this.recklessActiveObstacleId) || null;
+    return {
+      enabled: Boolean(run.recklessDriversEnabled),
+      scheduled: run.recklessDriversScheduled || 0,
+      started: run.recklessDriversStarted || 0,
+      completed: run.recklessDriversCompleted || 0,
+      panic: run.recklessDriversPanicCorrections || 0,
+      seen: run.recklessEventsSeen || 0,
+      safetyRejects: run.recklessDriversSafetyRejects || 0,
+      rewardRejects: run.recklessDriversRewardRejects || 0,
+      pressureRejects: run.recklessDriversPressureRejects || 0,
+      activeId: this.recklessActiveObstacleId || "",
+      activePhase: active?.recklessState?.phase || "",
+      activeBehavior: active?.recklessState?.behavior || ""
+    };
   }
 
   maybePlayWarningSfx(obstacle, ahead) {
@@ -16575,9 +17342,17 @@ class ObstacleManager {
     const config = getHitboxConfig(obstacle.type);
     const laneHalfSpan = clamp((visualSize.w * config.width) / Math.max(1, laneW * 2), 0.18, 0.48);
     const halfDistance = this.getObjectDistanceHalfSize(obstacle.type, obstacle);
+    let laneMin = laneCenterValue - laneHalfSpan;
+    let laneMax = laneCenterValue + laneHalfSpan;
+    if (obstacle.recklessPrototype && !obstacle.recklessComplete && Number.isFinite(obstacle.recklessTargetLane)) {
+      const sourceLane = Number.isFinite(obstacle.recklessSourceLane) ? obstacle.recklessSourceLane : laneCenterValue;
+      const targetLane = obstacle.recklessTargetLane;
+      laneMin = Math.min(laneMin, sourceLane - laneHalfSpan, targetLane - laneHalfSpan);
+      laneMax = Math.max(laneMax, sourceLane + laneHalfSpan, targetLane + laneHalfSpan);
+    }
     return {
-      laneMin: laneCenterValue - laneHalfSpan,
-      laneMax: laneCenterValue + laneHalfSpan,
+      laneMin,
+      laneMax,
       distanceMin: obstacle.distance - halfDistance,
       distanceMax: obstacle.distance + halfDistance,
       centerDistance: obstacle.distance
@@ -17694,6 +18469,13 @@ class CollisionSystem {
         this.game.addScoreEvent("nearMiss", 150);
         this.game.audio.playSfx("nearMiss");
         run.nearMisses += 1;
+        this.game.triggerNearMissDrama(obstacle, info);
+        if (obstacle.recklessPrototype) {
+          run.recklessNearMisses = Math.max(0, (run.recklessNearMisses || 0) + 1);
+          if (isRunDrifting(run) || (run.driftReleaseBurstTimer || 0) > 0) {
+            run.recklessAvoidedWithDriftDash = Math.max(0, (run.recklessAvoidedWithDriftDash || 0) + 1);
+          }
+        }
         if (isRunDrifting(run)) {
           run.driftNearMisses = Math.max(0, (run.driftNearMisses || 0) + 1);
           this.game.addNeonFlow("driftNearMiss");
@@ -17769,6 +18551,9 @@ class CollisionSystem {
     run.lastCollision = info.label;
 
     if (info.crash) {
+      if (obstacle.recklessPrototype) {
+        run.recklessCrashes = Math.max(0, (run.recklessCrashes || 0) + 1);
+      }
       this.game.queueCrashImpact(info.label);
       return;
     }
@@ -18130,7 +18915,9 @@ class Renderer {
   }
 
   getObstacleLaneFloatAt(obstacle, runDistance) {
-    if (obstacle.type !== "deer") return obstacle.lane;
+    if (obstacle.type !== "deer") {
+      return Number.isFinite(obstacle.laneFloat) ? obstacle.laneFloat : obstacle.lane;
+    }
     const ahead = obstacle.distance - runDistance;
     const travel = clamp(1 - ahead / VIEW_DISTANCE, 0, 1);
     const eased = easeOutCubic(travel);
@@ -18989,6 +19776,7 @@ class Renderer {
     }
     this.drawRoadsideScenery(1);
     this.drawRoadBase(1);
+    this.drawRouteEmotionLayer();
     this.drawStartLineIfVisible();
     this.drawSpeedLines();
     this.drawBoostRoadStreak();
@@ -19023,6 +19811,7 @@ class Renderer {
     this.drawBumpFlash();
     if (this.game.debugMode) this.drawHitboxOverlay();
     ctx.restore();
+    this.drawNearMissDramaOverlay();
     this.drawPursuitPressureOverlay();
     this.drawBoostFlash();
     this.drawFinishFlash();
@@ -19152,6 +19941,102 @@ class Renderer {
     this.drawPlayerLaneFloorGlow(alpha);
     this.drawFuelRoadPulse(alpha);
     this.drawFinalStretchRoadGlow(alpha);
+    ctx.restore();
+  }
+
+  drawRouteEmotionLayer() {
+    const run = this.game.run;
+    if (!ARCADE_FEEL.enabled || !run || this.game.screen !== "game") return;
+    const theme = this.getCurrentTrackVisualTheme();
+    const identity = theme.identity || "";
+    const effectScale = this.getPerformanceEffectScale();
+    if (effectScale < 0.66) return;
+    const ctx = this.ctx;
+    const road = this.road;
+    const scrollSource = this.getVisualDistance() * this.getVisualMotionMultiplier();
+    const speedFeel = this.getSpeedFeelIntensity();
+    const visualIntensity = this.getRaceVisualIntensity();
+    const readProtection = this.getCriticalReadProtection();
+    const pulse = 0.5 + Math.sin((run.elapsed || 0) * (2.6 + speedFeel * 1.4)) * 0.5;
+    const alphaBase = (1 - readProtection * 0.44) * lerp(0.62, 1, effectScale);
+    if (alphaBase <= 0.04) return;
+
+    ctx.save();
+    ctx.globalCompositeOperation = "lighter";
+    if (identity === "blackout-run" || theme.blackoutRoad) {
+      const playerLaneX = road.x + ((Number.isFinite(run.renderLaneFloat) ? run.renderLaneFloat : run.targetLane) + 0.5) * road.laneW;
+      const playerY = this.getPlayerScreenY() + road.laneW * 0.26;
+      const topY = road.y + road.h * 0.08;
+      const topW = road.w * 0.46;
+      const bottomW = road.laneW * (1.2 + speedFeel * 0.32);
+      const light = ctx.createLinearGradient(0, topY, 0, playerY);
+      light.addColorStop(0, "rgba(255, 244, 205, 0.012)");
+      light.addColorStop(0.62, "rgba(255, 244, 205, 0.04)");
+      light.addColorStop(1, "rgba(255, 244, 205, 0.11)");
+      ctx.globalAlpha = alphaBase * (0.68 + pulse * 0.18);
+      ctx.fillStyle = light;
+      ctx.beginPath();
+      ctx.moveTo(playerLaneX - topW * 0.5, topY);
+      ctx.lineTo(playerLaneX + topW * 0.5, topY);
+      ctx.lineTo(playerLaneX + bottomW * 0.5, playerY);
+      ctx.lineTo(playerLaneX - bottomW * 0.5, playerY);
+      ctx.closePath();
+      ctx.fill();
+    } else if (identity === "prism-highway" || theme.prismRoadSurface) {
+      const palette = this.getPrismPalette(theme);
+      const spacing = 172 / Math.max(0.78, effectScale);
+      const scroll = (scrollSource * (0.24 + speedFeel * 0.08)) % spacing;
+      ctx.lineWidth = 2 + speedFeel * 0.5;
+      ctx.globalAlpha = alphaBase * clamp(0.07 + visualIntensity * 0.025, 0.06, 0.13);
+      for (let i = 0; i < 4; i += 1) {
+        const y = road.y - spacing + scroll + i * spacing * 0.72;
+        ctx.strokeStyle = palette[(i * 2 + Math.floor(scrollSource * 0.01)) % palette.length] || "#22f3ff";
+        ctx.shadowBlur = 0;
+        ctx.beginPath();
+        ctx.moveTo(road.x + road.laneW * 0.2, y);
+        ctx.lineTo(road.x + road.w - road.laneW * 0.2, y + 16 + i * 3);
+        ctx.stroke();
+      }
+    } else if (identity === "midnight-ridge" || theme.ridgeGuardrail) {
+      const spacing = 148;
+      const scroll = (scrollSource * (0.38 + speedFeel * 0.08)) % spacing;
+      ctx.strokeStyle = theme.guardrailColor || "#9fb8d3";
+      ctx.shadowColor = theme.edgeColor || "#9fb8d3";
+      ctx.shadowBlur = 8 * effectScale;
+      ctx.lineWidth = 2;
+      ctx.globalAlpha = alphaBase * clamp(0.16 + speedFeel * 0.04 + pulse * 0.05, 0.12, 0.26);
+      for (let y = road.y - spacing + scroll; y < road.y + road.h + spacing; y += spacing) {
+        ctx.beginPath();
+        ctx.moveTo(road.x - 24, y);
+        ctx.lineTo(road.x - 82, y + 42);
+        ctx.moveTo(road.x + road.w + 24, y);
+        ctx.lineTo(road.x + road.w + 82, y + 42);
+        ctx.stroke();
+      }
+    } else if (identity === "redline") {
+      const spacing = 118 / Math.max(0.84, effectScale);
+      const scroll = (scrollSource * (0.46 + speedFeel * 0.12)) % spacing;
+      ctx.strokeStyle = theme.edgeAltColor || "#ff3b58";
+      ctx.shadowColor = theme.edgeAltColor || "#ff3b58";
+      ctx.shadowBlur = 10 * effectScale;
+      ctx.lineWidth = 2.4 + speedFeel * 0.4;
+      ctx.globalAlpha = alphaBase * clamp(0.12 + speedFeel * 0.06 + pulse * 0.04, 0.1, 0.24);
+      for (let y = road.y - spacing + scroll; y < road.y + road.h + spacing; y += spacing) {
+        ctx.beginPath();
+        ctx.moveTo(road.x + 6, y);
+        ctx.lineTo(road.x + road.laneW * 0.5, y + 20);
+        ctx.moveTo(road.x + road.w - 6, y);
+        ctx.lineTo(road.x + road.w - road.laneW * 0.5, y + 20);
+        ctx.stroke();
+      }
+    } else {
+      const horizon = ctx.createLinearGradient(0, road.y, 0, road.y + road.h * 0.34);
+      horizon.addColorStop(0, rgbaFromHex(theme.edgeAltColor || "#ff8a2a", 0.09 * alphaBase));
+      horizon.addColorStop(1, rgbaFromHex(theme.edgeColor || "#28f6ff", 0));
+      ctx.globalAlpha = 0.72 + pulse * 0.12;
+      ctx.fillStyle = horizon;
+      ctx.fillRect(road.x, road.y, road.w, road.h * 0.34);
+    }
     ctx.restore();
   }
 
@@ -20014,12 +20899,15 @@ class Renderer {
   }
 
   drawObstacleBody(ctx, obstacle, x, y, scale) {
+    const surgeY = this.getRecklessVisualSurgeY(obstacle, scale);
+    if (surgeY) y += surgeY;
     const visual = this.getObstacleVisualSize(obstacle.type, scale, obstacle);
     const theme = this.getCurrentTrackVisualTheme();
     if (theme.blackoutObstacleSilhouettes && this.drawBlackoutObstacle(ctx, obstacle, x, y, visual, scale)) {
       if (obstacle.pursuitMarker || obstacle.pursuitRoadblock) {
         this.drawPursuitObstacleMarker(ctx, x, y, visual.w, visual.h, scale, obstacle);
       }
+      this.drawRecklessObstacleCue(ctx, obstacle, x, y, visual.w, visual.h, scale);
       return;
     }
     if (visual.sprite) {
@@ -20031,6 +20919,7 @@ class Renderer {
       if (obstacle.pursuitMarker || obstacle.pursuitRoadblock) {
         this.drawPursuitObstacleMarker(ctx, x, y, visual.w, visual.h, scale, obstacle);
       }
+      this.drawRecklessObstacleCue(ctx, obstacle, x, y, visual.w, visual.h, scale);
       return;
     }
     const drawScale = visual.drawScale;
@@ -20072,6 +20961,19 @@ class Renderer {
     if (obstacle.pursuitMarker || obstacle.pursuitRoadblock) {
       this.drawPursuitObstacleMarker(ctx, x, y, visual.w, visual.h, scale, obstacle);
     }
+    this.drawRecklessObstacleCue(ctx, obstacle, x, y, visual.w, visual.h, scale);
+  }
+
+  getRecklessVisualSurgeY(obstacle, scale = 1) {
+    const state = obstacle?.recklessState;
+    if (!state || obstacle.recklessComplete || state.behavior !== RECKLESS_DRIVER_BEHAVIORS.aggressiveOvertake) return 0;
+    const phase = state.phase || "queued";
+    if (phase === "queued" || phase === "done") return 0;
+    const intent = clamp(state.visualIntent || 0, 0, 1);
+    const commit = clamp(state.visualCommit || 0, 0, 1);
+    const surge = clamp(state.visualSurgeAmount || 0, 0, 0.25);
+    const pulse = clamp(state.visualPulse || 0, 0, 1.5);
+    return (4 * intent + 18 * commit + 34 * surge + 2 * pulse) * clamp(scale, 0.45, 1.2);
   }
 
   drawReflectiveObstacleCue(ctx, x, y, width, height, scale, obstacle = {}) {
@@ -20099,6 +21001,147 @@ class Renderer {
     ctx.moveTo(x + width * 0.28, yMid);
     ctx.lineTo(x + width * 0.42, yMid);
     ctx.stroke();
+    ctx.restore();
+  }
+
+  drawRecklessObstacleCue(ctx, obstacle, x, y, width, height, scale) {
+    if (!obstacle?.recklessPrototype || obstacle.recklessComplete || !obstacle.recklessState) return;
+    if (!["slowCar", "fastCar"].includes(obstacle.type)) return;
+    const state = obstacle.recklessState;
+    const phase = state.phase || "queued";
+    if (phase === "queued" || phase === "done") return;
+    const direction = Math.sign(state.targetLane - state.sourceLane) || state.direction || 1;
+    const profile = getRecklessDriverBehaviorProfile(state.behavior);
+    const elapsed = Math.max(0, state.phaseElapsed || 0);
+    const pulseRate = 10 + (state.signalIntensity || profile.signalIntensity || 1) * 3.5;
+    const pulse = 0.5 + Math.sin((this.game.run?.elapsed || elapsed) * pulseRate + obstacle.distance * 0.012) * 0.5;
+    const panic = state.behavior === RECKLESS_DRIVER_BEHAVIORS.panicCorrection;
+    const aggressive = state.behavior === RECKLESS_DRIVER_BEHAVIORS.aggressiveOvertake;
+    const slow = state.behavior === RECKLESS_DRIVER_BEHAVIORS.slowDriftMerge;
+    const color = profile.signalColor || (panic ? "#ff6a8f" : "#ffe45e");
+    const accent = profile.accentColor || color;
+    const intent = clamp(state.visualIntent || 0, 0, 1);
+    const commit = clamp(state.visualCommit || 0, 0, 1);
+    const brake = clamp(state.visualBrake || 0, 0, 1);
+    const sideX = x + direction * width * 0.42;
+    const sideY = y - height * 0.08;
+    ctx.save();
+    ctx.globalCompositeOperation = "lighter";
+    const leanShift = direction * width * (0.035 + intent * 0.08 + commit * 0.05);
+    const leanAngle = clampNumber(state.visualLean, -0.12, 0.12, 0);
+    ctx.globalAlpha = clamp(0.12 + intent * 0.18 + commit * 0.18, 0.1, aggressive ? 0.52 : 0.4);
+    ctx.strokeStyle = accent;
+    ctx.shadowColor = accent;
+    ctx.shadowBlur = aggressive ? 12 * scale : 8 * scale;
+    ctx.lineWidth = Math.max(1.4, (aggressive ? 2.4 : 1.8) * scale);
+    ctx.beginPath();
+    ctx.moveTo(x - width * 0.38 + leanShift, y - height * 0.38 + leanAngle * height);
+    ctx.lineTo(x + width * 0.38 + leanShift, y - height * 0.27 - leanAngle * height);
+    ctx.lineTo(x + width * 0.32 + leanShift * 0.45, y + height * 0.36 - leanAngle * height * 0.45);
+    ctx.lineTo(x - width * 0.32 + leanShift * 0.45, y + height * 0.28 + leanAngle * height * 0.45);
+    ctx.closePath();
+    ctx.stroke();
+    ctx.globalAlpha = clamp(0.1 + intent * 0.14 + pulse * 0.08, 0.08, 0.32);
+    ctx.strokeStyle = color;
+    ctx.lineWidth = Math.max(1.2, 1.7 * scale);
+    ctx.beginPath();
+    ctx.moveTo(sideX + direction * width * 0.18, y - height * 0.28);
+    ctx.lineTo(sideX + direction * width * (0.46 + commit * 0.16), y - height * 0.06);
+    ctx.lineTo(sideX + direction * width * 0.18, y + height * 0.18);
+    ctx.stroke();
+    ctx.globalAlpha = clamp((0.46 + pulse * 0.36) * (0.72 + intent * 0.4), 0.4, 0.96);
+    ctx.shadowBlur = (8 * scale + pulse * 6) * (0.9 + (state.signalIntensity || 1) * 0.18);
+    ctx.shadowColor = color;
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.moveTo(sideX + direction * width * 0.13, sideY);
+    ctx.lineTo(sideX - direction * width * 0.02, sideY - height * 0.11);
+    ctx.lineTo(sideX - direction * width * 0.02, sideY + height * 0.11);
+    ctx.closePath();
+    ctx.fill();
+    ctx.strokeStyle = color;
+    ctx.lineWidth = Math.max(1.4, 2.2 * scale);
+    ctx.globalAlpha *= slow ? 0.6 : 0.76;
+    ctx.beginPath();
+    const cueY = y + height * 0.36;
+    const cueStart = x - direction * width * 0.22;
+    const cueEnd = x + direction * width * (aggressive ? 0.52 : 0.44);
+    ctx.moveTo(cueStart, cueY);
+    ctx.lineTo(cueEnd, cueY - height * (aggressive ? 0.1 : 0.04));
+    ctx.stroke();
+    if (slow) {
+      ctx.globalAlpha = clamp(0.22 + pulse * 0.2 + intent * 0.16, 0.22, 0.62);
+      ctx.beginPath();
+      ctx.moveTo(x - direction * width * 0.08, y - height * 0.18);
+      ctx.quadraticCurveTo(x + direction * width * 0.18, y - height * 0.1, x + direction * width * 0.34, y + height * 0.12);
+      ctx.stroke();
+    } else if (aggressive) {
+      ctx.strokeStyle = accent;
+      ctx.lineWidth = Math.max(1.6, 2.8 * scale);
+      ctx.globalAlpha = clamp(0.38 + pulse * 0.28 + commit * 0.2, 0.38, 0.9);
+      ctx.beginPath();
+      ctx.moveTo(x - direction * width * 0.34, y - height * 0.36);
+      ctx.lineTo(x + direction * width * 0.42, y - height * 0.04);
+      ctx.moveTo(x - direction * width * 0.28, y - height * 0.16);
+      ctx.lineTo(x + direction * width * 0.48, y + height * 0.18);
+      ctx.stroke();
+      ctx.globalAlpha = clamp((state.visualSurgeAmount || 0) * 5, 0.08, 0.38);
+      ctx.strokeStyle = "#f6fbff";
+      ctx.beginPath();
+      ctx.moveTo(x - direction * width * 0.54, y + height * 0.12);
+      ctx.lineTo(x - direction * width * 0.24, y + height * 0.02);
+      ctx.stroke();
+    }
+    if (panic || brake > 0.05) {
+      const brakeAlpha = clamp(0.25 + brake * 0.55 + pulse * 0.18, 0.25, 0.95);
+      ctx.globalAlpha = brakeAlpha;
+      ctx.shadowColor = "#ff3b58";
+      ctx.shadowBlur = 9 * scale + brake * 8;
+      ctx.fillStyle = "#ff3b58";
+      const rearY = y + height * 0.36;
+      ctx.fillRect(x - width * 0.3, rearY, width * 0.16, Math.max(2, height * 0.055));
+      ctx.fillRect(x + width * 0.14, rearY, width * 0.16, Math.max(2, height * 0.055));
+      if (panic && phase === "panicCorrection") {
+        ctx.strokeStyle = "#f6fbff";
+        ctx.lineWidth = Math.max(1.3, 2 * scale);
+        ctx.globalAlpha = clamp(0.34 + pulse * 0.3, 0.34, 0.8);
+        ctx.beginPath();
+        ctx.moveTo(x + direction * width * 0.24, y - height * 0.34);
+        ctx.lineTo(x - direction * width * 0.18, y - height * 0.26);
+        ctx.lineTo(x - direction * width * 0.1, y - height * 0.36);
+        ctx.moveTo(x - direction * width * 0.18, y - height * 0.26);
+        ctx.lineTo(x - direction * width * 0.08, y - height * 0.17);
+        ctx.stroke();
+      }
+    }
+    if (this.game.debugMode && scale > 0.3 && Number.isFinite(state.targetLane)) {
+      const targetX = this.laneCenter(clamp(state.targetLane, 0, LANES - 1));
+      ctx.globalAlpha = 0.34;
+      ctx.shadowBlur = 4 * scale;
+      ctx.shadowColor = color;
+      ctx.fillStyle = color;
+      const markerY = y + height * 0.52;
+      ctx.beginPath();
+      ctx.moveTo(targetX, markerY - height * 0.13);
+      ctx.lineTo(targetX + direction * width * 0.18, markerY);
+      ctx.lineTo(targetX, markerY + height * 0.13);
+      ctx.closePath();
+      ctx.fill();
+    }
+    if (this.game.debugMode && scale > 0.36) {
+      ctx.globalCompositeOperation = "source-over";
+      ctx.shadowBlur = 0;
+      ctx.globalAlpha = 0.92;
+      ctx.fillStyle = "rgba(1, 4, 9, 0.84)";
+      const label = panic ? "PANIC" : (aggressive ? "OVERTAKE" : (phase === "merge" ? "MERGE" : "SIGNAL"));
+      ctx.font = `800 ${Math.max(8, 9 * scale)}px Trebuchet MS, Verdana, sans-serif`;
+      const labelW = ctx.measureText(label).width + 10;
+      ctx.fillRect(x - labelW / 2, y - height * 0.62, labelW, Math.max(12, 15 * scale));
+      ctx.fillStyle = color;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText(label, x, y - height * 0.62 + Math.max(6, 7.5 * scale));
+    }
     ctx.restore();
   }
 
@@ -20700,7 +21743,9 @@ class Renderer {
     const boosting = run.boostTimer > 0 || run.padBoostTimer > 0;
     const visualIntensity = this.getRaceVisualIntensity();
     const sectionEnergy = visualIntensity > 1.22 && this.game.screen === "game";
-    if (!(boosting || highSpeed || sectionEnergy)) return;
+    const nearMissRushDuration = ARCADE_FEEL.nearMissRushMs / 1000;
+    const nearMissRush = nearMissRushDuration > 0 ? clamp((run.nearMissRushTimer || 0) / nearMissRushDuration, 0, 1) : 0;
+    if (!(boosting || highSpeed || sectionEnergy || nearMissRush > 0.04)) return;
     const ctx = this.ctx;
     const speedRatio = this.getVisualSpeedRatio();
     const speedFeel = this.getSpeedFeelIntensity();
@@ -20718,15 +21763,16 @@ class Renderer {
       * (1 + finalStretch * 0.25)
       * clamp(visualIntensity, 0.8, 1.35)
       * (1 + boostPunch * 0.7)
+      * (1 + nearMissRush * 0.62)
       * (0.9 + speedFeel * 0.22 + speedClass * 0.14)
       * (1 - readProtection * 0.22)
       * lerp(0.8, 1, effectScale);
     const lineCap = effectScale < 0.76 ? (boosting ? 26 : 14) : (boosting ? 34 : 24);
-    const lineCount = Math.min(lineCap, Math.round((run.boostTimer > 0 ? 38 : (run.padBoostTimer > 0 ? 30 : (sectionEnergy ? 20 : 16))) * (0.82 + speedRatio * 0.34 + speedClass * 0.12) * clamp(visualIntensity, 0.92, 1.14) * (1 + boostPunch * 0.36) * (1 - readProtection * 0.18) * lerp(0.45, 1, effectScale)));
+    const lineCount = Math.min(lineCap, Math.round((run.boostTimer > 0 ? 38 : (run.padBoostTimer > 0 ? 30 : (sectionEnergy ? 20 : 16))) * (0.82 + speedRatio * 0.34 + speedClass * 0.12) * clamp(visualIntensity, 0.92, 1.14) * (1 + boostPunch * 0.36 + nearMissRush * 0.28) * (1 - readProtection * 0.18) * lerp(0.45, 1, effectScale)));
     ctx.save();
     ctx.globalAlpha = clamp(intensity, 0, 0.82);
-    ctx.strokeStyle = boosting ? (theme.boostStreakColor || "#28f6ff") : (theme.speedStreakColor || "#f6fbff");
-    ctx.lineWidth = boosting ? 2.9 + boostPunch * 1.6 : 1.4 + speedClass * 0.5;
+    ctx.strokeStyle = boosting || nearMissRush > 0.12 ? (theme.boostStreakColor || "#28f6ff") : (theme.speedStreakColor || "#f6fbff");
+    ctx.lineWidth = boosting ? 2.9 + boostPunch * 1.6 : 1.4 + speedClass * 0.5 + nearMissRush * 0.6;
     const lineSeed = Math.floor((run.elapsed || 0) * 28);
     for (let i = 0; i < lineCount; i += 1) {
       const side = i % 2 === 0 ? -1 : 1;
@@ -20735,7 +21781,7 @@ class Renderer {
       const outsideOffset = i % 5 === 0 ? side * (18 + deterministicNoise(lineSeed + i, 91) * 28) : 0;
       const x = edgeX + outsideOffset + (deterministicNoise(lineSeed + i, 92) - 0.5) * 18;
       const y = this.road.y + deterministicNoise(lineSeed + i, 93) * this.road.h;
-      const length = (boosting ? 128 : 72) + deterministicNoise(lineSeed + i, 94) * (boosting ? 142 : 72) + speedRatio * 48 + speedClass * 24;
+      const length = (boosting ? 128 : 72) + deterministicNoise(lineSeed + i, 94) * (boosting ? 142 : 72) + speedRatio * 48 + speedClass * 24 + nearMissRush * 46;
       ctx.beginPath();
       ctx.moveTo(x, y);
       ctx.lineTo(x, y + length);
@@ -20984,22 +22030,79 @@ class Renderer {
     const duration = ARCADE_FEEL.nearMissSparkMs / 1000;
     if (!ARCADE_FEEL.enabled || duration <= 0 || run.nearMissSparkTimer <= 0) return;
     const progress = 1 - run.nearMissSparkTimer / duration;
-    const alpha = (1 - progress) * 0.62;
+    const tier = clampNumber(run.nearMissDramaTier, 0.8, 1.9, 1);
+    const alpha = (1 - progress) * 0.62 * (0.9 + tier * 0.16);
     const { x, y } = this.getPlayerFloatingAnchor();
     const ctx = this.ctx;
     ctx.save();
     ctx.globalAlpha = alpha;
     ctx.strokeStyle = "#28f6ff";
-    ctx.shadowBlur = 13;
+    ctx.shadowBlur = 13 + tier * 3;
     ctx.shadowColor = "#28f6ff";
-    ctx.lineWidth = 2;
-    const side = Math.sin((run.nearMisses || 1) * 2.4) >= 0 ? 1 : -1;
-    for (let i = 0; i < 4; i += 1) {
+    ctx.lineWidth = 2 + tier * 0.28;
+    const side = run.nearMissSparkSide === -1 ? -1 : 1;
+    const lineCount = tier > 1.3 ? 6 : 4;
+    for (let i = 0; i < lineCount; i += 1) {
       const sx = x + side * (this.road.laneW * 0.38 + i * 7);
       const sy = y - 42 + i * 18 + progress * 18;
       ctx.beginPath();
       ctx.moveTo(sx, sy);
-      ctx.lineTo(sx + side * (20 + progress * 12), sy - 8);
+      ctx.lineTo(sx + side * (20 + progress * (12 + tier * 6)), sy - 8 - tier * 1.5);
+      ctx.stroke();
+    }
+    if ((run.nearMissDramaTimer || 0) > 0) {
+      ctx.globalCompositeOperation = "lighter";
+      ctx.globalAlpha = alpha * 0.34;
+      ctx.fillStyle = "#28f6ff";
+      ctx.beginPath();
+      ctx.moveTo(x + side * this.road.laneW * 0.22, y - 58);
+      ctx.lineTo(x + side * this.road.laneW * (0.82 + tier * 0.08), y - 8);
+      ctx.lineTo(x + side * this.road.laneW * 0.28, y + 54);
+      ctx.closePath();
+      ctx.fill();
+      ctx.globalAlpha = alpha * 0.78;
+      ctx.strokeStyle = "#f6fbff";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.ellipse(x, y + 8, this.road.laneW * (0.42 + tier * 0.08), 22 + tier * 5, 0, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  drawNearMissDramaOverlay() {
+    const run = this.game.run;
+    const duration = ARCADE_FEEL.nearMissDramaMs / 1000;
+    if (!ARCADE_FEEL.enabled || this.game.screen !== "game" || duration <= 0 || (run.nearMissDramaTimer || 0) <= 0) return;
+    const effectScale = this.getPerformanceEffectScale();
+    if (effectScale < 0.66) return;
+    const progress = 1 - clamp((run.nearMissDramaTimer || 0) / duration, 0, 1);
+    const tier = clampNumber(run.nearMissDramaTier, 0.8, 1.9, 1);
+    const side = run.nearMissSparkSide === -1 ? -1 : 1;
+    const alpha = (1 - progress) * (0.14 + tier * 0.025) * lerp(0.72, 1, effectScale);
+    const ctx = this.ctx;
+    const road = this.road;
+    const centerX = road.x + road.w * 0.5;
+    ctx.save();
+    ctx.globalCompositeOperation = "lighter";
+    const flareX = side < 0 ? 0 : this.width;
+    const flare = ctx.createLinearGradient(flareX, 0, centerX, 0);
+    flare.addColorStop(0, `rgba(40, 246, 255, ${alpha})`);
+    flare.addColorStop(0.4, `rgba(40, 246, 255, ${alpha * 0.22})`);
+    flare.addColorStop(1, "rgba(40, 246, 255, 0)");
+    ctx.fillStyle = flare;
+    ctx.fillRect(0, this.height * 0.08, this.width, this.height * 0.84);
+    ctx.strokeStyle = "#f6fbff";
+    ctx.shadowColor = "#28f6ff";
+    ctx.shadowBlur = 10 * effectScale;
+    ctx.lineWidth = 2;
+    ctx.globalAlpha = alpha * 2.2;
+    for (let i = 0; i < 3; i += 1) {
+      const offset = road.laneW * (0.32 + i * 0.24);
+      const x = side < 0 ? road.x + offset : road.x + road.w - offset;
+      ctx.beginPath();
+      ctx.moveTo(x, road.y + road.h * 0.28 + i * 38 + progress * 36);
+      ctx.lineTo(x + side * road.laneW * (0.36 + i * 0.06), road.y + road.h * 0.62 + i * 42 + progress * 72);
       ctx.stroke();
     }
     ctx.restore();
@@ -21019,8 +22122,9 @@ class Renderer {
     ctx.fillStyle = "#ffe45e";
     ctx.shadowBlur = 16;
     ctx.shadowColor = "#ff3b58";
-    for (let i = 0; i < 12; i += 1) {
-      const angle = (Math.PI * 2 * i) / 12;
+    const count = 14;
+    for (let i = 0; i < count; i += 1) {
+      const angle = (Math.PI * 2 * i) / count;
       const start = 18 + (i % 3) * 5;
       const end = start + 24 + progress * 34;
       const sx = x + Math.cos(angle) * start;
@@ -21032,6 +22136,21 @@ class Renderer {
       ctx.lineTo(ex, ey);
       ctx.stroke();
       if (i % 2 === 0) ctx.fillRect(ex - 2, ey - 2, 4, 4);
+    }
+    const causeDuration = ARCADE_FEEL.crashCauseMs / 1000;
+    const causeAlpha = causeDuration > 0 ? clamp((run.crashCauseTimer || 0) / causeDuration, 0, 1) : 0;
+    if (causeAlpha > 0.02) {
+      ctx.globalAlpha = alpha * causeAlpha * 0.72;
+      ctx.lineWidth = 4;
+      ctx.strokeStyle = "#f6fbff";
+      ctx.shadowColor = "#ffe45e";
+      ctx.shadowBlur = 18;
+      ctx.beginPath();
+      ctx.moveTo(x - 48 - progress * 24, y + 26);
+      ctx.lineTo(x + 48 + progress * 24, y + 10);
+      ctx.moveTo(x - 34 - progress * 18, y + 42);
+      ctx.lineTo(x + 34 + progress * 18, y + 28);
+      ctx.stroke();
     }
     ctx.restore();
   }
@@ -21191,6 +22310,21 @@ class Renderer {
     ctx.shadowColor = "#ff3b58";
     ctx.fillStyle = "#f6fbff";
     ctx.fillText("CRASH!", this.width / 2, this.height * 0.38);
+    const cause = sanitizeName(run.crashCauseLabel || run.crashCollisionType || "", "", DISPLAY_TEXT_MAX_LENGTH);
+    if (cause) {
+      const causeDuration = ARCADE_FEEL.crashCauseMs / 1000;
+      const causeAlpha = causeDuration > 0 ? clamp((run.crashCauseTimer || 0) / causeDuration, 0, 1) : alpha;
+      const label = `HIT ${cause.toUpperCase()}`;
+      ctx.globalAlpha = Math.min(1, causeAlpha * 0.9);
+      ctx.shadowBlur = 12;
+      ctx.shadowColor = "#ffe45e";
+      ctx.font = `900 ${Math.max(14, Math.min(24, this.width * 0.024))}px Trebuchet MS, Verdana, sans-serif`;
+      ctx.lineWidth = 5;
+      ctx.strokeStyle = "rgba(0, 0, 0, 0.78)";
+      ctx.strokeText(label, this.width / 2, this.height * 0.48, this.width * 0.62);
+      ctx.fillStyle = "#ffe45e";
+      ctx.fillText(label, this.width / 2, this.height * 0.48, this.width * 0.62);
+    }
     ctx.restore();
   }
 
@@ -22206,6 +23340,7 @@ class Renderer {
     const visibleRamps = this.game.obstacles.getRampUsefulness(this.game.obstacles.obstacles, run.distance);
     const activeDensity = this.game.obstacles.getActiveFieldDensity(this.game.obstacles.obstacles, run.distance);
     const activeBudget = this.game.obstacles.getActiveFieldBudget(run);
+    const recklessDebug = this.game.obstacles.getRecklessDebugInfo(run);
     const currentResultStatus = run.ended
       ? getRunStatusLabel(run.finished ? "finished" : (run.endReason === "Out of Fuel" ? "outOfFuel" : "crashed"), run.endReason)
       : (run.raceActive ? "Running" : "Countdown");
@@ -22245,6 +23380,7 @@ class Renderer {
       `spawn rule: visible ${VIEW_DISTANCE} target ahead ${spawnPlan.minimumSpawnAhead.toFixed(0)} safe ahead ${this.game.obstacles.getMinimumVisibleSpawnSafetyAhead(run).toFixed(0)} buffer ${spawnRevealBuffer.toFixed(0)}`,
       `spawn state: last ahead ${(run.lastWaveSpawnAhead || 0).toFixed(0)} section ${run.lastWaveSpawnSection || "none"} delayed ${run.lastWaveDelayedForVisibleSafety ? "yes" : "no"} frame ${run.wavesSpawnedThisFrame || 0} max/frame ${run.maxWavesSpawnedInSingleFrame || 0}`,
       `spawn safety: pop-in prevented ${run.popInPreventedCount || 0} visible violations ${run.wavesSpawnedInsideVisibleCount || 0} catch-up blocked ${run.catchUpSpawnsBlockedCount || 0} transition bursts ${run.sectionTransitionWaveBurstCount || 0}`,
+      `reckless v1: ${recklessDebug.enabled ? "enabled" : "off"} scheduled ${recklessDebug.scheduled || 0} seen ${recklessDebug.seen || 0} started ${recklessDebug.started || 0} done ${recklessDebug.completed || 0} panic ${recklessDebug.panic || 0} active ${recklessDebug.activeBehavior || "none"} ${recklessDebug.activePhase || ""}`,
       `active field: budget ${activeDensity.visibleHardBlockers}/${activeBudget.maxVisibleHardBlockers} tactical ${activeDensity.tacticalHardBlockers}/${activeBudget.maxTacticalHardBlockers} next3 ${activeDensity.hardBlockersNext3Seconds}/${activeBudget.maxHardBlockersNext3Seconds}`,
       `active overlap: waves ${activeDensity.visibleHardWaveOverlap}/${activeBudget.maxVisibleHardWaveOverlap} 2s ${activeDensity.maxHardBlockersInTwoSeconds}/${activeBudget.maxHardBlockersInTwoSeconds} 3-lane ${activeDensity.maxHardBlockersInThreeLaneNeighborhood}/${activeBudget.maxHardBlockersInThreeLaneNeighborhood}`,
       `active budget: delays ${run.activeFieldBudgetDelays || 0} rejected ${run.activeFieldRejectedSpawns || 0} route ${run.combinedRouteFailures || 0} support suppressed ${run.supportObjectsSuppressedByDensity || 0} reason ${run.lastActiveFieldBudgetReason || "none"}`,
@@ -24342,6 +25478,39 @@ class NeonRoadRally {
       roadSeedHash: hashSeed(getRunRandomSeedSource(DEFAULT_ROAD_SEED, track, speedClass.id, DEFAULT_RACE_TYPE_ID)),
       roadRngState: hashSeed(getRunRandomSeedSource(DEFAULT_ROAD_SEED, track, speedClass.id, DEFAULT_RACE_TYPE_ID)),
       roadDirectorSequence: [],
+      recklessDriversEnabled: false,
+      recklessDriversScheduled: 0,
+      recklessDriversStarted: 0,
+      recklessDriversCompleted: 0,
+      recklessDriversPanicCorrections: 0,
+      recklessDriversCancelled: 0,
+      recklessDriversSafetyRejects: 0,
+      recklessDriversRewardRejects: 0,
+      recklessDriversPressureRejects: 0,
+      recklessDriversDisabledModeSkips: 0,
+      recklessDriversActiveMax: 0,
+      recklessEventsSeen: 0,
+      recklessSlowMerges: 0,
+      recklessAggressiveOvertakes: 0,
+      recklessPanicCorrections: 0,
+      recklessNearMisses: 0,
+      recklessCrashes: 0,
+      recklessAvoidedWithDriftDash: 0,
+      recklessTelegraphSecondsSum: 0,
+      recklessMovementSecondsSum: 0,
+      recklessTelemetrySamples: 0,
+      recklessScheduledByBehavior: {},
+      recklessScheduledBySection: {},
+      recklessSeenBySection: {},
+      recklessCompletedByBehavior: {},
+      recklessCompletedBySection: {},
+      recklessRejectsByReason: {},
+      recklessRejectsBySection: {},
+      recklessRejectsByDetail: {},
+      recklessLastScheduleDistance: -Infinity,
+      recklessActiveObstacleId: "",
+      recklessFirstOpportunityGranted: false,
+      recklessDriverEvents: [],
       currentSectionId: section.id,
       currentSectionLabel: section.label,
       sectionProgress: 0,
@@ -24694,7 +25863,14 @@ class NeonRoadRally {
       rampLandingPulseTimer: 0,
       rampClearSparkTimer: 0,
       nearMissSparkTimer: 0,
+      nearMissDramaTimer: 0,
+      nearMissRushTimer: 0,
+      nearMissSparkSide: 1,
+      nearMissDramaTier: 1,
+      nearMissDramaTextCooldown: 0,
       nearMissPopupCooldown: 0,
+      crashCauseTimer: 0,
+      crashCauseLabel: "",
       fuelWarningPulseTimer: 0,
       fuelSavedPulseTimer: 0,
       fuelSavedPopupCooldown: 0,
@@ -24823,7 +25999,11 @@ class NeonRoadRally {
     run.rampLandingPulseTimer = Math.max(0, (run.rampLandingPulseTimer || 0) - dt);
     run.rampClearSparkTimer = Math.max(0, (run.rampClearSparkTimer || 0) - dt);
     run.nearMissSparkTimer = Math.max(0, (run.nearMissSparkTimer || 0) - dt);
+    run.nearMissDramaTimer = Math.max(0, (run.nearMissDramaTimer || 0) - dt);
+    run.nearMissRushTimer = Math.max(0, (run.nearMissRushTimer || 0) - dt);
+    run.nearMissDramaTextCooldown = Math.max(0, (run.nearMissDramaTextCooldown || 0) - dt);
     run.nearMissPopupCooldown = Math.max(0, (run.nearMissPopupCooldown || 0) - dt);
+    run.crashCauseTimer = Math.max(0, (run.crashCauseTimer || 0) - dt);
     run.fuelWarningPulseTimer = Math.max(0, (run.fuelWarningPulseTimer || 0) - dt);
     run.fuelSavedPulseTimer = Math.max(0, (run.fuelSavedPulseTimer || 0) - dt);
     run.fuelSavedPopupCooldown = Math.max(0, (run.fuelSavedPopupCooldown || 0) - dt);
@@ -25493,6 +26673,8 @@ class NeonRoadRally {
     run.pendingEndReason = reason || run.lastCollision || "Crash";
     run.hitPauseTimer = ARCADE_FEEL.crashPauseMs / 1000;
     run.crashCollisionType = sanitizeName(run.pendingEndReason, "Unknown", DISPLAY_TEXT_MAX_LENGTH);
+    run.crashCauseLabel = run.crashCollisionType;
+    run.crashCauseTimer = Math.max(run.crashCauseTimer || 0, ARCADE_FEEL.crashCauseMs / 1000);
     run.crashFlash = Math.max(run.crashFlash || 0, 1);
     run.crashBeatTimer = Math.max(run.crashBeatTimer || 0, 0.72);
     run.crashSparkTimer = Math.max(run.crashSparkTimer || 0, ARCADE_FEEL.crashSparkMs / 1000);
@@ -27548,6 +28730,51 @@ class NeonRoadRally {
     run.score = Math.max(0, Math.round(run.baseScore * (run.scoreMultiplier || 1)));
   }
 
+  triggerNearMissDrama(obstacle = null, info = null) {
+    const run = this.run;
+    if (!ARCADE_FEEL.enabled || !run || this.screen !== "game") return;
+    const playerLane = Number.isFinite(run.renderLaneFloat) ? run.renderLaneFloat : run.targetLane;
+    const obstacleLane = Number.isFinite(obstacle?.laneFloat)
+      ? obstacle.laneFloat
+      : (Number.isFinite(obstacle?.lane) ? obstacle.lane : playerLane);
+    let side = Math.sign(obstacleLane - playerLane);
+    if (!side) side = (run.nearMisses || 0) % 2 === 0 ? -1 : 1;
+    const reckless = Boolean(obstacle?.recklessPrototype);
+    const drifting = isRunDrifting(run) || (run.driftReleaseBurstTimer || 0) > 0;
+    const tier = clampNumber(1 + (reckless ? 0.35 : 0) + (drifting ? 0.22 : 0), 1, 1.65, 1);
+    const dramaDuration = ARCADE_FEEL.nearMissDramaMs / 1000;
+    const rushDuration = ARCADE_FEEL.nearMissRushMs / 1000;
+    run.nearMissSparkSide = side < 0 ? -1 : 1;
+    run.nearMissDramaTier = (run.nearMissDramaTimer || 0) > 0 ? Math.max(run.nearMissDramaTier || 1, tier) : tier;
+    run.nearMissDramaTimer = Math.max(run.nearMissDramaTimer || 0, dramaDuration * (0.84 + tier * 0.12));
+    run.nearMissRushTimer = Math.max(run.nearMissRushTimer || 0, rushDuration * (0.86 + tier * 0.1));
+    run.nearMissSparkTimer = Math.max(run.nearMissSparkTimer || 0, ARCADE_FEEL.nearMissSparkMs / 1000);
+    run.screenShake = Math.max(run.screenShake || 0, Math.min(0.24, ARCADE_FEEL.nearMissShake * (0.72 + tier * 0.22)));
+    this.audio.playSfx("nearMissDrama", {
+      cooldownMs: 260,
+      maxInstances: 1,
+      volume: this.audio.sfxVolume * (reckless ? 0.42 : 0.34)
+    });
+    if (run.nearMissDramaTextCooldown <= 0 && (reckless || drifting)) {
+      const label = reckless ? "TOO CLOSE!" : "THREAD!";
+      this.addFloatingScoreText(label, {
+        color: reckless ? "#ff8d3a" : "#28f6ff",
+        size: 15,
+        life: 0.62,
+        yOffset: -104
+      });
+      run.nearMissDramaTextCooldown = 1.25;
+    }
+    if (this.debugMode && obstacle) {
+      run.lastNearMissDrama = {
+        label: info?.label || obstacle.type || "traffic",
+        reckless,
+        tier: Number(tier.toFixed(2)),
+        side: run.nearMissSparkSide
+      };
+    }
+  }
+
   addScoreEvent(type, points) {
     const run = this.run;
     this.addBaseScore(points);
@@ -27828,6 +29055,36 @@ class NeonRoadRally {
       officialFullRouteSignatureWaveCount: summary.officialFullRouteSignatureWaveCount || run.officialFullRouteSignatureWaveCount || 0,
       officialFullRouteSignatureScope: summary.officialFullRouteSignatureScope || run.officialFullRouteSignatureScope || (summary.officialFullRouteSignatureHash || run.officialFullRouteSignatureHash ? OFFICIAL_FULL_ROUTE_SIGNATURE_SCOPE : ""),
       routeSeedLocked: Boolean(summary.routeSeedLocked || run.routeSeedLocked || run.officialRouteSeedLocked),
+      recklessDriversEnabled: Boolean(run.recklessDriversEnabled),
+      recklessDriversScheduled: run.recklessDriversScheduled || 0,
+      recklessDriversStarted: run.recklessDriversStarted || 0,
+      recklessDriversCompleted: run.recklessDriversCompleted || 0,
+      recklessDriversPanicCorrections: run.recklessDriversPanicCorrections || 0,
+      recklessDriversCancelled: run.recklessDriversCancelled || 0,
+      recklessDriversSafetyRejects: run.recklessDriversSafetyRejects || 0,
+      recklessDriversRewardRejects: run.recklessDriversRewardRejects || 0,
+      recklessDriversPressureRejects: run.recklessDriversPressureRejects || 0,
+      recklessDriversActiveMax: run.recklessDriversActiveMax || 0,
+      recklessEventsSeen: run.recklessEventsSeen || 0,
+      recklessSlowMerges: run.recklessSlowMerges || 0,
+      recklessAggressiveOvertakes: run.recklessAggressiveOvertakes || 0,
+      recklessPanicCorrections: run.recklessPanicCorrections || 0,
+      recklessNearMisses: run.recklessNearMisses || 0,
+      recklessCrashes: run.recklessCrashes || 0,
+      recklessAvoidedWithDriftDash: run.recklessAvoidedWithDriftDash || 0,
+      recklessTelegraphAverageSeconds: getRecklessTelemetryAverage(run, "recklessTelegraphSecondsSum"),
+      recklessMovementAverageSeconds: getRecklessTelemetryAverage(run, "recklessMovementSecondsSum"),
+      recklessScheduledByBehavior: normalizeCountMap(run.recklessScheduledByBehavior, 8),
+      recklessScheduledBySection: normalizeSectionCountMap(run.recklessScheduledBySection),
+      recklessSeenBySection: normalizeSectionCountMap(run.recklessSeenBySection),
+      recklessCompletedByBehavior: normalizeCountMap(run.recklessCompletedByBehavior, 8),
+      recklessCompletedBySection: normalizeSectionCountMap(run.recklessCompletedBySection),
+      recklessRejectsByReason: normalizeCountMap(run.recklessRejectsByReason, 8),
+      recklessRejectsBySection: normalizeSectionCountMap(run.recklessRejectsBySection),
+      recklessRejectsByDetail: normalizeCountMap(run.recklessRejectsByDetail, 16),
+      recklessDriverEvents: Array.isArray(run.recklessDriverEvents)
+        ? run.recklessDriverEvents.slice(-RECKLESS_DRIVER_PROTOTYPE_CONFIG.debugEventLimit)
+        : [],
       pacingRulesVersion: summary.pacingRulesVersion || run.pacingRulesVersion || getActivePacingRulesVersion(summary.raceTypeId),
       challengeId: summary.challengeMode ? summary.challengeId : "",
       challengeName: summary.challengeMode ? summary.challengeName : "",
@@ -28099,6 +29356,8 @@ class NeonRoadRally {
     run.crashCollisionType = status === "crashed"
       ? sanitizeName(reason || run.lastCollision, "Unknown", DISPLAY_TEXT_MAX_LENGTH)
       : "";
+    run.crashCauseLabel = status === "crashed" ? run.crashCollisionType : "";
+    run.crashCauseTimer = status === "crashed" ? Math.max(run.crashCauseTimer || 0, ARCADE_FEEL.crashCauseMs / 1000) : 0;
     run.crashFlash = status === "crashed" ? Math.max(run.crashFlash || 0, 1) : 0;
     run.screenShake = status === "crashed" ? Math.max(run.screenShake || 0, ARCADE_FEEL.crashShake) : run.screenShake;
     run.crashBeatTimer = status === "crashed" ? Math.max(run.crashBeatTimer || 0, 0.72) : 0;
@@ -29123,6 +30382,8 @@ class NeonRoadRally {
       officialRouteName: officialRoute?.name || "",
       officialSeed: officialRoute?.seed || "",
       officialRouteSeedLocked: Boolean(officialRoute),
+      officialEnduranceActive: Boolean(options.officialEnduranceActive),
+      officialFinishLocked: Boolean(options.officialFinishLocked),
       routeSeedLocked,
       roadSeed: seed,
       roadSeedSource: seedSource,
@@ -29130,7 +30391,43 @@ class NeonRoadRally {
       roadRngState: rng.getState(),
       roadDirectorSequence: [],
       preserveFullRoadDirectorSequence,
+      partyMode: Boolean(options.partyMode),
+      officialRecordChase: Boolean(options.officialRecordChase),
       partySeedLocked: Boolean(options.partySeedLocked),
+      challengeMode: Boolean(options.challengeMode),
+      recklessDriversEnabled: false,
+      recklessDriversScheduled: 0,
+      recklessDriversStarted: 0,
+      recklessDriversCompleted: 0,
+      recklessDriversPanicCorrections: 0,
+      recklessDriversCancelled: 0,
+      recklessDriversSafetyRejects: 0,
+      recklessDriversRewardRejects: 0,
+      recklessDriversPressureRejects: 0,
+      recklessDriversDisabledModeSkips: 0,
+      recklessDriversActiveMax: 0,
+      recklessEventsSeen: 0,
+      recklessSlowMerges: 0,
+      recklessAggressiveOvertakes: 0,
+      recklessPanicCorrections: 0,
+      recklessNearMisses: 0,
+      recklessCrashes: 0,
+      recklessAvoidedWithDriftDash: 0,
+      recklessTelegraphSecondsSum: 0,
+      recklessMovementSecondsSum: 0,
+      recklessTelemetrySamples: 0,
+      recklessScheduledByBehavior: {},
+      recklessScheduledBySection: {},
+      recklessSeenBySection: {},
+      recklessCompletedByBehavior: {},
+      recklessCompletedBySection: {},
+      recklessRejectsByReason: {},
+      recklessRejectsBySection: {},
+      recklessRejectsByDetail: {},
+      recklessLastScheduleDistance: -Infinity,
+      recklessActiveObstacleId: "",
+      recklessFirstOpportunityGranted: false,
+      recklessDriverEvents: [],
       distance: 0,
       elapsed: 0,
       currentSpeed: getTrackCruiseSpeed(track, 0, speedClassId),
@@ -29216,6 +30513,34 @@ class NeonRoadRally {
       gasCanRecoveryPlacements: simRun.gasCanRecoveryPlacements || 0,
       officialFuelViabilityMinGasCans: simRun.officialFuelViabilityMinGasCans || 0,
       officialFuelViabilityCansNeeded: simRun.officialFuelViabilityCansNeeded || 0,
+      recklessDriversEnabled: Boolean(simRun.recklessDriversEnabled),
+      recklessDriversScheduled: simRun.recklessDriversScheduled || 0,
+      recklessDriversStarted: simRun.recklessDriversStarted || 0,
+      recklessDriversCompleted: simRun.recklessDriversCompleted || 0,
+      recklessDriversPanicCorrections: simRun.recklessDriversPanicCorrections || 0,
+      recklessDriversCancelled: simRun.recklessDriversCancelled || 0,
+      recklessDriversSafetyRejects: simRun.recklessDriversSafetyRejects || 0,
+      recklessDriversRewardRejects: simRun.recklessDriversRewardRejects || 0,
+      recklessDriversPressureRejects: simRun.recklessDriversPressureRejects || 0,
+      recklessDriversActiveMax: simRun.recklessDriversActiveMax || 0,
+      recklessEventsSeen: simRun.recklessEventsSeen || 0,
+      recklessSlowMerges: simRun.recklessSlowMerges || 0,
+      recklessAggressiveOvertakes: simRun.recklessAggressiveOvertakes || 0,
+      recklessPanicCorrections: simRun.recklessPanicCorrections || 0,
+      recklessNearMisses: simRun.recklessNearMisses || 0,
+      recklessCrashes: simRun.recklessCrashes || 0,
+      recklessAvoidedWithDriftDash: simRun.recklessAvoidedWithDriftDash || 0,
+      recklessTelegraphAverageSeconds: getRecklessTelemetryAverage(simRun, "recklessTelegraphSecondsSum"),
+      recklessMovementAverageSeconds: getRecklessTelemetryAverage(simRun, "recklessMovementSecondsSum"),
+      recklessScheduledByBehavior: normalizeCountMap(simRun.recklessScheduledByBehavior, 8),
+      recklessScheduledBySection: normalizeSectionCountMap(simRun.recklessScheduledBySection),
+      recklessSeenBySection: normalizeSectionCountMap(simRun.recklessSeenBySection),
+      recklessCompletedByBehavior: normalizeCountMap(simRun.recklessCompletedByBehavior, 8),
+      recklessCompletedBySection: normalizeSectionCountMap(simRun.recklessCompletedBySection),
+      recklessRejectsByReason: normalizeCountMap(simRun.recklessRejectsByReason, 8),
+      recklessRejectsBySection: normalizeSectionCountMap(simRun.recklessRejectsBySection),
+      recklessRejectsByDetail: normalizeCountMap(simRun.recklessRejectsByDetail, 16),
+      recklessDriverEvents: Array.isArray(simRun.recklessDriverEvents) ? simRun.recklessDriverEvents.slice() : [],
       preventedUnsafeSpawns: manager.preventedUnsafeSpawns || 0,
       recentRoadDirectorRejections: Array.isArray(simRun.recentRoadDirectorRejections) ? simRun.recentRoadDirectorRejections.slice() : [],
       seedHash: rng.seedHash,
@@ -31972,6 +33297,13 @@ class NeonRoadRally {
       .filter((value) => value !== null);
     const paceFeedbackRuns = runs.filter((run) => (Number(run.paceFeedbackSampleCount) || 0) > 0 || (Number(run.paceFeedbackActiveTime) || 0) > 0);
     const frameTelemetryRuns = runs.filter((run) => (Number(run.frameSampleCount) || 0) > 0);
+    const recklessRuns = runs.filter((run) => Boolean(run.recklessDriversEnabled) || (Number(run.recklessDriversScheduled) || 0) > 0 || (Number(run.recklessEventsSeen) || 0) > 0);
+    const recklessEventsSeen = recklessRuns.reduce((sum, run) => sum + (Number(run.recklessEventsSeen) || 0), 0);
+    const recklessTelegraphWeightedSeconds = recklessRuns.reduce((sum, run) => sum + (Number(run.recklessTelegraphAverageSeconds) || 0) * (Number(run.recklessEventsSeen) || 0), 0);
+    const recklessMovementWeightedSeconds = recklessRuns.reduce((sum, run) => sum + (Number(run.recklessMovementAverageSeconds) || 0) * (Number(run.recklessEventsSeen) || 0), 0);
+    const redlineRecklessRuns = recklessRuns.filter((run) => normalizeSpeedClassId(run.raceModeId || run.speedClassId, "") === "redline");
+    const redlineFlowBreakHazardsCleared = redlineRecklessRuns.reduce((sum, run) => sum + (Number(run.flowBreakHazardsCleared) || 0), 0);
+    const redlineRecklessEventsSeen = redlineRecklessRuns.reduce((sum, run) => sum + (Number(run.recklessEventsSeen) || 0), 0);
     const officialRouteRuns = runs.filter((run) => Boolean(run.officialRouteId));
     const officialFullRouteSignatureRows = this.countPlaytestRuns(
       officialRouteRuns.filter((run) => run.officialFullRouteSignatureHash),
@@ -32078,6 +33410,29 @@ class NeonRoadRally {
         averageFps: this.averagePlaytestField(frameTelemetryRuns, "averageFps"),
         worstFrameMs: frameTelemetryRuns.reduce((max, run) => Math.max(max, Number(run.worstFrameMs) || 0), 0),
         averageSlowFramePercent: this.averagePlaytestField(frameTelemetryRuns, "slowFramePercent"),
+        recklessRunCount: recklessRuns.length,
+        recklessEventsSeen,
+        recklessDriversScheduled: recklessRuns.reduce((sum, run) => sum + (Number(run.recklessDriversScheduled) || 0), 0),
+        recklessSlowMerges: recklessRuns.reduce((sum, run) => sum + (Number(run.recklessSlowMerges) || 0), 0),
+        recklessAggressiveOvertakes: recklessRuns.reduce((sum, run) => sum + (Number(run.recklessAggressiveOvertakes) || 0), 0),
+        recklessPanicCorrections: recklessRuns.reduce((sum, run) => sum + (Number(run.recklessPanicCorrections) || 0), 0),
+        recklessNearMisses: recklessRuns.reduce((sum, run) => sum + (Number(run.recklessNearMisses) || 0), 0),
+        recklessCrashes: recklessRuns.reduce((sum, run) => sum + (Number(run.recklessCrashes) || 0), 0),
+        recklessAvoidedWithDriftDash: recklessRuns.reduce((sum, run) => sum + (Number(run.recklessAvoidedWithDriftDash) || 0), 0),
+        recklessTelegraphAverageSeconds: recklessEventsSeen ? Number((recklessTelegraphWeightedSeconds / recklessEventsSeen).toFixed(3)) : 0,
+        recklessMovementAverageSeconds: recklessEventsSeen ? Number((recklessMovementWeightedSeconds / recklessEventsSeen).toFixed(3)) : 0,
+        recklessScheduledByBehaviorRows: this.countPlaytestMapRows(recklessRuns, "recklessScheduledByBehavior"),
+        recklessScheduledBySectionRows: this.countPlaytestMapRows(recklessRuns, "recklessScheduledBySection"),
+        recklessSeenBySectionRows: this.countPlaytestMapRows(recklessRuns, "recklessSeenBySection"),
+        recklessCompletedByBehaviorRows: this.countPlaytestMapRows(recklessRuns, "recklessCompletedByBehavior"),
+        recklessCompletedBySectionRows: this.countPlaytestMapRows(recklessRuns, "recklessCompletedBySection"),
+        recklessRejectReasonRows: this.countPlaytestMapRows(recklessRuns, "recklessRejectsByReason"),
+        recklessRejectSectionRows: this.countPlaytestMapRows(recklessRuns, "recklessRejectsBySection"),
+        recklessRejectDetailRows: this.countPlaytestMapRows(recklessRuns, "recklessRejectsByDetail"),
+        redlineRecklessRunCount: redlineRecklessRuns.length,
+        redlineRecklessEventsSeen,
+        redlineFlowBreakHazardsCleared,
+        redlineFlowBreakSafetyFlag: Boolean(redlineRecklessRuns.length && redlineFlowBreakHazardsCleared >= Math.max(8, redlineRecklessRuns.length * 4) && redlineRecklessEventsSeen <= redlineRecklessRuns.length),
         minPerformanceEffectScale: frameTelemetryRuns.length
           ? frameTelemetryRuns.reduce((min, run) => Math.min(min, clampNumber(Number(run.performanceEffectScale), 0.62, 1, 1)), 1)
           : 1,
@@ -32295,6 +33650,31 @@ class NeonRoadRally {
           averageFps: roundStatNumber(aggregate.averageFps, 1),
           worstFrameMs: roundStatNumber(aggregate.worstFrameMs, 2),
           averageSlowFramePercent: roundStatNumber(aggregate.averageSlowFramePercent, 2),
+          recklessDrivers: {
+            runs: aggregate.recklessRunCount,
+            scheduled: aggregate.recklessDriversScheduled,
+            eventsSeen: aggregate.recklessEventsSeen,
+            slowMerges: aggregate.recklessSlowMerges,
+            aggressiveOvertakes: aggregate.recklessAggressiveOvertakes,
+            panicCorrections: aggregate.recklessPanicCorrections,
+            nearMisses: aggregate.recklessNearMisses,
+            crashes: aggregate.recklessCrashes,
+            avoidedWithDriftDash: aggregate.recklessAvoidedWithDriftDash,
+            telegraphAverageSeconds: aggregate.recklessTelegraphAverageSeconds,
+            movementAverageSeconds: aggregate.recklessMovementAverageSeconds,
+            scheduledByBehavior: aggregate.recklessScheduledByBehaviorRows,
+            scheduledBySection: aggregate.recklessScheduledBySectionRows,
+            seenBySection: aggregate.recklessSeenBySectionRows,
+            completedByBehavior: aggregate.recklessCompletedByBehaviorRows,
+            completedBySection: aggregate.recklessCompletedBySectionRows,
+            rejectsByReason: aggregate.recklessRejectReasonRows,
+            rejectsBySection: aggregate.recklessRejectSectionRows,
+            rejectsByDetail: aggregate.recklessRejectDetailRows,
+            redlineRunCount: aggregate.redlineRecklessRunCount,
+            redlineEventsSeen: aggregate.redlineRecklessEventsSeen,
+            redlineFlowBreakHazardsCleared: aggregate.redlineFlowBreakHazardsCleared,
+            redlineFlowBreakSafetyFlag: aggregate.redlineFlowBreakSafetyFlag
+          },
           minPerformanceEffectScale: roundStatNumber(aggregate.minPerformanceEffectScale, 2),
           minRenderEffectScale: roundStatNumber(aggregate.minRenderEffectScale, 2),
           officialRouteRuns: aggregate.officialRouteRunCount,
@@ -32371,6 +33751,17 @@ class NeonRoadRally {
       const numeric = Number(value);
       return Number.isFinite(numeric) ? numeric.toFixed(digits) : (0).toFixed(digits);
     };
+    const formatMapInline = (value, emptyText = "none") => {
+      const rows = Array.isArray(value)
+        ? value
+        : Object.entries(normalizeCountMap(value || {}, 10)).map(([label, count]) => ({ label, count }));
+      const text = rows
+        .filter((row) => (Number(row.count) || 0) > 0)
+        .slice(0, 6)
+        .map((row) => `${row.label}: ${row.count}`)
+        .join(", ");
+      return text || emptyText;
+    };
     const latestRoute = latest
       ? (latest.officialRouteName || latest.challengeName || latest.trackName || "Unknown route")
       : "No runs recorded yet";
@@ -32394,6 +33785,12 @@ class NeonRoadRally {
     const latestDrift = latest
       ? `${latest.driftDashesCompleted || 0} dashes, ${formatNumber(latest.driftLanesCrossed || 0, 1)} lanes crossed, ${latest.driftNearMisses || 0} drift near misses, ${latest.crashesWhileDrifting || 0} drift crashes`
       : "not recorded yet";
+    const latestReckless = latest
+      ? `${latest.recklessEventsSeen || 0} seen, ${latest.recklessSlowMerges || 0} slow merges, ${latest.recklessAggressiveOvertakes || 0} overtakes, ${latest.recklessPanicCorrections || 0} panic corrections, ${latest.recklessNearMisses || 0} near misses, ${latest.recklessCrashes || 0} crashes`
+      : "not recorded yet";
+    const latestRecklessDiagnostics = latest
+      ? `scheduled ${formatMapInline(latest.recklessScheduledByBehavior)}, sections ${formatMapInline(latest.recklessScheduledBySection)}, rejects ${formatMapInline(latest.recklessRejectsByReason)}`
+      : "not recorded yet";
     return [
       "Neon Road Rally Feedback Report",
       `Build version: ${GAME_VERSION}`,
@@ -32409,12 +33806,18 @@ class NeonRoadRally {
       `FPS summary: ${latestFps}`,
       `Missed boosts/gas cans: ${latestMisses}`,
       `Drift usage: ${latestDrift}`,
+      `Reckless Drivers: ${latestReckless}`,
+      `Reckless Diagnostics: ${latestRecklessDiagnostics}`,
       "",
       "Session Summary",
       `Runs in report: ${aggregate.filteredCount}/${aggregate.totalStored}`,
       `Completion rate: ${this.formatPlaytestPercent(aggregate.completionRate)}`,
       `Average score: ${formatScore(aggregate.averageScore || 0)}`,
       `Average FPS: ${formatNumber(aggregate.averageFps, 0)}`,
+      `Reckless Drivers: ${aggregate.recklessEventsSeen} seen (${aggregate.recklessSlowMerges} slow merges / ${aggregate.recklessAggressiveOvertakes} overtakes / ${aggregate.recklessPanicCorrections} panic corrections), ${aggregate.recklessAvoidedWithDriftDash} avoided with Drift Dash, ${aggregate.recklessCrashes} crashes, telegraph avg ${formatNumber(aggregate.recklessTelegraphAverageSeconds, 2)}s, movement avg ${formatNumber(aggregate.recklessMovementAverageSeconds, 2)}s`,
+      `Reckless Scheduled: behaviors ${formatMapInline(aggregate.recklessScheduledByBehaviorRows)}; sections ${formatMapInline(aggregate.recklessScheduledBySectionRows)}`,
+      `Reckless Rejects: reasons ${formatMapInline(aggregate.recklessRejectReasonRows)}; sections ${formatMapInline(aggregate.recklessRejectSectionRows)}; details ${formatMapInline(aggregate.recklessRejectDetailRows)}`,
+      `Redline Flow Break Watch: ${aggregate.redlineRecklessRunCount} reckless Redline runs, ${aggregate.redlineRecklessEventsSeen} reckless events seen, ${aggregate.redlineFlowBreakHazardsCleared} Flow Break hazards cleared${aggregate.redlineFlowBreakSafetyFlag ? " (watch: Flow Break may be clearing too much Redline pressure)" : ""}`,
       `Total missed reachable boosts: ${aggregate.totalBoostPadsMissedReachable}`,
       `Total missed gas cans: ${aggregate.fuelSummary.totalGasCansMissed}`,
       "",
@@ -33021,6 +34424,15 @@ class NeonRoadRally {
         .slice(0, 4)
         .map((row) => `${row.label} ${row.count}`)
         .join(" / ") || "none";
+      const summarizeCountRows = (rows) => (Array.isArray(rows) ? rows : [])
+        .slice(0, 4)
+        .map((row) => `${row.label} ${row.count}`)
+        .join(" / ") || "none";
+      const recklessScheduledText = `${summarizeCountRows(aggregate.recklessScheduledByBehaviorRows)} · ${summarizeCountRows(aggregate.recklessScheduledBySectionRows)}`;
+      const recklessRejectText = `${summarizeCountRows(aggregate.recklessRejectReasonRows)} · ${summarizeCountRows(aggregate.recklessRejectDetailRows)}`;
+      const redlineFlowBreakWatchText = aggregate.redlineRecklessRunCount
+        ? `${aggregate.redlineRecklessEventsSeen} reckless seen · ${aggregate.redlineFlowBreakHazardsCleared} Flow Break clears${aggregate.redlineFlowBreakSafetyFlag ? " · watch" : ""}`
+        : "no Redline reckless runs";
       this.layer.classList.remove("is-empty");
       this.layer.innerHTML = `
       <section class="panel playtest-report-panel">
@@ -33058,6 +34470,14 @@ class NeonRoadRally {
             <div class="score-card"><strong>Missed Reachable Pads</strong><span>${aggregate.totalBoostPadsMissedReachable}</span></div>
             <div class="score-card"><strong>PB Delta Avg</strong><span>${pbDeltaText}</span></div>
             <div class="score-card"><strong>Pace Feedback Runs</strong><span>${aggregate.paceFeedbackRunCount}</span></div>
+            <div class="score-card"><strong>Reckless Runs</strong><span>${aggregate.recklessRunCount}</span></div>
+            <div class="score-card"><strong>Reckless Seen</strong><span>${aggregate.recklessEventsSeen} seen / ${aggregate.recklessDriversScheduled} scheduled</span></div>
+            <div class="score-card"><strong>Reckless Types</strong><span>${aggregate.recklessSlowMerges} merge / ${aggregate.recklessAggressiveOvertakes} overtake / ${aggregate.recklessPanicCorrections} panic</span></div>
+            <div class="score-card"><strong>Reckless Outcomes</strong><span>${aggregate.recklessNearMisses} near / ${aggregate.recklessCrashes} crashes / ${aggregate.recklessAvoidedWithDriftDash} drift saves</span></div>
+            <div class="score-card"><strong>Reckless Timing</strong><span>${this.formatPlaytestDecimal(aggregate.recklessTelegraphAverageSeconds, 2)}s tell / ${this.formatPlaytestDecimal(aggregate.recklessMovementAverageSeconds, 2)}s move</span></div>
+            <div class="score-card"><strong>Reckless Scheduled</strong><span class="is-compact">${escapeHtml(recklessScheduledText)}</span></div>
+            <div class="score-card"><strong>Reckless Rejects</strong><span class="is-compact">${escapeHtml(recklessRejectText)}</span></div>
+            <div class="score-card"><strong>Redline Flow Watch</strong><span class="is-compact">${escapeHtml(redlineFlowBreakWatchText)}</span></div>
             <div class="score-card"><strong>Avg Lane Changes</strong><span>${this.formatPlaytestDecimal(aggregate.averageLaneChanges)}</span></div>
             <div class="score-card"><strong>Frame Telemetry Runs</strong><span>${aggregate.frameTelemetryRunCount}</span></div>
             <div class="score-card"><strong>Avg Frame Time</strong><span>${this.formatPlaytestDecimal(aggregate.averageFrameMs, 1)}ms / ${this.formatPlaytestDecimal(aggregate.averageFps, 0)}fps</span></div>

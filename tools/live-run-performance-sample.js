@@ -49,6 +49,12 @@ const DEFAULT_PERF_ROUTE_IDS = [
 ].join(",");
 
 const TRACK_PERFORMANCE_THRESHOLDS = {
+  "sunset-highway": {
+    minAverageFps: 58,
+    maxSlowFramePercent: 3,
+    maxWorstFrameMs: 95,
+    maxRecentAverageFrameMs: 24
+  },
   "blackout-run": {
     minAverageFps: 58,
     maxSlowFramePercent: 3,
@@ -196,7 +202,7 @@ async function runRoute(page, route) {
     await page.waitForFunction(() => {
       const app = window.neonRoadRally;
       const run = app?.run;
-      return Boolean(run?.ended || (run?.officialEnduranceActive && run?.officialFinishLocked && app?.lastSummary?.status === "finished"));
+      return Boolean(run?.ended || (run?.officialEnduranceActive && run?.officialFinishLocked && (app?.lastSummary?.status === "finished" || run?.officialFinishTimeMs != null)));
     }, null, { timeout: ROUTE_TIMEOUT_MS });
     await page.evaluate(() => {
       const app = window.neonRoadRally;
