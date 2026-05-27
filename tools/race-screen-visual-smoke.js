@@ -42,6 +42,29 @@ function assert(condition, message, details = {}) {
   }
 }
 
+function countMatches(text, pattern) {
+  return (String(text || "").match(pattern) || []).length;
+}
+
+function assertNoDuplicateResultHierarchy(scoreScreen, label) {
+  if (scoreScreen?.screen !== "score") return;
+  const text = String(scoreScreen.text || "");
+  const primaryActions = Array.isArray(scoreScreen.primaryActions) ? scoreScreen.primaryActions : [];
+  const cashAmount = Math.max(0, Number(scoreScreen.summary?.neonCashAwardAmount || 0));
+  const cashMentions = countMatches(text, /\+\d[\d,]*\s+Neon Cash\b/gi);
+  assert(primaryActions.length === 1, `${label} should expose exactly one primary action`, { primaryActions, text });
+  if (cashAmount > 0) {
+    assert(cashMentions === 1, `${label} should show earned Neon Cash exactly once`, { cashAmount, cashMentions, text });
+  } else {
+    assert(cashMentions === 0, `${label} should hide zero Neon Cash awards`, { cashAmount, cashMentions, text });
+  }
+  if (scoreScreen.summary?.status !== "finished") {
+    assert(countMatches(text, /^RUN OVER$/gim) <= 1, `${label} should not duplicate RUN OVER`, { text });
+    assert(countMatches(text, /^PROGRESS$/gim) <= 1, `${label} should not duplicate Progress stat labels`, { text });
+    assert(!/NO FINISH TIME\s*(?:·|\n)\s*NO FINISH TIME/i.test(text), `${label} should not duplicate No finish time copy`, { text });
+  }
+}
+
 async function waitForScreen(page, expected, timeout = 5000) {
   const screens = Array.isArray(expected) ? expected : [expected];
   await page.waitForFunction(
@@ -1457,6 +1480,7 @@ async function collectScoreScreen(page) {
   return page.evaluate((activeScreen) => ({
     screen: activeScreen,
     text: document.body.innerText.slice(0, 900),
+    primaryActions: [...document.querySelectorAll(".result-screen-panel .btn--primary")].map((button) => button.innerText.trim()),
     summary: (() => {
       const summary = window.neonRoadRally?.lastSummary;
       if (!summary) return null;
@@ -1466,6 +1490,7 @@ async function collectScoreScreen(page) {
         raceTypeId: summary.raceTypeId,
         finalScore: summary.finalScore,
         finishTimeMs: summary.finishTimeMs,
+        neonCashAwardAmount: summary.neonCashAward?.amount || 0,
         partyMode: Boolean(summary.partyMode),
         partyScreen: activeScreen,
         gasCansCollected: summary.gasCansCollected || 0,
@@ -1647,6 +1672,7 @@ async function run() {
     report.observed.classicFinish = finish.finish;
     report.scoreScreens.classicFinish = await collectScoreScreen(page);
     assert(report.scoreScreens.classicFinish.screen === "score", "Classic finish did not reach score screen", report.scoreScreens.classicFinish);
+    assertNoDuplicateResultHierarchy(report.scoreScreens.classicFinish, "Classic finish result");
 
     const crash = await page.evaluate(() => window.__nrrVisualSmoke.testClassicCrash());
     assert(crash.impact.crash.flash > 0 && crash.impact.crash.beat > 0, "Classic crash impact visuals were not active", crash.impact.crash);
@@ -1659,6 +1685,7 @@ async function run() {
     };
     report.scoreScreens.classicCrash = await collectScoreScreen(page);
     assert(report.scoreScreens.classicCrash.screen === "score", "Classic crash did not reach score screen", report.scoreScreens.classicCrash);
+    assertNoDuplicateResultHierarchy(report.scoreScreens.classicCrash, "Classic crash result");
 
     await page.setViewportSize({ width: 1440, height: 900 });
     const fuelGasVisible = await page.evaluate(() => window.__nrrVisualSmoke.testFuelGasApproachOnly("fuel-run-gas-visibility"));
@@ -1906,6 +1933,7 @@ async function run() {
     };
     report.scoreScreens.pursuitEscaped = await collectScoreScreen(page);
     assert(report.scoreScreens.pursuitEscaped.summary?.pursuitResult === "Escaped", "Pursuit escaped result was not recorded", report.scoreScreens.pursuitEscaped.summary);
+    assertNoDuplicateResultHierarchy(report.scoreScreens.pursuitEscaped, "Pursuit escaped result");
 
     const busted = await page.evaluate(() => window.__nrrVisualSmoke.testPursuitBusted());
     assert(busted.pursuit.busted && busted.pursuit.bustedBeat > 0, "Pursuit busted visual was not observed", busted.pursuit);
@@ -1916,6 +1944,7 @@ async function run() {
     };
     report.scoreScreens.pursuitBusted = await collectScoreScreen(page);
     assert(report.scoreScreens.pursuitBusted.summary?.pursuitResult === "Busted", "Pursuit busted result was not recorded", report.scoreScreens.pursuitBusted.summary);
+    assertNoDuplicateResultHierarchy(report.scoreScreens.pursuitBusted, "Pursuit busted result");
 
     const partyActiveSamples = [];
     for (const viewport of [

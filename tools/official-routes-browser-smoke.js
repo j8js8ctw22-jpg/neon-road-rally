@@ -605,7 +605,7 @@ async function runOfficialScenario(page, scenario, options = {}) {
   assert(!text.includes(route.seed), "Official result first view should not expose raw route seed", { routeId: route.id });
   assertNoNormalUiDebugTerms(text, `${route.name} result`);
   assertIncludes(text, `${scenario.time.toFixed(3)}s`);
-  assertIncludes(text, "PB Delta");
+  assert(/PB Delta|PB pace/i.test(text), "Official result should show PB pace context", { snippet: text.slice(0, 1000) });
   assertIncludes(text, "Top 20");
   if (scenario.expectFeedback) assertIncludes(text, scenario.expectFeedback);
   const routeBoardActionCount = await page.locator('[data-action="leaderboard"]').filter({ hasText: "View Route Boards" }).count();

@@ -37164,7 +37164,7 @@ class NeonRoadRally {
     `;
   }
 
-  renderResultRewardStrip(summary) {
+  renderResultRewardStrip(summary, options = {}) {
     const badges = Array.isArray(summary?.newlyEarnedBadges) ? summary.newlyEarnedBadges : [];
     const masteryBadges = badges.filter((badge) => badge.category === "mastery");
     const titleChanges = summary?.titleChanges || {};
@@ -37173,10 +37173,10 @@ class NeonRoadRally {
       .concat((Array.isArray(titleChanges.defended) ? titleChanges.defended : []).map((title) => ({ ...title, state: "defended" })));
     const chips = [];
     const cashAmount = normalizeNonNegativeInteger(summary?.neonCashAward?.amount, 0, NEON_CASH_AWARD_CAP);
-    if (cashAmount) {
+    if (cashAmount && !options.omitCash) {
       chips.push({
         label: "Neon Cash",
-        value: `+${cashAmount.toLocaleString()}`,
+        value: `+${cashAmount.toLocaleString()} Neon Cash`,
         detail: "Earned in-game · cosmetic only"
       });
     }
@@ -37767,7 +37767,7 @@ class NeonRoadRally {
         <div class="result-improvement-panel boostline-result-panel">
           <span class="eyebrow">Boostline Result</span>
           <div class="result-improvement-list">
-            <span><strong>PB Delta</strong><em>${escapeHtml(pbDelta)}</em></span>
+            <span><strong>PB Pace</strong><em>${escapeHtml(pbDelta)}</em></span>
             <span><strong>Boost Chain</strong><em>${escapeHtml(boostChain)}</em></span>
             <span><strong>Ramps</strong><em>${escapeHtml(ramps)}</em></span>
             <span><strong>Improve</strong><em>${escapeHtml(note)}</em></span>
@@ -37803,7 +37803,7 @@ class NeonRoadRally {
           <div class="result-improvement-list">
             <span><strong>First Finish</strong><em>${escapeHtml(officialTime)}</em></span>
             <span><strong>Time Attack</strong><em>${escapeHtml(timeAttackText)}</em></span>
-            <span><strong>PB Delta</strong><em>${escapeHtml(pbDeltaText)}</em></span>
+            <span><strong>PB Pace</strong><em>${escapeHtml(pbDeltaText)}</em></span>
             <span><strong>Official Score</strong><em>${formatScore(result.officialFinishScore || summary.finalScore || 0)}</em></span>
             <span><strong>Score Attack</strong><em>${escapeHtml(scoreAttackText)}</em></span>
           </div>
@@ -37873,7 +37873,7 @@ class NeonRoadRally {
       if (roadblocks > 0) return `Roadblock cleared${roadblocks > 1 ? ` x${roadblocks}` : ""}`;
       if (flowBreakPasses > 0) return `Flow Break phased through ${flowBreakPasses} traffic hit${flowBreakPasses === 1 ? "" : "s"}`;
       if (flowBreakPhases > 0) return "Flow Break phase escape";
-      if (flowBreakClears > 0) return `Flow Break converted ${flowBreakClears} hazard${flowBreakClears === 1 ? "" : "s"}`;
+      if (flowBreakClears > 0) return `Flow Break phase window x${flowBreakClears}`;
       if (bestBoostChain >= 2) return `Best boost chain x${bestBoostChain}`;
       if (rampClears > 0) return jumpDistance > 0 ? `Clear jump ${jumpDistance.toLocaleString()} road units` : `Clear jump x${rampClears}`;
       if (cleanFinish) return "Clean finish";
@@ -37915,7 +37915,7 @@ class NeonRoadRally {
       }
 	      if (summary.neonFlowEnabled && flowBreaks > 0) {
 	        add("Flow Break phase", flowBreakPasses > 0 || flowBreakSlowdownStops > 0
-	          ? `Phased through ${flowBreakPasses} traffic hit${flowBreakPasses === 1 ? "" : "s"} and prevented ${flowBreakSlowdownStops} slowdown${flowBreakSlowdownStops === 1 ? "" : "s"}.`
+	          ? `Phased past ${flowBreakPasses} traffic hit${flowBreakPasses === 1 ? "" : "s"} and avoided ${flowBreakSlowdownStops} slowdown${flowBreakSlowdownStops === 1 ? "" : "s"}.`
 	          : "Flow armed and phased the car for a short escape window.");
 	      } else if (summary.neonFlowEnabled && (summary.flowBreakArmedUnused || 0) > 0) {
 	        add("Flow Break ready unused", "Flow armed, but the charge was not spent before the run ended.");
@@ -38174,7 +38174,7 @@ class NeonRoadRally {
               <div class="party-stat-grid">
                 <span><strong>Flow Break</strong><em>${Math.max(0, summary.flowBreaksTriggered || 0)}</em></span>
                 <span><strong>Traffic Phased</strong><em>${Math.max(0, summary.flowBreakCollisionsPhasedThrough || 0)}</em></span>
-                <span><strong>Slowdowns Blocked</strong><em>${Math.max(0, summary.flowBreakSlowdownsPrevented || 0)}</em></span>
+                <span><strong>Slowdowns Avoided</strong><em>${Math.max(0, summary.flowBreakSlowdownsPrevented || 0)}</em></span>
               </div>
             ` : ""}
             ${summary.raceTypeId === FUEL_RUN_RACE_TYPE_ID ? `
@@ -40972,7 +40972,7 @@ class NeonRoadRally {
     if (compact) {
       return `
         <span class="playground-record-chip">
-          <strong>Playground Record</strong>
+          <strong>Local Fun Playground Record</strong>
           <em>${escapeHtml(scoreText)}</em>
           ${status === "finished" ? `<small>${escapeHtml(timeText)}</small>` : ""}
         </span>
@@ -40980,7 +40980,7 @@ class NeonRoadRally {
     }
     return `
       <section class="playground-record-card result-couch-card">
-        <span class="eyebrow">Playground Record</span>
+        <span class="eyebrow">Local Fun Playground Record</span>
         <div class="playground-record-grid">
           <span><strong>Score Rank</strong><em>${escapeHtml(scoreText)}</em></span>
           <span><strong>Time Rank</strong><em>${escapeHtml(timeText)}</em></span>
@@ -41248,42 +41248,49 @@ class NeonRoadRally {
         ? outcomeText
         : (status === "finished" ? (boostlineRun ? "Boostline Finished" : "Finished") : (status === "outOfFuel" ? "Out of Fuel" : "Run Over")));
     const crashReason = summary.reason || summary.endReason || "the road";
-      const outcomeDetail = summary.raceTypeId === PURSUIT_RACE_TYPE_ID
+    const completedResult = enduranceResult || status === "finished";
+    const failedResult = !completedResult;
+    const outcomeDetail = summary.raceTypeId === PURSUIT_RACE_TYPE_ID
         ? this.getPursuitOutcomeDetail(summary, progressPercent, resultTimeText, crashReason)
         : (enduranceResult
-          ? `${resultTimeText} locked. Bonus survival: ${formatTime(enduranceResult.survivalTime)}.`
+          ? `${resultTimeText} locked for the official route. Bonus survival: ${formatTime(enduranceResult.survivalTime)}.`
           : status === "finished"
-          ? `Finished in ${resultTimeText}.`
+          ? `Finish recorded on ${summary.officialRouteId ? "Official Race" : "Local Fun"} rules.`
           : (status === "outOfFuel"
             ? `Tank empty at ${progressPercent}% progress.`
             : (status === "busted"
               ? `Heat hit the limit at ${progressPercent}% progress.`
-              : `Hit ${crashReason} at ${progressPercent}% progress. Replay the same route to practice that spot.`)));
+              : `Hit ${crashReason} at ${progressPercent}% progress.`)));
     const boardMetricText = summary.scoreSaved ? leaderboardText : "Not saved";
-    const restartLabel = summary.challengeMode ? "Retry Challenge" : (summary.partyMode ? "Replay This Turn" : "Race Again");
+    const primaryAction = summary.partyMode ? "partyNextPlayer" : "restart";
+    const restartLabel = summary.partyMode ? "Next Driver" : "Race Again";
     const resultEyebrow = summary.challengeMode
       ? "Challenge Run Result"
         : (summary.partyMode
         ? "Party Run Result"
-        : (enduranceResult ? "Official Race Locked + Bonus Survival" : (boostlineRun ? "Boostline Prototype Result" : (summary.officialRouteId ? "Official Race Result" : "Playground Result"))));
+        : (enduranceResult ? "Official Race Locked + Bonus Survival" : (boostlineRun ? "Boostline Result" : (summary.officialRouteId ? "Official Race Result" : "Local Fun Playground Result"))));
+    const headerTitle = completedResult
+      ? resultHeadline
+      : (summary.challengeMode
+        ? "Challenge Result"
+        : (summary.raceTypeId === PURSUIT_RACE_TYPE_ID
+          ? "Pursuit Result"
+          : (summary.officialRouteId ? "Official Race" : "Local Fun Run")));
     const officialRouteDisplayName = getOfficialRouteEntryDisplayName(summary);
     const routeLine = summary.officialRouteId
       ? officialRouteDisplayName
       : `Custom Road · ${summary.seed}`;
+    const routeContextLine = summary.challengeMode
+      ? `${summary.challengeName} · ${routeLine}`
+      : routeLine;
     const setupLine = `${summary.trackName} · ${summary.raceTypeLabel || getRaceTypeLabel(summary.raceTypeId)} · ${summary.speedClassLabel}`;
-    const timeAttackLabel = enduranceResult ? "Official Time" : (status === "finished" ? (boostlineRun ? "Finish Time" : (playgroundResult ? "Playground Time" : "Time Attack")) : "Progress");
-    const timeAttackValue = enduranceResult || status === "finished" ? resultTimeText : `${progressPercent}%`;
     const timeAttackPlacement = playgroundResult
       ? (status === "finished" ? playgroundTimeText : "No time record on crash")
       : this.getTimeAttackPlacementText(officialSummaryForBoards);
-    const timeAttackDetail = enduranceResult || status === "finished"
-      ? `PB Delta: ${paceDeltaText}`
-      : "No finish time";
     const scoreAttackPlacement = playgroundResult ? playgroundScoreText : this.getScoreAttackPlacementText(officialSummaryForBoards);
     const scoreAttackDetail = summary.scoreSaved
-      ? (playgroundResult ? "Saved to local Playground Records" : (summary.newPersonalBest ? "New score PB" : "Score saved locally"))
+      ? (playgroundResult ? "Saved to Local Fun records" : (summary.newPersonalBest ? "New score PB" : (summary.officialRouteId ? "Official score saved" : "Local Fun score saved")))
       : "Not saved";
-    const secondaryMetricLabel = enduranceResult ? "Bonus Survival" : (boostlineRun ? "Boost Chain" : "Score Attack");
     const secondaryMetricValue = enduranceResult
       ? formatTime(enduranceResult.survivalTime || 0)
       : boostlineRun
@@ -41302,65 +41309,125 @@ class NeonRoadRally {
     const resultBoardView = enduranceResult ? LEADERBOARD_VIEW_ENDURANCE_SURVIVAL : (summary.officialRouteId ? LEADERBOARD_VIEW_TIME_ATTACK : LEADERBOARD_VIEW_PLAYGROUND_SCORE);
     const resultBoardRaceTypeId = enduranceResult ? DEFAULT_RACE_TYPE_ID : summary.raceTypeId;
     const showResultBoardAction = !summary.partyMode && !isExperimentalRaceType(summary.raceTypeId);
-    const rewardStrip = this.renderResultRewardStrip(summary);
+    const neonCashAmount = normalizeNonNegativeInteger(summary.neonCashAward?.amount, 0, NEON_CASH_AWARD_CAP);
+    const rewardStrip = this.renderResultRewardStrip(summary, { omitCash: neonCashAmount > 0 });
     const improvementNotes = this.renderResultImprovementNotes(summary);
     const resultDetailPanel = enduranceResult
       ? this.renderOfficialEnduranceResultPanel(summary)
-      : (boostlineRun ? this.renderBoostlineResultPanel(summary) : `${rewardStrip}${improvementNotes}`);
+      : (boostlineRun ? this.renderBoostlineResultPanel(summary) : improvementNotes);
     const resultStateClass = enduranceResult
       ? "is-endurance"
       : (status === "finished"
         ? "is-finished"
         : (status === "outOfFuel" ? "is-fuel-empty" : (status === "busted" ? "is-busted" : "is-crashed")));
-    const primaryResultLabel = playgroundResult
-      ? "Playground Record"
-      : enduranceResult
-      ? "Bonus Survival"
-      : (status === "finished"
-        ? (summary.officialRouteId ? "Finish Time · Time Attack" : "Finish Time")
-        : (status === "outOfFuel" ? "Out of Fuel" : "Progress"));
-    const primaryResultValue = playgroundResult
-      ? formatScore(summary.finalScore)
-      : enduranceResult
-      ? formatTime(enduranceResult.survivalTime || 0)
-      : (status === "finished" ? resultTimeText : `${progressPercent}%`);
-    const primaryResultSub = playgroundResult
-      ? `${playgroundScoreText}${playgroundTimeText ? ` · ${playgroundTimeText}` : ""}`
-      : enduranceResult
-      ? `${secondaryMetricPlacement} · ${secondaryMetricDetail}`
-      : (status === "finished"
-        ? `${timeAttackPlacement} · PB Delta: ${paceDeltaText}`
-        : (status === "outOfFuel"
-          ? `Tank empty at ${progressPercent}% progress`
-          : `${outcomeText} at ${progressPercent}% progress`));
+    const failureHeroValue = status === "outOfFuel"
+      ? "Out Of Fuel"
+      : (status === "busted" ? "Busted" : resultHeadline);
+    const failureHeroDetail = status === "outOfFuel"
+      ? `Out of Fuel · ${progressPercent}% progress`
+      : (status === "busted"
+        ? `Busted · ${progressPercent}% progress`
+        : `Crashed: ${crashReason} · ${progressPercent}% progress`);
+    const primaryPaceParts = [routeContextLine, timeAttackPlacement, `PB pace: ${paceDeltaText}`].filter(Boolean);
+    const primaryResultLabel = completedResult
+      ? (enduranceResult ? "Official Finish Time" : (summary.officialRouteId ? "Official Finish Time" : "Local Fun Finish Time"))
+      : "Run Result";
+    const primaryResultValue = completedResult ? resultTimeText : failureHeroValue;
+    const primaryResultSub = completedResult ? primaryPaceParts.join(" · ") : failureHeroDetail;
     const scoreStatValue = enduranceResult
       ? formatScore(enduranceResult.officialFinishScore || summary.finalScore || 0)
       : formatScore(summary.finalScore);
-    const scoreStatLabel = boostlineRun ? "Boost Chain" : (playgroundResult ? "Playground Score" : "Score Attack");
+    const scoreStatLabel = boostlineRun ? "Boost Chain" : (playgroundResult ? "Local Fun Score" : "Score");
     const scoreStatSub = boostlineRun
       ? `${secondaryMetricPlacement} · ${secondaryMetricDetail}`
       : `${scoreAttackPlacement} · ${scoreAttackDetail}`;
-    const supportStatLabel = enduranceResult
-      ? "Bonus Score"
-      : (summary.raceTypeId === FUEL_RUN_RACE_TYPE_ID ? "Fuel" : "Progress");
-    const supportStatValue = enduranceResult
-      ? formatScore(enduranceResult.postFinishScore || 0)
-      : (summary.raceTypeId === FUEL_RUN_RACE_TYPE_ID
-        ? `${Math.max(0, summary.fuelRemaining || 0)} / ${FUEL_RUN_CONFIG.fuelMax}`
-        : `${progressPercent}%`);
-    const supportStatSub = enduranceResult
-      ? `${secondaryMetricPlacement} · ${secondaryMetricDetail}`
-      : (summary.raceTypeId === FUEL_RUN_RACE_TYPE_ID
-        ? `${Math.max(0, summary.gasCansCollected || 0).toLocaleString()} gas cans`
-        : `${Math.round(summary.distance).toLocaleString()} / ${summary.trackDistance.toLocaleString()}`);
-    const timeStatToneClass = enduranceResult || status === "finished"
-      ? "stat-value stat-value--green"
-      : "stat-value stat-value--cyan";
-    const chipItems = [];
-    const neonCashAmount = normalizeNonNegativeInteger(summary.neonCashAward?.amount, 0, NEON_CASH_AWARD_CAP);
-    if (neonCashAmount) {
-      chipItems.push({ label: `+${neonCashAmount.toLocaleString()} Neon Cash`, tone: "green" });
+    const flowBreakPhases = Math.max(0, summary.flowBreakPhaseActivations || summary.flowBreaksTriggered || 0);
+    const flowBreakPasses = Math.max(0, summary.flowBreakCollisionsPhasedThrough || 0);
+    const flowBreakSlowdownStops = Math.max(0, summary.flowBreakSlowdownsPrevented || 0);
+    const flowBreakSparks = Math.max(0, summary.flowBreakSparksCollected || 0);
+    const recklessEventsSeen = Math.max(0, summary.recklessEventsSeen || 0);
+    const recklessNearMisses = Math.max(0, summary.recklessNearMisses || 0);
+    const nearMisses = Math.max(0, summary.nearMisses || 0);
+    const resultHighlightItems = [];
+    if (summary.neonFlowEnabled && (flowBreakPhases || flowBreakPasses || flowBreakSlowdownStops || flowBreakSparks)) {
+      const flowParts = [];
+      if (flowBreakPasses) flowParts.push(`${flowBreakPasses} traffic phased`);
+      if (flowBreakSlowdownStops) flowParts.push(`${flowBreakSlowdownStops} slowdown${flowBreakSlowdownStops === 1 ? "" : "s"} avoided`);
+      if (flowBreakSparks) flowParts.push(`${flowBreakSparks} spark${flowBreakSparks === 1 ? "" : "s"} collected`);
+      resultHighlightItems.push({
+        label: "Flow Break",
+        value: flowBreakPhases
+          ? `${flowBreakPhases} phase${flowBreakPhases === 1 ? "" : "s"}`
+          : (flowBreakPasses ? `${flowBreakPasses} traffic` : `${flowBreakSparks} spark${flowBreakSparks === 1 ? "" : "s"}`),
+        detail: flowParts.join(" · ") || "Phase ability charged the run"
+      });
     }
+    if (recklessEventsSeen || recklessNearMisses) {
+      resultHighlightItems.push({
+        label: "Reckless Traffic",
+        value: recklessEventsSeen ? `${recklessEventsSeen} seen` : `${recklessNearMisses} near miss${recklessNearMisses === 1 ? "" : "es"}`,
+        detail: recklessNearMisses ? `${recklessNearMisses} reckless near miss${recklessNearMisses === 1 ? "" : "es"}` : "Pressure survived"
+      });
+    }
+    if (nearMisses && (!recklessNearMisses || nearMisses !== recklessNearMisses)) {
+      resultHighlightItems.push({
+        label: "Near Misses",
+        value: nearMisses.toLocaleString(),
+        detail: "Close calls banked"
+      });
+    }
+    const resultHighlightMarkup = resultHighlightItems.length ? `
+      <div class="result-highlight-strip stat-strip" aria-label="Run highlights">
+        ${resultHighlightItems.map((item) => `
+          <div class="stat">
+            <span class="stat-label">${escapeHtml(item.label)}</span>
+            <span class="stat-value stat-value--cyan">${escapeHtml(item.value)}</span>
+            <span class="stat-sub">${escapeHtml(item.detail)}</span>
+          </div>
+        `).join("")}
+      </div>
+    ` : "";
+    const cashStat = neonCashAmount ? {
+      label: "Run Reward",
+      value: `+${neonCashAmount.toLocaleString()} Neon Cash`,
+      detail: "Cosmetic only",
+      toneClass: "stat-value stat-value--yellow"
+    } : null;
+    const scoreStat = {
+      label: scoreStatLabel,
+      value: boostlineRun ? secondaryMetricValue : scoreStatValue,
+      detail: scoreStatSub,
+      toneClass: "stat-value"
+    };
+    const progressStat = {
+      label: "Progress",
+      value: `${progressPercent}%`,
+      detail: `${Math.round(summary.distance).toLocaleString()} / ${summary.trackDistance.toLocaleString()}`,
+      toneClass: "stat-value stat-value--cyan"
+    };
+    const fuelStat = summary.raceTypeId === FUEL_RUN_RACE_TYPE_ID ? {
+      label: "Fuel",
+      value: `${Math.max(0, summary.fuelRemaining || 0)} / ${FUEL_RUN_CONFIG.fuelMax}`,
+      detail: `${Math.max(0, summary.gasCansCollected || 0).toLocaleString()} gas cans`,
+      toneClass: "stat-value stat-value--cyan"
+    } : null;
+    const bonusScoreStat = enduranceResult ? {
+      label: "Bonus Score",
+      value: formatScore(enduranceResult.postFinishScore || 0),
+      detail: `${secondaryMetricPlacement} · ${secondaryMetricDetail}`,
+      toneClass: "stat-value stat-value--cyan"
+    } : null;
+    const resultStatItems = failedResult
+      ? [scoreStat, progressStat, cashStat].filter(Boolean)
+      : [scoreStat, cashStat, bonusScoreStat || fuelStat].filter(Boolean);
+    const resultStatMarkup = resultStatItems.map((item) => `
+      <div class="stat">
+        <span class="stat-label">${escapeHtml(item.label)}</span>
+        <span class="${escapeAttr(item.toneClass)}" ${item.label === scoreStatLabel && !boostlineRun ? `id="finalScoreValue" data-tally-value="${escapeAttr(enduranceResult ? (enduranceResult.officialFinishScore || summary.finalScore || 0) : summary.finalScore)}"` : ""}>${escapeHtml(item.value)}</span>
+        <span class="stat-sub">${escapeHtml(item.detail)}</span>
+      </div>
+    `).join("");
+    const chipItems = [];
     if (enduranceResult) {
       chipItems.push({ label: "Official Race Locked", tone: "green" });
       chipItems.push({ label: secondaryMetricPlacement, tone: "cyan" });
@@ -41369,7 +41436,7 @@ class NeonRoadRally {
       chipItems.push({ label: timeAttackPlacement, tone: timeAttackPlacement.includes("Top 20") ? "yellow" : "cyan" });
     }
     if (playgroundResult) {
-      chipItems.unshift({ label: "Playground Record", tone: "cyan" });
+      chipItems.unshift({ label: "Local Fun Record", tone: "cyan" });
     }
     if (summary.newPersonalBestTime || summary.newPersonalBest) {
       chipItems.push({ label: summary.newPersonalBestTime ? "New Time PB" : "New Score PB", tone: "green" });
@@ -41380,12 +41447,10 @@ class NeonRoadRally {
     if (status === "finished" && !chipItems.some((item) => item.tone === "green")) {
       chipItems.push({ label: "Finished", tone: "green" });
     }
-    const resultChipMarkup = chipItems.slice(0, 4).map((item) => `
+    const visibleChipItems = enduranceResult ? chipItems.slice(0, 1) : [];
+    const resultChipMarkup = visibleChipItems.map((item) => `
       <span class="chip chip--${escapeAttr(item.tone)}">${escapeHtml(item.label)}</span>
     `).join("");
-    const routeContextLine = summary.challengeMode
-      ? `${summary.challengeName} · ${routeLine}`
-      : routeLine;
     const resultExtras = `${resultDetailPanel}${this.renderPursuitResultPanel(summary)}${this.renderChallengeResultPanel(summary)}`;
     this.layer.classList.remove("is-empty");
     this.layer.innerHTML = `
@@ -41395,19 +41460,19 @@ class NeonRoadRally {
           <div class="result-header page-head">
             <div class="result-title-copy">
               <span class="crumb">${escapeHtml(resultEyebrow)} · ${escapeHtml(setupLine)}</span>
-              <h1>${escapeHtml(resultHeadline)}</h1>
+              <h1 class="result-header-title ${failedResult ? "is-contextual" : ""}">${escapeHtml(headerTitle)}</h1>
               <div class="result-driver-line">
                 <strong>${escapeHtml(summary.playerName)}</strong>
                 <span>${escapeHtml(summary.carName)}</span>
               </div>
-              <div class="result-route-line">
+              ${failedResult ? `<div class="result-route-line">
                 <span>${escapeHtml(routeContextLine)}</span>
-              </div>
+              </div>` : ""}
             </div>
             <div class="actions result-actions">
               <button class="btn btn--ghost" data-action="title">Back to Title</button>
               ${showResultBoardAction ? `<button class="btn btn--secondary" data-action="leaderboard" data-view="${escapeAttr(resultBoardView)}" data-track-id="${escapeAttr(summary.trackId)}" data-race-type-id="${escapeAttr(resultBoardRaceTypeId)}" data-speed-class-id="${escapeAttr(summary.speedClass)}" data-official-route-id="${escapeAttr(summary.officialRouteId || "")}">View Route Boards</button>` : ""}
-              <button class="btn btn--primary btn--lg" data-action="restart"><span>${escapeHtml(restartLabel)}</span><span class="kbd">↵</span></button>
+              <button class="btn btn--primary btn--lg" data-action="${escapeAttr(primaryAction)}"><span>${escapeHtml(restartLabel)}</span><span class="kbd">↵</span></button>
             </div>
           </div>
 
@@ -41416,31 +41481,19 @@ class NeonRoadRally {
               <span class="label">${escapeHtml(primaryResultLabel)}</span>
               <strong class="result-primary-value">${escapeHtml(primaryResultValue)}</strong>
               <div class="result-chip-strip">
-                ${resultChipMarkup || `<span class="chip chip--cyan">${escapeHtml(outcomeText)}</span>`}
+                ${resultChipMarkup}
                 <span class="result-primary-detail">${escapeHtml(primaryResultSub)}</span>
               </div>
               ${this.renderOfficialChampionCallouts(summary)}
             </div>
             <div class="result-side-board">
-              <div class="label label--cyan">Score Board</div>
-              <div class="stat-row result-stat-row">
-                <div class="stat">
-                  <span class="stat-label">${escapeHtml(timeAttackLabel)}</span>
-                  <span class="${escapeAttr(timeStatToneClass)}">${escapeHtml(timeAttackValue)}</span>
-                  <span class="stat-sub">${escapeHtml(timeAttackPlacement)} · ${escapeHtml(timeAttackDetail)}</span>
-                </div>
-                <div class="stat">
-                  <span class="stat-label">${escapeHtml(scoreStatLabel)}</span>
-                  <span id="finalScoreValue" class="stat-value" ${boostlineRun ? "" : `data-tally-value="${escapeAttr(enduranceResult ? (enduranceResult.officialFinishScore || summary.finalScore || 0) : summary.finalScore)}"`}>${escapeHtml(boostlineRun ? secondaryMetricValue : scoreStatValue)}</span>
-                  <span class="stat-sub">${escapeHtml(scoreStatSub)}</span>
-                </div>
-                <div class="stat">
-                  <span class="stat-label">${escapeHtml(supportStatLabel)}</span>
-                  <span class="stat-value stat-value--cyan">${escapeHtml(supportStatValue)}</span>
-                  <span class="stat-sub">${escapeHtml(supportStatSub)}</span>
-                </div>
+              <div class="label label--cyan">Run Sheet</div>
+              <div class="stat-row stat-strip result-stat-row">
+                ${resultStatMarkup}
               </div>
+              ${resultHighlightMarkup}
             </div>
+            ${rewardStrip ? `<div class="result-reward-lane">${rewardStrip}</div>` : ""}
           </div>
 
           ${playgroundResult ? this.renderPlaygroundRecordCard(summary) : ""}
@@ -41482,8 +41535,8 @@ class NeonRoadRally {
               <div class="score-card"><strong>Session Best</strong><span class="is-compact">${escapeHtml(enduranceResult.newBest ? `New best ${formatTime(enduranceResult.survivalTime || 0)}` : `Best ${formatTime(enduranceResult.bestSurvivalTime || enduranceResult.survivalTime || 0)}`)}</span></div>
             </div>
           ` : ""}
-          <h2>${playgroundResult ? "Playground Score" : "Score Attack"}</h2>
-          <p class="hint">${summary.officialRouteId ? `${escapeHtml(officialRouteDisplayName)} Top 20. Open Time Attack for precise finish times on this Official Race.` : "Playground records are local fun records. They stay separate from Official Time Attack and Score Attack."}</p>
+          <h2>${playgroundResult ? "Local Fun Score" : "Score Attack"}</h2>
+          <p class="hint">${summary.officialRouteId ? `${escapeHtml(officialRouteDisplayName)} Top 20. Open Time Attack for precise finish times on this Official Race.` : "Local Fun records stay separate from Official Time Attack and Score Attack."}</p>
           <ol class="leaderboard-list">
             ${playgroundResult ? this.renderPlaygroundRecordRows(leaderboard, LEADERBOARD_VIEW_PLAYGROUND_SCORE) : this.renderScoreAttackRows(leaderboard, summary.scoreEntry)}
           </ol>
@@ -41498,7 +41551,7 @@ class NeonRoadRally {
           <div class="score-card"><strong>Score Attack Result</strong><span class="is-compact">${formatScore(summary.finalScore)} · ${escapeHtml(leaderboardText)}</span></div>
           <div class="score-card"><strong>Time Attack Result</strong><span class="is-compact">${escapeHtml(resultTimeText)} · ${escapeHtml(paceDeltaText)}</span></div>
           ${summary.driftsStarted || summary.driftDashesCompleted || summary.driftBoostsReleased ? `<div class="score-card"><strong>Drift</strong><span class="is-compact">${Math.max(0, summary.driftDashesCompleted || 0)} dashes · best ${Number(summary.longestDriftDashLanes || 0).toFixed(1)} lanes · hold ${escapeHtml(formatTime(summary.maxDriftHold || summary.maxDriftCharge || summary.longestDrift || 0))}${summary.driftNearMisses ? ` · ${Math.max(0, summary.driftNearMisses || 0)} risky` : ""}</span></div>` : ""}
-	          ${summary.neonFlowEnabled ? `<div class="score-card"><strong>Neon Flow</strong><span class="is-compact">${Math.max(0, summary.neonFlowTotalEarned || 0)} flow · ${Math.max(0, summary.flowBreaksArmed || 0)} armed · ${Math.max(0, summary.flowBreakManualActivationAttempts || 0)} attempt${Math.max(0, summary.flowBreakManualActivationAttempts || 0) === 1 ? "" : "s"} · ${Math.max(0, summary.flowBreakPhaseActivations || summary.flowBreaksTriggered || 0)} phase${Math.max(0, summary.flowBreakPhaseActivations || summary.flowBreaksTriggered || 0) === 1 ? "" : "s"} · ${Math.max(0, summary.flowBreakCollisionsPhasedThrough || 0)} traffic pass${Math.max(0, summary.flowBreakCollisionsPhasedThrough || 0) === 1 ? "" : "es"} · ${Math.max(0, summary.flowBreakSlowdownsPrevented || 0)} slowdown${Math.max(0, summary.flowBreakSlowdownsPrevented || 0) === 1 ? "" : "s"} blocked</span></div>` : ""}
+	          ${summary.neonFlowEnabled ? `<div class="score-card"><strong>Neon Flow</strong><span class="is-compact">${Math.max(0, summary.neonFlowTotalEarned || 0)} flow · ${Math.max(0, summary.flowBreaksArmed || 0)} armed · ${Math.max(0, summary.flowBreakManualActivationAttempts || 0)} attempt${Math.max(0, summary.flowBreakManualActivationAttempts || 0) === 1 ? "" : "s"} · ${Math.max(0, summary.flowBreakPhaseActivations || summary.flowBreaksTriggered || 0)} phase${Math.max(0, summary.flowBreakPhaseActivations || summary.flowBreaksTriggered || 0) === 1 ? "" : "s"} · ${Math.max(0, summary.flowBreakCollisionsPhasedThrough || 0)} traffic phased · ${Math.max(0, summary.flowBreakSlowdownsPrevented || 0)} slowdown${Math.max(0, summary.flowBreakSlowdownsPrevented || 0) === 1 ? "" : "s"} avoided</span></div>` : ""}
           <div class="score-card"><strong>Competition</strong><span>${escapeHtml(summary.competitionKind || (summary.officialRouteId ? "Official Race" : "Custom Road"))}</span></div>
           ${summary.officialRouteId ? `<div class="score-card"><strong>Official Route</strong><span class="is-compact">${escapeHtml(officialRouteDisplayName)}</span></div>` : ""}
           <div class="score-card"><strong>Track</strong><span>${escapeHtml(summary.trackName)}</span></div>
