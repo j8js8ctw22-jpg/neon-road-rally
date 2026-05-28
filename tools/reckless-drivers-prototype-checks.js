@@ -55,14 +55,15 @@ vm.runInContext(`
         return { w: info.w * scale, h: info.h * scale, drawScale: scale };
       },
       getObstacleScreenPositionAt(obstacle, runDistance) {
-        const y = this.yForDistanceAt(obstacle.distance, runDistance);
+        const effectiveDistance = getObstacleEffectiveDistance(obstacle);
+        const y = this.yForDistanceAt(effectiveDistance, runDistance);
         const lane = Number.isFinite(obstacle.laneFloat) ? obstacle.laneFloat : obstacle.lane;
         return { x: this.laneCenter(clamp(lane, 0, LANES - 1)), y, scale: this.scaleForY(y) };
       },
       getObstacleVisualRectAt(obstacle, runDistance) {
         const info = OBSTACLE_INFO[obstacle.type];
         if (!info || obstacle.type === "warning") return null;
-        const ahead = obstacle.distance - runDistance;
+        const ahead = getObstacleEffectiveDistance(obstacle) - runDistance;
         if (ahead < -70 || ahead > VIEW_DISTANCE + 160) return null;
         const position = this.getObstacleScreenPositionAt(obstacle, runDistance);
         const size = this.getObstacleVisualSize(obstacle.type, position.scale, obstacle);
@@ -131,13 +132,64 @@ vm.runInContext(`
       sourceLane: event.sourceLane,
       targetLane: event.targetLane,
       laneDelta: event.laneDelta,
+      progress: event.progress,
       telegraphSeconds: event.telegraphSeconds,
       anticipationSeconds: event.anticipationSeconds,
       commitPauseSeconds: event.commitPauseSeconds,
+      forwardDistancePeak: event.forwardDistancePeak,
+      diagonalMotion: event.diagonalMotion,
       behaviorProfileLabel: event.behaviorProfileLabel,
       mergeSeconds: event.mergeSeconds,
-      targetSafetyOk: event.targetSafetyOk
+      afterOfficialFinish: Boolean(event.afterOfficialFinish || event.enduranceContinuation),
+      enduranceLap: event.enduranceLap || 1,
+      timeSinceOfficialFinish: event.timeSinceOfficialFinish || 0,
+      comfortBandTarget: Boolean(event.comfortBandTarget),
+      comfortBandMin: Number.isFinite(event.comfortBandMin) ? event.comfortBandMin : null,
+      comfortBandMax: Number.isFinite(event.comfortBandMax) ? event.comfortBandMax : null,
+      comfortBandCenter: Number.isFinite(event.comfortBandCenter) ? event.comfortBandCenter : null,
+      targetSafetyOk: event.targetSafetyOk,
+      targetLaneClearAtSchedule: event.targetLaneClearAtSchedule,
+      safetyReason: event.safetyReason
     }));
+  }
+
+  function assertRecklessQuality(captureResult, label) {
+    const scheduled = scheduledEvents(captureResult);
+    const started = startedEvents(captureResult);
+    const safelyCancelledBeforeStart = (captureResult.recklessDriverEvents || []).filter((event) => (
+      event.kind === "cancelled" && event.reason === "target-blocked-before-start"
+    ));
+    const enduranceCapture = scheduled.some((event) => event.afterOfficialFinish || event.enduranceContinuation);
+    if (enduranceCapture) {
+      assert(started.length > 0, label + " should show at least one visible post-finish reckless telegraph");
+      assert(started.length <= scheduled.length, label + " started telegraphs should not exceed scheduled reckless events");
+    } else {
+      const resolvedIds = new Set(started.concat(safelyCancelledBeforeStart).map((event) => event.obstacleId).filter(Boolean));
+      const unresolvedScheduled = scheduled.filter((event) => !resolvedIds.has(event.obstacleId));
+      assert(started.length > 0, label + " should show at least one visible reckless telegraph");
+      assert(
+        unresolvedScheduled.length === 0,
+        label + " scheduled reckless events should enter a visible telegraph or cancel during the start-time safety recheck"
+      );
+    }
+    assert.strictEqual(captureResult.recklessPanicCorrections || 0, 0, label + " should not spend scheduled events on fake blocked-lane panic corrections");
+    for (const event of scheduled) {
+      const enduranceEvent = Boolean(event.afterOfficialFinish || event.enduranceContinuation);
+      const minProgress = enduranceEvent
+        ? RECKLESS_DRIVER_PROTOTYPE_CONFIG.enduranceContinuation.minProgress
+        : RECKLESS_DRIVER_PROTOTYPE_CONFIG.minProgress;
+      const maxProgress = enduranceEvent
+        ? RECKLESS_DRIVER_PROTOTYPE_CONFIG.enduranceContinuation.maxProgress
+        : RECKLESS_DRIVER_PROTOTYPE_CONFIG.maxProgress;
+      assert.strictEqual(event.targetSafetyOk, true, label + " scheduled targets should pass complete safety validation");
+      assert.strictEqual(event.targetLaneClearAtSchedule, true, label + " target lane should be clear at schedule time");
+      assert(event.progress >= minProgress, label + " should not schedule before the reckless minimum progress");
+      assert(event.progress <= maxProgress, label + " should not schedule after the reckless maximum progress");
+    }
+    for (const event of started) {
+      assert.strictEqual(event.targetLaneClearAtStart, true, label + " target lane should still be clear when the event enters telegraph");
+      assert.strictEqual(event.targetSafetyOkAtStart, true, label + " target lane should still pass safety when the event enters telegraph");
+    }
   }
 
   function normalizeSequenceSpine(captureResult) {
@@ -160,13 +212,22 @@ vm.runInContext(`
       "recklessNearMisses",
       "recklessCrashes",
       "recklessAvoidedWithDriftDash",
+      "recklessEventsScheduledBeforeOfficialFinish",
+      "recklessEventsScheduledAfterOfficialFinish",
+      "recklessEventsSeenBeforeOfficialFinish",
+      "recklessEventsSeenAfterOfficialFinish",
+      "recklessLateLapVisibleCount",
+      "recklessComfortBandTargets",
+      "recklessLatestTimeSinceOfficialFinish",
       "recklessTelegraphAverageSeconds",
       "recklessMovementAverageSeconds"
     ];
     const mapFields = [
       "recklessScheduledByBehavior",
       "recklessScheduledBySection",
+      "recklessScheduledAfterOfficialFinishByLap",
       "recklessSeenBySection",
+      "recklessSeenAfterOfficialFinishByLap",
       "recklessCompletedByBehavior",
       "recklessCompletedBySection",
       "recklessRejectsByReason",
@@ -205,6 +266,12 @@ vm.runInContext(`
     behaviorTimings.some((item) => item.behavior === RECKLESS_DRIVER_BEHAVIORS.aggressiveOvertake && item.profile.visualSurge > 0.05),
     "aggressive overtake should have a visible surge profile"
   );
+  const slowForward = getRecklessDriverBehaviorProfile(RECKLESS_DRIVER_BEHAVIORS.slowDriftMerge).forwardDistance || 0;
+  const aggressiveForward = getRecklessDriverBehaviorProfile(RECKLESS_DRIVER_BEHAVIORS.aggressiveOvertake).forwardDistance || 0;
+  const panicForward = getRecklessDriverBehaviorProfile(RECKLESS_DRIVER_BEHAVIORS.panicCorrection).forwardDistance || 0;
+  assert(slowForward > 0, "slow drift merge should include gentle forward displacement");
+  assert(aggressiveForward > slowForward, "aggressive overtake should have the strongest forward displacement");
+  assert(panicForward > slowForward, "panic correction should begin with diagonal forward displacement");
   assert(
     behaviorTimings.some((item) => item.behavior === RECKLESS_DRIVER_BEHAVIORS.panicCorrection && item.profile.brakeFlash >= 1),
     "panic correction should have a brake-flash profile"
@@ -224,6 +291,7 @@ vm.runInContext(`
   const officialScenario = officialCaptures.find((row) => scheduledEvents(row.capture).length > 0);
   assert(officialScenario, "at least one solo Official Classic route should schedule a rare reckless driver prototype event");
   assertTelemetryShape(officialScenario.capture, "official reckless capture");
+  assertRecklessQuality(officialScenario.capture, "official reckless capture");
 
   const officialRepeat = capture({
     officialRouteId: officialScenario.routeId,
@@ -245,17 +313,275 @@ vm.runInContext(`
     assert(!RECKLESS_DRIVER_PROTOTYPE_CONFIG.sectionBlocklist.includes(event.sectionId), "reckless should not attach to blocked sections");
     assert(event.telegraphSeconds >= 0.85, "telegraph should meet the Redline minimum readability window");
     assert(event.anticipationSeconds >= 0, "scheduled event should include anticipation timing");
+    assert(event.forwardDistancePeak > 0, "scheduled event should include forward reckless displacement");
+    assert.strictEqual(event.diagonalMotion, true, "scheduled event should advertise diagonal reckless motion");
     assert(event.mergeSeconds >= 0.32, "merge should not snap instantly");
-    assert(event.targetSafetyOk || event.behavior === RECKLESS_DRIVER_BEHAVIORS.panicCorrection, "unsafe targets should only become panic corrections");
+    assert.strictEqual(event.targetSafetyOk, true, "scheduled reckless events should not use unsafe targets");
+    assert.strictEqual(event.targetLaneClearAtSchedule, true, "scheduled reckless events should not target an occupied lane");
   }
   for (const event of startedEvents(officialScenario.capture)) {
     assert.strictEqual(event.phase, "telegraph", "started reckless event should begin in telegraph before movement");
     assert(event.telegraphSeconds >= event.mergeSeconds, "telegraph should be at least as readable as movement duration");
     assert(event.anticipationSeconds >= 0, "started event should expose anticipation timing");
+    assert(event.forwardDistancePeak > 0, "started event should expose forward displacement");
+    assert.strictEqual(event.diagonalMotion, true, "started event should expose diagonal motion state");
+    assert.strictEqual(event.targetLaneClearAtStart, true, "started reckless event should still have a clear target lane at telegraph");
   }
   assert(
     (officialScenario.capture.recklessDriversActiveMax || 0) <= RECKLESS_DRIVER_PROTOTYPE_CONFIG.maxActiveAtOnce,
     "prototype should keep one active reckless movement globally"
+  );
+
+  function makeManualRecklessHarness(options = {}) {
+    const speedClassId = options.speedClassId || "redline";
+    const track = createRaceTrackForSpeedClass(getTrackById("sunset-highway"), speedClassId, DEFAULT_RACE_TYPE_ID);
+    const progress = options.progress || 0.72;
+    const spawnDistance = Math.round(track.distanceToFinish * progress);
+    const runDistance = Math.max(0, spawnDistance - DIRECTOR_PACING_VIEW_DISTANCE * 0.8);
+    const seed = options.seed || "RECKLESS-FORCED-TARGET-LANE";
+    const seedSource = getRunRandomSeedSource(seed, track, speedClassId, DEFAULT_RACE_TYPE_ID);
+    const rng = createSeededRandomController(seedSource);
+    const run = {
+      track,
+      speedClassId,
+      speedClass: getSpeedClassConfig(speedClassId),
+      raceTypeId: DEFAULT_RACE_TYPE_ID,
+      raceType: getRaceTypeConfig(DEFAULT_RACE_TYPE_ID),
+      distance: runDistance,
+      elapsed: 0,
+      currentSpeed: getTrackCruiseSpeed(track, progress, speedClassId),
+      targetLane: TRACK_DIRECTOR.centerLane,
+      renderLaneFloat: TRACK_DIRECTOR.centerLane,
+      playerLaneFloat: TRACK_DIRECTOR.centerLane,
+      roadSeed: seed,
+      roadSeedSource: seedSource,
+      roadDirectorSequence: [],
+      routeSeedLocked: false,
+      partySeedLocked: false,
+      officialRouteSeedLocked: false,
+      partyMode: false,
+      challengeMode: false,
+      officialEnduranceActive: false,
+      officialFinishLocked: false,
+      currentSectionId: "pressure",
+      currentSectionLabel: "Pressure",
+      recklessDriversEnabled: false,
+      recklessDriversScheduled: 0,
+      recklessDriversStarted: 0,
+      recklessDriversCompleted: 0,
+      recklessDriversPanicCorrections: 0,
+      recklessDriversCancelled: 0,
+      recklessDriversSafetyRejects: 0,
+      recklessDriversRewardRejects: 0,
+      recklessDriversPressureRejects: 0,
+      recklessDriversDisabledModeSkips: 0,
+      recklessDriversActiveMax: 0,
+      recklessEventsSeen: 0,
+      recklessSlowMerges: 0,
+      recklessAggressiveOvertakes: 0,
+      recklessPanicCorrections: 0,
+      recklessNearMisses: 0,
+      recklessCrashes: 0,
+      recklessAvoidedWithDriftDash: 0,
+      recklessComfortBandTargets: 0,
+      recklessTelegraphSecondsSum: 0,
+      recklessMovementSecondsSum: 0,
+      recklessTelemetrySamples: 0,
+      recklessScheduledByBehavior: {},
+      recklessScheduledBySection: {},
+      recklessSeenBySection: {},
+      recklessCompletedByBehavior: {},
+      recklessCompletedBySection: {},
+      recklessRejectsByReason: {},
+      recklessRejectsBySection: {},
+      recklessRejectsByDetail: {},
+      recklessLastScheduleDistance: -Infinity,
+      recklessActiveObstacleId: "",
+      recklessFirstOpportunityGranted: false,
+      recklessDriverEvents: []
+    };
+    const renderer = makeHarnessRenderer();
+    renderer.run = run;
+    const game = {
+      run,
+      renderer,
+      screen: "game",
+      randomFloat: () => rng.random(),
+      trafficSprites: null,
+      audio: { playSfx: () => {} }
+    };
+    const manager = new ObstacleManager(game);
+    manager.reset(track);
+    manager.obstacles = [];
+    game.obstacles = manager;
+    run.distance = runDistance;
+    return { manager, run, spawnDistance };
+  }
+
+  function tryForcedRecklessSchedule(options = {}) {
+    const { manager, run, spawnDistance } = makeManualRecklessHarness(options);
+    const sourceLane = Number.isFinite(options.sourceLane) ? options.sourceLane : TRACK_DIRECTOR.centerLane;
+    const wave = {
+      type: "offsetPair",
+      waveId: options.waveId || "forced-reckless-target-lane",
+      distance: spawnDistance,
+      section: { id: "pressure", label: "Pressure" },
+      spawned: []
+    };
+    const source = manager.createObstacle("slowCar", sourceLane, spawnDistance, {
+      waveType: wave.type,
+      waveId: wave.waveId,
+      sectionId: wave.section.id,
+      sectionLabel: wave.section.label
+    });
+    manager.obstacles.push(source);
+    wave.spawned.push(source);
+    for (const lane of options.blockedLanes || []) {
+      manager.obstacles.push(manager.createObstacle("fastCar", lane, spawnDistance, {
+        waveType: "forcedTargetBlocker",
+        waveId: wave.waveId,
+        sectionId: wave.section.id,
+        sectionLabel: wave.section.label
+      }));
+    }
+    const scheduled = manager.tryScheduleRecklessFromWave(wave, spawnDistance, { section: wave.section });
+    return { manager, run, source, scheduled, events: run.recklessDriverEvents };
+  }
+
+  function sampleForcedRecklessMotion(behavior, options = {}) {
+    const { manager, run, spawnDistance } = makeManualRecklessHarness({
+      ...options,
+      seed: options.seed || ("RECKLESS-MOTION-" + behavior)
+    });
+    const sourceLane = Number.isFinite(options.sourceLane) ? options.sourceLane : TRACK_DIRECTOR.centerLane;
+    const targetLane = Number.isFinite(options.targetLane) ? options.targetLane : sourceLane + 1;
+    const wave = {
+      type: "offsetPair",
+      waveId: "forced-motion-" + behavior,
+      distance: spawnDistance,
+      section: { id: "pressure", label: "Pressure" },
+      spawned: []
+    };
+    const source = manager.createObstacle("fastCar", sourceLane, spawnDistance, {
+      waveType: wave.type,
+      waveId: wave.waveId,
+      sectionId: wave.section.id,
+      sectionLabel: wave.section.label
+    });
+    manager.obstacles.push(source);
+    wave.spawned.push(source);
+    const validation = manager.validateRecklessTargetLane(source, targetLane);
+    assert(validation.ok, "forced motion sample should start with a valid target lane for " + behavior);
+    const scheduled = manager.scheduleRecklessDriver(source, wave, behavior, sourceLane, targetLane, validation);
+    const state = scheduled.recklessState;
+    const activationLead = state.telegraphSeconds + state.mergeSeconds + state.settleSeconds + 0.28;
+    const playerAhead = manager.getPlayerZoneAhead(run.distance);
+    run.distance = scheduled.distance - playerAhead - run.currentSpeed * Math.max(0.1, activationLead - 0.03);
+    const samples = [];
+    for (let i = 0; i < 170 && !scheduled.recklessComplete; i += 1) {
+      run.elapsed += 1 / 60;
+      manager.updateRecklessObstacle(scheduled, 1 / 60, run);
+      const position = manager.game.renderer.getObstacleScreenPositionAt(scheduled, run.distance);
+      samples.push({
+        phase: state.phase,
+        laneFloat: Number((scheduled.laneFloat || 0).toFixed(3)),
+        forwardOffset: Number((scheduled.recklessDistanceOffset || 0).toFixed(2)),
+        y: Number(position.y.toFixed(2))
+      });
+    }
+    return {
+      behavior,
+      forwardDistancePeak: state.forwardDistancePeak || 0,
+      maxForwardOffset: Number((state.maxForwardDistanceOffsetSeen || 0).toFixed(2)),
+      maxLaneDisplacement: Number((state.maxLaneDisplacementSeen || 0).toFixed(3)),
+      diagonalMotionSeen: Boolean(state.diagonalMotionSeen),
+      finalLane: scheduled.lane,
+      finalForwardOffset: scheduled.recklessDistanceOffset || 0,
+      phases: Array.from(new Set(samples.map((sample) => sample.phase))),
+      samples: samples.filter((sample, index) => index % 16 === 0 || index === samples.length - 1)
+    };
+  }
+
+  const motionSamples = Object.values(RECKLESS_DRIVER_BEHAVIORS).map((behavior) => sampleForcedRecklessMotion(behavior));
+  const motionByBehavior = Object.fromEntries(motionSamples.map((sample) => [sample.behavior, sample]));
+  for (const sample of motionSamples) {
+    assert(sample.maxForwardOffset > 12, sample.behavior + " should produce forward displacement during lane change");
+    assert(sample.maxLaneDisplacement > 0.09, sample.behavior + " should produce lateral displacement during lane change");
+    assert.strictEqual(sample.diagonalMotionSeen, true, sample.behavior + " should record diagonal motion state");
+    assert.strictEqual(sample.finalForwardOffset, 0, sample.behavior + " should clear forward offset after completion/cancel");
+  }
+  assert(
+    motionByBehavior.aggressiveOvertake.maxForwardOffset > motionByBehavior.slowDriftMerge.maxForwardOffset * 1.8,
+    "Aggressive Overtake should surge forward more strongly than Slow Drift Merge"
+  );
+  assert(
+    motionByBehavior.panicCorrection.phases.includes("panicCommit") && motionByBehavior.panicCorrection.phases.includes("panicCorrection"),
+    "Panic Correction should start diagonally then correct back"
+  );
+  assert.strictEqual(
+    motionByBehavior.panicCorrection.finalLane,
+    TRACK_DIRECTOR.centerLane,
+    "Panic Correction should finish back in the source lane"
+  );
+
+  const forcedBlockedTarget = tryForcedRecklessSchedule({
+    sourceLane: TRACK_DIRECTOR.centerLane,
+    blockedLanes: [TRACK_DIRECTOR.centerLane + 1],
+    seed: "RECKLESS-FORCED-ONE-BLOCKED"
+  });
+  assert(forcedBlockedTarget.scheduled, "forced one-blocked target should still schedule by choosing a valid adjacent lane");
+  assert.notStrictEqual(
+    forcedBlockedTarget.scheduled.recklessTargetLane,
+    TRACK_DIRECTOR.centerLane + 1,
+    "reckless scheduler should not choose an occupied adjacent target lane"
+  );
+  assert.strictEqual(
+    forcedBlockedTarget.scheduled.recklessState.targetLaneClearAtSchedule,
+    true,
+    "forced one-blocked target should schedule with a clear target lane"
+  );
+
+  const forcedFullyBlocked = tryForcedRecklessSchedule({
+    sourceLane: 0,
+    blockedLanes: [1],
+    seed: "RECKLESS-FORCED-FULLY-BLOCKED"
+  });
+  assert.strictEqual(forcedFullyBlocked.scheduled, null, "fully blocked edge-lane reckless opportunity should cancel before scheduling");
+  assert(
+    forcedFullyBlocked.events.some((event) => event.kind === "skip" && event.detail === "target-lane-blocked"),
+    "fully blocked forced opportunity should record a target-lane-blocked safety skip"
+  );
+
+  const forcedStartRetarget = tryForcedRecklessSchedule({
+    sourceLane: TRACK_DIRECTOR.centerLane,
+    blockedLanes: [],
+    seed: "RECKLESS-FORCED-START-RETARGET"
+  });
+  assert(forcedStartRetarget.scheduled, "forced start-retarget setup should schedule before the target lane changes");
+  const oldStartTargetLane = forcedStartRetarget.scheduled.recklessTargetLane;
+  forcedStartRetarget.manager.obstacles.push(forcedStartRetarget.manager.createObstacle("fastCar", oldStartTargetLane, forcedStartRetarget.scheduled.distance, {
+    waveType: "forcedStartBlocker",
+    waveId: "forced-start-retarget",
+    sectionId: "pressure",
+    sectionLabel: "Pressure"
+  }));
+  const state = forcedStartRetarget.scheduled.recklessState;
+  const activationLead = state.telegraphSeconds + state.mergeSeconds + state.settleSeconds + 0.28;
+  const playerAhead = forcedStartRetarget.manager.getPlayerZoneAhead(forcedStartRetarget.run.distance);
+  forcedStartRetarget.run.distance = forcedStartRetarget.scheduled.distance
+    - playerAhead
+    - forcedStartRetarget.run.currentSpeed * Math.max(0.1, activationLead - 0.03);
+  const becameActive = forcedStartRetarget.manager.updateRecklessObstacle(forcedStartRetarget.scheduled, 1 / 60, forcedStartRetarget.run);
+  assert(becameActive, "reckless start-time target recheck should retarget to the alternate lane when one is available");
+  assert.notStrictEqual(
+    forcedStartRetarget.scheduled.recklessTargetLane,
+    oldStartTargetLane,
+    "start-time recheck should not keep a target lane that became blocked"
+  );
+  assert.strictEqual(state.targetLaneClearAtStart, true, "retargeted reckless start should mark the new target lane clear");
+  assert(
+    forcedStartRetarget.events.some((event) => event.kind === "retargeted"),
+    "start-time recheck should record a retargeted telemetry event"
   );
 
   const customCapture = capture({
@@ -266,6 +592,7 @@ vm.runInContext(`
     waveLimit: 180
   });
   assertTelemetryShape(customCapture, "custom reckless capture");
+  assertRecklessQuality(customCapture, "custom reckless capture");
   assert(scheduledEvents(customCapture).length > 0, "Playground/Custom Classic should be eligible for reckless prototype events");
 
   const redlineCapture = capture({
@@ -274,10 +601,12 @@ vm.runInContext(`
     waveLimit: 260
   });
   assertTelemetryShape(redlineCapture, "redline reckless capture");
+  assertRecklessQuality(redlineCapture, "redline reckless capture");
   const redlineScheduled = scheduledEvents(redlineCapture);
-  assert(redlineScheduled.length >= 3, "Redline should schedule 3-4 meaningful reckless events when fair");
+  assert(redlineScheduled.length >= 5, "Redline should schedule 5-6 meaningful reckless events when fair");
   assert(redlineScheduled.length <= RECKLESS_DRIVER_PROTOTYPE_CONFIG.maxPerRunBySpeed.redline, "Redline should respect the prototype max per run");
-  assert(redlineCapture.recklessAggressiveOvertakes >= 2, "Redline should strongly prefer Aggressive Overtake when safe");
+  assert(redlineCapture.recklessAggressiveOvertakes >= 4, "Redline should strongly prefer Aggressive Overtake when safe");
+  assert(redlineCapture.recklessComfortBandTargets >= 2, "Redline should cut into the player's 3-lane comfort band when fair");
   assert(
     redlineScheduled.some((event) => event.sectionId === "pressure" || event.sectionId === "finalPush"),
     "Redline should allow a fair reckless event in pressure/finalPush instead of launch-only scheduling"
@@ -285,6 +614,18 @@ vm.runInContext(`
   assert(
     redlineScheduled.some((event) => event.behavior === RECKLESS_DRIVER_BEHAVIORS.aggressiveOvertake),
     "Redline scheduled events should include Aggressive Overtake"
+  );
+  assert(
+    redlineScheduled.some((event) => event.progress >= 0.7),
+    "Redline should schedule later-race reckless events when route length allows"
+  );
+  assert(
+    redlineScheduled.some((event) => event.progress >= 0.7 && event.behavior === RECKLESS_DRIVER_BEHAVIORS.aggressiveOvertake),
+    "Redline later-race reckless events should lean toward Aggressive Overtake"
+  );
+  assert(
+    redlineScheduled.filter((event) => event.progress >= 0.5).every((event) => event.behavior === RECKLESS_DRIVER_BEHAVIORS.aggressiveOvertake),
+    "Redline mid/late reckless events should not fall back to Slow Merge"
   );
   assert(
     Object.values(redlineCapture.recklessRejectsByReason || {}).reduce((sum, count) => sum + count, 0) > 0,
@@ -319,6 +660,7 @@ vm.runInContext(`
     waveLimit: 180
   });
   assertTelemetryShape(partyCapture, "party classic capture");
+  assertRecklessQuality(partyCapture, "party classic capture");
   assert(scheduledEvents(partyCapture).length > 0, "Party Classic should schedule reckless events from the shared Classic seed");
   const partyRepeat = capture({
     trackId: "sunset-highway",
@@ -343,6 +685,7 @@ vm.runInContext(`
     partySeedLocked: true
   });
   assertTelemetryShape(chaseCapture, "record chase classic capture");
+  assertRecklessQuality(chaseCapture, "record chase classic capture");
   assert(scheduledEvents(chaseCapture).length > 0, "Official Record Chase Classic should schedule reckless events");
   assert.deepStrictEqual(
     normalizeScheduled(chaseCapture),
@@ -392,11 +735,54 @@ vm.runInContext(`
     officialRouteId: officialScenario.routeId,
     raceTypeId: DEFAULT_RACE_TYPE_ID,
     officialEnduranceActive: true,
-    officialFinishLocked: true
+    officialFinishLocked: true,
+    officialEnduranceLap: 2,
+    waveLimit: 320,
+    dt: 0.28
   });
-  assertTelemetryShape(enduranceCapture, "endurance disabled capture");
-  assert.strictEqual(scheduledEvents(enduranceCapture).length, 0, "Official Endurance continuation should not schedule reckless prototype events");
-  assert.strictEqual(enduranceCapture.recklessEventsSeen, 0, "Official Endurance continuation should not show reckless telemetry events");
+  assertTelemetryShape(enduranceCapture, "endurance continuation capture");
+  assertRecklessQuality(enduranceCapture, "endurance continuation capture");
+  assert(scheduledEvents(enduranceCapture).length > 0, "Official Endurance continuation should keep scheduling reckless prototype events");
+  assert(enduranceCapture.recklessEventsScheduledAfterOfficialFinish > 0, "Official Endurance continuation should count post-finish scheduled reckless events");
+  assert.strictEqual(enduranceCapture.recklessEventsScheduledBeforeOfficialFinish, 0, "Endurance capture should not mutate first-lap reckless telemetry");
+  assert(enduranceCapture.recklessEventsSeenAfterOfficialFinish >= 2, "Official Endurance continuation should show meaningful post-finish reckless events");
+  assert(enduranceCapture.recklessLateLapVisibleCount >= 2, "Official Endurance continuation should count visible late-lap reckless events");
+  assert(
+    Object.values(enduranceCapture.recklessScheduledAfterOfficialFinishByLap || {}).reduce((sum, count) => sum + count, 0) > 0,
+    "Official Endurance continuation should report scheduled reckless events by endurance lap"
+  );
+  assert(
+    scheduledEvents(enduranceCapture).every((event) => event.afterOfficialFinish === true && event.enduranceLap >= 2),
+    "Official Endurance scheduled events should be marked as post-finish lap events"
+  );
+  const redlineEnduranceCapture = capture({
+    officialRouteId: "redline-city-limits-blaze",
+    raceTypeId: DEFAULT_RACE_TYPE_ID,
+    officialEnduranceActive: true,
+    officialFinishLocked: true,
+    officialEnduranceLap: 3,
+    waveLimit: 240,
+    dt: 0.24
+  });
+  assertTelemetryShape(redlineEnduranceCapture, "redline endurance continuation capture");
+  assertRecklessQuality(redlineEnduranceCapture, "redline endurance continuation capture");
+  assert(redlineEnduranceCapture.recklessEventsScheduledAfterOfficialFinish >= 2, "Redline endurance continuation should get meaningful late-lap reckless pressure");
+  assert(redlineEnduranceCapture.recklessEventsSeenAfterOfficialFinish >= 2, "Redline endurance continuation should show meaningful late-lap reckless pressure");
+  assert(redlineEnduranceCapture.recklessComfortBandTargets >= 2, "Redline endurance continuation should keep cutting into the comfort band when fair");
+  const officialAfterEnduranceRepeat = capture({
+    officialRouteId: officialScenario.routeId,
+    raceTypeId: DEFAULT_RACE_TYPE_ID
+  });
+  assert.deepStrictEqual(
+    normalizeSequenceSpine(officialAfterEnduranceRepeat),
+    normalizeSequenceSpine(officialScenario.capture),
+    "Endurance continuation scheduling should not alter the official locked first-lap route sequence spine"
+  );
+  assert.deepStrictEqual(
+    normalizeScheduled(officialAfterEnduranceRepeat),
+    normalizeScheduled(officialScenario.capture),
+    "Endurance continuation scheduling should not alter official locked first-lap reckless choices"
+  );
 
   globalThis.__recklessPrototypeCheckResult = {
     officialRouteId: officialScenario.routeId,
@@ -419,21 +805,50 @@ vm.runInContext(`
       recklessSlowMerges: redlineCapture.recklessSlowMerges,
       recklessAggressiveOvertakes: redlineCapture.recklessAggressiveOvertakes,
       recklessPanicCorrections: redlineCapture.recklessPanicCorrections,
+      recklessComfortBandTargets: redlineCapture.recklessComfortBandTargets,
       recklessScheduledByBehavior: redlineCapture.recklessScheduledByBehavior,
       recklessScheduledBySection: redlineCapture.recklessScheduledBySection,
       recklessRejectsByReason: redlineCapture.recklessRejectsByReason,
       recklessRejectsBySection: redlineCapture.recklessRejectsBySection,
       recklessRejectsByDetail: redlineCapture.recklessRejectsByDetail
     },
+    forcedTargeting: {
+      oneBlockedTargetLane: forcedBlockedTarget.scheduled?.recklessTargetLane ?? null,
+      oneBlockedEvents: forcedBlockedTarget.events,
+      fullyBlockedScheduled: Boolean(forcedFullyBlocked.scheduled),
+      fullyBlockedEvents: forcedFullyBlocked.events,
+      startRetargetOldTargetLane: oldStartTargetLane,
+      startRetargetNewTargetLane: forcedStartRetarget.scheduled?.recklessTargetLane ?? null,
+      startRetargetEvents: forcedStartRetarget.events
+    },
+    motionSamples,
     customEvents: normalizeScheduled(customCapture),
     partyClassicEvents: normalizeScheduled(partyCapture),
     recordChaseEvents: normalizeScheduled(chaseCapture),
+    enduranceContinuation: {
+      routeId: enduranceCapture.officialRouteId,
+      lap: enduranceCapture.officialEnduranceLap,
+      scheduledAfterFinish: enduranceCapture.recklessEventsScheduledAfterOfficialFinish,
+      seenAfterFinish: enduranceCapture.recklessEventsSeenAfterOfficialFinish,
+      scheduledByLap: enduranceCapture.recklessScheduledAfterOfficialFinishByLap,
+      seenByLap: enduranceCapture.recklessSeenAfterOfficialFinishByLap,
+      latestTimeSinceOfficialFinish: enduranceCapture.recklessLatestTimeSinceOfficialFinish,
+      events: normalizeScheduled(enduranceCapture)
+    },
+    redlineEnduranceContinuation: {
+      routeId: redlineEnduranceCapture.officialRouteId,
+      lap: redlineEnduranceCapture.officialEnduranceLap,
+      scheduledAfterFinish: redlineEnduranceCapture.recklessEventsScheduledAfterOfficialFinish,
+      seenAfterFinish: redlineEnduranceCapture.recklessEventsSeenAfterOfficialFinish,
+      scheduledByLap: redlineEnduranceCapture.recklessScheduledAfterOfficialFinishByLap,
+      comfortBandTargets: redlineEnduranceCapture.recklessComfortBandTargets,
+      events: normalizeScheduled(redlineEnduranceCapture)
+    },
     disabledModeEvents: {
       fuel: scheduledEvents(fuelCapture).length,
       partyFuel: scheduledEvents(partyFuelCapture).length,
       pursuit: scheduledEvents(pursuitCapture).length,
-      challenge: scheduledEvents(challengeCapture).length,
-      endurance: scheduledEvents(enduranceCapture).length
+      challenge: scheduledEvents(challengeCapture).length
     }
   };
 `, context, { filename: "reckless-drivers-prototype-checks.vm.js" });

@@ -1093,6 +1093,89 @@ async function installVisualSmokeHelpers(page) {
       };
     }
 
+    function testPlayerCarFloorGlowShape(label = "player-car-floor-glow-shape") {
+      primeRun({
+        raceTypeId: "classic",
+        speedClassId: "redline",
+        trackId: "sunset-highway",
+        seed: `VISUAL-${label}`
+      });
+      const game = app();
+      const run = game.run;
+      const renderer = game.renderer;
+      const ctx = renderer.ctx;
+      run.boostTimer = 0;
+      run.padBoostTimer = 0;
+      run.driftBoostTimer = 0;
+      run.boostTrailPunchTimer = 0;
+      run.boostFlashTimer = 0;
+      renderer.render();
+      const calls = [];
+      const ellipseCalls = [];
+      const originalFillRect = ctx.fillRect;
+      const originalEllipse = ctx.ellipse;
+      ctx.fillRect = function probedFillRect(x, y, w, h) {
+        calls.push({ x, y, w, h });
+        return originalFillRect.apply(this, arguments);
+      };
+      ctx.ellipse = function probedEllipse(x, y, rx, ry, rotation, startAngle, endAngle) {
+        ellipseCalls.push({ x, y, rx, ry, rotation, startAngle, endAngle });
+        return originalEllipse.apply(this, arguments);
+      };
+      try {
+        renderer.drawPlayerLaneFloorGlow(1);
+      } finally {
+        ctx.fillRect = originalFillRect;
+        ctx.ellipse = originalEllipse;
+      }
+      const road = renderer.road;
+      const laneX = road.x + run.targetLane * road.laneW;
+      const laneCenterX = laneX + road.laneW * 0.5;
+      const playerY = renderer.getPlayerScreenY();
+      const playerGlowRects = calls.filter((rect) => (
+        rect.w >= road.laneW * 0.25
+        && rect.h >= road.laneW * 0.7
+        && rect.x < laneX + road.laneW
+        && rect.x + rect.w > laneX
+        && rect.y < playerY + road.laneW * 1.2
+        && rect.y + rect.h > playerY - road.laneW * 1.3
+      ));
+      const playerGlowEllipses = ellipseCalls.filter((ellipse) => (
+        ellipse.rx >= road.laneW * 0.16
+        && ellipse.ry >= road.laneW * 0.14
+        && Math.abs(ellipse.x - laneCenterX) <= road.laneW * 0.55
+        && ellipse.y < playerY + road.laneW * 1.2
+        && ellipse.y > playerY - road.laneW * 1.3
+      ));
+      return {
+        snapshot: snapshot(label),
+        fillRectCalls: calls.map((rect) => ({
+          x: Number(rect.x.toFixed(2)),
+          y: Number(rect.y.toFixed(2)),
+          w: Number(rect.w.toFixed(2)),
+          h: Number(rect.h.toFixed(2))
+        })),
+        ellipseCalls: ellipseCalls.map((ellipse) => ({
+          x: Number(ellipse.x.toFixed(2)),
+          y: Number(ellipse.y.toFixed(2)),
+          rx: Number(ellipse.rx.toFixed(2)),
+          ry: Number(ellipse.ry.toFixed(2))
+        })),
+        playerGlowRects: playerGlowRects.map((rect) => ({
+          x: Number(rect.x.toFixed(2)),
+          y: Number(rect.y.toFixed(2)),
+          w: Number(rect.w.toFixed(2)),
+          h: Number(rect.h.toFixed(2))
+        })),
+        playerGlowEllipses: playerGlowEllipses.map((ellipse) => ({
+          x: Number(ellipse.x.toFixed(2)),
+          y: Number(ellipse.y.toFixed(2)),
+          rx: Number(ellipse.rx.toFixed(2)),
+          ry: Number(ellipse.ry.toFixed(2))
+        }))
+      };
+    }
+
     function testDriftDashWideRoad(label = "drift-dash-wide-road") {
       primeRun({
         raceTypeId: "classic",
@@ -1450,6 +1533,7 @@ async function installVisualSmokeHelpers(page) {
       testPartyFuel,
       testTrackTheme,
       testClassicViewport,
+      testPlayerCarFloorGlowShape,
       testBlackoutSpeedReadability,
       testBlackoutIdentity,
       testPrismIdentity,
@@ -1582,6 +1666,26 @@ async function run() {
     report.observed.viewports = viewportSamples;
 
     await page.setViewportSize({ width: 1440, height: 900 });
+    const playerGlowShape = await page.evaluate(() => window.__nrrVisualSmoke.testPlayerCarFloorGlowShape("player-car-floor-glow-shape"));
+    assert(
+      playerGlowShape.playerGlowRects.length === 0,
+      "Player car floor glow should not draw a tall rectangular box around the car",
+      playerGlowShape
+    );
+    assert(
+      playerGlowShape.playerGlowEllipses.length === 0,
+      "Player car floor glow should not draw an oval/blob around the car",
+      playerGlowShape
+    );
+    report.observed.playerCarFloorGlow = {
+      playerGlowRects: playerGlowShape.playerGlowRects,
+      playerGlowEllipses: playerGlowShape.playerGlowEllipses,
+      fillRectCalls: playerGlowShape.fillRectCalls,
+      ellipseCalls: playerGlowShape.ellipseCalls,
+      camera: playerGlowShape.snapshot.camera
+    };
+    await captureScreenshot(page, report, "player-car-floor-glow-shape");
+
     const decisionTrace = await page.evaluate(() => window.__nrrVisualSmoke.testDecisionDistance("decision-distance-1440x900"));
     assert(decisionTrace.metrics.readDistanceToPlayer >= 8000, "Decision trace should show the longer strategic-scale read distance", decisionTrace.metrics);
     assert(decisionTrace.metrics.firstRequiredLaneDecision?.distanceToPlayerZone >= 4200, "Decision trace should still put a required lane decision meaningfully ahead", decisionTrace.metrics);
