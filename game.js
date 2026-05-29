@@ -3317,9 +3317,35 @@ const OFFICIAL_ROUTE_DEFINITIONS = [
   { id: "sunset-cactus-cutback", name: "Cactus Cutback", trackId: "sunset-highway", speedClassId: "overdrive", seed: "SUNSET-CACTUS-CUTBACK-OVERDRIVE", feelTag: "traffic pressure" },
   { id: "sunset-radio-tower-run", name: "Radio Tower Run", trackId: "sunset-highway", speedClassId: "overdrive", seed: "SUNSET-RADIO-TOWER-OVERDRIVE", feelTag: "final push" },
   { id: "sunset-heatwave-express", name: "Heatwave Express", trackId: "sunset-highway", speedClassId: "redline", seed: "SUNSET-HEATWAVE-EXPRESS-REDLINE", feelTag: "clean speed" },
-  { id: "sunset-mirage-merge", name: "Mirage Merge", trackId: "sunset-highway", speedClassId: "redline", seed: "SUNSET-MIRAGE-MERGE-REDLINE", feelTag: "lane discipline" },
+  {
+    id: "sunset-mirage-merge",
+    name: "Mirage Merge",
+    trackId: "sunset-highway",
+    speedClassId: "redline",
+    seed: "SUNSET-MIRAGE-MERGE-REDLINE",
+    feelTag: "lane discipline",
+    classicRacecraftPlan: {
+      groove: ["officialGateSweep", "officialFastLineFork", "offsetPair"],
+      pressure: ["officialLaneClosureTaper", "officialRollingBlockade", "nearMissCorridor"],
+      breather: ["boostTemptation", "officialFarSideTemptation", "recoveryGap"],
+      finalPush: ["officialFinalClosureGate", "officialCrossTrackFork", "officialFinalPushSplit"]
+    }
+  },
   { id: "sunset-afterburner-mile", name: "Afterburner Mile", trackId: "sunset-highway", speedClassId: "redline", seed: "SUNSET-AFTERBURNER-MILE-REDLINE", feelTag: "boost line" },
-  { id: "sunset-last-light-gauntlet", name: "Last Light Gauntlet", trackId: "sunset-highway", speedClassId: "redline", seed: "SUNSET-LAST-LIGHT-REDLINE", feelTag: "final push" },
+  {
+    id: "sunset-last-light-gauntlet",
+    name: "Last Light Gauntlet",
+    trackId: "sunset-highway",
+    speedClassId: "redline",
+    seed: "SUNSET-LAST-LIGHT-REDLINE",
+    feelTag: "final push",
+    classicRacecraftPlan: {
+      groove: ["officialFarSideTemptation", "officialGateSweep", "officialFastLineFork"],
+      pressure: ["officialLaneClosureSide", "nearMissCorridor", "officialRollingBlockade"],
+      breather: ["rampEscape", "speedGateChain", "recoveryGap"],
+      finalPush: ["officialFinalClosureGate", "officialCrossTrackFork", "officialFinalPushSplit"]
+    }
+  },
   { id: "redline-tunnel-spark-sprint", name: "Tunnel Spark Sprint", trackId: "redline-run", speedClassId: "turbo", seed: "REDLINE-TUNNEL-SPARK-TURBO", feelTag: "clean speed" },
   { id: "redline-neon-gate-dash", name: "Neon Gate Dash", trackId: "redline-run", speedClassId: "turbo", seed: "REDLINE-NEON-GATE-TURBO", feelTag: "lane discipline" },
   { id: "redline-service-lane-slalom", name: "Service Lane Slalom", trackId: "redline-run", speedClassId: "turbo", seed: "REDLINE-SERVICE-LANE-TURBO", feelTag: "traffic pressure" },
@@ -3339,7 +3365,20 @@ const OFFICIAL_ROUTE_DEFINITIONS = [
   { id: "midnight-summit-driftline", name: "Summit Driftline", trackId: "midnight-ridge", speedClassId: "overdrive", seed: "MIDNIGHT-SUMMIT-DRIFTLINE-OVERDRIVE", feelTag: "drift timing" },
   { id: "midnight-black-peak-charge", name: "Black Peak Charge", trackId: "midnight-ridge", speedClassId: "redline", seed: "MIDNIGHT-BLACK-PEAK-REDLINE", feelTag: "final push" },
   { id: "midnight-last-ridge-drop", name: "Last Ridge Drop", trackId: "midnight-ridge", speedClassId: "redline", seed: "MIDNIGHT-LAST-RIDGE-REDLINE", feelTag: "lane discipline" },
-  { id: "midnight-no-return-pass", name: "No-Return Pass", trackId: "midnight-ridge", speedClassId: "redline", seed: "MIDNIGHT-NO-RETURN-PASS-REDLINE", feelTag: "final push" },
+  {
+    id: "midnight-no-return-pass",
+    name: "No-Return Pass",
+    trackId: "midnight-ridge",
+    speedClassId: "redline",
+    seed: "MIDNIGHT-NO-RETURN-PASS-REDLINE",
+    feelTag: "final push",
+    classicRacecraftPlan: {
+      groove: ["officialCrossTrackFork", "officialFarSideTemptation", "officialFastLineFork"],
+      pressure: ["officialLaneClosureTaper", "officialRollingBlockade", "nearMissCorridor"],
+      breather: ["boostTemptation", "recoveryGap"],
+      finalPush: ["officialFinalClosureGate", "officialCrossTrackFork", "officialFinalPushSplit"]
+    }
+  },
   { id: "blackout-headlight-mile", name: "Headlight Mile", trackId: "blackout-run", speedClassId: "turbo", seed: "BLACKOUT-HEADLIGHT-MILE-TURBO", feelTag: "headlight read" },
   { id: "blackout-reflector-gate", name: "Reflector Gate", trackId: "blackout-run", speedClassId: "turbo", seed: "BLACKOUT-REFLECTOR-GATE-TURBO", feelTag: "lane discipline" },
   { id: "blackout-dark-lane-dash", name: "Dark Lane Dash", trackId: "blackout-run", speedClassId: "turbo", seed: "BLACKOUT-DARK-LANE-DASH-TURBO", feelTag: "clean speed" },
@@ -3349,7 +3388,20 @@ const OFFICIAL_ROUTE_DEFINITIONS = [
   { id: "blackout-low-beam-sprint", name: "Low Beam Sprint", trackId: "blackout-run", speedClassId: "overdrive", seed: "BLACKOUT-LOW-BEAM-SPRINT-OVERDRIVE", feelTag: "clean speed" },
   { id: "blackout-lights-out-charge", name: "Lights Out Charge", trackId: "blackout-run", speedClassId: "redline", seed: "BLACKOUT-LIGHTS-OUT-REDLINE", feelTag: "final push" },
   { id: "blackout-black-glass-run", name: "Black Glass Run", trackId: "blackout-run", speedClassId: "redline", seed: "BLACKOUT-BLACK-GLASS-REDLINE", feelTag: "lane discipline" },
-  { id: "blackout-no-moon-finale", name: "No Moon Finale", trackId: "blackout-run", speedClassId: "redline", seed: "BLACKOUT-NO-MOON-FINALE-REDLINE", feelTag: "final push" },
+  {
+    id: "blackout-no-moon-finale",
+    name: "No Moon Finale",
+    trackId: "blackout-run",
+    speedClassId: "redline",
+    seed: "BLACKOUT-NO-MOON-FINALE-REDLINE",
+    feelTag: "final push",
+    classicRacecraftPlan: {
+      groove: ["officialFarSideTemptation", "officialGateSweep", "boostTemptation"],
+      pressure: ["officialLaneClosureSide", "officialGateSweep", "nearMissCorridor"],
+      breather: ["officialFastLineFork", "nearMissCorridor", "recoveryGap"],
+      finalPush: ["officialFinalClosureGate", "officialCrossTrackFork", "officialFinalPushSplit"]
+    }
+  },
   { id: "prism-pinkline-sprint", name: "Pinkline Sprint", trackId: "prism-highway", speedClassId: "turbo", seed: "PRISM-PINKLINE-SPRINT-TURBO", feelTag: "clean speed" },
   { id: "prism-rainbow-ramp-rush", name: "Rainbow Ramp Rush", trackId: "prism-highway", speedClassId: "turbo", seed: "PRISM-RAINBOW-RAMP-TURBO", feelTag: "ramp route" },
   { id: "prism-neon-ribbon-run", name: "Neon Ribbon Run", trackId: "prism-highway", speedClassId: "turbo", seed: "PRISM-NEON-RIBBON-TURBO", feelTag: "boost chain" },
@@ -3357,7 +3409,20 @@ const OFFICIAL_ROUTE_DEFINITIONS = [
   { id: "prism-violet-boostway", name: "Violet Boostway", trackId: "prism-highway", speedClassId: "overdrive", seed: "PRISM-VIOLET-BOOSTWAY-OVERDRIVE", feelTag: "boost chain" },
   { id: "prism-glowwave-merge", name: "Glowwave Merge", trackId: "prism-highway", speedClassId: "overdrive", seed: "PRISM-GLOWWAVE-MERGE-OVERDRIVE", feelTag: "traffic pressure" },
   { id: "prism-starburst-switch", name: "Starburst Switch", trackId: "prism-highway", speedClassId: "overdrive", seed: "PRISM-STARBURST-SWITCH-OVERDRIVE", feelTag: "lane discipline" },
-  { id: "prism-hot-pink-redline", name: "Hot Pink Redline", trackId: "prism-highway", speedClassId: "redline", seed: "PRISM-HOT-PINK-REDLINE", feelTag: "final push" },
+  {
+    id: "prism-hot-pink-redline",
+    name: "Hot Pink Redline",
+    trackId: "prism-highway",
+    speedClassId: "redline",
+    seed: "PRISM-HOT-PINK-REDLINE",
+    feelTag: "final push",
+    classicRacecraftPlan: {
+      groove: ["officialFarSideTemptation", "officialGateSweep", "boostTemptation"],
+      pressure: ["officialLaneClosureTaper", "officialRollingBlockade", "speedGateChain"],
+      breather: ["speedGateChain", "boostTemptation", "recoveryGap"],
+      finalPush: ["officialFinalClosureGate", "officialCrossTrackFork", "officialFinalPushSplit", "speedGateChain"]
+    }
+  },
   { id: "prism-spectrum-surge", name: "Spectrum Surge", trackId: "prism-highway", speedClassId: "redline", seed: "PRISM-SPECTRUM-SURGE-REDLINE", feelTag: "boost chain" },
   { id: "prism-finale", name: "Prism Finale", trackId: "prism-highway", speedClassId: "redline", seed: "PRISM-FINALE-REDLINE", feelTag: "final push" }
 ];
@@ -3502,7 +3567,14 @@ function getOfficialRouteRacecraftPlan(route, raceTypeId = DEFAULT_RACE_TYPE_ID)
   if (!route) return null;
   const key = String(route.feelTag || "").toLowerCase();
   const plans = isFuelRunRaceType(raceTypeId) ? OFFICIAL_RACECRAFT_FUEL_PLANS : OFFICIAL_RACECRAFT_CLASSIC_PLANS;
-  return plans[key] || plans["clean speed"] || null;
+  const basePlan = plans[key] || plans["clean speed"] || null;
+  if (!isFuelRunRaceType(raceTypeId) && route.classicRacecraftPlan) {
+    return {
+      ...(basePlan || {}),
+      ...route.classicRacecraftPlan
+    };
+  }
+  return basePlan;
 }
 
 const BOOSTLINE_ROUTE_PHASE_SCRIPT = [
@@ -4330,6 +4402,403 @@ const RECKLESS_DRIVER_PROTOTYPE_CONFIG = {
     forwardDistanceScale: 1.15
   }
 };
+
+const ROUTE_IDENTITY_V2_PROTOTYPE_VERSION = "route-identity-v2-debug-1";
+const ROAD_CONDITION_V2_TYPES = Object.freeze({
+  constructionZone: "constructionZone",
+  accidentScene: "accidentScene",
+  tunnelRestriction: "tunnelRestriction",
+  shoulderCollapse: "shoulderCollapse",
+  emergencyResponse: "emergencyResponse"
+});
+const ROAD_CONDITIONS_V2_DEBUG_FLAGS = Object.freeze({
+  enabled: false,
+  constructionZone: false,
+  accidentScene: false,
+  tunnelRestriction: false,
+  shoulderCollapse: false,
+  emergencyResponse: false
+});
+const ROAD_CONDITION_V2_PROTOTYPES = Object.freeze({
+  constructionZone: {
+    id: ROAD_CONDITION_V2_TYPES.constructionZone,
+    label: "Construction Zone",
+    lanePolicy: "side",
+    preferredProgress: 0.22,
+    closedLaneCountBySpeed: { turbo: 1, overdrive: 2, redline: 2 },
+    zoneDistanceBySpeed: { turbo: 9000, overdrive: 13000, redline: 17000 },
+    warningSecondsBySpeed: { turbo: 2.2, overdrive: 2.15, redline: 2.05 },
+    minSafeLanes: 4,
+    visualLanguage: ["LANE CLOSED sign", "spaced taper cones", "work barrier markers", "reopen chevrons"],
+    readability: "taper plus sustained work area plus reopen"
+  },
+  accidentScene: {
+    id: ROAD_CONDITION_V2_TYPES.accidentScene,
+    label: "Accident Scene",
+    lanePolicy: "centerOrSide",
+    preferredProgress: 0.38,
+    closedLaneCountBySpeed: { turbo: 1, overdrive: 2, redline: 2 },
+    zoneDistanceBySpeed: { turbo: 6500, overdrive: 9000, redline: 12000 },
+    warningSecondsBySpeed: { turbo: 2.05, overdrive: 2, redline: 1.95 },
+    minSafeLanes: 4,
+    visualLanguage: ["warning flares", "emergency light wash", "staggered blocked lanes", "clear bypass lane"],
+    readability: "obvious incident with one readable alternate route"
+  },
+  tunnelRestriction: {
+    id: ROAD_CONDITION_V2_TYPES.tunnelRestriction,
+    label: "Tunnel Restriction",
+    lanePolicy: "edges",
+    preferredProgress: 0.54,
+    closedLaneCountBySpeed: { turbo: 1, overdrive: 2, redline: 2 },
+    zoneDistanceBySpeed: { turbo: 10000, overdrive: 14000, redline: 18000 },
+    warningSecondsBySpeed: { turbo: 2.15, overdrive: 2.1, redline: 2 },
+    minSafeLanes: 5,
+    visualLanguage: ["height-limit sign", "narrow-road chevrons", "edge barrier lights", "center travel lane"],
+    readability: "narrowed road identity without random clutter"
+  },
+  shoulderCollapse: {
+    id: ROAD_CONDITION_V2_TYPES.shoulderCollapse,
+    label: "Shoulder Collapse",
+    lanePolicy: "shoulder",
+    preferredProgress: 0.68,
+    closedLaneCountBySpeed: { turbo: 1, overdrive: 1, redline: 2 },
+    zoneDistanceBySpeed: { turbo: 9000, overdrive: 12000, redline: 16000 },
+    warningSecondsBySpeed: { turbo: 2.25, overdrive: 2.15, redline: 2.05 },
+    minSafeLanes: 5,
+    visualLanguage: ["edge warning sign", "broken shoulder stripe", "spaced hazard lamps", "shift-back arrows"],
+    readability: "edge-lane denial that makes the safe area drift inward"
+  },
+  emergencyResponse: {
+    id: ROAD_CONDITION_V2_TYPES.emergencyResponse,
+    label: "Emergency Response",
+    lanePolicy: "movingPocket",
+    preferredProgress: 0.82,
+    closedLaneCountBySpeed: { turbo: 1, overdrive: 1, redline: 2 },
+    zoneDistanceBySpeed: { turbo: 7500, overdrive: 10000, redline: 14000 },
+    warningSecondsBySpeed: { turbo: 2.2, overdrive: 2.05, redline: 1.95 },
+    minSafeLanes: 4,
+    visualLanguage: ["flashing response vehicle", "lane-claim arrows", "moving traffic pocket", "clear merge-out cue"],
+    readability: "visible response activity that changes the preferred lane pattern"
+  }
+});
+
+const RECKLESS_DRIVER_V2_BEHAVIORS = Object.freeze({
+  panicBrake: "panicBrake",
+  boostChaser: "boostChaser",
+  overCorrect: "overCorrect",
+  multiLaneCut: "multiLaneCut",
+  wrongLineDriver: "wrongLineDriver"
+});
+const RECKLESS_DRIVER_V2_DEBUG_FLAGS = Object.freeze({
+  enabled: false,
+  panicBrake: false,
+  boostChaser: false,
+  overCorrect: false,
+  multiLaneCut: false,
+  wrongLineDriver: false
+});
+const RECKLESS_DRIVER_V2_PROTOTYPES = Object.freeze({
+  panicBrake: {
+    id: RECKLESS_DRIVER_V2_BEHAVIORS.panicBrake,
+    label: "Panic Brake",
+    preferredProgress: 0.26,
+    laneDeltaMax: 0,
+    telegraphSecondsBySpeed: { turbo: 1.35, overdrive: 1.25, redline: 1.18 },
+    movementSeconds: 0.72,
+    visualLanguage: ["bright brake flash", "short skid streak", "rear hazard blink"],
+    fairRead: "slowdown is signaled before it occupies the player's line"
+  },
+  boostChaser: {
+    id: RECKLESS_DRIVER_V2_BEHAVIORS.boostChaser,
+    label: "Boost Chaser",
+    preferredProgress: 0.42,
+    laneDeltaMax: 1,
+    telegraphSecondsBySpeed: { turbo: 1.32, overdrive: 1.22, redline: 1.12 },
+    movementSeconds: 0.5,
+    visualLanguage: ["boost-lane glance", "turn signal pulse", "diagonal dive"],
+    fairRead: "driver claims the reward lane after a visible intent cue"
+  },
+  overCorrect: {
+    id: RECKLESS_DRIVER_V2_BEHAVIORS.overCorrect,
+    label: "Over-Correct",
+    preferredProgress: 0.58,
+    laneDeltaMax: 1,
+    telegraphSecondsBySpeed: { turbo: 1.45, overdrive: 1.32, redline: 1.22 },
+    movementSeconds: 0.62,
+    visualLanguage: ["wobble cue", "half-commit lean", "snap-back brake wink"],
+    fairRead: "first move and correction are both visible before the hitbox settles"
+  },
+  multiLaneCut: {
+    id: RECKLESS_DRIVER_V2_BEHAVIORS.multiLaneCut,
+    label: "Multi-Lane Cut",
+    preferredProgress: 0.72,
+    laneDeltaMax: 2,
+    rare: true,
+    telegraphSecondsBySpeed: { turbo: 1.8, overdrive: 1.7, redline: 1.6 },
+    movementSeconds: 0.72,
+    visualLanguage: ["double signal sweep", "wide lean", "long diagonal lane claim"],
+    fairRead: "rare two-lane cut with extra telegraph and no hidden collision"
+  },
+  wrongLineDriver: {
+    id: RECKLESS_DRIVER_V2_BEHAVIORS.wrongLineDriver,
+    label: "Wrong-Line Driver",
+    preferredProgress: 0.86,
+    laneDeltaMax: 1,
+    telegraphSecondsBySpeed: { turbo: 1.5, overdrive: 1.38, redline: 1.28 },
+    movementSeconds: 0.68,
+    visualLanguage: ["off-line headlight path", "late correction signal", "clear bypass side"],
+    fairRead: "unusual lane path stays visible and leaves an obvious escape"
+  }
+});
+
+const ROUTE_IDENTITY_V2_FEEL_FITS = Object.freeze({
+  "clean speed": {
+    roadCondition: ROAD_CONDITION_V2_TYPES.tunnelRestriction,
+    recklessBehavior: RECKLESS_DRIVER_V2_BEHAVIORS.wrongLineDriver,
+    signatureMoment: "clean-speed read through a narrowed lane pocket"
+  },
+  "boost line": {
+    roadCondition: ROAD_CONDITION_V2_TYPES.emergencyResponse,
+    recklessBehavior: RECKLESS_DRIVER_V2_BEHAVIORS.boostChaser,
+    signatureMoment: "reward lane is tempting while response traffic claims space"
+  },
+  "boost chain": {
+    roadCondition: ROAD_CONDITION_V2_TYPES.emergencyResponse,
+    recklessBehavior: RECKLESS_DRIVER_V2_BEHAVIORS.boostChaser,
+    signatureMoment: "boost chain crosses an active response pocket"
+  },
+  "ramp route": {
+    roadCondition: ROAD_CONDITION_V2_TYPES.constructionZone,
+    recklessBehavior: RECKLESS_DRIVER_V2_BEHAVIORS.boostChaser,
+    signatureMoment: "ramp reward sits beyond a visible work-zone taper"
+  },
+  "lane discipline": {
+    roadCondition: ROAD_CONDITION_V2_TYPES.constructionZone,
+    recklessBehavior: RECKLESS_DRIVER_V2_BEHAVIORS.overCorrect,
+    signatureMoment: "sustained closure forces an early side commitment"
+  },
+  "traffic pressure": {
+    roadCondition: ROAD_CONDITION_V2_TYPES.accidentScene,
+    recklessBehavior: RECKLESS_DRIVER_V2_BEHAVIORS.panicBrake,
+    signatureMoment: "traffic compresses around a lit incident scene"
+  },
+  "final push": {
+    roadCondition: ROAD_CONDITION_V2_TYPES.emergencyResponse,
+    recklessBehavior: RECKLESS_DRIVER_V2_BEHAVIORS.multiLaneCut,
+    signatureMoment: "late-route emergency response creates a final committed side choice"
+  },
+  "drift timing": {
+    roadCondition: ROAD_CONDITION_V2_TYPES.shoulderCollapse,
+    recklessBehavior: RECKLESS_DRIVER_V2_BEHAVIORS.overCorrect,
+    signatureMoment: "edge denial makes the drift timing line move inward"
+  },
+  "ridge line": {
+    roadCondition: ROAD_CONDITION_V2_TYPES.shoulderCollapse,
+    recklessBehavior: RECKLESS_DRIVER_V2_BEHAVIORS.wrongLineDriver,
+    signatureMoment: "ridge edge disappears and the safe line migrates"
+  },
+  "risk line": {
+    roadCondition: ROAD_CONDITION_V2_TYPES.shoulderCollapse,
+    recklessBehavior: RECKLESS_DRIVER_V2_BEHAVIORS.multiLaneCut,
+    signatureMoment: "the greedy edge lane closes before the reward line"
+  },
+  "descent pressure": {
+    roadCondition: ROAD_CONDITION_V2_TYPES.shoulderCollapse,
+    recklessBehavior: RECKLESS_DRIVER_V2_BEHAVIORS.panicBrake,
+    signatureMoment: "descending traffic slows as the shoulder falls away"
+  },
+  "headlight read": {
+    roadCondition: ROAD_CONDITION_V2_TYPES.accidentScene,
+    recklessBehavior: RECKLESS_DRIVER_V2_BEHAVIORS.wrongLineDriver,
+    signatureMoment: "flares and headlights define the only clean bypass"
+  },
+  "white line": {
+    roadCondition: ROAD_CONDITION_V2_TYPES.tunnelRestriction,
+    recklessBehavior: RECKLESS_DRIVER_V2_BEHAVIORS.overCorrect,
+    signatureMoment: "the white line becomes the readable center path"
+  },
+  precision: {
+    roadCondition: ROAD_CONDITION_V2_TYPES.tunnelRestriction,
+    recklessBehavior: RECKLESS_DRIVER_V2_BEHAVIORS.panicBrake,
+    signatureMoment: "tight restriction rewards a precise early lane read"
+  },
+  "traffic shadow": {
+    roadCondition: ROAD_CONDITION_V2_TYPES.accidentScene,
+    recklessBehavior: RECKLESS_DRIVER_V2_BEHAVIORS.wrongLineDriver,
+    signatureMoment: "a shadowed incident makes traffic pick an unusual line"
+  }
+});
+
+const ROUTE_IDENTITY_V2_TRACK_OVERRIDES = Object.freeze({
+  "sunset-highway": {
+    defaultRoadCondition: ROAD_CONDITION_V2_TYPES.constructionZone,
+    defaultRecklessBehavior: RECKLESS_DRIVER_V2_BEHAVIORS.boostChaser
+  },
+  "redline-run": {
+    defaultRoadCondition: ROAD_CONDITION_V2_TYPES.tunnelRestriction,
+    defaultRecklessBehavior: RECKLESS_DRIVER_V2_BEHAVIORS.multiLaneCut
+  },
+  "midnight-ridge": {
+    defaultRoadCondition: ROAD_CONDITION_V2_TYPES.shoulderCollapse,
+    defaultRecklessBehavior: RECKLESS_DRIVER_V2_BEHAVIORS.overCorrect
+  },
+  "blackout-run": {
+    defaultRoadCondition: ROAD_CONDITION_V2_TYPES.accidentScene,
+    defaultRecklessBehavior: RECKLESS_DRIVER_V2_BEHAVIORS.wrongLineDriver
+  },
+  "prism-highway": {
+    defaultRoadCondition: ROAD_CONDITION_V2_TYPES.emergencyResponse,
+    defaultRecklessBehavior: RECKLESS_DRIVER_V2_BEHAVIORS.boostChaser
+  }
+});
+
+function normalizePrototypeDebugFlags(input, defaults, ids) {
+  const normalized = { ...defaults };
+  if (input === true || input === "all") {
+    normalized.enabled = true;
+    ids.forEach((id) => { normalized[id] = true; });
+    return normalized;
+  }
+  if (!input) return normalized;
+  if (Array.isArray(input)) {
+    ids.forEach((id) => { normalized[id] = input.includes(id); });
+    normalized.enabled = ids.some((id) => normalized[id]);
+    return normalized;
+  }
+  if (typeof input === "string") {
+    const requested = new Set(input.split(",").map((item) => item.trim()).filter(Boolean));
+    if (requested.has("all")) {
+      normalized.enabled = true;
+      ids.forEach((id) => { normalized[id] = true; });
+      return normalized;
+    }
+    ids.forEach((id) => { normalized[id] = requested.has(id); });
+    normalized.enabled = ids.some((id) => normalized[id]);
+    return normalized;
+  }
+  if (typeof input === "object") {
+    const hasExplicitTypeFlags = ids.some((id) => Object.prototype.hasOwnProperty.call(input, id));
+    normalized.enabled = Boolean(input.enabled || input.all);
+    ids.forEach((id) => {
+      normalized[id] = Boolean(input.all || input[id]);
+    });
+    if (input.enabled && !hasExplicitTypeFlags) {
+      ids.forEach((id) => { normalized[id] = true; });
+    }
+    if (ids.some((id) => normalized[id])) normalized.enabled = true;
+  }
+  return normalized;
+}
+
+function normalizeRoadConditionsV2DebugFlags(input) {
+  return normalizePrototypeDebugFlags(
+    input,
+    ROAD_CONDITIONS_V2_DEBUG_FLAGS,
+    Object.values(ROAD_CONDITION_V2_TYPES)
+  );
+}
+
+function normalizeRecklessDriversV2DebugFlags(input) {
+  return normalizePrototypeDebugFlags(
+    input,
+    RECKLESS_DRIVER_V2_DEBUG_FLAGS,
+    Object.values(RECKLESS_DRIVER_V2_BEHAVIORS)
+  );
+}
+
+function getEnabledPrototypeIds(flags, ids) {
+  if (!flags?.enabled) return [];
+  return ids.filter((id) => flags[id]);
+}
+
+function getSequentialLanes(startLane, count) {
+  const lanes = [];
+  for (let offset = 0; offset < count; offset += 1) {
+    lanes.push(clamp(startLane + offset, 0, LANES - 1));
+  }
+  return Array.from(new Set(lanes)).sort((a, b) => a - b);
+}
+
+function getSafeLanesForClosedLanes(closedLanes) {
+  const closed = new Set((closedLanes || []).filter(Number.isFinite));
+  const safe = [];
+  for (let lane = 0; lane < LANES; lane += 1) {
+    if (!closed.has(lane)) safe.push(lane);
+  }
+  return safe;
+}
+
+function getPrototypeValueBySpeed(values, speedClassId, fallback) {
+  if (values && Number.isFinite(values[speedClassId])) return values[speedClassId];
+  if (values && Number.isFinite(values.turbo)) return values.turbo;
+  return fallback;
+}
+
+function getRoadConditionV2ClosedLanes(type, speedClassId, rng) {
+  const prototype = ROAD_CONDITION_V2_PROTOTYPES[type];
+  if (!prototype) return [];
+  const configuredCount = getPrototypeValueBySpeed(prototype.closedLaneCountBySpeed, speedClassId, 1);
+  const maxClosed = Math.max(1, LANES - Math.max(2, prototype.minSafeLanes || 2));
+  const closedCount = clamp(Math.round(configuredCount), 1, maxClosed);
+  const coin = rng.random();
+  if (prototype.lanePolicy === "centerOrSide") {
+    if (coin < 0.34) return getSequentialLanes(2, closedCount);
+    if (coin < 0.67) return getSequentialLanes(0, closedCount);
+    return getSequentialLanes(LANES - closedCount, closedCount);
+  }
+  if (prototype.lanePolicy === "edges") {
+    return closedCount <= 1
+      ? [coin < 0.5 ? 0 : LANES - 1]
+      : [0, LANES - 1];
+  }
+  if (prototype.lanePolicy === "shoulder") {
+    const sideStart = coin < 0.5 ? 0 : LANES - closedCount;
+    return getSequentialLanes(sideStart, closedCount);
+  }
+  if (prototype.lanePolicy === "movingPocket") {
+    const starts = closedCount > 1 ? [1, 4] : [1, 2, 4, 5];
+    return getSequentialLanes(starts[Math.floor(coin * starts.length)] || 1, closedCount);
+  }
+  const sideStart = coin < 0.5 ? 0 : LANES - closedCount;
+  return getSequentialLanes(sideStart, closedCount);
+}
+
+function summarizeRoadConditionV2Zones(zones) {
+  const count = zones.length;
+  const sum = (key) => zones.reduce((total, zone) => total + (Number.isFinite(zone[key]) ? zone[key] : 0), 0);
+  const typeCounts = {};
+  for (const zone of zones) {
+    typeCounts[zone.type] = (typeCounts[zone.type] || 0) + 1;
+  }
+  return {
+    roadConditionZoneCount: count,
+    roadConditionTypes: typeCounts,
+    roadConditionAverageDistance: count ? Number((sum("distance") / count).toFixed(1)) : 0,
+    roadConditionAverageDurationSeconds: count ? Number((sum("durationSeconds") / count).toFixed(2)) : 0,
+    roadConditionAverageWarningSeconds: count ? Number((sum("warningSeconds") / count).toFixed(2)) : 0,
+    roadConditionSafeLaneCountMin: count ? Math.min(...zones.map((zone) => zone.safeLaneCount)) : LANES,
+    roadConditionLanesClosedMax: count ? Math.max(...zones.map((zone) => zone.closedLanes.length)) : 0
+  };
+}
+
+function summarizeRecklessDriverV2Events(events) {
+  const count = events.length;
+  const behaviorCounts = {};
+  for (const event of events) {
+    behaviorCounts[event.behavior] = (behaviorCounts[event.behavior] || 0) + 1;
+  }
+  return {
+    recklessDriverV2EventCount: count,
+    recklessDriverV2Behaviors: behaviorCounts,
+    recklessDriverV2AverageTelegraphSeconds: count
+      ? Number((events.reduce((sum, event) => sum + event.telegraphSeconds, 0) / count).toFixed(2))
+      : 0,
+    recklessDriverV2MaxLaneDelta: count
+      ? Math.max(...events.map((event) => Math.abs(event.laneDelta || 0)))
+      : 0,
+    recklessDriverV2HitboxCoherent: events.every((event) => event.hitboxFollowsVisual)
+  };
+}
 
 function getRecklessDriverBehaviorProfile(behavior) {
   return RECKLESS_DRIVER_PROTOTYPE_CONFIG.behaviorProfiles?.[behavior]
@@ -8230,6 +8699,10 @@ function normalizePlaytestRunSummary(entry) {
     highSpeedMinorPenaltyScore: normalizeNonNegativeInteger(entry.highSpeedMinorPenaltyScore, 0, 999999),
     enduranceMinorPenaltyScore: normalizeNonNegativeInteger(entry.enduranceMinorPenaltyScore, 0, 999999),
     sloppyLineEvents: normalizeNonNegativeInteger(entry.sloppyLineEvents, 0, 999),
+    laneClosureWaves: normalizeNonNegativeInteger(entry.laneClosureWaves, 0, 999),
+    laneClosureZoneCount: normalizeNonNegativeInteger(entry.laneClosureZoneCount, 0, 999),
+    laneClosureLanesClosedMax: normalizeNonNegativeInteger(entry.laneClosureLanesClosedMax, 0, LANES),
+    laneClosureSustainedMarkerCount: normalizeNonNegativeInteger(entry.laneClosureSustainedMarkerCount, 0, 9999),
     collisionType: sanitizeName(entry.collisionType, "", DISPLAY_TEXT_MAX_LENGTH),
     laneChanges: normalizeNonNegativeInteger(entry.laneChanges || entry.laneMoves, 0, 9999),
     verticalMovementAmount: normalizeNonNegativeNumber(entry.verticalMovementAmount, 0, 9999),
@@ -8377,6 +8850,34 @@ function normalizePlaytestRunSummary(entry) {
 function normalizePlaytestReportFilter(value) {
   const id = String(value || "all");
   return PLAYTEST_REPORT_FILTERS.some((filter) => filter.id === id) ? id : "all";
+}
+
+function summarizeLaneClosuresFromSequence(sequence = []) {
+  const waves = Array.isArray(sequence) ? sequence : [];
+  const closureWaves = waves.filter((wave) => (
+    wave?.laneClosure
+    || (Array.isArray(wave?.laneClosureLanes) && wave.laneClosureLanes.length > 0)
+    || String(wave?.type || "").includes("LaneClosure")
+    || String(wave?.type || "").includes("ClosureGate")
+  ));
+  return closureWaves.reduce((summary, wave) => {
+    const closedCount = Math.max(
+      normalizeNonNegativeInteger(wave?.laneClosureClosedLaneCount, 0, LANES),
+      Array.isArray(wave?.laneClosureLanes) ? wave.laneClosureLanes.length : 0
+    );
+    summary.laneClosureWaves += 1;
+    if (wave?.laneClosure || Number(wave?.laneClosureZoneDistance || 0) > 0 || wave?.laneClosureZoneKind) {
+      summary.laneClosureZoneCount += 1;
+    }
+    summary.laneClosureLanesClosedMax = Math.max(summary.laneClosureLanesClosedMax, closedCount);
+    summary.laneClosureSustainedMarkerCount += normalizeNonNegativeInteger(wave?.laneClosureSustainedMarkerCount, 0, 9999);
+    return summary;
+  }, {
+    laneClosureWaves: 0,
+    laneClosureZoneCount: 0,
+    laneClosureLanesClosedMax: 0,
+    laneClosureSustainedMarkerCount: 0
+  });
 }
 
 function getChallengeRunStats(summary) {
@@ -26638,6 +27139,8 @@ class NeonRoadRally {
     this.leaderboardSpeedClassId = this.profiles.data.speedClassId;
     this.leaderboardOfficialRouteId = defaultOfficialRoute?.id || DEFAULT_OFFICIAL_ROUTE_ID;
     this.playtestReportCopyText = "";
+    this.lastRunSummaryCopyText = "";
+    this.lastRunSummaryStatus = "";
     this.roadDirectorReportCopyText = "";
     this.garagePreviewCosmeticId = "";
     this.garageMemoVersion = -1;
@@ -30763,6 +31266,7 @@ class NeonRoadRally {
       ? run.visibleMeaningfulMin
       : (directorStats.visibleMeaningfulMin || 0);
     const rewardLaneDistribution = normalizeCountMap(directorStats.rewardLaneCounts || {}, 8);
+    const laneClosureSummary = summarizeLaneClosuresFromSequence(run.roadDirectorSequence);
     return {
       runId: run.runId,
       timestamp: new Date().toISOString(),
@@ -30969,6 +31473,10 @@ class NeonRoadRally {
       highSpeedMinorPenaltyScore: summary.highSpeedMinorPenaltyScore || run.highSpeedMinorPenaltyScore || 0,
       enduranceMinorPenaltyScore: summary.enduranceMinorPenaltyScore || run.enduranceMinorPenaltyScore || 0,
       sloppyLineEvents: summary.sloppyLineEvents || run.sloppyLineEvents || 0,
+      laneClosureWaves: summary.laneClosureWaves || laneClosureSummary.laneClosureWaves,
+      laneClosureZoneCount: summary.laneClosureZoneCount || laneClosureSummary.laneClosureZoneCount,
+      laneClosureLanesClosedMax: summary.laneClosureLanesClosedMax || laneClosureSummary.laneClosureLanesClosedMax,
+      laneClosureSustainedMarkerCount: summary.laneClosureSustainedMarkerCount || laneClosureSummary.laneClosureSustainedMarkerCount,
       collisionType: summary.status === "crashed" ? (run.crashCollisionType || summary.reason || "") : "",
       laneChanges: summary.laneMoves,
       verticalMovementAmount: run.verticalMovementAmount || 0,
@@ -31111,6 +31619,8 @@ class NeonRoadRally {
   endRace(status, reason, options = {}) {
     const run = this.run;
     if (run.ended) return;
+    this.lastRunSummaryCopyText = "";
+    this.lastRunSummaryStatus = "";
     this.profiles.beginSaveBatch();
     status = normalizeRunStatus(status);
     const debugSpeedScaleActive = Math.abs((this.debugSpeedScale || 1) - 1) > 0.001;
@@ -31378,6 +31888,7 @@ class NeonRoadRally {
         HIGH_SPEED_CLASSIC_PRESSURE_CONFIG.passiveThreeLaneWarningSeconds,
         (run.elapsed || 0) * HIGH_SPEED_CLASSIC_PRESSURE_CONFIG.passiveThreeLaneFinishShare
       );
+    const laneClosureSummary = summarizeLaneClosuresFromSequence(run.roadDirectorSequence);
 
     const summary = {
       scoreEntry: entry,
@@ -31563,6 +32074,10 @@ class NeonRoadRally {
       highSpeedMinorPenaltyScore: run.highSpeedMinorPenaltyScore || 0,
       enduranceMinorPenaltyScore: run.enduranceMinorPenaltyScore || 0,
       sloppyLineEvents: run.sloppyLineEvents || 0,
+      laneClosureWaves: laneClosureSummary.laneClosureWaves,
+      laneClosureZoneCount: laneClosureSummary.laneClosureZoneCount,
+      laneClosureLanesClosedMax: laneClosureSummary.laneClosureLanesClosedMax,
+      laneClosureSustainedMarkerCount: laneClosureSummary.laneClosureSustainedMarkerCount,
       nearMisses: run.nearMisses || 0,
       manualBoostsUsed: run.manualBoostsUsed || 0,
       driftsStarted: run.driftsStarted || 0,
@@ -32168,6 +32683,318 @@ class NeonRoadRally {
       }
     };
     return renderer;
+  }
+
+  getRouteIdentityV2PrototypeContext(options = {}) {
+    const officialRoute = getOfficialRouteById(options.officialRouteId || options.routeId);
+    const speedClassId = officialRoute
+      ? officialRoute.speedClassId
+      : normalizeSpeedClassId(options.speedClassId, DEFAULT_SPEED_CLASS_ID);
+    const baseTrack = officialRoute
+      ? getTrackById(officialRoute.trackId)
+      : getTrackById(options.track?.id || options.trackId || DEFAULT_TRACK_ID);
+    const requestedRaceTypeId = normalizeRaceTypeId(options.raceTypeId || options.raceType, DEFAULT_RACE_TYPE_ID);
+    const routeSupportsRaceType = officialRoute ? officialRouteSupportsRaceType(officialRoute, requestedRaceTypeId) : true;
+    const raceTypeId = trackSupportsRaceType(baseTrack, requestedRaceTypeId) && routeSupportsRaceType
+      ? requestedRaceTypeId
+      : DEFAULT_RACE_TYPE_ID;
+    const track = createRaceTrackForSpeedClass(baseTrack, speedClassId, raceTypeId);
+    const seed = officialRoute ? officialRoute.seed : normalizeRoadSeed(options.seed, DEFAULT_ROAD_SEED);
+    const seedSource = [
+      ROUTE_IDENTITY_V2_PROTOTYPE_VERSION,
+      seed,
+      track.id,
+      speedClassId,
+      raceTypeId,
+      officialRoute?.id || "custom"
+    ].join("|");
+    return {
+      officialRoute,
+      speedClassId,
+      raceTypeId,
+      track,
+      seed,
+      seedSource
+    };
+  }
+
+  getRoadConditionsV2DebugFlags(options = {}) {
+    return normalizeRoadConditionsV2DebugFlags(
+      options.roadConditionsV2DebugFlags
+        || options.roadConditionsV2
+        || options.debugRoadConditionsV2
+        || false
+    );
+  }
+
+  getRecklessDriversV2DebugFlags(options = {}) {
+    return normalizeRecklessDriversV2DebugFlags(
+      options.recklessDriversV2DebugFlags
+        || options.recklessDriversV2
+        || options.debugRecklessDriversV2
+        || false
+    );
+  }
+
+  buildRoadConditionsV2PrototypePlan(options = {}) {
+    const context = options.prototypeContext || this.getRouteIdentityV2PrototypeContext(options);
+    const flags = this.getRoadConditionsV2DebugFlags(options);
+    const enabledTypes = getEnabledPrototypeIds(flags, Object.values(ROAD_CONDITION_V2_TYPES));
+    const rejectedZones = [];
+    const zones = enabledTypes.map((type) => {
+      const prototype = ROAD_CONDITION_V2_PROTOTYPES[type];
+      const rng = createSeededRandomController(`${context.seedSource}|road-condition-v2|${type}`);
+      const speedAtStartFallback = getTrackCruiseSpeed(context.track, prototype.preferredProgress, context.speedClassId);
+      const zoneDistance = Math.round(getPrototypeValueBySpeed(
+        prototype.zoneDistanceBySpeed,
+        context.speedClassId,
+        4200
+      ));
+      const warningSeconds = getPrototypeValueBySpeed(
+        prototype.warningSecondsBySpeed,
+        context.speedClassId,
+        2
+      );
+      const progressJitter = (rng.random() - 0.5) * 0.035;
+      const progressStart = clamp(prototype.preferredProgress + progressJitter, 0.12, 0.88);
+      const startDistance = Math.round(context.track.distanceToFinish * progressStart);
+      const endDistance = Math.min(
+        Math.round(context.track.distanceToFinish * 0.97),
+        startDistance + zoneDistance
+      );
+      const distance = Math.max(0, endDistance - startDistance);
+      const speedAtStart = Math.max(1, getTrackCruiseSpeed(context.track, progressStart, context.speedClassId) || speedAtStartFallback);
+      const warningDistance = Math.round(speedAtStart * warningSeconds);
+      const warningStartDistance = Math.max(0, startDistance - warningDistance);
+      const closedLanes = getRoadConditionV2ClosedLanes(type, context.speedClassId, rng);
+      const safeLanes = getSafeLanesForClosedLanes(closedLanes);
+      const taperInDistance = Math.round(Math.min(1800, Math.max(900, distance * 0.22)));
+      const taperOutDistance = Math.round(Math.min(1400, Math.max(700, distance * 0.16)));
+      const sustainedDistance = Math.max(0, distance - taperInDistance - taperOutDistance);
+      const zone = {
+        id: `road-condition-v2-${type}`,
+        version: ROUTE_IDENTITY_V2_PROTOTYPE_VERSION,
+        type,
+        label: prototype.label,
+        debugOnly: true,
+        shippingEnabled: false,
+        affectsRouteSignature: false,
+        deterministicSeedHash: rng.hash,
+        routeId: context.officialRoute?.id || "",
+        routeName: context.officialRoute?.name || "",
+        speedClassId: context.speedClassId,
+        raceTypeId: context.raceTypeId,
+        progressStart: Number(progressStart.toFixed(3)),
+        progressEnd: Number(clamp(endDistance / context.track.distanceToFinish, 0, 1).toFixed(3)),
+        warningStartProgress: Number(clamp(warningStartDistance / context.track.distanceToFinish, 0, 1).toFixed(3)),
+        startDistance,
+        endDistance,
+        distance,
+        durationSeconds: Number((distance / speedAtStart).toFixed(2)),
+        warningSeconds: Number(warningSeconds.toFixed(2)),
+        warningDistance,
+        taperInDistance,
+        sustainedDistance,
+        taperOutDistance,
+        closedLanes,
+        safeLanes,
+        safeLaneCount: safeLanes.length,
+        visualLanguage: prototype.visualLanguage.slice(),
+        readability: prototype.readability,
+        fairness: {
+          leavesAtLeastTwoLanes: safeLanes.length >= 2,
+          leavesConfiguredSafeLanes: safeLanes.length >= (prototype.minSafeLanes || 2),
+          telegraphedBeforeHardBlock: warningSeconds >= 1.85,
+          noHiddenCollision: true,
+          plannerOnlyNoLiveOverlap: true
+        }
+      };
+      if (!zone.fairness.leavesAtLeastTwoLanes || !zone.fairness.leavesConfiguredSafeLanes) {
+        rejectedZones.push({
+          type,
+          reason: "insufficient-safe-lanes",
+          closedLanes,
+          safeLaneCount: safeLanes.length
+        });
+        return null;
+      }
+      return zone;
+    }).filter(Boolean);
+    return {
+      version: ROUTE_IDENTITY_V2_PROTOTYPE_VERSION,
+      debugOnly: true,
+      shippingEnabled: false,
+      affectsRouteSignature: false,
+      flags,
+      enabledTypes,
+      zones,
+      rejectedZones,
+      metrics: {
+        ...summarizeRoadConditionV2Zones(zones),
+        roadConditionRejectedZoneCount: rejectedZones.length
+      }
+    };
+  }
+
+  buildRecklessDriversV2PrototypePlan(options = {}) {
+    const context = options.prototypeContext || this.getRouteIdentityV2PrototypeContext(options);
+    const flags = this.getRecklessDriversV2DebugFlags(options);
+    const enabledBehaviors = getEnabledPrototypeIds(flags, Object.values(RECKLESS_DRIVER_V2_BEHAVIORS));
+    const events = enabledBehaviors.map((behavior) => {
+      const prototype = RECKLESS_DRIVER_V2_PROTOTYPES[behavior];
+      const rng = createSeededRandomController(`${context.seedSource}|reckless-driver-v2|${behavior}`);
+      const progressJitter = (rng.random() - 0.5) * 0.04;
+      const progress = clamp(prototype.preferredProgress + progressJitter, 0.16, 0.92);
+      let sourceLane = clamp(1 + Math.floor(rng.random() * (LANES - 2)), 1, LANES - 2);
+      let targetLane = sourceLane;
+      let correctionLane = null;
+      let rewardLane = null;
+      if (behavior === RECKLESS_DRIVER_V2_BEHAVIORS.boostChaser) {
+        const direction = sourceLane >= TRACK_DIRECTOR.centerLane ? -1 : 1;
+        targetLane = clamp(sourceLane + direction, 0, LANES - 1);
+        rewardLane = targetLane;
+      } else if (behavior === RECKLESS_DRIVER_V2_BEHAVIORS.overCorrect) {
+        const direction = rng.random() < 0.5 ? -1 : 1;
+        correctionLane = clamp(sourceLane + direction, 0, LANES - 1);
+        targetLane = sourceLane;
+      } else if (behavior === RECKLESS_DRIVER_V2_BEHAVIORS.multiLaneCut) {
+        sourceLane = rng.random() < 0.5 ? 1 : LANES - 2;
+        const direction = sourceLane < TRACK_DIRECTOR.centerLane ? 1 : -1;
+        targetLane = clamp(sourceLane + direction * 2, 0, LANES - 1);
+      } else if (behavior === RECKLESS_DRIVER_V2_BEHAVIORS.wrongLineDriver) {
+        sourceLane = rng.random() < 0.5 ? 0 : LANES - 1;
+        targetLane = sourceLane === 0 ? 1 : LANES - 2;
+      }
+      const laneDelta = targetLane - sourceLane;
+      const speedAtProgress = Math.max(1, getTrackCruiseSpeed(context.track, progress, context.speedClassId));
+      const telegraphSeconds = getPrototypeValueBySpeed(
+        prototype.telegraphSecondsBySpeed,
+        context.speedClassId,
+        1.3
+      );
+      const distance = Math.round(context.track.distanceToFinish * progress);
+      const escapeLanes = getSafeLanesForClosedLanes(Array.from(new Set([sourceLane, targetLane, correctionLane].filter(Number.isFinite))));
+      return {
+        id: `reckless-driver-v2-${behavior}`,
+        version: ROUTE_IDENTITY_V2_PROTOTYPE_VERSION,
+        behavior,
+        label: prototype.label,
+        debugOnly: true,
+        shippingEnabled: false,
+        affectsRouteSignature: false,
+        deterministicSeedHash: rng.hash,
+        routeId: context.officialRoute?.id || "",
+        routeName: context.officialRoute?.name || "",
+        speedClassId: context.speedClassId,
+        raceTypeId: context.raceTypeId,
+        progress: Number(progress.toFixed(3)),
+        distance,
+        timeToReachSeconds: Number((distance / speedAtProgress).toFixed(2)),
+        sourceLane,
+        targetLane,
+        correctionLane,
+        rewardLane,
+        laneDelta,
+        laneDeltaMax: prototype.laneDeltaMax,
+        telegraphSeconds: Number(telegraphSeconds.toFixed(2)),
+        movementSeconds: prototype.movementSeconds,
+        rare: Boolean(prototype.rare),
+        visualLanguage: prototype.visualLanguage.slice(),
+        fairRead: prototype.fairRead,
+        hitboxFollowsVisual: true,
+        collisionModel: "planner-only visual path; future integration must reuse target-lane safety gates",
+        noHiddenCollision: true,
+        escapeLanes,
+        safety: {
+          oneActiveMovementGlobally: true,
+          targetLaneSafetyGateRequired: true,
+          noUnsafeRampBoostOverlapRequired: true,
+          telegraphed: telegraphSeconds >= 1.1,
+          multiLaneExtraTelegraph: behavior !== RECKLESS_DRIVER_V2_BEHAVIORS.multiLaneCut || telegraphSeconds >= 1.6,
+          escapeLaneCount: escapeLanes.length
+        }
+      };
+    });
+    return {
+      version: ROUTE_IDENTITY_V2_PROTOTYPE_VERSION,
+      debugOnly: true,
+      shippingEnabled: false,
+      affectsRouteSignature: false,
+      flags,
+      enabledBehaviors,
+      events,
+      metrics: summarizeRecklessDriverV2Events(events)
+    };
+  }
+
+  getRouteIdentityV2Recommendation(routeOrId) {
+    const route = typeof routeOrId === "string" ? getOfficialRouteById(routeOrId) : routeOrId;
+    if (!route) return null;
+    const track = getTrackById(route.trackId);
+    const feelFit = ROUTE_IDENTITY_V2_FEEL_FITS[route.feelTag] || {};
+    const trackFit = ROUTE_IDENTITY_V2_TRACK_OVERRIDES[route.trackId] || {};
+    const roadConditionType = feelFit.roadCondition || trackFit.defaultRoadCondition || ROAD_CONDITION_V2_TYPES.constructionZone;
+    const recklessBehavior = feelFit.recklessBehavior || trackFit.defaultRecklessBehavior || RECKLESS_DRIVER_V2_BEHAVIORS.overCorrect;
+    const roadCondition = ROAD_CONDITION_V2_PROTOTYPES[roadConditionType];
+    const reckless = RECKLESS_DRIVER_V2_PROTOTYPES[recklessBehavior];
+    return {
+      version: ROUTE_IDENTITY_V2_PROTOTYPE_VERSION,
+      routeId: route.id,
+      routeName: route.name,
+      trackId: route.trackId,
+      trackName: route.trackName || track?.name || "",
+      speedClassId: route.speedClassId,
+      currentIdentity: route.feelTag || "route identity",
+      roadConditionType,
+      roadConditionLabel: roadCondition?.label || roadConditionType,
+      recklessBehavior,
+      recklessBehaviorLabel: reckless?.label || recklessBehavior,
+      uniqueSignatureMoment: feelFit.signatureMoment || "a debug-only route identity set piece",
+      debugOnly: true,
+      shippingEnabled: false,
+      affectsRouteSignature: false
+    };
+  }
+
+  getRouteIdentityV2ReportRows(options = {}) {
+    const routes = options.includePrototypeRoutes ? ALL_OFFICIAL_ROUTES : OFFICIAL_ROUTES;
+    return routes.map((route) => this.getRouteIdentityV2Recommendation(route)).filter(Boolean);
+  }
+
+  captureRouteIdentityV2Prototype(options = {}) {
+    const prototypeContext = this.getRouteIdentityV2PrototypeContext(options);
+    const roadConditionsV2 = this.buildRoadConditionsV2PrototypePlan({
+      ...options,
+      prototypeContext
+    });
+    const recklessDriversV2 = this.buildRecklessDriversV2PrototypePlan({
+      ...options,
+      prototypeContext
+    });
+    const recommendation = prototypeContext.officialRoute
+      ? this.getRouteIdentityV2Recommendation(prototypeContext.officialRoute)
+      : null;
+    return {
+      version: ROUTE_IDENTITY_V2_PROTOTYPE_VERSION,
+      debugOnly: true,
+      shippingEnabled: false,
+      affectsRouteSignature: false,
+      routeId: prototypeContext.officialRoute?.id || "",
+      routeName: prototypeContext.officialRoute?.name || "",
+      trackId: prototypeContext.track.id,
+      speedClassId: prototypeContext.speedClassId,
+      raceTypeId: prototypeContext.raceTypeId,
+      seed: prototypeContext.seed,
+      seedSource: prototypeContext.seedSource,
+      seedHash: hashSeed(prototypeContext.seedSource),
+      recommendation,
+      roadConditionsV2,
+      recklessDriversV2,
+      metrics: {
+        ...roadConditionsV2.metrics,
+        ...recklessDriversV2.metrics
+      }
+    };
   }
 
   captureRoadDirectorSequence(options = {}) {
@@ -36420,6 +37247,7 @@ class NeonRoadRally {
     this.audio.playMusic("title", false);
     const filter = normalizePlaytestReportFilter(this.playtestReportFilter);
     const aggregate = this.buildPlaytestReportAggregate(filter);
+    const latestRunSummary = this.getLatestStoredPlaytestRun();
     const filterButtons = PLAYTEST_REPORT_FILTERS.map((item) => `
       <button class="playtest-filter-button ${item.id === filter ? "is-selected" : ""}" data-action="showPlaytestReport" data-filter="${escapeAttr(item.id)}">${escapeHtml(item.label)}</button>
     `).join("");
@@ -36538,11 +37366,13 @@ class NeonRoadRally {
             </div>
             <div class="playtest-report-top-actions">
               <button class="btn btn--primary btn--lg" data-action="copyFeedbackReport">Copy Feedback Report</button>
+              <button class="btn btn--secondary" data-action="copyLastRunSummary" ${latestRunSummary ? "" : "disabled"}>Copy Last Run Summary</button>
               <button class="btn btn--secondary" data-action="copyPlaytestReport">Copy Full Report</button>
               <button class="btn btn--ghost" data-action="settings">Settings</button>
               <button class="btn btn--ghost" data-action="title">Back</button>
             </div>
           </section>
+          ${this.renderPlaytestNightSummaryPanel(latestRunSummary, { compact: true })}
           ${this.renderWeekendPlaytestChecklist({ compact: true })}
           <section class="playtest-report-toolbar" aria-label="Playtest report controls">
             <div class="playtest-filter-row" role="group" aria-label="Report filters">${filterButtons}</div>
@@ -39634,6 +40464,224 @@ class NeonRoadRally {
       ` : ""}
       <p class="result-boost-note"><strong>Boost Route</strong> ${escapeHtml(boostText)} <span>${Math.max(0, summary.boostPadsCollected || 0)} collected / ${Math.max(0, summary.boostPadsMissedReachable || 0)} missed reachable.</span></p>
       ${bestMoment ? `<p class="result-boost-note result-best-moment"><strong>Best Moment</strong> ${escapeHtml(bestMoment)}</p>` : ""}
+    `;
+  }
+
+  getLatestStoredPlaytestRun() {
+    const runs = this.playtestReports?.getRuns ? this.playtestReports.getRuns() : [];
+    return runs.length ? runs[runs.length - 1] : null;
+  }
+
+  getRunProgressPercent(source) {
+    if (!source) return 0;
+    if (Number.isFinite(Number(source.finishProgressPercent))) {
+      return clampNumber(Number(source.finishProgressPercent), 0, 100, 0);
+    }
+    if (Number.isFinite(Number(source.progress))) {
+      const progress = Number(source.progress);
+      return clampNumber(progress <= 1 ? progress * 100 : progress, 0, 100, 0);
+    }
+    const distance = Number(source.distanceCompleted ?? source.distance);
+    const trackDistance = Number(source.trackDistance ?? source.baseTrackDistance);
+    if (Number.isFinite(distance) && Number.isFinite(trackDistance) && trackDistance > 0) {
+      return clampNumber((distance / trackDistance) * 100, 0, 100, 0);
+    }
+    return 0;
+  }
+
+  getRunSetupSummary(source) {
+    const trackName = sanitizeName(source?.trackName, "Unknown track", DISPLAY_TEXT_MAX_LENGTH);
+    const officialRoute = source?.officialRouteId ? getOfficialRouteById(source.officialRouteId) : null;
+    const routeName = sanitizeName(
+      source?.officialRouteName || (officialRoute ? getOfficialRouteDisplayName(officialRoute) : "") || source?.challengeName || source?.boostlineRouteName || "",
+      "",
+      DISPLAY_TEXT_MAX_LENGTH
+    );
+    const raceTypeLabel = sanitizeName(
+      source?.raceTypeLabel || getRaceTypeLabel(source?.raceTypeId || source?.raceType),
+      getRaceTypeLabel(DEFAULT_RACE_TYPE_ID),
+      DISPLAY_TEXT_MAX_LENGTH
+    );
+    const speedLabel = sanitizeName(
+      source?.speedClassLabel || source?.raceModeLabel || getSpeedClassLabel(source?.speedClass || source?.raceModeId),
+      getSpeedClassLabel(DEFAULT_SPEED_CLASS_ID),
+      DISPLAY_TEXT_MAX_LENGTH
+    );
+    return {
+      trackName,
+      routeName,
+      raceTypeLabel,
+      speedLabel,
+      primary: routeName || trackName,
+      detail: routeName ? `${trackName} - ${raceTypeLabel} - ${speedLabel}` : `${raceTypeLabel} - ${speedLabel}`
+    };
+  }
+
+  getRunTimeProgressSummary(source) {
+    const status = normalizeRunStatus(source?.status || source?.result);
+    const progressPercent = Math.round(this.getRunProgressPercent(source));
+    const finishTimeMs = normalizeFinishTimeMs(source?.finishTimeMs, source?.finishTimeSecondsPrecise ?? source?.elapsedTime ?? source?.time);
+    if (status === "finished" && finishTimeMs !== null) {
+      return {
+        value: formatFinishTimeMs(finishTimeMs),
+        detail: "Finished"
+      };
+    }
+    const elapsed = normalizeNonNegativeNumber(source?.elapsedTime ?? source?.time, 0, 24 * 60 * 60);
+    return {
+      value: `${progressPercent}%`,
+      detail: elapsed > 0 ? `${formatTime(elapsed)} elapsed` : "No time recorded"
+    };
+  }
+
+  getFlowBreakSummaryText(source) {
+    const enabled = Boolean(source?.neonFlowEnabled);
+    const used = Math.max(0, normalizeNonNegativeInteger(source?.flowBreakPhaseActivations || source?.flowBreaksTriggered, 0, 999));
+    const armed = Math.max(0, normalizeNonNegativeInteger(source?.flowBreaksArmed, 0, 999));
+    const unused = Math.max(0, normalizeNonNegativeInteger(source?.flowBreakUnusedAtRaceEnd ?? source?.flowBreakArmedUnused, 0, 999));
+    const manualAttempts = Math.max(0, normalizeNonNegativeInteger(source?.flowBreakManualActivationAttempts, 0, 9999));
+    if (!enabled && !armed && !used && !manualAttempts) {
+      return {
+        value: "Off",
+        detail: "Not active for this run"
+      };
+    }
+    if (used > 0) {
+      const phased = Math.max(0, normalizeNonNegativeInteger(source?.flowBreakCollisionsPhasedThrough, 0, 9999));
+      const slowdowns = Math.max(0, normalizeNonNegativeInteger(source?.flowBreakSlowdownsPrevented, 0, 9999));
+      return {
+        value: `${used} used`,
+        detail: `${phased} traffic phased - ${slowdowns} slowdowns stopped`
+      };
+    }
+    if (unused || armed) {
+      return {
+        value: "Armed unused",
+        detail: `${armed} armed - ${manualAttempts} manual attempts`
+      };
+    }
+    return {
+      value: "Unused",
+      detail: `${manualAttempts} manual attempts`
+    };
+  }
+
+  getWhatHappenedItems(source = this.lastSummary || this.getLatestStoredPlaytestRun()) {
+    if (!source) return [];
+    const status = normalizeRunStatus(source.status || source.result);
+    const setup = this.getRunSetupSummary(source);
+    const timeProgress = this.getRunTimeProgressSummary(source);
+    const outcome = getRunStatusLabel(status, source.reason || source.endReason);
+    const crashReason = source.reason || source.endReason || source.collisionType || "";
+    const score = Math.max(0, normalizeNonNegativeInteger(source.finalScore ?? source.score, 0, MAX_DISPLAY_SCORE));
+    const boostsCollected = Math.max(0, normalizeNonNegativeInteger(source.boostPadsCollected, 0, 9999));
+    const boostsMissed = Math.max(0, normalizeNonNegativeInteger(source.boostPadsMissedReachable, 0, 9999));
+    const recklessSeen = Math.max(0, normalizeNonNegativeInteger(source.recklessEventsSeen, 0, 999));
+    const recklessNear = Math.max(0, normalizeNonNegativeInteger(source.recklessNearMisses, 0, 999));
+    const recklessCrashes = Math.max(0, normalizeNonNegativeInteger(source.recklessCrashes, 0, 999));
+    const closureZones = Math.max(0, normalizeNonNegativeInteger(source.laneClosureZoneCount, 0, 999));
+    const closureWaves = Math.max(0, normalizeNonNegativeInteger(source.laneClosureWaves, 0, 999));
+    const closureMax = Math.max(0, normalizeNonNegativeInteger(source.laneClosureLanesClosedMax, 0, LANES));
+    const closureMarkers = Math.max(0, normalizeNonNegativeInteger(source.laneClosureSustainedMarkerCount, 0, 9999));
+    const minorHits = Math.max(0, normalizeNonNegativeInteger(source.minorObstacleHits, 0, 999));
+    const slowdownHits = Math.max(0, normalizeNonNegativeInteger(source.slowdownHits, 0, 999));
+    const flowBreak = this.getFlowBreakSummaryText(source);
+    return [
+      {
+        label: "Finish / Crash",
+        value: outcome,
+        detail: status === "finished" ? "Finished run" : (crashReason || "Run ended")
+      },
+      {
+        label: "Track / Route / Speed",
+        value: setup.primary,
+        detail: setup.detail
+      },
+      {
+        label: "Time / Progress",
+        value: timeProgress.value,
+        detail: timeProgress.detail
+      },
+      {
+        label: "Score",
+        value: formatScore(score),
+        detail: source.scoreSaved === false ? "Not saved" : "Run score"
+      },
+      {
+        label: "Boosts",
+        value: `${boostsCollected} collected`,
+        detail: `${boostsMissed} missed reachable`
+      },
+      {
+        label: "Reckless Drivers",
+        value: `${recklessSeen} seen`,
+        detail: `${recklessNear} near misses - ${recklessCrashes} crashes`
+      },
+      {
+        label: "Flow Break",
+        value: flowBreak.value,
+        detail: flowBreak.detail
+      },
+      {
+        label: "Lane Closures",
+        value: `${closureZones || closureWaves} seen`,
+        detail: closureMax ? `up to ${closureMax} lanes - ${closureMarkers} markers` : "none recorded"
+      },
+      {
+        label: "Minor Hits",
+        value: `${minorHits} hit${minorHits === 1 ? "" : "s"}`,
+        detail: `${slowdownHits} slowdown hit${slowdownHits === 1 ? "" : "s"}`
+      }
+    ];
+  }
+
+  buildLastRunSummaryText(source = this.lastSummary || this.getLatestStoredPlaytestRun()) {
+    const items = this.getWhatHappenedItems(source);
+    if (!source || !items.length) return "No Neon Road Rally run recorded yet.";
+    const playerName = sanitizePlayerName(source.playerName || source.playerDisplayName, "PLAYER");
+    const timestamp = source.timestamp || new Date().toISOString();
+    return [
+      "Neon Road Rally - Last Run Summary",
+      `Driver: ${playerName}`,
+      `Recorded: ${timestamp}`,
+      "",
+      ...items.map((item) => `${item.label}: ${item.value}${item.detail ? ` (${item.detail})` : ""}`)
+    ].join("\n");
+  }
+
+  renderPlaytestNightSummaryPanel(source = this.lastSummary || this.getLatestStoredPlaytestRun(), { compact = false } = {}) {
+    const items = this.getWhatHappenedItems(source);
+    if (!items.length) {
+      return `
+        <section class="playtest-night-summary ${compact ? "is-compact" : ""}">
+          <div class="playtest-night-summary-head">
+            <div>
+              <span class="label label--cyan">What happened?</span>
+              <strong>No run recorded yet</strong>
+            </div>
+          </div>
+        </section>
+      `;
+    }
+    return `
+      <section class="playtest-night-summary ${compact ? "is-compact" : ""}" aria-label="Last run summary">
+        <div class="playtest-night-summary-head">
+          <div>
+            <span class="label label--cyan">What happened?</span>
+            <strong>Last Run Summary</strong>
+          </div>
+          <button class="btn btn--secondary" data-action="copyLastRunSummary">Copy Last Run Summary</button>
+        </div>
+        <div class="playtest-night-summary-grid">
+          ${items.map((item) => `
+            <span>
+              <strong>${escapeHtml(item.label)}</strong>
+              <b>${escapeHtml(item.value)}</b>
+              <em>${escapeHtml(item.detail)}</em>
+            </span>
+          `).join("")}
+        </div>
+      </section>
     `;
   }
 
@@ -42840,7 +43888,7 @@ class NeonRoadRally {
     this.bindLeaderboardControls(activeView);
   }
 
-  showScoreScreen() {
+  showScoreScreen(options = {}) {
     this.setScreen("score");
     const summary = this.lastSummary;
     if (!summary) {
@@ -43100,6 +44148,7 @@ class NeonRoadRally {
     const resultChipMarkup = visibleChipItems.map((item) => `
       <span class="chip chip--${escapeAttr(item.tone)}">${escapeHtml(item.label)}</span>
     `).join("");
+    const playtestNightSummary = this.renderPlaytestNightSummaryPanel(summary);
     const resultExtras = `${resultDetailPanel}${this.renderPursuitResultPanel(summary)}${this.renderChallengeResultPanel(summary)}`;
     this.layer.classList.remove("is-empty");
     this.layer.innerHTML = `
@@ -43147,10 +44196,20 @@ class NeonRoadRally {
 
           ${playgroundResult ? this.renderPlaygroundRecordCard(summary) : ""}
 
+          ${playtestNightSummary}
+
           <div class="result-quiet-actions">
             ${summary.partyMode ? "" : `<button class="btn btn--ghost" data-action="preRace">Change Route</button>`}
             <button class="btn btn--ghost" data-action="players">Driver Garage</button>
           </div>
+
+          ${this.lastRunSummaryCopyText ? `
+            <div class="field playtest-copy-field result-last-run-copy-field">
+              <label for="lastRunSummaryCopyText">Manual Copy</label>
+              <textarea id="lastRunSummaryCopyText" readonly>${escapeHtml(this.lastRunSummaryCopyText)}</textarea>
+            </div>
+          ` : ""}
+          ${this.lastRunSummaryStatus ? `<p class="status-line result-copy-status">${escapeHtml(this.lastRunSummaryStatus)}</p>` : ""}
 
           ${resultExtras ? `<div class="result-followup-grid">${resultExtras}</div>` : ""}
 
@@ -43236,7 +44295,12 @@ class NeonRoadRally {
     `;
     this.bindLayerButtons();
     this.animateScoreTally();
-    if (summary.newHighScore) {
+    const copyText = document.getElementById("lastRunSummaryCopyText");
+    if (copyText) {
+      copyText.focus();
+      copyText.select();
+    }
+    if (summary.newHighScore && !options.skipSfx) {
       this.audio.playSfx("newHighScore");
     }
   }
@@ -43385,6 +44449,7 @@ class NeonRoadRally {
         else if (action === "buyCosmetic") this.handleBuyCosmetic(button.dataset.id);
         else if (action === "equipCosmetic") this.handleEquipCosmetic(button.dataset.id);
         else if (action === "resetData") this.handleResetData();
+        else if (action === "copyLastRunSummary") this.handleCopyLastRunSummary();
         else if (action === "copyPlaytestReport") this.handleCopyPlaytestReport();
         else if (action === "copyFeedbackReport") this.handleCopyFeedbackReport();
         else if (action === "copyRoadDirectorReport") this.handleCopyRoadDirectorReport();
@@ -43659,6 +44724,33 @@ class NeonRoadRally {
     this.audio.setMusicMuted(false);
     this.audio.setSfxMuted(false);
     this.showTitle();
+  }
+
+  async handleCopyLastRunSummary() {
+    const text = this.buildLastRunSummaryText(this.lastSummary || this.getLatestStoredPlaytestRun());
+    try {
+      if (!navigator.clipboard || typeof navigator.clipboard.writeText !== "function") {
+        throw new Error("Clipboard API unavailable");
+      }
+      await navigator.clipboard.writeText(text);
+      this.lastRunSummaryCopyText = "";
+      this.playtestReportCopyText = "";
+      this.lastRunSummaryStatus = "Last run summary copied to clipboard.";
+      if (this.screen === "playtestReport") {
+        this.showPlaytestReportScreen("Last run summary copied to clipboard.");
+      } else {
+        this.showScoreScreen({ skipSfx: true });
+      }
+    } catch (error) {
+      this.lastRunSummaryCopyText = text;
+      this.lastRunSummaryStatus = "Clipboard copy failed. Use the manual copy box below.";
+      if (this.screen === "playtestReport") {
+        this.playtestReportCopyText = text;
+        this.showPlaytestReportScreen("Clipboard copy failed. Use the manual copy box below.");
+      } else {
+        this.showScoreScreen({ skipSfx: true });
+      }
+    }
   }
 
   async handleCopyPlaytestReport() {

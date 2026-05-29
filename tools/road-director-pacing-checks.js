@@ -589,6 +589,115 @@ async function main() {
       fuelClosureRows.every((row) => row.laneClosureWaves === 0),
       "Fuel Run official routes should not receive Classic-only lane-closure waves"
     );
+    const routeIdentityV1Expectations = [
+      {
+        routeId: "sunset-mirage-merge",
+        routeName: "Mirage Merge",
+        signatureMoment: "mirage taper merge",
+        playerStory: "The safe-looking side pinches shut, then the final gate makes the driver finish the merge.",
+        pressurePattern: "gate sweep into taper closure into final closure",
+        requiredWaves: [
+          { sectionId: "groove", type: "officialGateSweep" },
+          { sectionId: "pressure", type: "officialLaneClosureTaper" },
+          { sectionId: "finalPush", type: "officialFinalClosureGate" }
+        ]
+      },
+      {
+        routeId: "sunset-last-light-gauntlet",
+        routeName: "Last Light Gauntlet",
+        signatureMoment: "last-light ramp gauntlet",
+        playerStory: "The route opens wide, squeezes the road, then offers a ramp escape before the last gate.",
+        pressurePattern: "far-side temptation into side closure into ramp escape",
+        requiredWaves: [
+          { sectionId: "groove", type: "officialFarSideTemptation" },
+          { sectionId: "pressure", type: "officialLaneClosureSide" },
+          { sectionId: "breather", type: "rampEscape" },
+          { sectionId: "finalPush", type: "officialFinalClosureGate" }
+        ]
+      },
+      {
+        routeId: "midnight-no-return-pass",
+        routeName: "No-Return Pass",
+        signatureMoment: "no-return cross-track commitment",
+        playerStory: "The route asks for the cross-track fork early, then blocks the return path with a taper.",
+        pressurePattern: "cross-track fork into taper closure into final side commitment",
+        requiredWaves: [
+          { sectionId: "groove", type: "officialCrossTrackFork" },
+          { sectionId: "pressure", type: "officialLaneClosureTaper" },
+          { sectionId: "finalPush", type: "officialFinalClosureGate" }
+        ]
+      },
+      {
+        routeId: "blackout-no-moon-finale",
+        routeName: "No Moon Finale",
+        signatureMoment: "blackout fast-line read",
+        playerStory: "The only clean line appears as a fast read before the roadwork forces a final dark-side choice.",
+        pressurePattern: "fast-line fork into side closure into final closure",
+        requiredWaves: [
+          { sectionId: "groove", type: "officialFarSideTemptation" },
+          { sectionId: "pressure", type: "officialLaneClosureSide" },
+          { sectionId: "breather", type: "officialFastLineFork" },
+          { sectionId: "finalPush", type: "officialFinalClosureGate" }
+        ]
+      },
+      {
+        routeId: "prism-hot-pink-redline",
+        routeName: "Hot Pink Redline",
+        signatureMoment: "hot-pink far-side bait",
+        playerStory: "The route flashes a far-side reward line, then forces a bright taper and one last side claim.",
+        pressurePattern: "far-side temptation into taper closure into final closure",
+        requiredWaves: [
+          { sectionId: "groove", type: "officialFarSideTemptation" },
+          { sectionId: "pressure", type: "officialLaneClosureTaper" },
+          { sectionId: "finalPush", type: "officialFinalClosureGate" }
+        ]
+      }
+    ];
+    function hasExpectedRouteIdentityWave(sample, expected) {
+      return sample.sequence.some((wave) => (
+        wave.type === expected.type
+          && (!expected.sectionId || wave.sectionId === expected.sectionId)
+      ));
+    }
+    const routeIdentityV1Rows = routeIdentityV1Expectations.map((expectation) => {
+      const sample = officialClassicRacecraftSamples.find((row) => row.routeId === expectation.routeId);
+      assert(sample, expectation.routeId + " should be included in official Classic racecraft samples");
+      expectation.requiredWaves.forEach((expected) => {
+        assert(
+          hasExpectedRouteIdentityWave(sample, expected),
+          expectation.routeId + " should include " + expected.type + " in " + expected.sectionId
+        );
+      });
+      const migration = officialLaneMigrationRows.find((row) => row.routeId === expectation.routeId) || {};
+      const closure = officialLaneClosureRows.find((row) => row.routeId === expectation.routeId) || {};
+      assert(
+        (migration.migrationWaveCount || 0) + (closure.laneClosureWaves || 0) >= 3,
+        expectation.routeId + " should combine migration and closure pressure for its identity moment"
+      );
+      assert(closure.laneClosureWaves >= 2, expectation.routeId + " should include pressure and final closure set pieces");
+      assert(closure.laneClosureFinalPushWaves >= 1, expectation.routeId + " should keep a final route commitment");
+      const fuelSample = captureOfficialRacecraft(expectation.routeId, FUEL_RUN_RACE_TYPE_ID);
+      const fuelMigration = getLaneMigrationMetrics(fuelSample);
+      const fuelClosure = getLaneClosureMetrics(fuelSample);
+      assert.strictEqual(fuelMigration.migrationWaveCount, 0, expectation.routeId + " Fuel Run should not inherit Route Identity v1 migration");
+      assert.strictEqual(fuelClosure.laneClosureWaves, 0, expectation.routeId + " Fuel Run should not inherit Route Identity v1 closures");
+      return {
+        routeId: expectation.routeId,
+        routeName: expectation.routeName,
+        signatureMoment: expectation.signatureMoment,
+        playerStory: expectation.playerStory,
+        pressurePattern: expectation.pressurePattern,
+        signatureHash: sample.signatureHash,
+        requiredWaves: expectation.requiredWaves,
+        migrationWaveTypes: migration.migrationWaveTypes || [],
+        laneClosureWaveTypes: closure.laneClosureWaveTypes || [],
+        laneClosureZoneKinds: closure.laneClosureZoneKinds || [],
+        laneClosureWaves: closure.laneClosureWaves || 0,
+        laneClosureFinalPushWaves: closure.laneClosureFinalPushWaves || 0,
+        fuelMigrationWaveCount: fuelMigration.migrationWaveCount,
+        fuelLaneClosureWaves: fuelClosure.laneClosureWaves
+      };
+    });
     console.log("OFFICIAL_LANE_MIGRATION_SAMPLE " + JSON.stringify({
       redline: redlineMigrationRows.map((row) => ({
         routeId: row.routeId,
@@ -669,6 +778,7 @@ async function main() {
         laneClosureWaves: row.laneClosureWaves
       }))
     }));
+    console.log("ROUTE_IDENTITY_V1_SAMPLE " + JSON.stringify(routeIdentityV1Rows));
 
     function getOpeningRouteSeconds(track, speedClassId, distance) {
       return estimateTrackElapsedSecondsAtDistance(track, speedClassId, distance);
