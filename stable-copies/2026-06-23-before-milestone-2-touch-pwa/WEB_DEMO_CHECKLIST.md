@@ -5,7 +5,7 @@ This checklist is for hosting the current Neon Road Rally browser build as stati
 ## Pre-Deploy Checklist
 
 - Run `bash scripts/build-dist.sh`.
-- Host only the generated `dist/` contents: `index.html`, `style.css`, `game.js`, `manifest.webmanifest`, `audio/`, and `assets/`.
+- Host only the generated `dist/` contents: `index.html`, `style.css`, `game.js`, `audio/`, and `assets/`.
 - Do not host `.git`, `docs/`, `tools/`, `ui-review-pack/`, `stable-copies/`, `*.md`, `.DS_Store`, or source-only review artifacts.
 - Keep all script, style, image, and media paths relative so the game can run from a subdirectory.
 - Confirm there are no API keys, tokens, credentials, private paths, analytics snippets, CDN scripts, `eval`, `new Function`, hidden network calls, or backend endpoints.
@@ -17,8 +17,6 @@ This checklist is for hosting the current Neon Road Rally browser build as stati
 
 - CSS loads from `style.css`.
 - JavaScript loads from `game.js`.
-- The web app manifest loads from `manifest.webmanifest`.
-- The 180px Apple touch icon and 192px/512px manifest icons load from `assets/icons/`.
 - Player car sprites load from `assets/cars/`.
 - Traffic sprites load from `assets/traffic/`.
 - There is no barrier sprite request; barriers use the canvas fallback art.
@@ -67,10 +65,6 @@ Use a current desktop browser and a local static server.
 11. Fullscreen works where the browser permits it.
 12. Console has no game errors or warnings.
 13. There are no missing asset or audio warnings in the intended demo file set.
-14. In an iPad-sized landscape viewport, touch controls appear after touch input and swipe steering changes one lane.
-15. Touch boost and pause use the same behavior as Space and Esc.
-16. Portrait touch viewports show the rotate-device screen.
-17. The manifest reports standalone display and landscape orientation.
 
 ## localStorage Note
 
@@ -79,8 +73,6 @@ The game stores local profiles, selected player, car settings, personal bests, T
 ```text
 neonRoadRally.v1
 ```
-
-Touch display and steering preferences are stored separately under `neonRoadRally.touch.v1`. Touch settings must never mutate the `neonRoadRally.v1` schema.
 
 The game should recover if that key is missing, corrupted, oversized, or contains unexpected value types. Local leaderboard entries are capped to Top 20, local player names are capped to 20 characters, local car names are capped to 24 characters, and manual seeds normalize to uppercase seed text capped at 32 characters.
 
@@ -113,13 +105,11 @@ The current website demo stores profiles, settings, challenge progress, and scor
 
 ## Mobile And iPad Status
 
-- iPad Safari landscape supports finger-only menus and racing.
-- Swipe left/right steps one lane through the existing lane-input path.
-- Settings offers hold-left/hold-right steering and an Always Show override.
-- On-screen boost and pause match Space and Esc behavior.
-- Portrait touch viewports show a rotate-device screen; phone portrait play is intentionally unsupported.
-- Safari Add to Home Screen uses the local manifest and Apple touch icon.
-- Complete the final acceptance run on physical iPad Safari: install, create a driver, set an Official record, then finish a 2-player Party round without a keyboard.
+- Desktop and laptop keyboard play is primary.
+- iPad with a keyboard may work.
+- Touch controls are not implemented yet.
+- Phone portrait is not supported or recommended.
+- Future iPad/touch support needs deliberate touch controls and a separate validation pass.
 
 ## Suggested CSP For Future Hosting
 
@@ -212,6 +202,6 @@ Local scores are local and can be modified by advanced users. That is acceptable
 ## Known Limitations
 
 - Saves are browser-local.
-- Party Mode is pass-the-device only; there is no network multiplayer.
+- Party Mode is pass-the-keyboard only.
 - There are no online features, accounts, cloud saves, global leaderboards, payments, uploads, chat, or backend APIs.
-- Phone portrait play is intentionally unsupported.
+- Mobile/touch controls are not implemented.

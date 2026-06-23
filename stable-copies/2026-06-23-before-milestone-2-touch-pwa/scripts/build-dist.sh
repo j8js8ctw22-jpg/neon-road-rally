@@ -6,7 +6,7 @@ DIST_DIR="$ROOT_DIR/dist"
 
 cd "$ROOT_DIR"
 
-for required in index.html style.css game.js manifest.webmanifest assets audio; do
+for required in index.html style.css game.js assets audio; do
   if [[ ! -e "$required" ]]; then
     echo "Missing required runtime path: $required" >&2
     exit 1
@@ -16,7 +16,7 @@ done
 rm -rf "$DIST_DIR"
 mkdir -p "$DIST_DIR"
 
-cp index.html style.css game.js manifest.webmanifest "$DIST_DIR"/
+cp index.html style.css game.js "$DIST_DIR"/
 rsync -a --exclude '.DS_Store' --exclude '*.md' --exclude '.gitkeep' assets/ "$DIST_DIR/assets/"
 rsync -a --exclude '.DS_Store' --exclude '*.md' --exclude '.gitkeep' audio/ "$DIST_DIR/audio/"
 

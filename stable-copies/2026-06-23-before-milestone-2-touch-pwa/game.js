@@ -11,16 +11,6 @@
 // ---------------------------------------------------------------------------
 
 const STORAGE_KEY = "neonRoadRally.v1";
-const TOUCH_SETTINGS_STORAGE_KEY = "neonRoadRally.touch.v1";
-const TOUCH_SETTINGS_VERSION = 1;
-const TOUCH_STEERING_SWIPE = "swipe";
-const TOUCH_STEERING_HOLD = "hold";
-const TOUCH_CONFIG = Object.freeze({
-  swipeThresholdPx: 34,
-  swipeDirectionRatio: 1.15,
-  holdRepeatDelayMs: 260,
-  holdRepeatMs: 170
-});
 const GAME_VERSION = "web-alpha-2026-05-20";
 const RACE_PACING_RULES_VERSION = "lanes-7-v1";
 const FLOW_PACING_RULES_VERSION = "flow-lanes-7-v1";
@@ -8008,50 +7998,6 @@ function safeStorageRemoveItem(key) {
   }
 }
 
-function normalizeTouchSteeringMode(value) {
-  return value === TOUCH_STEERING_HOLD ? TOUCH_STEERING_HOLD : TOUCH_STEERING_SWIPE;
-}
-
-function createDefaultTouchSettings() {
-  return {
-    version: TOUCH_SETTINGS_VERSION,
-    forceControls: false,
-    steeringMode: TOUCH_STEERING_SWIPE
-  };
-}
-
-class TouchSettingsStore {
-  constructor(storageKey = TOUCH_SETTINGS_STORAGE_KEY) {
-    this.storageKey = storageKey;
-    this.data = this.load();
-  }
-
-  normalize(value) {
-    const source = value && typeof value === "object" ? value : {};
-    return {
-      version: TOUCH_SETTINGS_VERSION,
-      forceControls: Boolean(source.forceControls),
-      steeringMode: normalizeTouchSteeringMode(source.steeringMode)
-    };
-  }
-
-  load() {
-    const raw = safeStorageGetItem(this.storageKey);
-    if (!raw) return createDefaultTouchSettings();
-    try {
-      return this.normalize(JSON.parse(raw));
-    } catch (error) {
-      return createDefaultTouchSettings();
-    }
-  }
-
-  update(patch = {}) {
-    this.data = this.normalize({ ...this.data, ...patch });
-    safeStorageSetItem(this.storageKey, JSON.stringify(this.data));
-    return this.data;
-  }
-}
-
 function createDefaultChallengeSave() {
   return {
     version: CHALLENGE_SAVE_VERSION,
@@ -11722,19 +11668,6 @@ class InputManager {
     this.controllerStatusRenderDomVersion = -1;
     this.controllerStatusRenderAt = 0;
     this.lastPointerTime = 0;
-    this.touchCapabilityDetected = this.detectTouchCapability();
-    this.touchPointerDetected = false;
-    this.lastInputModality = "keyboard";
-    const touchDocument = typeof document !== "undefined" ? document : null;
-    this.touchControlsRoot = touchDocument?.getElementById?.("touchControls") || null;
-    this.touchPauseButton = touchDocument?.getElementById?.("touchPause") || null;
-    this.touchBoostButton = touchDocument?.getElementById?.("touchBoost") || null;
-    this.touchSteerZones = Array.from(touchDocument?.querySelectorAll?.("[data-touch-steer]") || []);
-    this.touchSwipeState = null;
-    this.touchHoldPointerId = null;
-    this.touchHoldDelayTimer = null;
-    this.touchHoldRepeatTimer = null;
-    this.touchVisibilityRenderKey = "";
     this.boundKeyDown = this.onKeyDown.bind(this);
     this.boundKeyUp = this.onKeyUp.bind(this);
     this.boundWindowBlur = this.clearGameplayInput.bind(this);
@@ -11742,16 +11675,6 @@ class InputManager {
     this.boundGamepadDisconnected = this.onGamepadDisconnected.bind(this);
     this.boundMenuFocusIn = this.onMenuFocusIn.bind(this);
     this.boundMenuFocusOut = this.onMenuFocusOut.bind(this);
-    this.boundGlobalPointerDown = this.onGlobalPointerDown.bind(this);
-    this.boundTouchCanvasPointerDown = this.onTouchCanvasPointerDown.bind(this);
-    this.boundTouchCanvasPointerMove = this.onTouchCanvasPointerMove.bind(this);
-    this.boundTouchCanvasPointerEnd = this.onTouchCanvasPointerEnd.bind(this);
-    this.boundTouchBoostPointerDown = this.onTouchBoostPointerDown.bind(this);
-    this.boundTouchPausePointerDown = this.onTouchPausePointerDown.bind(this);
-    this.boundTouchSteerPointerDown = this.onTouchSteerPointerDown.bind(this);
-    this.boundTouchSteerPointerEnd = this.onTouchSteerPointerEnd.bind(this);
-    this.boundPreventGameplayTouchMove = this.preventGameplayTouchMove.bind(this);
-    this.boundPreventGesture = this.preventGesture.bind(this);
     window.addEventListener("keydown", this.boundKeyDown);
     window.addEventListener("keyup", this.boundKeyUp);
     window.addEventListener("blur", this.boundWindowBlur);
@@ -11761,214 +11684,17 @@ class InputManager {
       document.addEventListener("focusin", this.boundMenuFocusIn, true);
       document.addEventListener("focusout", this.boundMenuFocusOut, true);
     }
-    window.addEventListener("pointerdown", this.boundGlobalPointerDown, { passive: true });
-    this.bindTouchControls();
-    this.updateTouchControlsVisibility({ force: true });
-  }
-
-  detectTouchCapability() {
-    if (typeof navigator !== "undefined" && Number(navigator.maxTouchPoints || 0) > 0) return true;
-    if (typeof window !== "undefined" && typeof window.matchMedia === "function") {
-      return window.matchMedia("(pointer: coarse)").matches || window.matchMedia("(hover: none)").matches;
-    }
-    return false;
-  }
-
-  getTouchSettings() {
-    return this.game?.touchSettings?.data || createDefaultTouchSettings();
-  }
-
-  bindTouchControls() {
-    const canvas = this.game?.canvas;
-    if (canvas) {
-      canvas.addEventListener("pointerdown", this.boundTouchCanvasPointerDown, { passive: false });
-      canvas.addEventListener("pointermove", this.boundTouchCanvasPointerMove, { passive: false });
-      canvas.addEventListener("pointerup", this.boundTouchCanvasPointerEnd, { passive: false });
-      canvas.addEventListener("pointercancel", this.boundTouchCanvasPointerEnd, { passive: false });
-    }
-    this.touchBoostButton?.addEventListener("pointerdown", this.boundTouchBoostPointerDown, { passive: false });
-    this.touchPauseButton?.addEventListener("pointerdown", this.boundTouchPausePointerDown, { passive: false });
-    this.touchSteerZones.forEach((zone) => {
-      zone.addEventListener("pointerdown", this.boundTouchSteerPointerDown, { passive: false });
-      zone.addEventListener("pointerup", this.boundTouchSteerPointerEnd, { passive: false });
-      zone.addEventListener("pointercancel", this.boundTouchSteerPointerEnd, { passive: false });
-      zone.addEventListener("lostpointercapture", this.boundTouchSteerPointerEnd, { passive: false });
-    });
-    if (typeof document !== "undefined" && typeof document.addEventListener === "function") {
-      document.addEventListener("touchmove", this.boundPreventGameplayTouchMove, { passive: false });
-      document.addEventListener("gesturestart", this.boundPreventGesture, { passive: false });
-      document.addEventListener("gesturechange", this.boundPreventGesture, { passive: false });
-      document.addEventListener("gestureend", this.boundPreventGesture, { passive: false });
-    }
-  }
-
-  onGlobalPointerDown(event) {
-    this.lastPointerTime = performance.now();
-    this.setMenuNavigationActive(false);
-    if (event?.pointerType === "touch") {
-      this.touchPointerDetected = true;
-      this.lastInputModality = "touch";
-    } else if (event?.pointerType === "mouse" && !this.getTouchSettings().forceControls) {
-      this.lastInputModality = "pointer";
-    }
-    this.updateTouchControlsVisibility();
-    this.game.audio.activate();
-    if (this.game.screen === "game" || event.target === this.game.canvas) this.game.focusControls();
-    if (this.game.screen === "title") this.game.audio.playMusic("title");
-  }
-
-  noteKeyboardInput() {
-    if (this.getTouchSettings().forceControls) return;
-    this.lastInputModality = "keyboard";
-    this.updateTouchControlsVisibility();
-  }
-
-  noteGamepadInput() {
-    if (this.getTouchSettings().forceControls) return;
-    this.lastInputModality = "gamepad";
-    this.updateTouchControlsVisibility();
-  }
-
-  isTouchPointer(event) {
-    return event?.pointerType === "touch" || this.getTouchSettings().forceControls;
-  }
-
-  shouldShowTouchControls() {
-    const settings = this.getTouchSettings();
-    const touchSelected = settings.forceControls || (this.touchPointerDetected && this.lastInputModality === "touch");
-    return Boolean(touchSelected && this.game.screen === "game" && this.game.run && !this.game.run.paused && !this.game.run.ended);
-  }
-
-  updateTouchControlsVisibility(options = {}) {
-    const settings = this.getTouchSettings();
-    const visible = this.shouldShowTouchControls();
-    const renderKey = `${visible}|${settings.forceControls}|${settings.steeringMode}|${this.touchPointerDetected}|${this.lastInputModality}`;
-    if (!options.force && renderKey === this.touchVisibilityRenderKey) return;
-    this.touchVisibilityRenderKey = renderKey;
-    const body = typeof document !== "undefined" ? document.body : null;
-    body?.classList?.toggle("is-touch-capable", this.touchCapabilityDetected || this.touchPointerDetected || settings.forceControls);
-    body?.classList?.toggle("is-touch-gameplay", visible);
-    body?.classList?.toggle("is-touch-hold-steering", visible && settings.steeringMode === TOUCH_STEERING_HOLD);
-    if (this.touchControlsRoot) {
-      this.touchControlsRoot.hidden = !visible;
-      this.touchControlsRoot.setAttribute("aria-hidden", visible ? "false" : "true");
-      this.touchControlsRoot.dataset.steeringMode = settings.steeringMode;
-    }
-    if (!visible) {
-      this.touchSwipeState = null;
-      this.clearTouchHold();
-    }
-  }
-
-  preventGameplayTouchMove(event) {
-    if (!this.shouldShowTouchControls()) return;
-    if (event.target === this.game.canvas || event.target?.closest?.("#touchControls")) event.preventDefault();
-  }
-
-  preventGesture(event) {
-    if (this.game.screen === "game" || this.touchCapabilityDetected || this.touchPointerDetected) event.preventDefault();
-  }
-
-  onTouchCanvasPointerDown(event) {
-    if (!this.isTouchPointer(event)) return;
-    this.touchPointerDetected = true;
-    this.lastInputModality = "touch";
-    this.updateTouchControlsVisibility();
-    if (this.getTouchSettings().steeringMode !== TOUCH_STEERING_SWIPE || !this.canProcessGameplayInput()) return;
-    event.preventDefault();
-    this.touchSwipeState = {
-      pointerId: event.pointerId,
-      startX: event.clientX,
-      startY: event.clientY,
-      triggered: false
-    };
-    this.game.canvas?.setPointerCapture?.(event.pointerId);
-  }
-
-  onTouchCanvasPointerMove(event) {
-    const state = this.touchSwipeState;
-    if (!state || state.pointerId !== event.pointerId) return;
-    event.preventDefault();
-    if (state.triggered) return;
-    const dx = event.clientX - state.startX;
-    const dy = event.clientY - state.startY;
-    if (Math.abs(dx) < TOUCH_CONFIG.swipeThresholdPx || Math.abs(dx) < Math.abs(dy) * TOUCH_CONFIG.swipeDirectionRatio) return;
-    state.triggered = this.triggerTouchLaneStep(dx < 0 ? -1 : 1, "swipe");
-  }
-
-  onTouchCanvasPointerEnd(event) {
-    const state = this.touchSwipeState;
-    if (!state || state.pointerId !== event.pointerId) return;
-    event.preventDefault();
-    if (!state.triggered) {
-      const dx = event.clientX - state.startX;
-      const dy = event.clientY - state.startY;
-      if (Math.abs(dx) >= TOUCH_CONFIG.swipeThresholdPx && Math.abs(dx) >= Math.abs(dy) * TOUCH_CONFIG.swipeDirectionRatio) {
-        this.triggerTouchLaneStep(dx < 0 ? -1 : 1, "swipe");
+    window.addEventListener("pointerdown", (event) => {
+      this.lastPointerTime = performance.now();
+      this.setMenuNavigationActive(false);
+      this.game.audio.activate();
+      if (this.game.screen === "game" || event.target === this.game.canvas) {
+        this.game.focusControls();
       }
-    }
-    this.touchSwipeState = null;
-  }
-
-  triggerTouchLaneStep(direction, mode = "touch") {
-    if (!this.canProcessGameplayInput()) return false;
-    const label = direction < 0 ? "left" : "right";
-    this.requestLaneStep(`touch-${mode}-${label}`, direction, "touch");
-    this.game.recordInputEvent(`touch-${mode}-${label}`);
-    return true;
-  }
-
-  onTouchSteerPointerDown(event) {
-    if (!this.isTouchPointer(event)
-      || this.getTouchSettings().steeringMode !== TOUCH_STEERING_HOLD
-      || !this.canProcessGameplayInput()) return;
-    event.preventDefault();
-    event.stopPropagation();
-    this.touchPointerDetected = true;
-    this.lastInputModality = "touch";
-    const direction = Number(event.currentTarget?.dataset?.touchSteer || 0) < 0 ? -1 : 1;
-    this.clearTouchHold();
-    this.touchHoldPointerId = event.pointerId;
-    event.currentTarget?.setPointerCapture?.(event.pointerId);
-    this.triggerTouchLaneStep(direction, "hold");
-    this.touchHoldDelayTimer = window.setTimeout(() => {
-      this.triggerTouchLaneStep(direction, "hold");
-      this.touchHoldRepeatTimer = window.setInterval(() => {
-        if (!this.triggerTouchLaneStep(direction, "hold")) this.clearTouchHold();
-      }, TOUCH_CONFIG.holdRepeatMs);
-    }, TOUCH_CONFIG.holdRepeatDelayMs);
-  }
-
-  onTouchSteerPointerEnd(event) {
-    if (this.touchHoldPointerId !== null && event.pointerId !== this.touchHoldPointerId) return;
-    event.preventDefault();
-    this.clearTouchHold();
-  }
-
-  clearTouchHold() {
-    if (this.touchHoldDelayTimer !== null) window.clearTimeout(this.touchHoldDelayTimer);
-    if (this.touchHoldRepeatTimer !== null) window.clearInterval(this.touchHoldRepeatTimer);
-    this.touchHoldDelayTimer = null;
-    this.touchHoldRepeatTimer = null;
-    this.touchHoldPointerId = null;
-  }
-
-  onTouchBoostPointerDown(event) {
-    if (!this.isTouchPointer(event)) return;
-    event.preventDefault();
-    event.stopPropagation();
-    this.touchPointerDetected = true;
-    this.lastInputModality = "touch";
-    this.requestManualBoost("touch", "touch-boost");
-  }
-
-  onTouchPausePointerDown(event) {
-    if (!this.isTouchPointer(event)) return;
-    event.preventDefault();
-    event.stopPropagation();
-    this.touchPointerDetected = true;
-    this.lastInputModality = "touch";
-    this.requestPause("touch", "touch-pause");
+      if (this.game.screen === "title") {
+        this.game.audio.playMusic("title");
+      }
+    }, { passive: true });
   }
 
   createEmptyGamepadState() {
@@ -12376,7 +12102,6 @@ class InputManager {
 
   update(dt) {
     void dt;
-    this.updateTouchControlsVisibility();
     this.pollGamepad();
   }
 
@@ -12405,7 +12130,6 @@ class InputManager {
     if (shouldRefreshStatus) this.refreshControllerStatusDisplay();
     if (state.anyInput) {
       this.gamepadLastInputTime = performance.now();
-      this.noteGamepadInput();
       this.game.audio.activate();
       if (this.game.screen === "title") this.game.audio.playMusic("title");
     }
@@ -12421,7 +12145,9 @@ class InputManager {
     const backEdge = this.gamepadEdge(state, "back");
     const run = this.game.run;
     if (pauseEdge) {
-      this.requestPause("gamepad", "gamepad-menu");
+      if (this.game.canEndOfficialEndurance()) this.game.endOfficialEndurance("Driver Ended");
+      else this.game.togglePause();
+      this.game.recordInputEvent("gamepad-menu");
       return;
     }
     if (run?.paused) {
@@ -12454,7 +12180,12 @@ class InputManager {
       this.requestLaneStep("gamepad-right", 1, "gamepad");
       this.game.recordInputEvent("gamepad-right");
     }
-	    if (boostEdge) this.requestManualBoost("gamepad", "gamepad-boost");
+	    if (boostEdge && this.canAcceptGamepadBoostEdge(now)) {
+	      this.lastBoostEdgeTime = now;
+	      this.lastBoostInputSource = "gamepad";
+	      this.game.recordInputEvent("gamepad-boost");
+	      this.game.useManualBoost();
+	    }
 	    if (flowBreakEdge) {
 	      this.game.recordInputEvent("gamepad-flow-break");
 	      this.game.activateFlowBreak("gamepad");
@@ -12726,7 +12457,6 @@ class InputManager {
   }
 
   onKeyDown(event) {
-    this.noteKeyboardInput();
     const key = event.key;
     const lowerKey = String(key || "").toLowerCase();
     if (this.isEditableTarget(event.target) && key !== "Escape") return;
@@ -12846,7 +12576,11 @@ class InputManager {
         return;
       }
       if (keyId === "escape") {
-        this.requestPause("keyboard");
+        if (this.game.canEndOfficialEndurance()) {
+          this.game.endOfficialEndurance("Driver Ended");
+        } else {
+          this.game.togglePause();
+        }
       } else if (keyId === "up") {
         this.heldVerticalKeys.add("up");
         this.updateVerticalInput();
@@ -12860,7 +12594,12 @@ class InputManager {
         if (this.isShiftHeld()) this.updateDriftInput();
         else if (this.canAcceptKeyboardLaneEdge(performance.now())) this.requestLaneStep("right", 1);
 	      } else if (keyId === "boost") {
-	        this.requestManualBoost("keyboard");
+	        const now = performance.now();
+	        if (this.canAcceptKeyboardBoostEdge(now)) {
+	          this.lastBoostEdgeTime = now;
+	          this.lastBoostInputSource = "keyboard";
+	          this.game.useManualBoost();
+	        }
 	      } else if (keyId === "flowBreak") {
 	        this.game.activateFlowBreak("keyboard");
 	      }
@@ -12948,30 +12687,6 @@ class InputManager {
     this.game.requestLaneMove(direction, "press");
   }
 
-  requestManualBoost(source = "keyboard", inputEventId = "") {
-    if (!this.canProcessGameplayInput()) return false;
-    const now = performance.now();
-    const accepted = source === "gamepad"
-      ? this.canAcceptGamepadBoostEdge(now)
-      : (source === "keyboard" ? this.canAcceptKeyboardBoostEdge(now) : now - this.lastBoostEdgeTime > 80);
-    if (!accepted) return false;
-    this.lastBoostEdgeTime = now;
-    this.lastBoostInputSource = source;
-    if (inputEventId) this.game.recordInputEvent(inputEventId);
-    this.game.useManualBoost();
-    return true;
-  }
-
-  requestPause(source = "keyboard", inputEventId = "") {
-    if (this.game.screen !== "game") return false;
-    if (this.game.canEndOfficialEndurance()) this.game.endOfficialEndurance("Driver Ended");
-    else this.game.togglePause();
-    if (inputEventId) this.game.recordInputEvent(inputEventId);
-    this.lastInputModality = source;
-    this.updateTouchControlsVisibility({ force: true });
-    return true;
-  }
-
   releaseGameplayKey(keyId) {
     if (keyId === "up" || keyId === "down") {
       this.heldVerticalKeys.delete(keyId);
@@ -12992,8 +12707,6 @@ class InputManager {
     this.gamepadDriftHeld = false;
     this.game.setVerticalInput(0);
     this.game.clearDriftInput({ release: false });
-    this.touchSwipeState = null;
-    this.clearTouchHold();
   }
 
   clearCountdownInputLocks() {
@@ -27382,7 +27095,6 @@ class NeonRoadRally {
       this.canvas.addEventListener("pointerdown", () => this.focusControls());
     }
     this.profiles = new PlayerProfileManager(STORAGE_KEY);
-    this.touchSettings = new TouchSettingsStore(TOUCH_SETTINGS_STORAGE_KEY);
     this.playtestReports = new PlaytestReportStore(PLAYTEST_REPORT_STORAGE_KEY);
     this.audio = new AudioManager(this.profiles.data.audio, (settings) => this.profiles.updateAudioSettings(settings));
     this.carSprites = new CarSpriteManager(CAR_BODY_STYLES, () => {
@@ -27484,10 +27196,6 @@ class NeonRoadRally {
 
   getControllerPresetDefinition() {
     return getControllerPresetDefinition(this.getControllerPresetId());
-  }
-
-  getTouchSettings() {
-    return this.touchSettings?.data || createDefaultTouchSettings();
   }
 
   getControllerMoveHintText() {
@@ -35454,8 +35162,8 @@ class NeonRoadRally {
               </button>
             </div>
             <div class="pause-control-strip" aria-label="Controls">
-	              <span><b>Move</b> Swipe / Arrows / ${escapeHtml(controllerMoveHint)}</span>
-	              <span><b>Boost</b> Touch / Space / Cross</span>
+              <span><b>Move</b> Arrows / ${escapeHtml(controllerMoveHint)}</span>
+	              <span><b>Boost</b> Space / Cross</span>
 	              <span><b>Drift</b> ${escapeHtml(controlHint)} / ${escapeHtml(controllerDriftHint)}</span>
 	              <span><b>Flow Break</b> E / ${escapeHtml(controllerFlowBreakHint)}</span>
 	              <span><b>Audio</b> M / N</span>
@@ -35694,15 +35402,14 @@ class NeonRoadRally {
           title: "Basic Controls",
           chips: ["Move", "Boost", "Drift", "Flow"],
           controls: [
-            { label: "Move", value: "Swipe or A/D / Left-Right" },
-            { label: "Boost", value: "Touch button / Space / Cross" },
+            { label: "Move", value: "A/D or Left/Right" },
+            { label: "Boost", value: "Space / Cross" },
             { label: "Drift Dash", value: "Shift + A/D" },
             { label: "Flow Break", value: "E / Triangle when ready" },
-            { label: "Pause", value: "Touch button / Esc / Options" }
+            { label: "Pause", value: "Esc / Options" }
           ],
           points: [
-            "On touch, swipe left or right to change one lane. Settings also offers hold-side steering.",
-            "On keyboard or controller, tap once to change one lane. Release Shift or the drift direction to settle.",
+            "Tap once to change one lane. Release Shift or the drift direction to settle.",
             controllerLine,
             "W/S or Up/Down moves forward and back.",
             "Drift Dash cuts across lanes fast for boosts and traffic gaps. Mistime it and you can clip traffic.",
@@ -35770,9 +35477,9 @@ class NeonRoadRally {
       party: [
         {
           title: "Party Mode",
-          chips: ["Local", "Pass Device", "Same Road"],
+          chips: ["Local", "Pass Controller", "Same Road"],
           points: [
-            "Party Mode is local pass-the-iPad, controller, or keyboard competition on one device.",
+            "Party Mode is local pass-the-controller or pass-the-keyboard competition on one computer.",
             "Players use the same road for fair comparison.",
 	            "Classic Party includes Neon Flow and manual Flow Break.",
             "Bonus Survival can let Classic Party turns continue after the official finish until crash or manual end.",
@@ -35807,7 +35514,7 @@ class NeonRoadRally {
           chips: ["Picks", "Checklist", "Report"],
           points: [
             "Start with First Arcade Race or Family Arcade before jumping to Redline Dare.",
-            "Use Party Starter when the room wants pass-the-device competition.",
+            "Use Party Starter when the room wants pass-the-keyboard competition.",
             "Optional: open Settings > Playtest Tools to copy a local run report."
           ]
         }
@@ -36068,10 +35775,6 @@ class NeonRoadRally {
     this.audio.playMusic("title", false);
     const selectedSpeedClass = getSpeedClassConfig(this.profiles.data.speedClassId);
     const controllerPreset = this.getControllerPresetDefinition();
-    const touchSettings = this.getTouchSettings();
-    const touchStatus = touchSettings.forceControls
-      ? "Always On"
-      : (this.input?.touchCapabilityDetected ? "Auto Detected" : "Auto");
     const debugToolsVisible = this.debugMode && this.isDebugAccessAllowed();
     const controllerStatus = this.input?.getControllerStatusText ? this.input.getControllerStatusText() : "Press any controller button";
     this.layer.classList.remove("is-empty");
@@ -36127,7 +35830,7 @@ class NeonRoadRally {
             <section class="settings-section settings-controls-section">
               <div class="settings-section-heading">
                 <span class="label label--cyan">Controls</span>
-                <strong>Touch + Keyboard + Controller</strong>
+                <strong>Keyboard + Controller</strong>
                 <small data-controller-status>${escapeHtml(controllerStatus)}</small>
               </div>
               <div class="settings-controller-preset">
@@ -36161,21 +35864,6 @@ class NeonRoadRally {
                 <span><b>F</b><em>Fullscreen</em></span>
               </div>
               <button class="btn btn--ghost settings-help-action" data-action="howToPlay">How To Play</button>
-            </section>
-
-            <section class="settings-section settings-touch-section">
-              <div class="settings-section-heading">
-                <span class="label label--cyan">Touch Controls</span>
-                <strong>${escapeHtml(touchStatus)}</strong>
-              </div>
-              <label class="settings-switch-row" for="touchControlsOverride">
-                <span>Always Show</span>
-                <input id="touchControlsOverride" type="checkbox" ${touchSettings.forceControls ? "checked" : ""}>
-              </label>
-              <div class="settings-touch-mode" role="group" aria-label="Touch steering mode">
-                <button data-action="setTouchSteering" data-id="${TOUCH_STEERING_SWIPE}" aria-pressed="${touchSettings.steeringMode === TOUCH_STEERING_SWIPE ? "true" : "false"}">Swipe</button>
-                <button data-action="setTouchSteering" data-id="${TOUCH_STEERING_HOLD}" aria-pressed="${touchSettings.steeringMode === TOUCH_STEERING_HOLD ? "true" : "false"}">Hold Sides</button>
-              </div>
             </section>
 
             <section class="settings-section settings-defaults-section">
@@ -38133,7 +37821,7 @@ class NeonRoadRally {
                     </div>
                     <div class="field official-road-code-field">
                       <label for="roadSeedInput">Road Code</label>
-                      <input id="roadSeedInput" type="text" maxlength="${ROAD_SEED_MAX_LENGTH}" value="${escapeAttr(seed)}" autocomplete="off" autocapitalize="characters" autocorrect="off" spellcheck="false" inputmode="text" enterkeyhint="done">
+                      <input id="roadSeedInput" type="text" maxlength="${ROAD_SEED_MAX_LENGTH}" value="${escapeAttr(seed)}" autocomplete="off" spellcheck="false" inputmode="text">
                     </div>
                   </div>
                   <input id="officialRouteInput" type="hidden" value="${escapeAttr(officialRoute?.id || "")}">
@@ -38495,7 +38183,7 @@ class NeonRoadRally {
 	              <div class="party-driver-tools">
 	                <div class="field">
 	                  <label for="partyNewDriverName">Add Driver</label>
-	                  <input id="partyNewDriverName" type="text" maxlength="${LOCAL_PLAYER_NAME_MAX_LENGTH}" value="" placeholder="DRIVER ${players.length + 1}" autocomplete="off" autocapitalize="words" enterkeyhint="done">
+	                  <input id="partyNewDriverName" type="text" maxlength="${LOCAL_PLAYER_NAME_MAX_LENGTH}" value="" placeholder="DRIVER ${players.length + 1}">
 	                </div>
 	                <button class="btn btn--secondary party-add-driver-button" data-action="partyQuickAddDriver">Add Driver</button>
 	              </div>
@@ -38956,7 +38644,7 @@ class NeonRoadRally {
               <div class="party-driver-tools">
                 <div class="field">
                   <label for="partyNewDriverName">Add Driver</label>
-                  <input id="partyNewDriverName" type="text" maxlength="${LOCAL_PLAYER_NAME_MAX_LENGTH}" value="" placeholder="DRIVER ${players.length + 1}" autocomplete="off" autocapitalize="words" enterkeyhint="done">
+                  <input id="partyNewDriverName" type="text" maxlength="${LOCAL_PLAYER_NAME_MAX_LENGTH}" value="" placeholder="DRIVER ${players.length + 1}">
                 </div>
                 <button class="btn btn--secondary party-add-driver-button" data-action="partyQuickAddDriver">Add Driver</button>
               </div>
@@ -38972,7 +38660,7 @@ class NeonRoadRally {
                   </div>
                   <div class="field">
                     <label for="partyRenameName">New Name</label>
-                    <input id="partyRenameName" type="text" maxlength="${LOCAL_PLAYER_NAME_MAX_LENGTH}" value="" placeholder="Driver name" autocomplete="off" autocapitalize="words" enterkeyhint="done">
+                    <input id="partyRenameName" type="text" maxlength="${LOCAL_PLAYER_NAME_MAX_LENGTH}" value="" placeholder="Driver name">
                   </div>
                   <button class="small-button" data-action="partyInlineRenamePlayer">Save</button>
                   <button class="small-button" data-action="players">Garage</button>
@@ -39051,7 +38739,7 @@ class NeonRoadRally {
                   </div>
                   <div class="field">
                     <label for="partySeedInput">Road Code</label>
-                    <input id="partySeedInput" type="text" maxlength="${ROAD_SEED_MAX_LENGTH}" value="${escapeAttr(setup.sharedSeed)}" autocomplete="off" autocapitalize="characters" autocorrect="off" spellcheck="false" inputmode="text" enterkeyhint="done">
+                    <input id="partySeedInput" type="text" maxlength="${ROAD_SEED_MAX_LENGTH}" value="${escapeAttr(setup.sharedSeed)}" autocomplete="off" spellcheck="false" inputmode="text">
                   </div>
                 </div>
                 <div class="row setup-action-row">
@@ -39574,7 +39262,7 @@ class NeonRoadRally {
     const officialRoute = officialChase ? getOfficialRouteById(session.officialRouteId) : null;
     const officialRouteName = officialRoute ? getOfficialRouteDisplayName(officialRoute) : (session.officialRouteName || session.track.name);
     const startRunLabel = officialChase ? `Start ${player.name}'s Official Run` : `Start ${player.name}'s Run`;
-    const handoffCopy = officialChase ? "Pass the iPad or controller now. Same official route." : "Pass the iPad or controller now.";
+    const handoffCopy = officialChase ? "Pass the controller or keyboard now. Same official route." : "Pass the controller or keyboard now.";
     const turnMeta = officialChase
       ? `${officialRouteName} · Player ${session.currentTurnNumber} of ${session.totalPlayers}`
       : `Round ${session.roundNumber} of ${session.totalRounds} · Player ${session.currentTurnNumber} of ${session.totalPlayers}`;
@@ -39628,7 +39316,7 @@ class NeonRoadRally {
                 <span>${escapeHtml(startRunLabel)}</span>
                 <span class="kbd">Enter</span>
               </button>
-              <p class="hint party-turn-rule-line">${officialChase ? "Everyone runs the same official route. Records still count for each driver." : (isFuelRunRaceType(session.raceType) ? "Fuel Run: collect gas cans and survive to the finish. Run out of fuel and the run ends." : `Tap Start Run, press Enter, or press Cross when this driver is ready.${bonusSurvivalActive ? " After the finish, the pause button, Esc, or Options ends Bonus Survival." : ""}`)}</p>
+              <p class="hint party-turn-rule-line">${officialChase ? "Everyone runs the same official route. Records still count for each driver." : (isFuelRunRaceType(session.raceType) ? "Fuel Run: collect gas cans and survive to the finish. Run out of fuel and the run ends." : `Press Enter, Cross, or Start Run when this driver is ready.${bonusSurvivalActive ? " After the finish, Esc or Options ends Bonus Survival." : ""}`)}</p>
               ${badgePrompt ? `<p class="hint party-badge-prompt">${escapeHtml(badgePrompt)}</p>` : ""}
               ${message ? `<p class="status-line">${escapeHtml(message)}</p>` : ""}
             </section>
@@ -41218,7 +40906,7 @@ class NeonRoadRally {
           </section>
           ${!final ? this.renderPartyTurnOrderPanel(session) : ""}
           ${this.renderPartyAwardsPanel(session)}
-          ${!final && nextPlayer ? `<p class="hint next-player-hint">Next up: ${escapeHtml(nextPlayer.name)} · ${escapeHtml(getPartyStartingOrderLabel(session.startingOrderMode))} · Round ${session.roundNumber} road ${escapeHtml(roundSeed)}. Tap Next Driver to continue.</p>` : `<p class="hint next-player-hint">Tap Rematch Same Road to race again.</p>`}
+          ${!final && nextPlayer ? `<p class="hint next-player-hint">Next up: ${escapeHtml(nextPlayer.name)} · ${escapeHtml(getPartyStartingOrderLabel(session.startingOrderMode))} · Round ${session.roundNumber} road ${escapeHtml(roundSeed)}. Press Enter to continue.</p>` : `<p class="hint next-player-hint">Press Enter for a same-road rematch.</p>`}
           ${message ? `<p class="status-line">${escapeHtml(message)}</p>` : ""}
         </div>
       </section>
@@ -41345,7 +41033,7 @@ class NeonRoadRally {
           <p class="hint">Make one local driver, then continue straight to Solo race setup.</p>
           <div class="field">
             <label for="newDriverName">Driver Name</label>
-            <input id="newDriverName" type="text" maxlength="${LOCAL_PLAYER_NAME_MAX_LENGTH}" value="" placeholder="DRIVER ${nextNumber}" autocomplete="off" autocapitalize="words" enterkeyhint="done">
+            <input id="newDriverName" type="text" maxlength="${LOCAL_PLAYER_NAME_MAX_LENGTH}" value="" placeholder="DRIVER ${nextNumber}" autocomplete="off">
           </div>
           <div class="row create-driver-actions">
             <button class="small-button primary" data-action="createPlayer">Create Driver & Start</button>
@@ -42421,7 +42109,7 @@ class NeonRoadRally {
                 <p class="garage-section-copy">Free base look: body color, accent color, nickname, basic trail color.</p>
                 <div class="field">
                   <label for="carName">Car Nickname</label>
-                  <input id="carName" type="text" maxlength="${LOCAL_CAR_NAME_MAX_LENGTH}" value="${escapeAttr(nickname)}" placeholder="Optional nickname" autocomplete="off" autocapitalize="words" enterkeyhint="done" ${player ? "" : "disabled"}>
+                  <input id="carName" type="text" maxlength="${LOCAL_CAR_NAME_MAX_LENGTH}" value="${escapeAttr(nickname)}" placeholder="Optional nickname" ${player ? "" : "disabled"}>
                 </div>
                 <div class="field">
                   <label for="bodyStyle">Body Style</label>
@@ -42465,14 +42153,14 @@ class NeonRoadRally {
                   <section id="garageRenameDriver" class="garage-inline-form">
                     <label for="driverRenameName">Rename Driver</label>
                     <div class="garage-inline-controls">
-                      <input id="driverRenameName" type="text" maxlength="${LOCAL_PLAYER_NAME_MAX_LENGTH}" value="${player ? escapeAttr(player.name) : ""}" placeholder="DRIVER NAME" autocomplete="off" autocapitalize="words" enterkeyhint="done" ${player ? "" : "disabled"}>
+                      <input id="driverRenameName" type="text" maxlength="${LOCAL_PLAYER_NAME_MAX_LENGTH}" value="${player ? escapeAttr(player.name) : ""}" placeholder="DRIVER NAME" ${player ? "" : "disabled"}>
                       <button class="btn btn--secondary btn--sm" data-action="renameDriver" ${player ? "" : "disabled"}>Rename</button>
                     </div>
                   </section>
                   <section id="garageAddDriver" class="garage-inline-form">
                     <label for="newDriverName">Add Driver</label>
                     <div class="garage-inline-controls">
-                      <input id="newDriverName" type="text" maxlength="${LOCAL_PLAYER_NAME_MAX_LENGTH}" value="" placeholder="DRIVER ${players.length + 1}" autocomplete="off" autocapitalize="words" enterkeyhint="done">
+                      <input id="newDriverName" type="text" maxlength="${LOCAL_PLAYER_NAME_MAX_LENGTH}" value="" placeholder="DRIVER ${players.length + 1}">
                       <button class="btn btn--secondary btn--sm" data-action="createPlayer">Add</button>
                     </div>
                   </section>
@@ -44715,7 +44403,6 @@ class NeonRoadRally {
         else if (action === "fullscreen") this.toggleFullscreen();
         else if (action === "setSpeedClass") this.handleSetSpeedClass(button.dataset.id);
         else if (action === "setControllerPreset") this.handleSetControllerPreset(button.dataset.id);
-        else if (action === "setTouchSteering") this.handleSetTouchSteering(button.dataset.id);
         else if (action === "setModePickerSpeed") this.handleModePickerSpeed(button.dataset.id);
         else if (action === "focusGarageSection") this.focusGarageSection(button.dataset.target);
         else if (action === "randomSeed") this.handleRandomSeed();
@@ -44776,7 +44463,6 @@ class NeonRoadRally {
     const masterVolume = document.getElementById("masterVolume");
     const musicVolume = document.getElementById("musicVolume");
     const sfxVolume = document.getElementById("sfxVolume");
-    const touchControlsOverride = document.getElementById("touchControlsOverride");
     if (masterVolume) {
       masterVolume.addEventListener("input", () => {
         this.audio.setMasterVolume(masterVolume.value);
@@ -44790,11 +44476,6 @@ class NeonRoadRally {
     if (sfxVolume) {
       sfxVolume.addEventListener("input", () => {
         this.audio.setSfxVolume(sfxVolume.value);
-      });
-    }
-    if (touchControlsOverride) {
-      touchControlsOverride.addEventListener("change", () => {
-        this.handleTouchControlsOverride(touchControlsOverride.checked);
       });
     }
   }
@@ -45019,20 +44700,6 @@ class NeonRoadRally {
     this.input?.clearGamepadInputState?.();
     const preset = getControllerPresetDefinition(nextPresetId);
     this.showSettingsScreen(`Controller preset set to ${preset.label}.`);
-  }
-
-  handleTouchControlsOverride(enabled) {
-    this.touchSettings.update({ forceControls: Boolean(enabled) });
-    if (enabled) this.input.lastInputModality = "touch";
-    this.input?.updateTouchControlsVisibility?.({ force: true });
-    this.showSettingsScreen(enabled ? "Touch controls set to always show." : "Touch controls set to auto detection.");
-  }
-
-  handleSetTouchSteering(mode) {
-    const steeringMode = normalizeTouchSteeringMode(mode);
-    this.touchSettings.update({ steeringMode });
-    this.input?.updateTouchControlsVisibility?.({ force: true });
-    this.showSettingsScreen(steeringMode === TOUCH_STEERING_HOLD ? "Touch steering set to hold sides." : "Touch steering set to swipe.");
   }
 
   handleModePickerSpeed(id) {

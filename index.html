@@ -2,15 +2,40 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+  <meta name="theme-color" content="#07061a">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Neon Road Rally">
   <title>Neon Road Rally</title>
   <link rel="icon" href="data:,">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="apple-touch-icon" href="assets/icons/apple-touch-icon.png">
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
   <main id="arcadeCabinet" class="arcade-cabinet">
     <canvas id="gameCanvas" width="960" height="720" aria-label="Neon Road Rally game canvas"></canvas>
     <section id="screenLayer" class="screen-layer" aria-live="polite"></section>
+    <section id="touchControls" class="touch-controls" aria-label="Race touch controls" aria-hidden="true" data-steering-mode="swipe" hidden>
+      <button id="touchPause" class="touch-control touch-pause" type="button" aria-label="Pause race" title="Pause">
+        <span class="touch-pause-icon" aria-hidden="true"></span>
+      </button>
+      <button class="touch-steer-zone touch-steer-zone--left" type="button" data-touch-steer="-1" aria-label="Steer left">
+        <span class="touch-chevron touch-chevron--left" aria-hidden="true"></span>
+      </button>
+      <button class="touch-steer-zone touch-steer-zone--right" type="button" data-touch-steer="1" aria-label="Steer right">
+        <span class="touch-chevron touch-chevron--right" aria-hidden="true"></span>
+      </button>
+      <button id="touchBoost" class="touch-control touch-boost" type="button" aria-label="Use boost" title="Boost">
+        <span class="touch-boost-icon" aria-hidden="true"></span>
+      </button>
+    </section>
+    <aside class="orientation-gate" aria-label="Rotate device">
+      <div class="orientation-device" aria-hidden="true"><span></span></div>
+      <strong>Neon Road Rally</strong>
+      <span>Rotate Your Device</span>
+    </aside>
   </main>
   <script src="game.js" defer></script>
 </body>

@@ -35,7 +35,7 @@ python3 -m http.server 8081 --directory dist
 
 ## Demo Checklist
 
-For a local show build, use a current desktop browser or iPad Safari in landscape and run from the local server above so audio loads consistently.
+For a local show build, use a current desktop browser and run from the local server above so audio loads consistently.
 
 Recommended first demo path:
 
@@ -52,16 +52,12 @@ To clear local test data, open Leaderboard, choose `Reset Local Data`, and accep
 
 Audio files live in `audio/`. Player car sprites live in `assets/cars/`, and traffic sprites live in `assets/traffic/`.
 
-Known demo limitations: saves are browser-local, phone portrait play is intentionally blocked, and there are no online, account, cloud-save, payment, upload, chat, or backend API features.
+Known demo limitations: Party Mode is pass-the-keyboard only, saves are browser-local, touch controls are not implemented yet, and there are no online, account, cloud-save, payment, upload, chat, or backend API features.
 
 For public static-hosting safety checks, see `WEB_DEMO_CHECKLIST.md`.
 
 ## Controls
 
-- Touch in landscape: swipe left/right on the road to step one lane
-- Touch alternative: choose `Hold Sides` in Settings, then press either side of the road to steer
-- Touch boost button: use one manual boost
-- Touch pause button: pause or end an Official endurance bonus
 - Arrow keys or WASD: steer and move within the driving zone
 - Space: use one manual boost
 - Enter: start or confirm from title, setup, score, and party screens
@@ -142,7 +138,7 @@ Featured demo seeds for future web copy:
 
 ### Party Mode
 
-Party Mode is local pass-the-device competition. Pick 2-8 local players, one shared seed, and one race mode. Each player gets one run on the same Road Director sequence, then the standings screen shows leader, margin, latest run, and rematch options.
+Party Mode is local pass-the-keyboard competition. Pick 2-8 local players, one shared seed, and one race mode. Each player gets one run on the same Road Director sequence, then the standings screen shows leader, margin, latest run, and rematch options.
 
 Party rematches support:
 
@@ -175,8 +171,6 @@ The game uses browser `localStorage` under:
 neonRoadRally.v1
 ```
 
-Touch preferences use a separate `neonRoadRally.touch.v1` key so the validated game save schema remains unchanged.
-
 It saves:
 
 - Local players
@@ -208,11 +202,7 @@ Privacy note: profiles, settings, challenge progress, and scores are stored loca
 
 Future public racer tags should use exactly 3 uppercase letters followed by 2 numbers, for example `AAA01`, `JDX77`, `SUN08`, or `DAD01`, validated by `/^[A-Z]{3}[0-9]{2}$/`. Do not submit free-form local player names to a future global leaderboard.
 
-## iPad And Home Screen Install
-
-On iPad, open the public build in Safari, rotate to landscape, tap Share, then choose `Add to Home Screen`. The installed app launches standalone in landscape. The first tap also unlocks browser audio under Safari's media rules.
-
-All setup, race, Party handoff, results, records, and Settings screens are tappable. Touch controls appear automatically after touch input during a race; Settings includes an `Always Show` override and Swipe/Hold Sides steering choice. Phone portrait play is not supported and shows a rotate-device screen.
+Mobile status: desktop/laptop keyboard play is primary. iPad with a keyboard may work. Touch controls are not implemented yet, and phone portrait is not supported or recommended.
 
 ## Audio Files
 
@@ -286,6 +276,6 @@ The Road Director simulation checks deterministic runs across race modes and rep
 
 - There are no online features, accounts, or cloud saves.
 - Saves are local to the current browser.
-- Party Mode is pass-the-device only; there is no network multiplayer.
-- Phone portrait play is intentionally unsupported.
+- Party Mode is pass-the-keyboard only.
+- Touch controls are not implemented yet.
 - Debug gameplay uses F for the finish-line shortcut, so fullscreen F is disabled during debug gameplay.
