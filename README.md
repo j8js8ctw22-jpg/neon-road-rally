@@ -1,8 +1,14 @@
 # Neon Road Rally
 
-Neon Road Rally is a local-only browser arcade racer built with plain HTML, CSS, and vanilla JavaScript. The current show build focuses on one track: Sunset Highway.
+Neon Road Rally is a local-only browser arcade racer built with plain HTML, CSS, and vanilla JavaScript. The current build includes five tracks, 50 official routes, local record boards, party play, challenge runs, and browser-local progression.
 
-There are no accounts, cloud saves, online features, build tools, third-party libraries, or server requirements.
+There are no accounts, cloud saves, online features, runtime dependencies, third-party libraries, or server requirements. Deployment uses a tiny dependency-free build script that copies the static runtime into `dist/`.
+
+## Play It
+
+Public build: [Neon Road Rally on GitHub Pages](https://j8js8ctw22-jpg.github.io/neon-road-rally/)
+
+The `Deploy static site to GitHub Pages` workflow builds `dist/` and publishes it on every push to `main`.
 
 ## How To Run Locally
 
@@ -20,6 +26,13 @@ Then open:
 http://127.0.0.1:8081/
 ```
 
+To test the deployable static package locally:
+
+```bash
+bash scripts/build-dist.sh
+python3 -m http.server 8081 --directory dist
+```
+
 ## Demo Checklist
 
 For a local show build, use a current desktop browser and run from the local server above so audio loads consistently.
@@ -28,17 +41,18 @@ Recommended first demo path:
 
 1. Choose or create a player.
 2. Customize or select a car.
-3. Run Solo / Seeded Run in Classic on Arcade with the generated seed.
-4. Run Solo / Seeded Run in Fuel Run with a manual seed.
-5. Open Challenge Mode and play First Run or Turbo Dare.
-6. Open Party Mode with 2 players, then try Rematch Same Seed and Rematch New Seed.
-7. Show Leaderboard, Settings/audio mute, and fullscreen.
+3. Run an Official Race route from the route board.
+4. Run Solo / Seeded Run in Classic on Arcade with the generated seed.
+5. Run Solo / Seeded Run in Fuel Run with a manual seed.
+6. Open Challenge Mode and play First Run or Turbo Dare.
+7. Open Party Mode with 2 players, then try Rematch Same Seed and Rematch New Seed.
+8. Show Leaderboard, Settings/audio mute, and fullscreen.
 
 To clear local test data, open Leaderboard, choose `Reset Local Data`, and accept the browser confirmation. This clears local players, car settings, scores, challenge progress, and audio/default race settings for this browser only. It never runs automatically.
 
 Audio files live in `audio/`. Player car sprites live in `assets/cars/`, and traffic sprites live in `assets/traffic/`.
 
-Known demo limitations: Sunset Highway is the only track, Party Mode is pass-the-keyboard only, saves are browser-local, and there are no online, account, cloud-save, payment, upload, chat, or backend API features.
+Known demo limitations: Party Mode is pass-the-keyboard only, saves are browser-local, touch controls are not implemented yet, and there are no online, account, cloud-save, payment, upload, chat, or backend API features.
 
 For public static-hosting safety checks, see `WEB_DEMO_CHECKLIST.md`.
 
@@ -66,9 +80,21 @@ Debug mode also enables:
 
 ## Current Modes
 
+### Official Race
+
+Official Race is the permanent local competition route board. Pick one of five tracks, then race one of 50 official routes with fixed seeds, speed classes, race types, and versioned pacing rules. Official records stay separate from local fun/custom records.
+
+Current tracks:
+
+- Sunset Highway
+- Redline Run
+- Midnight Ridge
+- Blackout Run
+- Prism Highway
+
 ### Solo / Seeded Run
 
-Solo is the main one-player route. Choose a race mode, use a random or manual Road Seed, and race Sunset Highway. The same seed, track, and race mode replay the same Road Director sequence.
+Solo is the main one-player custom route. Choose a track, race type, speed class, and random or manual Road Seed. The same seed, track, race type, speed class, and pacing rules version replay the same Road Director sequence.
 
 Race modes:
 
@@ -184,6 +210,10 @@ Audio is optional, but the show build expects these files in `audio/`:
 
 - `audio/title-theme.mp3`
 - `audio/sunset-highway.mp3`
+- `audio/redline-run.mp3`
+- `audio/midnight-ridge-mooncut-pass.mp3`
+- `audio/blackout-run-headlight-mile.mp3`
+- `audio/prism-highway-glasslight-fever.mp3`
 - `audio/boost.wav`
 - `audio/crash.wav`
 - `audio/slowdown.wav`
@@ -220,9 +250,9 @@ If a sprite is missing or disabled, the game uses the existing canvas fallback a
 
 ## Road Director
 
-The Road Director builds seeded obstacle waves from reusable templates. It validates lower-screen lane pressure so the game does not generate a five-lane unavoidable wall.
+The Road Director builds seeded obstacle waves from reusable templates. It validates lower-screen lane pressure so the game does not generate a full-road unavoidable wall.
 
-Sunset Highway is divided into race sections:
+Roads are divided into race sections such as:
 
 - Launch
 - Groove
@@ -244,7 +274,6 @@ The Road Director simulation checks deterministic runs across race modes and rep
 
 ## Known Limitations
 
-- The current show build has one track: Sunset Highway.
 - There are no online features, accounts, or cloud saves.
 - Saves are local to the current browser.
 - Party Mode is pass-the-keyboard only.

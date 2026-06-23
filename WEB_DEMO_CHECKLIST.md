@@ -1,10 +1,12 @@
 # Neon Road Rally Web Demo Safety Checklist
 
-This checklist is for hosting the current Neon Road Rally browser build as static files, likely under `tilthen.app`. The demo remains local-first: no accounts, cloud saves, backend API, global leaderboard, payments, uploads, chat, analytics, or external scripts.
+This checklist is for hosting the current Neon Road Rally browser build as static files through GitHub Pages or another static host. The demo remains local-first: no accounts, cloud saves, backend API, global leaderboard, payments, uploads, chat, analytics, or external scripts.
 
 ## Pre-Deploy Checklist
 
-- Host only `index.html`, `style.css`, `game.js`, `README.md`, `WEB_DEMO_CHECKLIST.md`, `audio/`, and `assets/`.
+- Run `bash scripts/build-dist.sh`.
+- Host only the generated `dist/` contents: `index.html`, `style.css`, `game.js`, `audio/`, and `assets/`.
+- Do not host `.git`, `docs/`, `tools/`, `ui-review-pack/`, `stable-copies/`, `*.md`, `.DS_Store`, or source-only review artifacts.
 - Keep all script, style, image, and media paths relative so the game can run from a subdirectory.
 - Confirm there are no API keys, tokens, credentials, private paths, analytics snippets, CDN scripts, `eval`, `new Function`, hidden network calls, or backend endpoints.
 - Run `node --check game.js`.
@@ -27,6 +29,10 @@ Expected local audio files:
 
 - `audio/title-theme.mp3`
 - `audio/sunset-highway.mp3`
+- `audio/redline-run.mp3`
+- `audio/midnight-ridge-mooncut-pass.mp3`
+- `audio/blackout-run-headlight-mile.mp3`
+- `audio/prism-highway-glasslight-fever.mp3`
 - `audio/boost.wav`
 - `audio/crash.wav`
 - `audio/slowdown.wav`
@@ -47,17 +53,18 @@ Audio starts only after user interaction. Missing optional audio should not stop
 Use a current desktop browser and a local static server.
 
 1. Title screen loads.
-2. Solo / Seeded Run starts in Classic.
-3. Solo / Seeded Run starts in Fuel Run.
-4. Challenge Mode starts.
-5. Party Mode starts with 2 local players.
-6. Leaderboard opens.
-7. Settings opens.
-8. Reset Local Data confirmation appears.
-9. Audio mute/unmute works after user interaction.
-10. Fullscreen works where the browser permits it.
-11. Console has no game errors or warnings.
-12. There are no missing asset or audio warnings in the intended demo file set.
+2. Official Race starts from a route board.
+3. Solo / Seeded Run starts in Classic.
+4. Solo / Seeded Run starts in Fuel Run.
+5. Challenge Mode starts.
+6. Party Mode starts with 2 local players.
+7. Leaderboard opens.
+8. Settings opens.
+9. Reset Local Data confirmation appears.
+10. Audio mute/unmute works after user interaction.
+11. Fullscreen works where the browser permits it.
+12. Console has no game errors or warnings.
+13. There are no missing asset or audio warnings in the intended demo file set.
 
 ## localStorage Note
 
@@ -185,15 +192,15 @@ Local scores are local and can be modified by advanced users. That is acceptable
 
 1. Create a local player.
 2. Customize or select a car.
-3. Run Solo / Seeded Run in Classic on Arcade with a generated seed.
-4. Run Solo / Seeded Run in Fuel Run with a generated or manual seed.
-5. Open Challenge Mode and play First Run or Turbo Dare.
-6. Open Party Mode with 2 local players, then try Rematch Same Seed and Rematch New Seed.
-7. Show Leaderboard, Settings/audio mute, and fullscreen.
+3. Run an Official Race route from the route board.
+4. Run Solo / Seeded Run in Classic on Arcade with a generated seed.
+5. Run Solo / Seeded Run in Fuel Run with a generated or manual seed.
+6. Open Challenge Mode and play First Run or Turbo Dare.
+7. Open Party Mode with 2 local players, then try Rematch Same Seed and Rematch New Seed.
+8. Show Leaderboard, Settings/audio mute, and fullscreen.
 
 ## Known Limitations
 
-- Sunset Highway is the only track.
 - Saves are browser-local.
 - Party Mode is pass-the-keyboard only.
 - There are no online features, accounts, cloud saves, global leaderboards, payments, uploads, chat, or backend APIs.
