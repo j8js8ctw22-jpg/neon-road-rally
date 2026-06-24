@@ -177,10 +177,6 @@ neonRoadRally.v1
 
 Touch preferences use a separate `neonRoadRally.touch.v1` key so the validated game save schema remains unchanged.
 
-Record Book backup metadata uses a separate `neonRoadRally.recordBook.v1` key. Open **Leaderboards → Data Tools** to export or import a Record Book JSON file containing local drivers, official/playground/endurance records, personal bests, badges, derived titles, and challenge progress. Imports merge with local data, keep the best records and oldest matching dates, and reject unsupported or corrupted files. Re-importing the same backup makes no changes.
-
-Desktop browsers download the JSON file. On iPhone and iPad, export uses the system Share sheet when file sharing is available, then falls back to copying the JSON to the clipboard. A dismissible reminder appears on the Leaderboards screen when records have changed and no backup has been made for 30 days.
-
 It saves:
 
 - Local players

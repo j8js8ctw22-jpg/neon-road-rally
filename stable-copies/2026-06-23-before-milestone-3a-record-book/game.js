@@ -13,13 +13,6 @@
 const STORAGE_KEY = "neonRoadRally.v1";
 const TOUCH_SETTINGS_STORAGE_KEY = "neonRoadRally.touch.v1";
 const TOUCH_SETTINGS_VERSION = 1;
-const RECORD_BOOK_STORAGE_KEY = "neonRoadRally.recordBook.v1";
-const RECORD_BOOK_SCHEMA_ID = "neon-road-rally-record-book";
-const RECORD_BOOK_SCHEMA_VERSION = 1;
-const RECORD_BOOK_METADATA_VERSION = 1;
-const RECORD_BOOK_MAX_BYTES = 2 * 1024 * 1024;
-const RECORD_BOOK_PLAYER_SCAN_LIMIT = 64;
-const RECORD_BOOK_BACKUP_INTERVAL_MS = 30 * 24 * 60 * 60 * 1000;
 const TOUCH_STEERING_SWIPE = "swipe";
 const TOUCH_STEERING_HOLD = "hold";
 const TOUCH_CONFIG = Object.freeze({
@@ -7843,7 +7836,6 @@ function normalizeBestTimeRecord(record, key = "") {
   const safeKey = key || getBestTimeKey(trackId, raceTypeId, speedClassId, pacingRulesVersion);
   return {
     key: safeKey,
-    gameVersion: sanitizeName(record.gameVersion || "legacy-unknown", "legacy-unknown", 32),
     trackId,
     raceTypeId,
     speedClassId,
@@ -7968,122 +7960,6 @@ function safeJsonParse(raw) {
     return JSON.parse(raw);
   } catch (error) {
     return null;
-  }
-}
-
-function stableJsonStringify(value) {
-  if (value === null || typeof value !== "object") return JSON.stringify(value);
-  if (Array.isArray(value)) {
-    return `[${value.map((item) => stableJsonStringify(item) ?? "null").join(",")}]`;
-  }
-  const entries = Object.keys(value).sort()
-    .map((key) => [key, stableJsonStringify(value[key])])
-    .filter(([, serialized]) => serialized !== undefined)
-    .map(([key, serialized]) => `${JSON.stringify(key)}:${serialized}`);
-  return `{${entries.join(",")}}`;
-}
-
-function getUtf8ByteLength(value) {
-  const text = String(value || "");
-  if (typeof TextEncoder === "function") return new TextEncoder().encode(text).length;
-  return encodeURIComponent(text).replace(/%[0-9A-F]{2}|./gi, "x").length;
-}
-
-function calculateRecordBookChecksum(payload) {
-  const text = stableJsonStringify(payload);
-  let hash = 0x811c9dc5;
-  for (let index = 0; index < text.length; index += 1) {
-    const code = text.charCodeAt(index);
-    hash ^= code & 0xff;
-    hash = Math.imul(hash, 0x01000193);
-    hash ^= code >>> 8;
-    hash = Math.imul(hash, 0x01000193);
-  }
-  return `fnv1a32:${(hash >>> 0).toString(16).padStart(8, "0")}`;
-}
-
-function normalizeRecordBookChecksum(value) {
-  const checksum = sanitizeName(value, "", 32).toLowerCase();
-  return /^fnv1a32:[0-9a-f]{8}$/.test(checksum) ? checksum : "";
-}
-
-function getOldestDateString(...values) {
-  return values
-    .map((value) => normalizeDateString(value, ""))
-    .filter(Boolean)
-    .sort((a, b) => Date.parse(a) - Date.parse(b))[0] || "";
-}
-
-function createDefaultRecordBookMetadata() {
-  return {
-    version: RECORD_BOOK_METADATA_VERSION,
-    lastExportAt: "",
-    lastExportChecksum: "",
-    firstUnexportedChangeAt: "",
-    dismissedChecksum: ""
-  };
-}
-
-class RecordBookMetadataStore {
-  constructor(storageKey = RECORD_BOOK_STORAGE_KEY) {
-    this.storageKey = storageKey;
-    this.data = this.load();
-  }
-
-  normalize(value) {
-    const source = value && typeof value === "object" ? value : {};
-    return {
-      version: RECORD_BOOK_METADATA_VERSION,
-      lastExportAt: normalizeDateString(source.lastExportAt, ""),
-      lastExportChecksum: normalizeRecordBookChecksum(source.lastExportChecksum),
-      firstUnexportedChangeAt: normalizeDateString(source.firstUnexportedChangeAt, ""),
-      dismissedChecksum: normalizeRecordBookChecksum(source.dismissedChecksum)
-    };
-  }
-
-  load() {
-    return this.normalize(safeJsonParse(safeStorageGetItem(this.storageKey)) || createDefaultRecordBookMetadata());
-  }
-
-  save() {
-    return safeStorageSetItem(this.storageKey, JSON.stringify(this.data));
-  }
-
-  observe(checksum, hasRecords, now = new Date()) {
-    const safeChecksum = normalizeRecordBookChecksum(checksum);
-    const changed = Boolean(hasRecords && safeChecksum && safeChecksum !== this.data.lastExportChecksum);
-    if (changed && !this.data.firstUnexportedChangeAt) {
-      this.data.firstUnexportedChangeAt = now.toISOString();
-      this.save();
-    } else if (!changed && this.data.firstUnexportedChangeAt) {
-      this.data.firstUnexportedChangeAt = "";
-      this.data.dismissedChecksum = "";
-      this.save();
-    }
-    return this.shouldRemind(safeChecksum, hasRecords, now);
-  }
-
-  shouldRemind(checksum, hasRecords, now = new Date()) {
-    if (!hasRecords || !checksum || checksum === this.data.lastExportChecksum || checksum === this.data.dismissedChecksum) return false;
-    const reference = this.data.lastExportAt || this.data.firstUnexportedChangeAt;
-    const referenceTime = Date.parse(reference || "");
-    return Number.isFinite(referenceTime) && now.getTime() - referenceTime >= RECORD_BOOK_BACKUP_INTERVAL_MS;
-  }
-
-  markExported(checksum, now = new Date()) {
-    this.data = {
-      version: RECORD_BOOK_METADATA_VERSION,
-      lastExportAt: now.toISOString(),
-      lastExportChecksum: normalizeRecordBookChecksum(checksum),
-      firstUnexportedChangeAt: "",
-      dismissedChecksum: ""
-    };
-    this.save();
-  }
-
-  dismiss(checksum) {
-    this.data.dismissedChecksum = normalizeRecordBookChecksum(checksum);
-    this.save();
   }
 }
 
@@ -8279,7 +8155,6 @@ function normalizeLeaderboardEntry(entry) {
     : getOfficialRouteForRun(trackId, speedClass, raceType, entry.seed, entry.officialRouteId);
   return {
     runId: normalizeStorageId(entry.runId || entry.id, ""),
-    gameVersion: sanitizeName(entry.gameVersion || "legacy-unknown", "legacy-unknown", 32),
     playerName: sanitizePlayerName(entry.playerName, "PLAYER"),
     playerId: normalizeStorageId(entry.playerId, ""),
     carName: sanitizeCarName(entry.carName, "CAR"),
@@ -8384,7 +8259,6 @@ function normalizePlaygroundRecordEntry(entry) {
   return {
     recordId: normalizeStorageId(entry.recordId || entry.playgroundRecordId || fallbackRecordId, fallbackRecordId),
     runId,
-    gameVersion: sanitizeName(entry.gameVersion || "legacy-unknown", "legacy-unknown", 32),
     playerId: normalizeStorageId(entry.playerId, ""),
     playerName: sanitizePlayerName(entry.playerName || entry.playerDisplayName, "PLAYER"),
     carName: sanitizeCarName(entry.carName, "CAR"),
@@ -8519,7 +8393,6 @@ function normalizeEnduranceLeaderboardEntry(entry) {
   return {
     recordId,
     runId,
-    gameVersion: sanitizeName(entry.gameVersion || "legacy-unknown", "legacy-unknown", 32),
     playerName: sanitizePlayerName(entry.playerName, "PLAYER"),
     playerId: normalizeStorageId(entry.playerId, ""),
     carName: sanitizeCarName(entry.carName, "CAR"),
@@ -8531,10 +8404,6 @@ function normalizeEnduranceLeaderboardEntry(entry) {
     speedClassLabel: route.speedClassLabel || getSpeedClassLabel(route.speedClassId),
     raceType: DEFAULT_RACE_TYPE_ID,
     raceTypeId: DEFAULT_RACE_TYPE_ID,
-    pacingRulesVersion: normalizePacingRulesVersion(
-      entry.pacingRulesVersion || entry.pacingVersion,
-      getMissingPacingRulesFallback(DEFAULT_RACE_TYPE_ID)
-    ),
     officialSeed: route.seed,
     seed: normalizeStoredRoadSeed(entry.seed || entry.officialSeed || route.seed, route.seed),
     officialFinishTimeMs,
@@ -8633,7 +8502,6 @@ function hydratePlayerBestTimesFromLeaderboard(players, leaderboard) {
     const existing = player.bestTimes[key] || null;
     if (!existing || finishTimeMs < existing.finishTimeMs) {
       player.bestTimes[key] = normalizeBestTimeRecord({
-        gameVersion: entry.gameVersion || "legacy-unknown",
         trackId: entry.trackId,
         raceTypeId: entry.raceType,
         speedClassId: entry.raceMode || entry.speedClass,
@@ -8646,445 +8514,6 @@ function hydratePlayerBestTimesFromLeaderboard(players, leaderboard) {
       }, key);
     }
   });
-}
-
-function normalizeRecordBookPlayer(player, index = 0) {
-  if (!player || typeof player !== "object") return null;
-  const id = normalizeStorageId(player.id, "");
-  if (!id) return null;
-  return {
-    id,
-    name: sanitizePlayerName(player.name, `DRIVER ${index + 1}`),
-    car: normalizeCarConfig(player.car),
-    neonCash: normalizeNeonCashBalance(player.neonCash ?? player.cash ?? player.garageCash),
-    cosmetics: normalizePlayerCosmetics(player.cosmetics || player.garageCosmetics || player.unlocks)
-  };
-}
-
-function getRecordBookLeaderboardKey(entry) {
-  const runId = normalizeStorageId(entry?.runId || entry?.id, "");
-  if (runId) return `run:${runId}`;
-  return [
-    normalizeStorageId(entry?.playerId, ""),
-    sanitizePlayerName(entry?.playerName, "PLAYER"),
-    normalizeTrackId(entry?.trackId, DEFAULT_TRACK_ID),
-    normalizeRaceTypeId(entry?.raceType || entry?.raceTypeId, DEFAULT_RACE_TYPE_ID),
-    normalizeSpeedClassId(entry?.raceMode || entry?.speedClass, DEFAULT_SPEED_CLASS_ID),
-    normalizePacingRulesVersion(entry?.pacingRulesVersion || entry?.pacingVersion, getMissingPacingRulesFallback(entry?.raceType || entry?.raceTypeId)),
-    normalizeStoredRoadSeed(entry?.seed, ""),
-    normalizeNonNegativeInteger(entry?.score, 0, MAX_DISPLAY_SCORE),
-    normalizeFinishTimeMs(entry?.finishTimeMs, entry?.finishTimeSecondsPrecise ?? entry?.time) ?? "",
-    normalizeRunStatus(entry?.status)
-  ].join("|");
-}
-
-function getRecordBookEnduranceKey(entry) {
-  const recordId = normalizeStorageId(entry?.recordId, "");
-  if (recordId) return `record:${recordId}`;
-  const runId = normalizeStorageId(entry?.runId, "");
-  if (runId) return `run:${runId}`;
-  return [
-    normalizeStorageId(entry?.playerId, ""),
-    sanitizePlayerName(entry?.playerName, "PLAYER"),
-    normalizeStorageId(entry?.officialRouteId, ""),
-    normalizeSpeedClassId(entry?.speedClass || entry?.raceMode, DEFAULT_SPEED_CLASS_ID),
-    normalizePacingRulesVersion(entry?.pacingRulesVersion || entry?.pacingVersion, getMissingPacingRulesFallback(DEFAULT_RACE_TYPE_ID)),
-    normalizeFinishTimeMs(entry?.officialFinishTimeMs, entry?.officialFinishTimeSecondsPrecise) ?? "",
-    normalizeNonNegativeNumber(entry?.survivalTime, 0, 24 * 60 * 60),
-    normalizeNonNegativeInteger(entry?.postFinishScore, 0, MAX_DISPLAY_SCORE)
-  ].join("|");
-}
-
-function getRecordBookPlaygroundKey(entry) {
-  const runId = normalizeStorageId(entry?.runId || entry?.id, "");
-  if (runId) return `run:${runId}`;
-  return [
-    normalizeStorageId(entry?.playerId, ""),
-    sanitizePlayerName(entry?.playerName, "PLAYER"),
-    getPlaygroundRecordGroupKey(entry),
-    normalizeStoredRoadSeed(entry?.seed || entry?.roadSeed, ""),
-    normalizeNonNegativeInteger(entry?.score || entry?.finalScore, 0, MAX_DISPLAY_SCORE),
-    normalizeFinishTimeMs(entry?.finishTimeMs, entry?.finishTimeSecondsPrecise ?? entry?.time) ?? "",
-    normalizeRunStatus(entry?.status)
-  ].join("|");
-}
-
-function sortRecordBookPlayers(players) {
-  return players.slice().sort((a, b) => a.id.localeCompare(b.id));
-}
-
-function buildRecordBookPayload(data) {
-  const source = data && typeof data === "object" ? data : {};
-  const players = sortRecordBookPlayers((Array.isArray(source.players) ? source.players : [])
-    .slice(0, LOCAL_PLAYER_MAX_COUNT)
-    .map((player, index) => normalizeRecordBookPlayer(player, index))
-    .filter(Boolean));
-  const sourcePlayersById = new Map((Array.isArray(source.players) ? source.players : [])
-    .map((player) => [normalizeStorageId(player?.id, ""), player])
-    .filter(([id]) => id));
-  const personalBests = players.map((player) => {
-    const sourcePlayer = sourcePlayersById.get(player.id) || {};
-    return {
-      playerId: player.id,
-      bestScore: normalizeNonNegativeInteger(sourcePlayer.bestScore, 0, MAX_DISPLAY_SCORE),
-      bestTimes: normalizeBestTimeRecords(sourcePlayer.bestTimes || sourcePlayer.personalBestTimes)
-    };
-  });
-  const badges = players.map((player) => {
-    const sourcePlayer = sourcePlayersById.get(player.id) || {};
-    return {
-      playerId: player.id,
-      badges: normalizePlayerBadges(sourcePlayer.badges),
-      badgeStats: normalizePlayerBadgeStats(sourcePlayer.badgeStats || sourcePlayer.stats)
-    };
-  });
-  const playerChallenges = players.map((player) => {
-    const sourcePlayer = sourcePlayersById.get(player.id) || {};
-    return {
-      playerId: player.id,
-      progress: normalizePlayerChallengeSave(sourcePlayer.challengeProgress || sourcePlayer.challengeStats)
-    };
-  });
-  const normalizedData = {
-    players: players.map((player) => ({
-      ...player,
-      bestScore: personalBests.find((entry) => entry.playerId === player.id)?.bestScore || 0,
-      bestTimes: personalBests.find((entry) => entry.playerId === player.id)?.bestTimes || {},
-      challengeProgress: playerChallenges.find((entry) => entry.playerId === player.id)?.progress || createDefaultPlayerChallengeSave()
-    })),
-    leaderboard: normalizeLeaderboardList(source.leaderboard),
-    playgroundRecords: normalizePlaygroundRecordList(source.playgroundRecords || source.playgroundLeaderboard),
-    enduranceLeaderboard: normalizeEnduranceLeaderboardList(source.enduranceLeaderboard || source.officialEnduranceLeaderboard)
-  };
-  return {
-    players,
-    leaderboards: {
-      official: normalizedData.leaderboard,
-      playground: normalizedData.playgroundRecords,
-      endurance: normalizedData.enduranceLeaderboard
-    },
-    personalBests,
-    badges,
-    titles: calculateLocalTitles(normalizedData),
-    challengeProgress: {
-      global: normalizeChallengeSave(source.challengeProgress || source.challenges),
-      players: playerChallenges
-    }
-  };
-}
-
-function createRecordBookDocument(data, now = new Date()) {
-  const payload = buildRecordBookPayload(data);
-  return {
-    schema: RECORD_BOOK_SCHEMA_ID,
-    schemaVersion: RECORD_BOOK_SCHEMA_VERSION,
-    exportedAt: now.toISOString(),
-    gameVersion: GAME_VERSION,
-    payload,
-    checksum: calculateRecordBookChecksum(payload)
-  };
-}
-
-function recordBookPayloadHasRecords(payload) {
-  const leaderboards = payload?.leaderboards || {};
-  return Boolean(
-    (Array.isArray(payload?.players) && payload.players.length)
-    || (Array.isArray(leaderboards.official) && leaderboards.official.length)
-    || (Array.isArray(leaderboards.playground) && leaderboards.playground.length)
-    || (Array.isArray(leaderboards.endurance) && leaderboards.endurance.length)
-  );
-}
-
-function normalizeRecordBookPayload(payload) {
-  const source = payload && typeof payload === "object" ? payload : {};
-  const seenPlayerIds = new Set();
-  const players = (Array.isArray(source.players) ? source.players : [])
-    .slice(0, RECORD_BOOK_PLAYER_SCAN_LIMIT)
-    .map((player, index) => normalizeRecordBookPlayer(player, index))
-    .filter((player) => {
-      if (!player || seenPlayerIds.has(player.id) || seenPlayerIds.size >= LOCAL_PLAYER_MAX_COUNT) return false;
-      seenPlayerIds.add(player.id);
-      return true;
-    });
-  const allowedPlayerIds = new Set(players.map((player) => player.id));
-  const personalBests = (Array.isArray(source.personalBests) ? source.personalBests : [])
-    .slice(0, RECORD_BOOK_PLAYER_SCAN_LIMIT)
-    .map((entry) => ({
-      playerId: normalizeStorageId(entry?.playerId, ""),
-      bestScore: normalizeNonNegativeInteger(entry?.bestScore, 0, MAX_DISPLAY_SCORE),
-      bestTimes: normalizeBestTimeRecords(entry?.bestTimes || entry?.personalBestTimes)
-    }))
-    .filter((entry) => entry.playerId && allowedPlayerIds.has(entry.playerId));
-  const badges = (Array.isArray(source.badges) ? source.badges : [])
-    .slice(0, RECORD_BOOK_PLAYER_SCAN_LIMIT)
-    .map((entry) => ({
-      playerId: normalizeStorageId(entry?.playerId, ""),
-      badges: normalizePlayerBadges(entry?.badges),
-      badgeStats: normalizePlayerBadgeStats(entry?.badgeStats || entry?.stats)
-    }))
-    .filter((entry) => entry.playerId && allowedPlayerIds.has(entry.playerId));
-  const playerChallenges = (Array.isArray(source.challengeProgress?.players) ? source.challengeProgress.players : [])
-    .slice(0, RECORD_BOOK_PLAYER_SCAN_LIMIT)
-    .map((entry) => ({
-      playerId: normalizeStorageId(entry?.playerId, ""),
-      progress: normalizePlayerChallengeSave(entry?.progress || entry?.challengeProgress)
-    }))
-    .filter((entry) => entry.playerId && allowedPlayerIds.has(entry.playerId));
-  return {
-    players: sortRecordBookPlayers(players),
-    leaderboards: {
-      official: normalizeLeaderboardList(source.leaderboards?.official),
-      playground: normalizePlaygroundRecordList(source.leaderboards?.playground),
-      endurance: normalizeEnduranceLeaderboardList(source.leaderboards?.endurance)
-    },
-    personalBests: personalBests.sort((a, b) => a.playerId.localeCompare(b.playerId)),
-    badges: badges.sort((a, b) => a.playerId.localeCompare(b.playerId)),
-    titles: Array.isArray(source.titles) ? source.titles.slice(0, TITLE_DEFINITIONS.length) : [],
-    challengeProgress: {
-      global: normalizeChallengeSave(source.challengeProgress?.global),
-      players: playerChallenges.sort((a, b) => a.playerId.localeCompare(b.playerId))
-    }
-  };
-}
-
-function validateRecordBookDocument(input) {
-  let documentValue = input;
-  if (typeof input === "string") {
-    if (getUtf8ByteLength(input) > RECORD_BOOK_MAX_BYTES) throw new Error("Record Book file is too large.");
-    try {
-      documentValue = JSON.parse(input);
-    } catch (error) {
-      throw new Error("Record Book file is not valid JSON.");
-    }
-  }
-  if (!documentValue || typeof documentValue !== "object" || Array.isArray(documentValue)) {
-    throw new Error("Record Book file is not a valid object.");
-  }
-  if (getUtf8ByteLength(JSON.stringify(documentValue)) > RECORD_BOOK_MAX_BYTES) {
-    throw new Error("Record Book file is too large.");
-  }
-  if (documentValue.schema !== RECORD_BOOK_SCHEMA_ID) throw new Error("This is not a Neon Road Rally Record Book file.");
-  if (Number(documentValue.schemaVersion) !== RECORD_BOOK_SCHEMA_VERSION) {
-    throw new Error(`Unsupported Record Book schema version: ${sanitizeName(documentValue.schemaVersion, "unknown", 16)}.`);
-  }
-  if (!documentValue.payload || typeof documentValue.payload !== "object" || Array.isArray(documentValue.payload)) {
-    throw new Error("Record Book payload is missing.");
-  }
-  const checksum = normalizeRecordBookChecksum(documentValue.checksum);
-  if (!checksum || checksum !== calculateRecordBookChecksum(documentValue.payload)) {
-    throw new Error("Record Book checksum does not match. The file may be corrupted.");
-  }
-  return {
-    document: documentValue,
-    payload: normalizeRecordBookPayload(documentValue.payload),
-    checksum
-  };
-}
-
-function mergeRecordBookBestTimes(localValue, importedValue) {
-  const local = normalizeBestTimeRecords(localValue);
-  const imported = normalizeBestTimeRecords(importedValue);
-  const result = { ...local };
-  Object.entries(imported).forEach(([key, candidate]) => {
-    const current = result[key];
-    if (!current || candidate.finishTimeMs < current.finishTimeMs) {
-      result[key] = candidate;
-    } else if (candidate.finishTimeMs === current.finishTimeMs) {
-      result[key] = { ...current, date: getOldestDateString(current.date, candidate.date) };
-    }
-  });
-  return normalizeBestTimeRecords(result);
-}
-
-function mergeRecordBookBadges(localValue, importedValue) {
-  const local = normalizePlayerBadges(localValue);
-  const imported = normalizePlayerBadges(importedValue);
-  const earned = { ...local.earned };
-  Object.entries(imported.earned).forEach(([id, entry]) => {
-    earned[id] = {
-      earnedAt: getOldestDateString(earned[id]?.earnedAt, entry?.earnedAt)
-    };
-  });
-  return normalizePlayerBadges({ earned });
-}
-
-function mergeRecordBookBadgeStats(localValue, importedValue) {
-  const local = normalizePlayerBadgeStats(localValue);
-  const imported = normalizePlayerBadgeStats(importedValue);
-  const merged = { ...local };
-  Object.keys(createDefaultPlayerBadgeStats()).forEach((key) => {
-    if (key === "version") return;
-    if (key === "partyAwardCategoriesWon" || key === "partyAwardStyleGroups") {
-      const keys = new Set([...Object.keys(local[key] || {}), ...Object.keys(imported[key] || {})]);
-      merged[key] = Object.fromEntries(Array.from(keys).map((id) => [id, Math.max(local[key]?.[id] || 0, imported[key]?.[id] || 0)]));
-    } else if (typeof local[key] === "number" || typeof imported[key] === "number") {
-      merged[key] = Math.max(local[key] || 0, imported[key] || 0);
-    }
-  });
-  return normalizePlayerBadgeStats(merged);
-}
-
-function mergeRecordBookPlayerChallenges(localValue, importedValue) {
-  const local = normalizePlayerChallengeSave(localValue);
-  const imported = normalizePlayerChallengeSave(importedValue);
-  const completed = { ...local.completed };
-  Object.entries(imported.completed).forEach(([challengeId, candidate]) => {
-    const current = completed[challengeId];
-    if (!current) {
-      completed[challengeId] = candidate;
-      return;
-    }
-    const importedIsBetter = candidate.bestScore > current.bestScore;
-    completed[challengeId] = {
-      challengeId,
-      completed: true,
-      bestScore: Math.max(current.bestScore, candidate.bestScore),
-      firstCompletedAt: getOldestDateString(current.firstCompletedAt, candidate.firstCompletedAt),
-      bestDate: importedIsBetter
-        ? candidate.bestDate
-        : (candidate.bestScore === current.bestScore ? getOldestDateString(current.bestDate, candidate.bestDate) : current.bestDate)
-    };
-  });
-  return normalizePlayerChallengeSave({ completed });
-}
-
-function mergeRecordBookGlobalChallenges(localValue, importedValue) {
-  const local = normalizeChallengeSave(localValue);
-  const imported = normalizeChallengeSave(importedValue);
-  const progress = { ...local.progress };
-  Object.entries(imported.progress).forEach(([challengeId, candidate]) => {
-    const current = progress[challengeId];
-    if (!current) {
-      progress[challengeId] = candidate;
-      return;
-    }
-    const candidateRank = [candidate.completed ? 1 : 0, candidate.bestProgressPercent, candidate.bestScore];
-    const currentRank = [current.completed ? 1 : 0, current.bestProgressPercent, current.bestScore];
-    const importedIsBetter = candidateRank.some((value, index) => value > currentRank[index]
-      && candidateRank.slice(0, index).every((prior, priorIndex) => prior === currentRank[priorIndex]));
-    const equal = candidateRank.every((value, index) => value === currentRank[index]);
-    progress[challengeId] = {
-      ...(importedIsBetter ? candidate : current),
-      challengeId,
-      completed: current.completed || candidate.completed,
-      bestCompletionStatus: current.completed || candidate.completed,
-      bestScore: Math.max(current.bestScore, candidate.bestScore),
-      bestProgressPercent: Math.max(current.bestProgressPercent, candidate.bestProgressPercent),
-      bestDate: equal ? getOldestDateString(current.bestDate, candidate.bestDate) : (importedIsBetter ? candidate.bestDate : current.bestDate)
-    };
-  });
-  return normalizeChallengeSave({ progress });
-}
-
-function mergeRecordBookCosmetics(localValue, importedValue) {
-  const local = normalizePlayerCosmetics(localValue);
-  const imported = normalizePlayerCosmetics(importedValue);
-  const owned = { ...local.owned };
-  Object.entries(imported.owned).forEach(([id, entry]) => {
-    if (!owned[id]) owned[id] = entry;
-    else owned[id] = { ...owned[id], ownedAt: getOldestDateString(owned[id].ownedAt, entry?.ownedAt) };
-  });
-  return normalizePlayerCosmetics({ owned, equipped: local.equipped });
-}
-
-function mergeRecordBookRows(localRows, importedRows, normalizeList, keyForEntry, betterEntry) {
-  const merged = new Map();
-  normalizeList(localRows).forEach((entry) => merged.set(keyForEntry(entry), entry));
-  normalizeList(importedRows).forEach((candidate) => {
-    const key = keyForEntry(candidate);
-    const current = merged.get(key);
-    if (!current) {
-      merged.set(key, candidate);
-      return;
-    }
-    const preferred = betterEntry(candidate, current) ? candidate : current;
-    merged.set(key, { ...preferred, date: getOldestDateString(current.date, candidate.date) });
-  });
-  return normalizeList(Array.from(merged.values()));
-}
-
-function mergeRecordBookPayload(localData, importedPayload) {
-  const source = localData && typeof localData === "object" ? localData : {};
-  const beforePayload = buildRecordBookPayload(source);
-  const imported = normalizeRecordBookPayload(importedPayload);
-  const personalBestById = new Map(imported.personalBests.map((entry) => [entry.playerId, entry]));
-  const badgesById = new Map(imported.badges.map((entry) => [entry.playerId, entry]));
-  const challengesById = new Map(imported.challengeProgress.players.map((entry) => [entry.playerId, entry.progress]));
-  const localPlayers = Array.isArray(source.players) ? source.players.map((player) => ({ ...player })) : [];
-  const localPlayerById = new Map(localPlayers.map((player) => [normalizeStorageId(player?.id, ""), player]).filter(([id]) => id));
-  imported.players.forEach((importedPlayer) => {
-    const current = localPlayerById.get(importedPlayer.id);
-    const best = personalBestById.get(importedPlayer.id) || {};
-    const badge = badgesById.get(importedPlayer.id) || {};
-    const challenge = challengesById.get(importedPlayer.id) || createDefaultPlayerChallengeSave();
-    if (!current) {
-      if (localPlayers.length >= LOCAL_PLAYER_MAX_COUNT) return;
-      const next = {
-        ...importedPlayer,
-        bestScore: best.bestScore || 0,
-        bestTimes: normalizeBestTimeRecords(best.bestTimes),
-        badges: normalizePlayerBadges(badge.badges),
-        badgeStats: normalizePlayerBadgeStats(badge.badgeStats),
-        challengeProgress: normalizePlayerChallengeSave(challenge)
-      };
-      localPlayers.push(next);
-      localPlayerById.set(next.id, next);
-      return;
-    }
-    current.neonCash = Math.max(normalizeNeonCashBalance(current.neonCash), importedPlayer.neonCash);
-    current.cosmetics = mergeRecordBookCosmetics(current.cosmetics, importedPlayer.cosmetics);
-    current.bestScore = Math.max(normalizeNonNegativeInteger(current.bestScore), best.bestScore || 0);
-    current.bestTimes = mergeRecordBookBestTimes(current.bestTimes, best.bestTimes);
-    current.badges = mergeRecordBookBadges(current.badges, badge.badges);
-    current.badgeStats = mergeRecordBookBadgeStats(current.badgeStats, badge.badgeStats);
-    current.challengeProgress = mergeRecordBookPlayerChallenges(current.challengeProgress, challenge);
-  });
-  const mergedData = {
-    ...source,
-    players: localPlayers,
-    currentPlayerId: localPlayers.some((player) => player.id === source.currentPlayerId)
-      ? source.currentPlayerId
-      : (localPlayers[0]?.id || null),
-    leaderboard: mergeRecordBookRows(
-      source.leaderboard,
-      imported.leaderboards.official,
-      normalizeLeaderboardList,
-      getRecordBookLeaderboardKey,
-      (candidate, current) => candidate.score > current.score
-        || (candidate.score === current.score && (getEntryFinishTimeMs(candidate) ?? Infinity) < (getEntryFinishTimeMs(current) ?? Infinity))
-    ),
-    playgroundRecords: mergeRecordBookRows(
-      source.playgroundRecords,
-      imported.leaderboards.playground,
-      (rows) => normalizePlaygroundRecordList(rows),
-      getRecordBookPlaygroundKey,
-      (candidate, current) => candidate.score > current.score
-        || (candidate.score === current.score && (getEntryFinishTimeMs(candidate) ?? Infinity) < (getEntryFinishTimeMs(current) ?? Infinity))
-    ),
-    enduranceLeaderboard: mergeRecordBookRows(
-      source.enduranceLeaderboard,
-      imported.leaderboards.endurance,
-      normalizeEnduranceLeaderboardList,
-      getRecordBookEnduranceKey,
-      (candidate, current) => candidate.survivalTime > current.survivalTime
-        || (candidate.survivalTime === current.survivalTime && candidate.postFinishScore > current.postFinishScore)
-    ),
-    challengeProgress: mergeRecordBookGlobalChallenges(source.challengeProgress, imported.challengeProgress.global)
-  };
-  hydratePlayerBestTimesFromLeaderboard(mergedData.players, mergedData.leaderboard);
-  const afterPayload = buildRecordBookPayload(mergedData);
-  const beforeChecksum = calculateRecordBookChecksum(beforePayload);
-  const afterChecksum = calculateRecordBookChecksum(afterPayload);
-  return {
-    data: mergedData,
-    changed: beforeChecksum !== afterChecksum,
-    beforeChecksum,
-    afterChecksum,
-    importedPlayers: imported.players.length,
-    importedRecords: imported.leaderboards.official.length
-      + imported.leaderboards.playground.length
-      + imported.leaderboards.endurance.length
-  };
 }
 
 function normalizePlaytestRunSummary(entry) {
@@ -10584,7 +10013,6 @@ class PlayerProfileManager {
     const improved = !existing || finishTimeMs < existing.finishTimeMs;
     if (improved) {
       player.bestTimes[key] = normalizeBestTimeRecord({
-        gameVersion: summary.gameVersion || GAME_VERSION,
         trackId: summary.trackId,
         raceTypeId: summary.raceTypeId,
         speedClassId: summary.speedClass,
@@ -27955,7 +27383,6 @@ class NeonRoadRally {
     }
     this.profiles = new PlayerProfileManager(STORAGE_KEY);
     this.touchSettings = new TouchSettingsStore(TOUCH_SETTINGS_STORAGE_KEY);
-    this.recordBookMetadata = new RecordBookMetadataStore(RECORD_BOOK_STORAGE_KEY);
     this.playtestReports = new PlaytestReportStore(PLAYTEST_REPORT_STORAGE_KEY);
     this.audio = new AudioManager(this.profiles.data.audio, (settings) => this.profiles.updateAudioSettings(settings));
     this.carSprites = new CarSpriteManager(CAR_BODY_STYLES, () => {
@@ -28000,10 +27427,6 @@ class NeonRoadRally {
     this.leaderboardSpeedClassId = this.profiles.data.speedClassId;
     this.leaderboardOfficialRouteId = defaultOfficialRoute?.id || DEFAULT_OFFICIAL_ROUTE_ID;
     this.playtestReportCopyText = "";
-    this.recordBookStatus = "";
-    this.recordBookManualCopyText = "";
-    this.recordBookCurrentChecksum = "";
-    this.recordBookToolsOpen = false;
     this.lastRunSummaryCopyText = "";
     this.lastRunSummaryStatus = "";
     this.roadDirectorReportCopyText = "";
@@ -30887,7 +30310,6 @@ class NeonRoadRally {
     if (result.endedBy !== "Crash" && result.endedBy !== "Escape") return null;
     const record = this.profiles.recordEnduranceResult({
       runId: summary.runId || officialSummary.runId || run.runId,
-      gameVersion: summary.gameVersion || officialSummary.gameVersion || run.gameVersion || GAME_VERSION,
       playerId: summary.playerId || officialSummary.playerId,
       playerName: summary.playerName || officialSummary.playerName,
       carName: summary.carName || officialSummary.carName,
@@ -30897,7 +30319,6 @@ class NeonRoadRally {
       officialRouteName: summary.officialRouteName || officialSummary.officialRouteName,
       speedClass: summary.speedClass || officialSummary.speedClass,
       raceTypeId: DEFAULT_RACE_TYPE_ID,
-      pacingRulesVersion: summary.pacingRulesVersion || officialSummary.pacingRulesVersion || run.pacingRulesVersion,
       officialSeed: summary.officialSeed || officialSummary.officialSeed,
       seed: summary.seed || officialSummary.seed,
       officialFinishTimeMs: result.officialFinishTimeMs ?? summary.finishTimeMs ?? officialSummary.finishTimeMs,
@@ -32669,7 +32090,6 @@ class NeonRoadRally {
     const skipScoreRecord = Boolean(options.skipScoreRecord || officialEnduranceFinal || deferPartyResultUntilBonusEnd);
     const recordPayload = {
       runId: run.runId,
-      gameVersion: run.gameVersion || GAME_VERSION,
       playerId: player.id,
       playerName: player.name,
       carName: player.car.name,
@@ -32773,7 +32193,6 @@ class NeonRoadRally {
       playgroundTimeGapToNextMs: playgroundTimePlacement?.timeGapToNextMs ?? null,
       playgroundTimeGapToPreviousMs: playgroundTimePlacement?.timeGapToPreviousMs ?? null,
       runId: run.runId,
-      gameVersion: run.gameVersion || GAME_VERSION,
       player: snapshotPartyPlayer(player),
       playerId: player.id,
       playerName: player.name,
@@ -44715,21 +44134,6 @@ class NeonRoadRally {
     ` : officialRoute ? `
       <button class="btn btn--primary btn--lg arcade-primary-action leaderboard-race-action" data-action="raceOfficialRoute" data-official-route-id="${escapeAttr(officialRoute.id)}" data-race-type-id="${escapeAttr(boardFilter.raceTypeId)}">Race This Route</button>
     ` : `<button class="btn btn--primary btn--lg arcade-primary-action leaderboard-race-action" data-action="preRace">Back to Official Race</button>`;
-    const recordBookDocument = createRecordBookDocument(this.profiles.data);
-    const recordBookHasRecords = recordBookPayloadHasRecords(recordBookDocument.payload);
-    const showRecordBookReminder = this.recordBookMetadata?.observe?.(
-      recordBookDocument.checksum,
-      recordBookHasRecords
-    ) || false;
-    this.recordBookCurrentChecksum = recordBookDocument.checksum;
-    const recordBookStatus = this.recordBookStatus || this.profiles.saveStatus;
-    const recordBookManualCopy = this.recordBookManualCopyText ? `
-      <div class="record-book-manual-copy">
-        <label for="recordBookCopyText">Record Book JSON</label>
-        <textarea id="recordBookCopyText" rows="6" readonly>${escapeHtml(this.recordBookManualCopyText)}</textarea>
-        <button class="btn btn--ghost" data-action="copyRecordBookJson">Copy JSON</button>
-      </div>
-    ` : "";
     this.layer.classList.remove("is-empty");
     this.layer.innerHTML = `
       <section class="arcade-page-shell leaderboard-chase-panel leaderboard-arcade-page leaderboard-screen-panel nrr">
@@ -44775,37 +44179,15 @@ class NeonRoadRally {
 
           ${timeExtras}
           ${scoreExtras}
-          ${showRecordBookReminder ? `
-            <aside class="record-book-reminder" aria-label="Record Book backup reminder">
-              <span>Your local records have not been backed up in 30 days.</span>
-              <div class="record-book-reminder-actions">
-                <button class="btn btn--primary" data-action="exportRecordBook">Export Record Book</button>
-                <button class="btn btn--ghost" data-action="dismissRecordBookReminder" aria-label="Dismiss backup reminder">Dismiss</button>
-              </div>
-            </aside>
-          ` : ""}
-          <details class="arcade-tools-panel result-details-block leaderboard-data-tools" ${this.recordBookToolsOpen ? "open" : ""}>
+          <details class="arcade-tools-panel result-details-block leaderboard-data-tools">
             <summary>Data Tools</summary>
-            <div class="record-book-tools">
-              <div class="record-book-tools-copy">
-                <strong>Record Book</strong>
-                <span>Back up or merge local drivers, records, badges, titles, and challenge progress.</span>
-              </div>
-              <div class="record-book-tool-actions">
-                <button class="btn btn--primary" data-action="exportRecordBook">Export JSON</button>
-                <button class="btn btn--ghost" data-action="importRecordBook">Import JSON</button>
-                <input class="record-book-file-input" id="recordBookImportInput" type="file" accept="application/json,.json">
-              </div>
-            </div>
-            <p class="status-line record-book-status" role="status">${escapeHtml(recordBookStatus)}</p>
-            ${recordBookManualCopy}
+            <p class="status-line">${escapeHtml(this.profiles.saveStatus)}</p>
             <button class="danger-button" data-action="resetData">Reset Local Data</button>
           </details>
         </div>
       </section>
     `;
     this.bindLayerButtons();
-    this.bindRecordBookControls();
     document.querySelectorAll('[data-race-type-choice="leaderboard"]').forEach((button) => {
       button.addEventListener("click", () => {
         this.showLeaderboard(activeView, {
@@ -45380,10 +44762,6 @@ class NeonRoadRally {
         else if (action === "buyCosmetic") this.handleBuyCosmetic(button.dataset.id);
         else if (action === "equipCosmetic") this.handleEquipCosmetic(button.dataset.id);
         else if (action === "resetData") this.handleResetData();
-        else if (action === "exportRecordBook") this.handleExportRecordBook();
-        else if (action === "importRecordBook") document.getElementById("recordBookImportInput")?.click();
-        else if (action === "dismissRecordBookReminder") this.handleDismissRecordBookReminder();
-        else if (action === "copyRecordBookJson") this.handleCopyRecordBookJson();
         else if (action === "copyLastRunSummary") this.handleCopyLastRunSummary();
         else if (action === "copyPlaytestReport") this.handleCopyPlaytestReport();
         else if (action === "copyFeedbackReport") this.handleCopyFeedbackReport();
@@ -45679,170 +45057,6 @@ class NeonRoadRally {
     this.audio.setMusicMuted(false);
     this.audio.setSfxMuted(false);
     this.showTitle();
-  }
-
-  getRecordBookLeaderboardOptions() {
-    return {
-      trackId: this.leaderboardTrackId,
-      raceTypeId: this.leaderboardRaceTypeId,
-      speedClassId: this.leaderboardSpeedClassId,
-      officialRouteId: this.leaderboardOfficialRouteId
-    };
-  }
-
-  refreshRecordBookTools(status = "") {
-    this.recordBookStatus = status;
-    this.recordBookToolsOpen = true;
-    this.showLeaderboard(this.leaderboardView, this.getRecordBookLeaderboardOptions());
-  }
-
-  bindRecordBookControls() {
-    const tools = this.layer.querySelector("details.leaderboard-data-tools");
-    if (tools) {
-      tools.addEventListener("toggle", () => {
-        this.recordBookToolsOpen = tools.open;
-      });
-    }
-    const input = document.getElementById("recordBookImportInput");
-    if (!input) return;
-    input.addEventListener("change", async () => {
-      const file = input.files?.[0] || null;
-      input.value = "";
-      if (file) await this.handleImportRecordBookFile(file);
-    });
-    const copyText = document.getElementById("recordBookCopyText");
-    if (copyText) {
-      copyText.addEventListener("focus", () => copyText.select());
-    }
-  }
-
-  isAppleTouchDevice() {
-    if (typeof navigator === "undefined") return false;
-    return /iPad|iPhone|iPod/i.test(navigator.userAgent || "")
-      || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
-  }
-
-  getRecordBookExport() {
-    const documentValue = createRecordBookDocument(this.profiles.data);
-    return {
-      document: documentValue,
-      text: `${JSON.stringify(documentValue, null, 2)}\n`,
-      fileName: `neon-road-rally-record-book-${new Date().toISOString().slice(0, 10)}.json`
-    };
-  }
-
-  downloadRecordBookFile(text, fileName) {
-    const blob = new Blob([text], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
-    const anchor = document.createElement("a");
-    anchor.href = url;
-    anchor.download = fileName;
-    anchor.hidden = true;
-    document.body.appendChild(anchor);
-    anchor.click();
-    anchor.remove();
-    window.setTimeout(() => URL.revokeObjectURL(url), 0);
-  }
-
-  async copyRecordBookText(text) {
-    if (!navigator.clipboard || typeof navigator.clipboard.writeText !== "function") {
-      throw new Error("Clipboard API unavailable");
-    }
-    await navigator.clipboard.writeText(text);
-  }
-
-  async handleExportRecordBook() {
-    const exportValue = this.getRecordBookExport();
-    try {
-      if (this.isAppleTouchDevice()) {
-        const file = typeof File === "function"
-          ? new File([exportValue.text], exportValue.fileName, { type: "application/json" })
-          : null;
-        let canShareFile = Boolean(file && typeof navigator.share === "function" && !navigator.canShare);
-        if (file && typeof navigator.share === "function" && navigator.canShare) {
-          try {
-            canShareFile = navigator.canShare({ files: [file] });
-          } catch (error) {
-            canShareFile = false;
-          }
-        }
-        if (canShareFile) {
-          try {
-            await navigator.share({
-              title: "Neon Road Rally Record Book",
-              text: "Neon Road Rally local Record Book backup",
-              files: [file]
-            });
-            this.recordBookMetadata.markExported(exportValue.document.checksum);
-            this.recordBookManualCopyText = "";
-            this.refreshRecordBookTools("Record Book shared and marked as backed up.");
-            return;
-          } catch (error) {
-            if (error?.name === "AbortError") throw error;
-          }
-        }
-        await this.copyRecordBookText(exportValue.text);
-        this.recordBookMetadata.markExported(exportValue.document.checksum);
-        this.recordBookManualCopyText = "";
-        this.refreshRecordBookTools("Record Book JSON copied to the clipboard and marked as backed up.");
-        return;
-      }
-      this.downloadRecordBookFile(exportValue.text, exportValue.fileName);
-      this.recordBookMetadata.markExported(exportValue.document.checksum);
-      this.recordBookManualCopyText = "";
-      this.refreshRecordBookTools("Record Book JSON downloaded and marked as backed up.");
-    } catch (error) {
-      if (error?.name === "AbortError") {
-        this.refreshRecordBookTools("Record Book export canceled.");
-        return;
-      }
-      this.recordBookManualCopyText = exportValue.text;
-      this.refreshRecordBookTools("Automatic export was unavailable. Use the manual JSON box below.");
-    }
-  }
-
-  async handleCopyRecordBookJson() {
-    const exportValue = this.getRecordBookExport();
-    const text = this.recordBookManualCopyText || exportValue.text;
-    try {
-      await this.copyRecordBookText(text);
-      this.recordBookMetadata.markExported(exportValue.document.checksum);
-      this.recordBookManualCopyText = "";
-      this.refreshRecordBookTools("Record Book JSON copied to the clipboard and marked as backed up.");
-    } catch (error) {
-      this.recordBookManualCopyText = text;
-      this.refreshRecordBookTools("Clipboard copy failed. Select the JSON in the box and copy it manually.");
-    }
-  }
-
-  async handleImportRecordBookFile(file) {
-    try {
-      if (!file || file.size > RECORD_BOOK_MAX_BYTES) throw new Error("Record Book file is too large.");
-      const text = await file.text();
-      const validated = validateRecordBookDocument(text);
-      const merged = mergeRecordBookPayload(this.profiles.data, validated.payload);
-      if (!merged.changed) {
-        this.recordBookManualCopyText = "";
-        this.refreshRecordBookTools("No changes: this Record Book is already merged.");
-        return;
-      }
-      const previousData = this.profiles.data;
-      this.profiles.data = merged.data;
-      if (!this.profiles.save()) {
-        this.profiles.data = previousData;
-        throw new Error("The merged Record Book could not be saved in this browser.");
-      }
-      this.recordBookMetadata.observe(merged.afterChecksum, recordBookPayloadHasRecords(buildRecordBookPayload(merged.data)));
-      this.recordBookManualCopyText = "";
-      this.refreshRecordBookTools(`Record Book merged: ${merged.importedPlayers} drivers and ${merged.importedRecords} records scanned.`);
-    } catch (error) {
-      this.refreshRecordBookTools(error?.message || "Record Book import failed.");
-    }
-  }
-
-  handleDismissRecordBookReminder() {
-    this.recordBookMetadata.dismiss(this.recordBookCurrentChecksum);
-    this.refreshRecordBookTools("Backup reminder dismissed until records change again.");
   }
 
   async handleCopyLastRunSummary() {

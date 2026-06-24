@@ -71,10 +71,6 @@ Use a current desktop browser and a local static server.
 15. Touch boost and pause use the same behavior as Space and Esc.
 16. Portrait touch viewports show the rotate-device screen.
 17. The manifest reports standalone display and landscape orientation.
-18. Leaderboards → Data Tools exports a Record Book JSON file with schema version and checksum.
-19. Importing that file into a clean browser reproduces the same drivers, records, personal bests, badges, titles, and challenge progress.
-20. Re-importing the same Record Book reports no changes.
-21. Editing the exported payload without updating its checksum is rejected without changing local data.
 
 ## localStorage Note
 
@@ -85,8 +81,6 @@ neonRoadRally.v1
 ```
 
 Touch display and steering preferences are stored separately under `neonRoadRally.touch.v1`. Touch settings must never mutate the `neonRoadRally.v1` schema.
-
-Record Book backup dates and checksums are stored separately under `neonRoadRally.recordBook.v1`. Record Book JSON imports must merge with, never replace, `neonRoadRally.v1`; enforce existing scan/storage caps; and reject unknown schema versions or checksum mismatches before saving.
 
 The game should recover if that key is missing, corrupted, oversized, or contains unexpected value types. Local leaderboard entries are capped to Top 20, local player names are capped to 20 characters, local car names are capped to 24 characters, and manual seeds normalize to uppercase seed text capped at 32 characters.
 
